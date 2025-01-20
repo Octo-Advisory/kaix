@@ -11,7 +11,7 @@ createRoot(document.getElementById('root')).render(
     <FrappeProvider >
     <Provider store={store}>
       <App />
-    </Provider>,
+    </Provider>
     </FrappeProvider>
-  </StrictMode>,
+  </StrictMode>
 )

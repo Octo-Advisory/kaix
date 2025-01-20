@@ -7,11 +7,11 @@ import Failure from '../Failure/Failure';
 
 function ProgressScreen() {
   const messages = [
-    { text: "Finding best lands", status: "Success" },
-    { text: "Finding nearest locations", status: "Success" },
-    { text: "Searching vendors nearby", status: "Success" },
-    { text: "Finding zones", status: "Success" },
-    { text: "Merging matches", status: "Success" }
+    { text: "Finding best lands", status: "Processing" },
+    { text: "Finding nearest locations", status: "Pending" },
+    { text: "Searching vendors nearby", status: "Pending" },
+    { text: "Finding zones", status: "Pending" },
+    { text: "Merging matches", status: "Pending" }
   ];
   
   const [showFailure, setShowFailure] = useState(false);
