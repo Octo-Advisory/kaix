@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { AiOutlineClear, AiOutlineSend } from 'react-icons/ai'; // React Icons
 import { FiSend } from 'react-icons/fi';
 import { useDispatch, useSelector } from 'react-redux';
@@ -11,7 +11,7 @@ import '../Chatscreen/Chatscreen.css';
 import userIcon from '../../assets/user.png'
 import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
-import { useFrappeCreateDoc } from 'frappe-react-sdk'
+import { FrappeContext, useFrappeCreateDoc, useFrappeGetCall } from 'frappe-react-sdk'
 import ProgressScreen from '../ProgressScreen/ProgressScreen'
 
 function Chatscreen() {
@@ -19,14 +19,19 @@ function Chatscreen() {
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.chat.messages);
   const chatId = useSelector((state) => state.chat.chatID);
-  const { fetchAIResponse } = useAIResponse();
+  // const { fetchAIResponse } = useAIResponse();
   const [loading, setLoading] = useState(false);
+  const [dataloading, setDataloading] = useState(false);
   const [disabled, setDisabled] = useState(false);
+  const [showerror, setShowerror] = useState(null);
   const { createDoc, isLoading, error } = useFrappeCreateDoc('');
   const [partialResponse, setPartialResponse] = useState('');
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const [isProgressVisible, setIsProgressVisible] = useState(false);
+
+  //Create frappe context to call apis
+  const {call} = useContext(FrappeContext)
 
   const createSessionid = () => {
     const nowTime = new Date();
@@ -34,6 +39,21 @@ function Chatscreen() {
     const doc = { time: formattedTime };
     createDoc("testing", doc).then((resp) => dispatch(addChatId(resp.name)));
   }
+
+  const fetchAIResponse = async (message) => {
+    try {
+      const result = await call.get("frontend_app.Management_Class.AI.ai_module_call", {
+        input: message,
+      });
+      console.log("message",result);
+      
+      return result.message;  // Return the result so that the calling function gets it.
+    } catch (err) {
+      console.log("error occurred 😂", err);
+      throw err;  // Rethrow the error if you want to catch it in the caller function.
+    }
+  };
+  
 
   const storeChatInChildTable = async () => {
     const messageLength = messages.length
@@ -68,25 +88,29 @@ function Chatscreen() {
         timestamp: new Date().toISOString(),
       };
 
-      if (messages.length === 0 && !chatId) {
-        createSessionid();
-      }
+      // if (messages.length === 0 && !chatId) {
+      //   createSessionid();
+      // }
 
       dispatch(addMessage(newUserMessage));
       setMessage('');
       setLoading(true)
-      setDisabled(true)
+      // setDisabled(true)
 
-      if (message.toLowerCase() === 'ok') {
-        setConfirmationMessage('Are you sure you want to proceed?');
-        setConfirmationPending(true);
-        setLoading(false);
-        setDisabled(true);
-        return;
-      }
+      // if (message.toLowerCase() === 'ok') {
+      //   setConfirmationMessage('Are you sure you want to proceed?');
+      //   setConfirmationPending(true);
+      //   setLoading(false);
+      //   setDisabled(true);
+      //   return;
+      // }
 
-      const aiResponse = await fetchAIResponse(message);
-
+      const resp = await fetchAIResponse(message);
+      console.log("ai response is",resp);
+      const aiResponse = resp.Ai_response
+      console.log("reponse is",aiResponse);
+      
+      
       let index = -1;
       setLoading(false)
       const typingInterval = setInterval(() => {
@@ -133,9 +157,9 @@ function Chatscreen() {
     }
   };
 
-  useEffect(() => {
-    storeChatInChildTable();
-  }, [messages])
+  // useEffect(() => {
+  //   storeChatInChildTable();
+  // }, [messages])
 
   const ref = useChatScroll(messages);
 

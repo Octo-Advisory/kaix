@@ -4,6 +4,7 @@ import logo2 from '../../assets/logo2.png'; // Company logo
 import marsBg from '../../assets/mars-bg.jpg'; // Background image
 import Chatscreen from '../Chatscreen/Chatscreen';
 import ProgressScreen from '../ProgressScreen/ProgressScreen';
+import TestComponent from '../TestComponent/TestComponent';
 
 function Home() {
   const [stage, setStage] = useState(1);
@@ -36,12 +37,9 @@ function Home() {
         <img src={logo2} alt="" className='logo h-56 w-full relative'/>
       </div>
     </div>):(<Chatscreen />)}
-      
+      {/* <TestComponent/> */}
     </>
   );
 }
 
 export default Home;
-
-
-{/* <Chatscreen /> */}
