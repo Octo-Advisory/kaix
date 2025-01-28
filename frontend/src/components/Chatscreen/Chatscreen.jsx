@@ -13,12 +13,14 @@ import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
 import { FrappeContext, useFrappeCreateDoc, useFrappeGetCall } from 'frappe-react-sdk'
 import ProgressScreen from '../ProgressScreen/ProgressScreen'
+import { addAIresponse } from '../../Redux/Store/Featuresilces/aiResponse';
 
 function Chatscreen() {
   const [message, setMessage] = useState('');
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.chat.messages);
   const chatId = useSelector((state) => state.chat.chatID);
+  // const aiResponse = useSelector((state) => state.aiResponse.aiReponse)
   // const { fetchAIResponse } = useAIResponse();
   const [loading, setLoading] = useState(false);
   const [dataloading, setDataloading] = useState(false);
@@ -37,13 +39,14 @@ function Chatscreen() {
     const nowTime = new Date();
     const formattedTime = `${nowTime.getFullYear()}-${String(nowTime.getMonth() + 1).padStart(2, '0')}-${String(nowTime.getDate()).padStart(2, '0')} ${String(nowTime.getHours()).padStart(2, '0')}:${String(nowTime.getMinutes()).padStart(2, '0')}:${String(nowTime.getSeconds()).padStart(2, '0')}`;
     const doc = { time: formattedTime };
-    createDoc("testing", doc).then((resp) => dispatch(addChatId(resp.name)));
+    createDoc("Session", doc).then((resp) => dispatch(addChatId(resp.name)));
   }
 
   const fetchAIResponse = async (message) => {
     try {
       const result = await call.get("frontend_app.Management_Class.AI.ai_module_call", {
         input: message,
+        chatId: chatId
       });
       console.log("message",result);
       
@@ -68,11 +71,11 @@ function Chatscreen() {
           user: messages[uin]['text'],
           ai: messages[ain]['text'],
           parent: chatId,
-          parentfield: "chats",
-          parenttype: "testing",
+          parentfield: "chat_history",
+          parenttype: "Session",
         };
         try {
-          await createDoc("Chats", chatDoc);
+          await createDoc("Chat history", chatDoc);
         } catch (error) {
           console.error('Error saving to child table:', error);
         }
@@ -88,28 +91,46 @@ function Chatscreen() {
         timestamp: new Date().toISOString(),
       };
 
-      // if (messages.length === 0 && !chatId) {
-      //   createSessionid();
-      // }
+      if (messages.length === 0 && !chatId) {
+        createSessionid();
+      }
 
       dispatch(addMessage(newUserMessage));
       setMessage('');
       setLoading(true)
       // setDisabled(true)
 
-      // if (message.toLowerCase() === 'ok') {
-      //   setConfirmationMessage('Are you sure you want to proceed?');
-      //   setConfirmationPending(true);
-      //   setLoading(false);
-      //   setDisabled(true);
-      //   return;
-      // }
-
       const resp = await fetchAIResponse(message);
       console.log("ai response is",resp);
       const aiResponse = resp.Ai_response
       console.log("reponse is",aiResponse);
-      
+
+      if (resp.Is_confirmation) {
+        const aiResponse1 = "Waiting For Confirmation"
+        let index = -1;
+        setLoading(false)
+        const typingInterval = setInterval(() => {
+          setPartialResponse((prev) => prev + aiResponse1.charAt(index));
+          index++;
+          if (index >= aiResponse.length) {
+            clearInterval(typingInterval);
+            const newAIMessage = {
+              sender: 'ai',
+              text: aiResponse1,
+              timestamp: new Date().toISOString(),
+            };
+            dispatch(addMessage(newAIMessage));
+            setPartialResponse(''); // Clear partial response
+            setDisabled(false);
+          }
+        }, 5);
+          dispatch(addAIresponse(resp))
+          setConfirmationMessage(aiResponse);
+          setConfirmationPending(true);
+          setLoading(false);
+          // setDisabled(true);
+          return;
+        }
       
       let index = -1;
       setLoading(false)
@@ -142,24 +163,37 @@ function Chatscreen() {
     };
     dispatch(addMessage(confirmationMessage));
 
-    const newAIMessage = {
-      sender: 'ai',
-      text: "Thank you for response",
-      timestamp: new Date().toISOString(),
-    };
-    dispatch(addMessage(newAIMessage));
-    setDisabled(false);
+    // const newAIMessage = {
+    //   sender: 'ai',
+    //   text: "Thank you for response",
+    //   timestamp: new Date().toISOString(),
+    // };
+    // dispatch(addMessage(newAIMessage));
+    // setDisabled(false);
 
     if(response == 'yes'){
+      const newAIMessage = {
+        sender: 'ai',
+        text: "Thank you for response",
+        timestamp: new Date().toISOString(),
+      };
+      dispatch(addMessage(newAIMessage));
       setTimeout(() => {
         setIsProgressVisible(true)
       }, 1000);
+    }else{
+      const newAIMessage = {
+        sender: 'ai',
+        text: "Alright! If you ever feel like chatting or need help, just let me know.",
+        timestamp: new Date().toISOString(),
+      };
+      dispatch(addMessage(newAIMessage));
     }
   };
 
-  // useEffect(() => {
-  //   storeChatInChildTable();
-  // }, [messages])
+  useEffect(() => {
+    storeChatInChildTable();
+  }, [messages])
 
   const ref = useChatScroll(messages);
 

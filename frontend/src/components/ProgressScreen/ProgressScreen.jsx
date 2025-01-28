@@ -1,49 +1,140 @@
-import React, { useEffect,useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { AiOutlineClear, AiOutlineSend } from 'react-icons/ai'; // React Icons
 import '../ProgressScreen/ProgressScreen.css';
 import check from '../../assets/check.png';
 import Confirmation from '../Confirmation/Confirmation';
 import Failure from '../Failure/Failure';
+import { FrappeContext, useFrappeDocTypeEventListener, useFrappeDocumentEventListener, useFrappeEventListener, useFrappeGetDoc, useFrappeGetDocList, useSWRConfig } from 'frappe-react-sdk';
+import { useDispatch, useSelector } from 'react-redux';
+import { Tuple } from '@reduxjs/toolkit';
+import Solutionscreen from '../SolutionScreen/Solutionscreen';
 
 function ProgressScreen() {
-  const messages = [
-    { text: "Finding best lands", status: "Processing" },
-    { text: "Finding nearest locations", status: "Pending" },
-    { text: "Searching vendors nearby", status: "Pending" },
-    { text: "Finding zones", status: "Pending" },
-    { text: "Merging matches", status: "Pending" }
-  ];
+
+  const { call } = useContext(FrappeContext);
+  const aiResponse = useSelector((state) => state.ai.aiReponse);
+  const chatId = useSelector((state) => state.chat.chatID);
+  const [messages, setMessages] = useState([]);
+  const [showfailure, setShowfailure] = useState(false);
+  const [allsuccess, setAllsuccess] = useState(false);
+  const [result, setresult] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [intervalId, setIntervalId] = useState(null);
+
+  const fetchAnalyticsResponse = async (aiReponse) => {
+    try {
+      const result = await call.get("frontend_app.Management_Class.Analytics.analytics_module_call", { aiReponse: aiReponse,chatId:chatId });
+      console.log("analytics message", result);
+      setresult(result.message)
+      // return result.message;  // Return the result so that the calling function gets it.
+    } catch (err) {
+      console.log("error occurred 😂", err);
+      throw err;  // Rethrow the error if you want to catch it in the caller function.
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      const response = await fetch(`api/resource/Session?fields=["progress.process_name","progress.process_value","progress.status","progress.modified"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
+        method: 'GET',
+        headers: {
+          // 'Authorization': 'token your_api_token', // Replace with actual token
+          'Content-Type': 'application/json'
+        }
+      });
   
-  const [showFailure, setShowFailure] = useState(false);
+      // Check if the response is OK
+      if (!response.ok) {
+        throw new Error(`Error: ${response.statusText}`);
+      }
+  
+      const data = await response.json();
+      console.log("data is",data);
+      setMessages(data.data)
+      // Optionally, store it in your state or handle further logic
+    } catch (error) {
+      console.error('Error fetching data:', error); // Handles errors
+    }
+  }
+
+  // useEffect(() => {
+  //   // Start the interval only if no failures and not all are complete
+  //   if (!showfailure && !allsuccess) {
+  //     const interval = setInterval(() => {
+  //       fetchData(); // Fetch data every second
+  //     }, 1000);
+  
+  //     // Cleanup the interval when conditions change or component unmounts
+  //     return () => clearInterval(interval);
+  //   }
+  // }, [showfailure, allsuccess, messages]);
+
+  // useEffect(()=>{
+  //   console.log("new use effect call");
+  //   fetchData()
+  // },[])
 
   useEffect(() => {
-    // Check if any message has a status of 'Fail'
-    
-    if (hasFailure) {
-      // Set a timeout to show the Failure component
-      const timeout = setTimeout(() => {
-        setShowFailure(true);
-      }, 3000); // 3 seconds delay
-      
-      // Cleanup timeout on component unmount or dependency change
-      return () => clearTimeout(timeout);
+    console.log("ai response is in progress", aiResponse);
+    if (aiResponse && aiResponse.length > 0) {
+      try {
+        fetchAnalyticsResponse(aiResponse[0]);
+      } catch (error) {
+        console.error("An error occurred:", error.message);
+      }
+    } else {
+      console.error("aiResponse is either null or empty");
     }
-  }, [messages]);
-  const hasFailure = messages.some((msg) => msg.status === 'Fail');
-  const allSuccess = messages.every((msg) => msg.status === 'Success');
+  }, []);
 
+  useEffect(()=>{
+    console.log("message is",messages);
+    
+    if (messages) {
+      const noPending = messages.some((msg)=>msg.status !== 'Pending')
+      console.log("no prnding",noPending);
+      console.log("loading",loading);
+      if(noPending) setLoading(false)
+      const allSuccess = messages.every((msg) => msg.status === 'Complete');
+      setAllsuccess(allSuccess);
+      const hasFailure = messages.some((msg) => msg.status === 'Fail');
+      setShowfailure(hasFailure);
+    }
+  },[messages])
+
+  const { data, mutate } = useFrappeGetDocList("Session", {
+    fields: ["progress.process_value", "progress.status","progress.modified"],
+    filters: [["name", "=", chatId]],
+    orderBy: { field: "modified", order: "asc" }
+  });
+    
+     useFrappeEventListener("progress_update", async (eventData) => {
+      console.log("Event triggered, event data:", eventData);
+      await mutate()
+      console.log("Data refetched after event trigger.");
+    });
+
+    useEffect(() => {
+      if (data) {
+        setMessages(data)
+        console.log("Updated data after mutate:", data);
+      }
+    }, [data]);
+  
   return (
     <div className="overflow-auto bg-white rounded-lg shadow-inner flex justify-center items-center h-[90%] w-[80%] relative shadow-mg">
-      {showFailure ? (
+      {loading ? (
+        <div className="loading-indicator">Loading...</div> // Add a loading indicator here
+      ) : showfailure ? (
         <Failure /> // Render the Failure component if a message has a status of 'Fail'
-      ) : allSuccess ? (
-        <Confirmation />
-      ) :(
+      ) : allsuccess ? (
+        <Confirmation result = {result}/>
+      ) : (
         <div className="progress-container flex flex-col items-start w-[80%] self-center justify-self-center mb-2 gap-8 h-auto sm:w-[60%] sm:pl-10 md:pl-32 lg:pl-36 md:w-[60%]  p-5 relative custom-top">
-          {messages.map((msg, index) => (
+          {messages?.map((msg, index) => (
             <div
               className={`progress-step ${
-                msg.status === 'Success'
+                msg.status === 'Complete'
                   ? 'toshow'
                   : msg.status === 'Processing'
                   ? 'toshow'
@@ -60,7 +151,7 @@ function ProgressScreen() {
     relative transition-all duration-300 ease-in-out 
     shrink-0 
     ${
-      msg.status === 'Success'
+      msg.status === 'Complete'
         ? 'completed'
         : msg.status === 'Processing'
         ? 'loading'
@@ -69,7 +160,7 @@ function ProgressScreen() {
         : ''
     }`}
                 >
-                  {msg.status === 'Success' ? (
+                  {msg.status === 'Complete' ? (
                     <span className="tick">
                       <img src={check} className="check" />
                     </span>
@@ -83,14 +174,14 @@ function ProgressScreen() {
                 <div className="step-text-container">
                   <span
                     className={`step-text text-base sm:text-md md:text-xl lg:text-2xl xl:text-3xl ${
-                      msg.status === 'Success'
+                      msg.status === 'Complete'
                         ? 'completed-text'
                         : msg.status === 'Processing'
                         ? 'active-text'
                         : ''
                     }`}
                   >
-                    {msg.text}
+                    {msg.process_value}
                   </span>
                 </div>
               </div>
@@ -98,6 +189,7 @@ function ProgressScreen() {
           ))}
         </div>
       )}
+      {/* {loading ? (<div className="loading-indicator">Loading...</div>):(<Solutionscreen result={messages}/>)} */}
     </div>
   );
 }

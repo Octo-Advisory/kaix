@@ -6,45 +6,52 @@ from langchain_groq import ChatGroq
 # from langchain_openai import ChatOpenAI
 
 # load_dotenv()
-groq_api_key = "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"
+groq_api_key = "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"
 # openai_key = os.getenv("OPENAI_API_KEY")
 
 # Initialize LLM    
-llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.1-70b-versatile", temperature=0.0)
-llm_8b_inst=ChatGroq(groq_api_key=groq_api_key,model_name="llama-3.1-8b-instant", temperature=0.0)
+llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.0)
+llm_70b_vers_creative = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.7)
+llm_8b_inst=ChatGroq(groq_api_key=groq_api_key,model_name="llama-3.3-8b-instant", temperature=0.0)
 # llm_openai = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_mini = ChatOpenAI(model="gpt-4o-mini", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_4o = ChatOpenAI(model="gpt-4o", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_4 = ChatOpenAI(model="gpt-4", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_3_5 = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0.0, api_key=openai_key)
 
-# Define retriever prompt
-retriever_prompt_template = """ 
-Given the chat history and the latest user question, which might reference context in the chat history, 
-formulate a standalone user query that incorporates only the explicit details provided by the user. 
-Use the AI's messages for context only to understand the user's intent better, but do not take examples or suggestions from AI responses as the user's actual input unless the user explicitly agrees or repeats them.
-
-Instructions:
-1. Only return the reformulated standalone query without any explanations, comments, or additional text.
-2. Ensure the reformulated query is concise, clear, and captures the user's intent as accurately as possible.
-3. Do not include any context, AI responses, or unrelated information in the output. Only provide the standalone query.
-
-Chat History:
-{history}
-
-Latest User Question:
-{latest_query}
-
-Reformulated Standalone Query:
-"""
-
 # Define a function to refine the query using history
-def refine_query_with_history(history, latest_query):
+def refine_query_with_history(history, latest_query, llm=llm_70b_vers):
+    # Define retriever prompt
+    retriever_prompt_template = """  
+    Given the chat history and the latest user input, reformulate a standalone query that maintains the intent and structure of the latest user input.  
+    Use the AI's messages for context only to understand the user's intent better, but do not take examples or suggestions from AI responses as the user's actual input unless the user explicitly agrees or repeats them.  
+
+    Instructions:  
+    1. Preserve the original structure of the user input.  
+    - If the user’s latest input is a statement, the reformulated query must remain a statement.  
+    - If the user’s latest input is a question, the reformulated query must remain a question.  
+    2. If the latest user input is completely different and unrelated to the past conversation, return it as-is without modification.  
+    3. If the latest user input is related to the past conversation, refine it by integrating relevant details from the chat history while ensuring clarity.  
+    4. Strictly do not infer or carry forward any industries or products from past AI responses unless the user explicitly acknowledges, agrees to, or repeats those industries or products in their latest input.  
+    5. Strictly do not infer or carry forward any industries or products from past user inputs unless they are explicitly mentioned in the latest user input.  
+    6. If the latest user input mentions only one industry or product, ensure only that industry or product appears in the reformulated query.  
+    - Do not include multiple industries or products unless the user explicitly mentions multiple ones in their latest query.  
+    7. Do not add any explanations, reasoning, or justifications in the reformulated standalone query. The output must be a clean and direct reformulation of the user’s intent without unnecessary elaboration.  
+
+    Chat History:  
+    {history}  
+
+    Latest User Input:  
+    {latest_query}  
+
+    Reformulated Standalone Query:  
+    """
+    
     prompt = PromptTemplate(
         input_variables=["history", "latest_query"],
         template=retriever_prompt_template
     )
-    chain = prompt | llm_70b_vers
+    chain = prompt | llm
     refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
     refined_text = refined_query.content.strip()
     
