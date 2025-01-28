@@ -11,13 +11,13 @@ logging.basicConfig(
 )
 
 @frappe.whitelist(allow_guest=True)
-def ai_module_call(input):
+def ai_module_call(input,chatId):
     logging.info(f"input {input}")
     # category = classify_query(input)
     # logging.info(f"category {category}")
     # if category == 'Query to Get Employee Search':
     try:
-        response = call_handle_employment_query(input)
+        response = call_handle_employment_query(input,chatId)
         return response
     except Exception as e:
         response = {

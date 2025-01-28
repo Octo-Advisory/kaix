@@ -2,12 +2,11 @@ import json
 import frappe
 import pickle
 
-def save_chat(chat_history):
-    # redis_conn = frappe.cache().client
-    frappe.cache.set("chat_history", pickle.dumps(chat_history))
+def save_chat(chat_history,chatId):
+    frappe.cache.set(chatId, pickle.dumps(chat_history))
 
 def delete_chat(key):
-    frappe.cache.delete("chat_history")
+    frappe.cache.delete(key)
 
 def get_chat(key):
     # Fetch the cached value
@@ -20,7 +19,6 @@ def get_chat(key):
             return original_value
         except Exception as e:
             # Handle potential deserialization errors
-            frappe.log_error(f"Error deserializing cached value for key {key}: {e}")
             return None
     else:
         return None
