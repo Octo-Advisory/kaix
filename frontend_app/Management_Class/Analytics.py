@@ -31,7 +31,6 @@ def analytics_module_call(aiReponse,chatId):
             result = {"error": "Unknown user intention"}
             return result
        
-
     except Exception as e:
         logging.error(f"Unexpected error: {e}")
         return {"error": f"An error occurred: {str(e)}"}

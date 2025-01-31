@@ -6,7 +6,7 @@ from langchain_groq import ChatGroq
 # from langchain_openai import ChatOpenAI
 
 # load_dotenv()
-groq_api_key = "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"
+groq_api_key = "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"
 # openai_key = os.getenv("OPENAI_API_KEY")
 
 # Initialize LLM    

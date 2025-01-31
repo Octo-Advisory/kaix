@@ -1,61 +1,80 @@
-import React, { useState, useEffect } from "react";
-import { useFrappeEventListener, useFrappeGetDocList } from "frappe-react-sdk";
+import React, { useState, useContext } from "react";
+import { FrappeContext } from "frappe-react-sdk";
 
-function TestComponent() {
-  const [first, setFirst] = useState(false);
-  // const [data, setData] = useState(null); // Store data in local state
-  const [error, setError] = useState(null);
+function ChatScreen() {
+  const { call } = useContext(FrappeContext);
+  const [messages, setMessages] = useState([]); // Store chat messages
+  const [userInput, setUserInput] = useState(""); // User input
 
-  const {data,mutate} = useFrappeGetDocList("Session",{
-     fields : ["progress.process_value","progress.status"],
-     filters : [["name","=","s10t518787"]]
-   })
+  const handleSendMessage = async () => {
+    if (!userInput.trim()) return; // Prevent sending empty messages
 
-  // const fetchData = async () => {
-  //   try {
-  //     const response = await fetch('/api/resource/Session?fields=["progress.process_name","progress.process_value","progress.status"]', {
-  //       method: 'GET',
-  //       headers: {
-  //         // 'Authorization': 'token your_api_token', // Replace with actual token
-  //         'Content-Type': 'application/json'
-  //       }
-  //     });
-  
-  //     // Check if the response is OK
-  //     if (!response.ok) {
-  //       throw new Error(`Error: ${response.statusText}`);
-  //     }
-  
-  //     const data = await response.json();
-  //     console.log("data is",data);
-  //     // Optionally, store it in your state or handle further logic
-  //   } catch (error) {
-  //     console.error('Error fetching data:', error); // Handles errors
-  //   }
-  // }
+    const userMessage = { sender: "user", text: userInput };
+    setMessages((prev) => [...prev, userMessage]); // Add user message to chat
+    setUserInput("");
 
-  useFrappeEventListener("progress_update",(eventData)=>{
-    console.log(eventData);
-    mutate()
-  })
+    try {
+      
+      const response = await call.get(
+        "frontend_app.Management_Class.Ai_management.build.build_from_scratch",
+        { input: userInput } // Pass user input to the call method
+      );
+      console.log("response is",response.message);
+      
+      const aiMessage = { sender: "ai", text: response.message['Ai_response'] || "No response" };
+      setMessages((prev) => [...prev, aiMessage]); // Add AI response to chat
+    } catch (err) {
+      console.error("Error occurred:", err);
+      const errorMessage = { sender: "ai", text: "Error processing your request." };
+      setMessages((prev) => [...prev, errorMessage]);
+    }
+  };
 
-  console.log("data is",data);
-  
-    // useEffect(()=>{
-    //   fetchData()
-    //   const interval = setInterval(fetchData, 1000);
-
-    // // Cleanup interval on component unmount
-    // return () => clearInterval(interval);
-    // })
   return (
-    <div>
-      <h1>Chat Screen</h1>
-      {/* <p>First state value (toggled every second): {first.toString()}</p>
-      <p>Data: {JSON.stringify(data)}</p>
-      {error && <p>Error: {error.message}</p>} */}
+    <div className="flex flex-col items-center justify-center w-full h-screen bg-gray-100">
+      <div className="flex flex-col w-[70%] h-[70%] bg-white shadow-lg rounded-lg overflow-hidden">
+        {/* Chat Messages */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={`flex my-2 ${
+                message.sender === "user" ? "justify-end" : "justify-start"
+              }`}
+            >
+              <div
+                className={`p-2 rounded-lg max-w-[50%] ${
+                  message.sender === "user"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-black"
+                }`}
+              >
+                {message.text}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Input and Send Button */}
+        <div className="flex items-center p-4 border-t">
+          <input
+            type="text"
+            className="flex-1 border rounded-lg px-4 py-2 mr-2 focus:outline-none"
+            placeholder="Type your message..."
+            value={userInput}
+            onChange={(e) => setUserInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+          />
+          <button
+            onClick={handleSendMessage}
+            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+          >
+            Send
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-export default TestComponent;
+export default ChatScreen;

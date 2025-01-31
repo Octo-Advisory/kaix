@@ -22,3 +22,16 @@ def get_chat(key):
             return None
     else:
         return None
+    
+def save_state(state,stateId):
+    frappe.cache.set(stateId,json.dumps(state) )
+
+def delete_state(key):
+    frappe.cache.delete(key)
+
+def get_state(key):
+    # Fetch the cached value
+    cached_value = frappe.cache.get(key)
+    if cached_value:
+        return json.loads(cached_value.decode("utf-8"))  # Decode bytes and parse JSON
+    return None

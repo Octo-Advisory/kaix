@@ -1,0 +1,1228 @@
+import re
+import json
+from dotenv import load_dotenv
+from typing import List, Dict, Tuple, Union
+from langchain.prompts import PromptTemplate
+from langchain.schema import HumanMessage, AIMessage
+from frontend_app.Ai_module.Query_Classification_And_Analysis import refine_query_with_history, classify_query, llm_70b_vers, llm_70b_vers_creative
+import frappe
+from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
+
+def extract_main_industry_and_product_for_scratch(user_query: str, main_industries: List[str], llm) -> Dict[str, str]:
+    """
+    Extract the Main-Industry and Product mentioned in the user query.
+
+    Parameters:
+        user_query (str): The user-provided query.
+        main_industries (List[str]): List of all available main industries.
+        llm: The language model instance to use for processing.
+
+    Returns:
+        Dict[str, str]: A dictionary containing the extracted Main-Industry and Product.
+    """
+    # Convert the list into a formatted string for the prompt
+    main_industries_str = ", ".join(main_industries)
+    # Define the prompt
+    prompt_template = """
+    You are an expert in analyzing industry-building queries and extracting specific details.
+    Based on the user's query, identify the following details:
+
+    1. Main-Industry: First, infer or predict the main industry based on the context of the query.  
+    - Users may phrase their queries in various ways, such as "I want to set up a spectacle factory," "I want to set up a spectacle industry," or simply "Spectacles." In all such cases, assume they are referring to manufacturing the product mentioned unless it is clearly illogical.  
+    - Do not rely on specific words like "factory," "industry," or similar terms to infer manufacturing intent. The product name alone (e.g., "Spectacles") is sufficient to deduce that the query is about manufacturing that product.  
+    - The query may sometimes be vague, incomplete, or consist of just the product name. In such cases, logically infer the appropriate main industry.  
+    - If the inferred main industry can logically match any category from the provided list of Main-Industries, return the matched category from the list and set `"Forced-Mapping": "No"`.  
+    - If no logical match is possible but a mapping must still be provided, forcefully map the inferred main industry to the closest match from the provided list and set `"Forced-Mapping": "Yes"`.  
+    - If no main industry can be inferred from the query, return `"None"` for both `"Original-Inferred-Main-Industry"` and `"Main-Industry"`.  
+
+    2. Product: Identify the specific product the query refers to (e.g., "Cement", "Steel Rods").  
+    - If the inferred term logically represents a product, include it in the output.  
+    - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
+
+    Logical Matching for Main Industries:
+    - A logical match occurs when the inferred main industry and an available main industry from the list are conceptually or functionally similar.  
+    - Examples of logical matches:  
+        - Inferred: "Chemical Processing" → Available: "Chemical Manufacturing" (`Forced-Mapping`: "No").  
+        - Inferred: "Electronics Production" → Available: "Electronics Manufacturing" (`Forced-Mapping`: "No").  
+    - Examples of forced mappings:  
+        - Inferred: "Nanotechnology Production" → Available: "Advanced Manufacturing" (`Forced-Mapping`: "Yes").  
+        - Inferred: "Eco-friendly Systems Design" → Available: "Green Manufacturing" (`Forced-Mapping`: "Yes").  
+
+    Provided List of Main-Industries:  
+    {main_industries}  
+
+    Important Notes:
+    - Always assume that the user is referring to manufacturing unless the context explicitly suggests otherwise.  
+    - Ensure that the output is strictly limited to the required JSON format and contains no explanations, reasoning, or comments.  
+    - Do not provide additional text, explanations, or reasoning within the fields of the JSON object. For example, avoid including reasoning like "This matches because..." or "Assumed manufacturing based on context."  
+    - Each field in the JSON must only contain the exact extracted information or the specified fallback values (e.g., "None").  
+
+    Output Format:
+    Output the result strictly as a JSON object in the following format:  
+    {{
+        "Main-Industry": <Mapped Main-Industry>,
+        "Original-Inferred-Main-Industry": <Inferred Main-Industry or 'None'>,
+        "Forced-Mapping": <'Yes' or 'No'>,
+        "Product": <Extracted Product or 'None'>
+    }}
+
+    Query: {query}  
+
+    Provide only the JSON object in the required format.  
+    """
+
+
+    # Create the prompt using the provided variables
+    prompt = PromptTemplate(
+        input_variables=["query", "main_industries"],
+        template=prompt_template
+    )
+    
+    # Create the LLM chain
+    chain = prompt | llm
+    
+    # Invoke the LLM
+    result = chain.invoke({
+        "query": user_query,
+        "main_industries": main_industries_str,
+    })
+    
+    # Extract JSON response
+    result_content = result.content.strip()
+
+    # Define regex patterns for Main-Industry and Product
+    main_industry_pattern = r'"Main-Industry":\s*"([^"]+)"'
+    original_inferred_main_industry_pattern = r'"Original-Inferred-Main-Industry":\s*"([^"]+)"'
+    forced_mapping_pattern = r'"Forced-Mapping":\s*"([^"]+)"'
+    product_pattern = r'"Product":\s*"([^"]+)"'
+
+    # Extract details using regex
+    main_industry_match = re.search(main_industry_pattern, result_content)
+    original_inferred_main_industry_match = re.search(original_inferred_main_industry_pattern, result_content)
+    forced_mapping_match = re.search(forced_mapping_pattern, result_content)
+    product_match = re.search(product_pattern, result_content)
+
+    # Extract values or default to "None"
+    main_industry = main_industry_match.group(1).strip() if main_industry_match else "None"
+    original_inferred_main_industry = original_inferred_main_industry_match.group(1).strip() if original_inferred_main_industry_match else "None"
+    forced_mapping = forced_mapping_match.group(1).strip() if forced_mapping_match else "No"
+    product = product_match.group(1).strip() if product_match else "None"
+
+    extracted_data = {
+        "Main-Industry": main_industry,
+        "Original-Inferred-Main-Industry": original_inferred_main_industry,
+        "Forced-Mapping": forced_mapping,
+        "Product": product
+    }
+
+    # Validate against the provided list of Segments
+    validated_data = extracted_data.copy()
+    if main_industry not in main_industries and main_industry != "None":
+        validated_data["Main-Industry"] = "Not Available in list"
+    return extracted_data, validated_data
+
+def extract_sub_sector_and_product_for_scratch(
+    user_query: str,
+    sub_sectors: List[str],
+    llm,
+    main_industry: str = None,
+    product: str = None
+) -> Dict[str, str]:
+    """
+    Extract the Sub-Sector and Product mentioned in the user query, optionally using inferred Main-Industry and Product.
+
+    Parameters:
+        user_query (str): The user-provided query.
+        sub_sectors (List[str]): List of all available sub-sectors.
+        llm: The language model instance to use for processing.
+        main_industry (str): Inferred Main-Industry to provide additional context (default: None).
+        product (str): Inferred Product to provide additional context (default: None).
+
+    Returns:
+        Dict[str, str]: A dictionary containing the extracted Sub-Sector, Original-Inferred Sub-Sector,
+                        Forced-Mapping, and Product.
+    """    
+    # Convert the list into a formatted string for the prompt
+    sub_sectors_str = ", ".join(sub_sectors)
+
+    # Define additional context for Main-Industry and Product if available
+    context_lines = []
+    if main_industry and main_industry not in ["None", "Not Available in list"]:
+        context_lines.append(f"Inferred Main-Industry: {main_industry}")
+    if product and product != "None":
+        context_lines.append(f"Inferred Product: {product}")
+    context = "\n".join(context_lines)
+
+    # Define the prompt
+    prompt_template = """
+    You are an expert in analyzing industry-building queries and extracting specific details.  
+    Sub-Sector is the functional or operational category that immediately follows the Main-Industry in the hierarchy.  
+    It encompasses broader categories of related activities, processes, or areas of focus that form part of the Main-Industry.  
+
+    For example:  
+    - In the "Automobile" Main-Industry, possible Sub-Sectors include "Vehicle Assembly," "Automotive Components," or "Electric Vehicles."
+    - In the "Pharmaceuticals" Main-Industry, possible Sub-Sectors include "Allopathic Medicines," "Ayurvedic Medicines," or "Biotechnology."
+    - Sub-Sectors are not specific to individual products; they represent broader categories within the Main-Industry.
+
+    {context}
+
+    Based on the user's query, identify the following details:
+
+    1. Sub-Sector: First, infer or predict the sub-sector based on the context of the query.  
+    - In the majority of cases, users may not explicitly mention "manufacturing" or related terms but are still referring to manufacturing-related sub-sectors. Assume the query is about a manufacturing-related sub-sector unless it is clearly illogical to do so.  
+    - The query may sometimes be vague or incomplete. In such cases, try to understand the implied intent and context to infer the appropriate sub-sector.  
+    - If the inferred sub-sector can logically match any category from the provided list of Sub-Sectors, return the matched category from the list and set `"Forced-Mapping"` to `"No"`.  
+    - If no logical match is possible but a mapping must still be provided, forcefully map the inferred sub-sector to the closest match from the provided list and set `"Forced-Mapping"` to `"Yes"`.  
+    - If no sub-sector can be inferred from the query, return `"None"` for the `"Original-Inferred-Sub-Sector"` and `"Sub-Sector"`.  
+
+    2. Product: If the product context is provided, return the same product in the output JSON as it is in the context.  
+    - Identify the specific product the query refers to (e.g., "Cement," "Steel Rods").  
+    - If the inferred term logically represents a product, include it in the output.  
+    - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
+
+    Important Notes:
+
+    Logical Matching for Sub-Sectors:  
+    - A logical match occurs when the inferred sub-sector and an available sub-sector from the list are conceptually or functionally similar.  
+    - Examples of logical matches:  
+        - Inferred: "Electric Cars" → Available: "Electric Vehicles" (`Forced-Mapping`: `"No"`).  
+        - Inferred: "Biological Research" → Available: "Biotechnology" (`Forced-Mapping`: `"No"`).  
+    - Examples of forced mappings:  
+        - Inferred: "Clean Energy Solutions" → Available: "Renewable Energy" (`Forced-Mapping`: `"Yes"`).  
+        - Inferred: "Pharma Research Labs" → Available: "Biotechnology" (`Forced-Mapping`: `"Yes"`).  
+    - If no logical match exists, set `"Forced-Mapping"` to `"Yes"`.  
+
+    Output Constraints:  
+    - Ensure that the output is strictly limited to the required JSON format and contains no explanations, reasoning, or comments.  
+    - Do not provide additional text, explanations, or reasoning within the fields of the JSON object. For example, avoid including reasoning like "This matches because..." or "Assumed manufacturing based on context."  
+    - Each field in the JSON must only contain the exact extracted information or the specified fallback values (e.g., `"None"`).  
+
+    Provided List of Sub-Sectors:  
+    {sub_sectors_str}  
+
+    Output Format:  
+    Output the result strictly as a JSON object in the following format:  
+    {{
+        "Sub-Sector": <Mapped Sub-Sector>,
+        "Original-Inferred-Sub-Sector": <Inferred Sub-Sector or 'None'>,
+        "Forced-Mapping": <'Yes' or 'No'>,
+        "Product": <Extracted Product or 'None'>
+    }}
+
+    Query: {user_query}  
+
+    Provide only the JSON object in the required format.  
+    """
+
+
+    # Create the prompt using the provided variables
+    prompt = PromptTemplate(
+        input_variables=["user_query", "sub_sectors_str", "context"],
+        template=prompt_template
+    )
+    
+    # Create the LLM chain
+    chain = prompt | llm
+    
+    # Invoke the LLM
+    result = chain.invoke({
+        "user_query": user_query,
+        "sub_sectors_str": sub_sectors_str,
+        "context": context
+    })
+    
+    # Extract JSON response
+    result_content = result.content.strip()
+
+    # Define regex patterns for Sub-Sector and Product
+    sub_sector_pattern = r'"Sub-Sector":\s*"([^"]+)"'
+    original_inferred_sub_sector_pattern = r'"Original-Inferred-Sub-Sector":\s*"([^"]+)"'
+    forced_mapping_pattern = r'"Forced-Mapping":\s*"([^"]+)"'
+    product_pattern = r'"Product":\s*"([^"]+)"'
+
+    # Extract details using regex
+    sub_sector_match = re.search(sub_sector_pattern, result_content)
+    original_inferred_sub_sector_match = re.search(original_inferred_sub_sector_pattern, result_content)
+    forced_mapping_match = re.search(forced_mapping_pattern, result_content)
+    product_match = re.search(product_pattern, result_content)
+
+    # Extract values or default to "None"
+    sub_sector = sub_sector_match.group(1).strip() if sub_sector_match else "None"
+    original_inferred_sub_sector = original_inferred_sub_sector_match.group(1).strip() if original_inferred_sub_sector_match else "None"
+    forced_mapping = forced_mapping_match.group(1).strip() if forced_mapping_match else "No"
+    product = product_match.group(1).strip() if product_match else "None"
+
+    extracted_data = {
+        "Sub-Sector": sub_sector,
+        "Original-Inferred-Sub-Sector": original_inferred_sub_sector,
+        "Forced-Mapping": forced_mapping,
+        "Product": product
+    }
+
+    # Validate against the provided list of Segments
+    validated_data = extracted_data.copy()
+    if sub_sector not in sub_sectors and sub_sector != "None":
+        validated_data["Sub-Sector"] = "Not Available in list"
+
+    return extracted_data, validated_data
+
+def extract_segment_and_product_for_scratch(
+    user_query: str,
+    segments: List[str],
+    llm,
+    main_industry: str = None,
+    sub_sector: str = None,
+    product: str = None
+) -> Dict[str, Dict[str, str]]:
+    """
+    Extract the Segment and Product mentioned in the user query, optionally using inferred Main-Industry and Sub-Sector.
+
+    Parameters:
+        user_query (str): The user-provided query.
+        segments (List[str]): List of all available segments.
+        llm: The language model instance to use for processing.
+        main_industry (str): Inferred Main-Industry to provide additional context (default: None).
+        sub_sector (str): Inferred Sub-Sector to provide additional context (default: None).
+
+    Returns:
+        Dict[str, Dict[str, str]]: A dictionary containing the extracted and validated Segment, Original-Inferred-Segment, Forced-Mapping, and Product.
+    """
+    # Convert the list into a formatted string for the prompt
+    segments_str = ", ".join(segments)
+
+    # Define additional context for Main-Industry and Sub-Sector if available
+    context_lines = []
+    if main_industry and main_industry not in ["None", "Not Available in list"]:
+        context_lines.append(f"Inferred Main-Industry: {main_industry}")
+    if sub_sector and sub_sector not in ["None", "Not Available in list"]:
+        context_lines.append(f"Inferred Sub-Sector: {sub_sector}")
+    if product and product != "None":
+        context_lines.append(f"Inferred Product: {product}")
+    context = "\n".join(context_lines)
+
+    # Define the prompt
+    prompt_template = """
+    You are an expert in analyzing industry-building queries and extracting specific details.
+    Segment is the logical grouping of products, which comes immediately next in the hierarchy after the Sub-Sector.
+    Sub-Sector itself is the functional or operational category following the Main-Industry in the hierarchy.
+
+    For example:
+    - In the "Automobile" Main-Industry, a Sub-Sector like "Automotive Components" may have Segments such as "Engines," "Batteries," or "Tires."
+    - In the "Pharmaceuticals" Main-Industry, a Sub-Sector like "Allopathic Medicines" may have Segments like "Antibiotics" or "Analgesics."
+
+    Based on the user's query, identify the following details:
+
+    {context}
+
+    1. Segment: First, infer or predict the segment based on the context of the query.
+    - In the majority of cases, users may not explicitly mention "manufacturing" or related terms but are still referring to manufacturing-related segments. Assume the query is about manufacturing unless it is clearly illogical to do so.
+    - The query may sometimes be vague or incomplete. In such cases, try to understand the implied intent and context to infer the appropriate segment.
+    - If the inferred segment can logically match any category from the provided list of Segments, return the matched category from the list and set `Forced-Mapping` to `No`.
+    - If no logical match is possible but a mapping must still be provided, forcefully map the inferred segment to the closest match from the provided list and set `Forced-Mapping` to `Yes`.
+    - If no segment can be inferred from the query, return "None" for the `Original-Inferred-Segment` and `Segment`.
+
+    2. Product: If the product context is provided, return the same product in the output JSON as it is in the context.  
+    - Identify the specific product the query refers to (e.g., "Cement," "Steel Rods").  
+    - If the inferred term logically represents a product, include it in the output.  
+    - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
+
+    Important Notes:
+
+    Logical Matching for Segments:
+    - A logical match occurs when the inferred segment and an available segment from the list are conceptually or functionally similar.
+    - Examples of logical matches:
+        - Inferred: "Metal Equipment" → Available: "Metalworking Machinery" (Not forced, `Forced-Mapping`: No).
+        - Inferred: "Metal Fabrication Tools" → Available: "Metalworking Machinery" (Not forced, `Forced-Mapping`: No).
+    - Examples of forced mappings:
+        - Inferred: "Advanced Robotics Systems" → Available: "Automation Equipment" (Forced, `Forced-Mapping`: Yes).
+        - Inferred: "Metal Gear Production" → Available: "Metalworking Machinery" (Forced, `Forced-Mapping`: Yes).
+    - If no logical match exists, set `Forced-Mapping` to `Yes`.
+
+    Provided List of Segments:  
+    {segments_str} 
+
+    Output Format:
+    - Ensure that the output strictly adheres to the specified JSON format without any additional reasoning, explanations, or comments.
+    - Do not include any reasoning or justification in the fields. For example, avoid entries such as `"This matches because..."` or `"Assumed based on the context..."`.
+    - Each field should only contain the extracted information or the specified fallback values (e.g., "None").
+
+    Output the result strictly as a JSON object in the following format:
+    {{
+        "Segment": <Mapped Segment>,
+        "Original-Inferred-Segment": <Inferred Segment or 'None'>,
+        "Forced-Mapping": <'Yes' or 'No'>,
+        "Product": <Extracted Product or 'None'>
+    }}
+
+    Query: {user_query}
+
+    Provide only the JSON object in the required format.
+    """
+
+
+    # Create the prompt using the provided variables
+    prompt = PromptTemplate(
+        input_variables=["user_query", "segments_str", "context"],
+        template=prompt_template
+    )
+
+    # Create the LLM chain
+    chain = prompt | llm
+
+    # Invoke the LLM
+    result = chain.invoke({
+        "user_query": user_query,
+        "segments_str": segments_str,
+        "context": context
+    })
+
+    # Extract JSON response
+    result_content = result.content.strip()
+
+    # Define regex patterns for Segment, Original-Inferred-Segment, Forced-Mapping, and Product
+    segment_pattern = r'"Segment":\s*"([^"]+)"'
+    original_inferred_segment_pattern = r'"Original-Inferred-Segment":\s*"([^"]+)"'
+    forced_mapping_pattern = r'"Forced-Mapping":\s*"([^"]+)"'
+    product_pattern = r'"Product":\s*"([^"]+)"'
+
+    # Extract details using regex
+    segment_match = re.search(segment_pattern, result_content)
+    original_inferred_segment_match = re.search(original_inferred_segment_pattern, result_content)
+    forced_mapping_match = re.search(forced_mapping_pattern, result_content)
+    product_match = re.search(product_pattern, result_content)
+
+    # Extract values or default to "None"
+    segment = segment_match.group(1).strip() if segment_match else "None"
+    original_inferred_segment = original_inferred_segment_match.group(1).strip() if original_inferred_segment_match else "None"
+    forced_mapping = forced_mapping_match.group(1).strip() if forced_mapping_match else "No"
+    product = product_match.group(1).strip() if product_match else "None"
+
+    extracted_data = {
+        "Segment": segment,
+        "Original-Inferred-Segment": original_inferred_segment,
+        "Forced-Mapping": forced_mapping,
+        "Product": product
+    }
+
+    # Validate against the provided list of Segments
+    validated_data = extracted_data.copy()
+    if segment not in segments and segment != "None":
+        validated_data["Segment"] = "Not Available in list"
+
+    return extracted_data, validated_data
+
+def extract_capacity_details(user_query, llm):
+    """
+    Extracts details related to capacity, capacity unit, and time period from the user query.
+
+    Args:
+        user_query (str): The message input from the user.
+
+    Returns:
+        dict: A dictionary containing "Capacity", "Capacity Unit", and "Time Period".
+    """
+
+    prompt_template = """
+    You are an expert in analyzing industry-building queries and extracting specific details. 
+    Your task is to analyze the provided query and extract the following information, ensuring accurate interpretation of industry-specific abbreviations and logical inference for missing details.
+
+    Extract the following details from the query:
+
+    1. Capacity: The numeric or descriptive quantity being referred to (e.g., "1", "100", "50,000").  
+       - This represents the actual quantity or amount the user wants to produce, build, or manufacture.  
+       - Extract the numeric part separately from any units or time-related context.  
+       - If no capacity is found in the query, return `"None"`.  
+
+    2. Capacity Unit: The unit of measurement associated with the capacity.  
+       - For measurable products (e.g., cement, chemicals, oil), identify logical units like "Tonnes", "Liters", "MegaWatts".  
+       - For countable products (e.g., bottles, bags, books), use the product name as the unit if explicitly mentioned (e.g., "1,000 Bottles").  
+       - Recognize and interpret common industry abbreviations:
+           - "MTPA" → Capacity Unit: "Million Tonnes", Time Period: "Per Annum".
+           - "TPA" → Capacity Unit: "Tonnes", Time Period: "Per Annum".
+           - "MW" → Capacity Unit: "MegaWatts", Time Period: "None" (if not explicitly stated).  
+       - If no logical unit is specified or the unit is illogical, return `"None"`.  
+
+    3. Time Period: The recurring frequency at which the capacity is achieved.  
+       - Examples include "Per Annum" (Yearly), "Per Month", or "Per Day".  
+       - If the time period is unconventional but can be inferred from the context (e.g., from abbreviations like "MTPA"), return the inferred value.  
+       - If no time period is mentioned or cannot be inferred, return `"None"`.  
+
+    Important Notes:  
+    - Abbreviations like "MTPA", "TPA", and "MW" must be interpreted correctly, and their components split into Capacity, Capacity Unit, and Time Period.  
+    - Handle vague or incomplete queries logically. For example:
+        - Query: "1 MTPA Cement Factory" → Capacity: "1", Capacity Unit: "Million Tonnes", Time Period: "Per Annum".
+        - Query: "100 MW Plant" → Capacity: "100", Capacity Unit: "MegaWatts", Time Period: "None".
+    - Ensure that the output is strictly limited to the required JSON format and contains no explanations, reasoning, or comments.  
+
+    Output Format:
+    Output the result strictly as a JSON object in the following format:
+    {{
+        "Capacity": <Extracted Capacity or 'None'>,
+        "Capacity Unit": <Extracted Capacity Unit or 'None'>,
+        "Time Period": <Extracted Time Period or 'None'>
+    }}
+
+    Query: {query}
+
+    Provide only the JSON object in the required format.
+    """
+
+    # Create the prompt using the correctly formatted variables
+    prompt = PromptTemplate(
+        input_variables=["query"],
+        template=prompt_template
+    )
+
+    # Create the LLM chain
+    chain = prompt | llm
+
+    # Invoke the query through the chain
+    result = chain.invoke({
+        "query": user_query
+    })
+
+    result = result.content.strip()
+
+    # Define regex patterns to extract details
+    capacity_pattern = r'"Capacity":\s*"([^"]+)"'
+    capacity_unit_pattern = r'"Capacity Unit":\s*"([^"]+)"'
+    time_period_pattern = r'"Time Period":\s*"([^"]+)"'
+
+    # Extract details using regex
+    capacity = re.search(capacity_pattern, result)
+    capacity_unit = re.search(capacity_unit_pattern, result)
+    time_period = re.search(time_period_pattern, result)
+
+    # Convert to a dictionary
+    extracted_details = {
+        "Capacity": capacity.group(1) if capacity else "None",
+        "Capacity Unit": capacity_unit.group(1) if capacity_unit else "None",
+        "Time Period": time_period.group(1) if time_period else "None",
+    }
+    with open("log2.txt", "a") as file:
+        file.write(f"\n extracted_details {extracted_details}")
+    return extracted_details
+
+def generate_ai_message(state, history, missing_fields, attempt_count, llm):
+    """
+    Generate a context-aware AI message for missing fields using the LLM.
+    Args:
+    - state (dict): Tracks previously provided information.
+    - history (list): Chat history for context.
+    - missing_fields (list): Fields still missing information.
+    - attempt_count (int): The number of attempts made to gather the missing details.
+
+    Returns:
+    - str: A dynamically generated message for the user.
+    """
+
+    # Create a prompt to generate the message
+    message_prompt = """
+    You are a professional assistant helping to gather business details for a user query.  
+    Based on the provided context and history, create a professional, polite, and clear message  
+    to request the missing details from the user. The message should be concise, clear, and easy to understand, while providing all necessary information for the user to respond appropriately.
+
+    Consider the following information:  
+    - Provided information: {provided_information}  
+    - Missing information: {missing_fields}  
+    - Attempt count: {attempt_count} (1 means first attempt, 2 means second, etc.)  
+    - Chat history: {chat_history}  
+
+    Guidelines:  
+    - Use the latest user message from the chat history to guide your response, ensuring it directly addresses their input.
+
+    - Avoid Explanations or Assumptions:  
+    - Do NOT include unnecessary explanations, assumptions, or robotic acknowledgments like "It seems you are asking about..." or "I’ve reviewed your message."  
+    - Focus on directly providing value or asking for the missing details without redundant statements.  
+
+    - Single Paragraph Output:  
+    - Ensure the response is concise and presented in a single paragraph.  
+    - Avoid splitting the message into multiple paragraphs.
+
+    - Handling Industry-Related Guidance:  
+    - If the user seeks guidance for an industry-related question (e.g., "What is the ideal capacity for a 10 crore investment?"), provide a realistic estimate or a general suggestion based on industry norms and context.  
+    - If exact figures cannot be determined, offer an indicative starting point or general direction (e.g., "Capacities for investments like this typically range based on the production scale and the industry.").  
+    - Clearly state that the decision depends on various factors, such as risk appetite, investment plans, production strategies, and market demand.  
+    - After providing guidance, smoothly transition to request the missing details needed for further assistance.
+
+    - Handling Greetings:  
+    - If the user greets (e.g., "Hi", "Hello", "Good morning"), warmly acknowledge the greeting (e.g., "Hello! It’s great to connect with you.")  
+    - Transition directly to ask for the missing details without including disclaimers or unrelated guidance.
+
+    - Handling Special Days:  
+    - If the user mentions a special occasion (e.g., birthday, anniversary), warmly acknowledge it (e.g., "Happy Birthday! Wishing you all the best.")  
+    - Transition smoothly to request the missing details without including disclaimers or unrelated guidance.
+
+    - Handling Negative Emotions:  
+    - If the user expresses frustration, anger, or sadness, respond empathetically (e.g., "I’m sorry to hear that. I’m here to help in any way I can.")  
+    - Transition smoothly to request the missing details while maintaining a supportive tone.
+
+    - Transitioning to Missing Information:  
+    - Ensure the transition to the missing details request feels natural and engaging.  
+    - Use clear and professional phrases like "To proceed further," "Additionally," or "To help you better" to connect the response seamlessly to the missing details request.
+
+    - First Three Attempts:  
+    - Focus solely on asking for the missing details concisely and clearly.  
+    - Do not acknowledge or repeat the provided information during the first Three attempts.  
+
+    - After Three Attempts:  
+    - Briefly acknowledge the details already provided by the user but without robotic phrasing.  
+    - Request the missing details concisely and clearly.
+
+    - Asking for Specific Missing Details:  
+    - If "Main-Industry" or "Sub-Sector" (or both) are missing, ask about the product or service the user deals with, but do NOT refer to them as "Main-Industry" or "Sub-Sector" in the message.  
+
+    Output Requirements:  
+    - The message must be concise, clear, and in a single paragraph.  
+    - Do NOT include any explanations, reasoning, or assumptions about the missing details, user input, or context.  
+    - For the first Three attempts, focus only on requesting the missing details.  
+    - After Three attempts, briefly acknowledge the provided details, then request the missing details concisely.  
+    """
+
+    # Format the provided details and missing details
+    provided_info = {k: v for k, v in state.items() if v != "None"}
+
+    # Create the prompt for the LLM
+    prompt = PromptTemplate(
+        input_variables=["provided_information", "missing_fields", "attempt_count", "chat_history"],
+        template=message_prompt
+    )
+    chain = prompt | llm
+
+    # Generate the message
+    result = chain.invoke({
+        "provided_information": provided_info,
+        "missing_fields": missing_fields,
+        "attempt_count": attempt_count,
+        "chat_history": history,
+    })
+    
+    return result.content.strip()
+
+def gather_industry_details(query, main_industries, llm,chatId):
+    """
+    Gathers industry details from the user query while maintaining a conversation history.
+    
+    Args:
+    - query (str): The latest user query or follow-up response.
+    - main_industries (list): List of valid main industries.
+    - state (dict): Tracks previously provided information.
+
+    Returns:
+    - tuple: A dictionary containing the extracted details and the updated conversation history.
+    """
+    state = get_state(f"QIND_state_{chatId}") or None
+    if state is None:
+        state = {'Main-Industry': 'None', 'Sub-Sector': 'None','Segment':'None', 'Capacity': 'None', 'Capacity Unit': 'None', 
+                 'Time Period': 'None', 'Product': 'None','product_attempt_count':0,'capacity_attempt_count':0}
+        save_state(state,f"QIND_state_{chatId}")
+    chat_history = get_chat(f"QIND_chat_{chatId}") or []
+
+    Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+    
+    # Refine query based on history
+    refined_query = refine_query_with_history(Chat_history_normal, query, llm)
+    chat_history.append(HumanMessage(content=refined_query))
+    save_chat(chat_history,f"QIND_chat_{chatId}")
+    # state = get_state(f"QIND_state_{chatId}")    
+    with open("log.txt", "a") as file:
+            file.write(f"\nstate2 {state}")
+    # Extract industry details from the refined query
+    is_changed = False
+    extracted_data,validated_data =  extract_main_industry_and_product_for_scratch(refined_query,main_industries,llm)
+    if validated_data['Main-Industry'] != 'None' and validated_data["Main-Industry"] != state['Main-Industry']:
+        # state = get_state(f"QIND_state_{chatId}")
+        state.update(validated_data)
+        state['Capacity'] = 'None'
+        state["Capacity Unit"] = 'None'
+        state["Time Period"] = 'None'
+        state['product_attempt_count'] = 0
+        state['capacity_attempt_count'] = 0
+        save_state(state,f"QIND_state_{chatId}")
+        is_changed = True
+    with open("log.txt", "a") as file:
+        file.write(f"\nvalidated_data {validated_data}")
+        file.write(f"\nstate3 {state}")
+    if state['Main-Industry'] == 'None' and state['Product'] == 'None':
+        capacity_json = extract_capacity_details(refined_query,llm)
+        if capacity_json["Capacity"] != 'None' or capacity_json["Capacity Unit"] != 'None' or capacity_json["Time Period"] != 'None':
+            state = get_state(f"QIND_state_{chatId}")
+            state.update(capacity_json)
+            save_state(state,f"QIND_state_{chatId}")
+        chat_history = get_chat(f"QIND_chat_{chatId}")
+        state['product_attempt_count'] = state['product_attempt_count'] + 1
+        save_state(state,f"QIND_state_{chatId}")
+        message = generate_ai_message(state,chat_history,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
+        chat_history.append(AIMessage(content=f"{message}"))
+        save_chat(chat_history,f"QIND_chat_{chatId}")
+        return {"Ai_response": message,
+                "Is_confirmation" : False,
+                "state":state}
+    elif state["Main-Industry"] == 'Not Available in List' and state["Product"] == 'None':
+        capacity_json = extract_capacity_details(refined_query,llm)
+        if capacity_json["Capacity"] != 'None' or capacity_json["Capacity Unit"] != 'None' or capacity_json["Time Period"] != 'None':
+            state = get_state(f"QIND_state_{chatId}")
+            state.update(capacity_json)
+            save_state(state,f"QIND_state_{chatId}")
+        missing_fields = [field for field, value in capacity_json.items() if value == 'None']
+        if len(missing_fields) == 0:
+            message = "We've your query, We'll get back to you soon"
+            return {"Ai_response": message,
+                "Is_confirmation" : False,
+                "state":state}
+        else:
+            chat_history = get_chat(f"QIND_chat_{chatId}")
+            state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
+            save_state(state,f"QIND_state_{chatId}")
+            message = generate_ai_message(state,chat_history,missing_fields,state['capacity_attempt_count'],llm_70b_vers_creative)
+            chat_history.append(AIMessage(content=f"{message}"))
+            save_chat(chat_history,f"QIND_chat_{chatId}")
+            return {"Ai_response": message,
+                "Is_confirmation" : False,
+                "state":state}
+        
+    elif state["Main-Industry"] != 'None':
+        capacity_json = extract_capacity_details(refined_query,llm)
+        if capacity_json["Capacity"] != 'None' or capacity_json["Capacity Unit"] != 'None' or capacity_json["Time Period"] != 'None':
+            state.update(capacity_json)
+            save_state(state,f"QIND_state_{chatId}")
+        final_json = get_json_for_industry()
+        if state['Sub-Sector'] == 'None' or is_changed:
+            with open("log.txt", "a") as file:
+                file.write(f"\n sub_state {state}")
+            sub_sector = get_sub_sectors(final_json,state["Main-Industry"])
+            sub_extracted_data,sub_validated_data = extract_sub_sector_and_product_for_scratch(refined_query,sub_sector,llm,state["Main-Industry"],state["Product"])
+            with open("log.txt", "a") as file:
+                file.write(f"\n sub_validated_data {sub_validated_data}")
+            state = get_state(f"QIND_state_{chatId}")
+            state["Sub-Sector"] = sub_validated_data["Sub-Sector"]
+            state["Product"] = sub_validated_data["Product"]
+            # state.update(sub_validated_data)
+            save_state(state,f"QIND_state_{chatId}")
+        state = get_state(f"QIND_state_{chatId}")
+        if state['Sub-Sector'] != 'None':
+            segments = get_segments(final_json,state["Main-Industry"],state['Sub-Sector'])
+            segment_extracted_data,segment_validated_data = extract_segment_and_product_for_scratch(refined_query,segments,llm,main_industries,state['Sub-Sector'],state["Product"])
+            with open("log.txt", "a") as file:
+                file.write(f"\n segment_validated_data {segment_validated_data}")
+            state = get_state(f"QIND_state_{chatId}")
+            state["Segment"] = segment_validated_data["Segment"]
+            state["Product"] = segment_validated_data["Product"]
+            # state.update(segment_validated_data)
+            save_state(state,f"QIND_state_{chatId}")
+            capicity_pending_list = get_keys_for_capicity(chatId)
+            if len(capicity_pending_list) > 0:
+                chat_history = get_chat(f"QIND_chat_{chatId}")
+                state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
+                save_state(state,f"QIND_state_{chatId}")
+                message = generate_ai_message(state,chat_history,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=f"{message}"))
+                save_chat(chat_history,f"QIND_chat_{chatId}")
+                return {"Ai_response": message,
+                    "Is_confirmation" : False,
+                    "state":state}
+            else:
+                response = {
+                    "Ai_response": "We have Found Something",
+                    "Is_confirmation" : True,
+                    "validated_data" : segment_validated_data,
+                    "state" : state
+                }
+                return response
+
+        elif state['Sub-Sector'] != ' Not Available in List':
+            capicity_pending_list = get_keys_for_capicity(chatId)
+            if len(capicity_pending_list) > 0:
+                chat_history = get_chat(f"QIND_chat_{chatId}")
+                state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
+                save_state(state,f"QIND_state_{chatId}")
+                message = generate_ai_message(state,chat_history,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=f"{message}"))
+                save_chat(chat_history,f"QIND_chat_{chatId}")
+                return {"Ai_response": message,
+                    "Is_confirmation" : False,
+                    "state": state}
+            else:
+                message = "We've your query, We'll get back to you soon"
+                return {"Ai_response": message,
+                "Is_confirmation" : False,
+                "state":state}
+
+        else:
+            chat_history = get_chat(f"QIND_chat_{chatId}")
+            state['product_attempt_count'] = state['product_attempt_count'] + 1
+            save_state(state,f"QIND_state_{chatId}")
+            message = generate_ai_message(state,chat_history,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
+            chat_history.append(AIMessage(content=f"{message}"))
+            save_chat(chat_history,f"QIND_chat_{chatId}")
+            return {"Ai_response": message,
+                "Is_confirmation" : False,
+                "state":state}
+    
+    else:
+        response = {
+            "Ai_response": "InValid query",
+            "Is_confirmation" : False,
+            "state":state
+        }
+        return response
+
+def extract_json_time_conversion(output):
+    """
+    Extract JSON-like structure for time conversion from an LLM output.
+    Tries multiple strategies:
+      1) Direct JSON parsing of the entire output (if it's valid JSON).
+      2) Extracting code blocks enclosed in triple backticks and parsing each as JSON.
+      3) Regex fallbacks:
+         (a) JSON-like with braces
+         (b) Partial JSON without braces
+
+    Returns
+    -------
+    dict
+        {
+            "Quantity": float,
+            "Time Period": str
+        }
+
+    Raises
+    ------
+    ValueError
+        If extraction fails.
+    """
+
+    # 1) Direct JSON parsing (entire output).
+    try:
+        entire_data = json.loads(output.strip())
+        if (
+            isinstance(entire_data, dict)
+            and "Quantity" in entire_data
+            and "Time Period" in entire_data
+        ):
+            return {
+                "Quantity": float(entire_data["Quantity"]),
+                "Time Period": str(entire_data["Time Period"])
+            }
+    except json.JSONDecodeError:
+        pass  # Not valid JSON in the entire string
+
+    # 2) Extract code blocks (with or without language hints) and parse each as JSON.
+    code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', output, flags=re.DOTALL)
+    for block in code_blocks:
+        text_block = block.strip()
+        try:
+            block_data = json.loads(text_block)
+            if (
+                isinstance(block_data, dict)
+                and "Quantity" in block_data
+                and "Time Period" in block_data
+            ):
+                return {
+                    "Quantity": float(block_data["Quantity"]),
+                    "Time Period": str(block_data["Time Period"])
+                }
+        except json.JSONDecodeError:
+            pass  # Not valid JSON in this block
+
+    # 3) Fallback approaches
+
+    # 3a) Regex for JSON with braces
+    pattern_with_braces = re.compile(
+        r'\{\s*"Quantity"\s*:\s*([\-\+\deE\.]+)\s*,\s*"Time Period"\s*:\s*"([^"]+)"\s*\}',
+        flags=re.DOTALL
+    )
+    match_braces = pattern_with_braces.search(output)
+    if match_braces:
+        quantity_str = match_braces.group(1)
+        time_period_str = match_braces.group(2)
+        try:
+            return {
+                "Quantity": float(quantity_str),
+                "Time Period": time_period_str
+            }
+        except ValueError:
+            pass  # Could not convert quantity to float
+
+    # 3b) Regex for partial JSON (no braces):
+    #     e.g. "Quantity": 1e-06, "Time Period": "per annum"
+    pattern_no_braces = re.compile(
+        r'"Quantity"\s*:\s*([\-\+\deE\.]+)\s*,?\s*"Time Period"\s*:\s*"([^"]+)"',
+        flags=re.DOTALL
+    )
+    match_no_braces = pattern_no_braces.search(output)
+    if match_no_braces:
+        quantity_str = match_no_braces.group(1)
+        time_period_str = match_no_braces.group(2)
+        try:
+            return {
+                "Quantity": float(quantity_str),
+                "Time Period": time_period_str
+            }
+        except ValueError:
+            pass  # Could not convert quantity to float
+
+    # If none of these methods worked, raise a ValueError.
+    raise ValueError(f"Failed to extract JSON for time conversion: {output}")
+
+def extract_json_unit_conversion(output):
+    """
+    Extract JSON-like structure specific to unit conversion from an LLM output.
+
+    It handles multiple scenarios:
+    1) Direct JSON parsing of the entire output (if the output is valid JSON).
+    2) Extracting code blocks within triple backticks and parsing each as JSON.
+    3) Fallback to two regex approaches:
+       - A pattern with curly braces
+       - A pattern without curly braces (just "Quantity": ..., "Unit": ...)
+
+    Returns:
+    -------
+    dict:
+        A dictionary with:
+        {
+            "Quantity": float,
+            "Unit": str
+        }
+
+    Raises:
+    ------
+    ValueError:
+        If no valid JSON-like structure is found.
+    """
+
+    # -- 1) Direct JSON parsing (entire output) --
+    try:
+        data_entire = json.loads(output.strip())
+        if isinstance(data_entire, dict) and "Quantity" in data_entire and "Unit" in data_entire:
+            return {
+                "Quantity": float(data_entire["Quantity"]),
+                "Unit": str(data_entire["Unit"])
+            }
+    except json.JSONDecodeError:
+        pass  # Not valid JSON in the entire output
+
+    # -- 2) Extract code blocks and try JSON parsing on each --
+    #    Allows optional language marker after ```
+    code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', output, flags=re.DOTALL)
+    for block in code_blocks:
+        text_block = block.strip()
+        # Try direct JSON parsing of each block
+        try:
+            block_data = json.loads(text_block)
+            if (
+                isinstance(block_data, dict)
+                and "Quantity" in block_data
+                and "Unit" in block_data
+            ):
+                return {
+                    "Quantity": float(block_data["Quantity"]),
+                    "Unit": str(block_data["Unit"])
+                }
+        except json.JSONDecodeError:
+            pass  # Not valid JSON in this code block
+
+        # If block isn't valid JSON, we can try direct regex on the text_block
+        # in case it's just partial JSON (no braces).
+        # (We'll still do the global fallback below, so we can skip here.)
+
+    # -- 3) Fallback: Regex search in the entire output --
+    #    a) Pattern with curly braces
+    fallback_pattern_braces = re.compile(
+        r'\{\s*"Quantity"\s*:\s*([\-\+\deE\.]+)\s*,\s*"Unit"\s*:\s*"([^"]+)"\s*\}',
+        flags=re.DOTALL
+    )
+    match_braces = fallback_pattern_braces.search(output)
+    if match_braces:
+        quantity_str = match_braces.group(1)
+        unit_str = match_braces.group(2)
+        try:
+            return {
+                "Quantity": float(quantity_str),
+                "Unit": unit_str
+            }
+        except ValueError:
+            pass  # Couldn't parse float
+
+    #    b) Pattern without curly braces (partial JSON)
+    #       Allows optional comma between "Quantity": ... and "Unit": ...
+    fallback_pattern_no_braces = re.compile(
+        r'"Quantity"\s*:\s*([\-\+\deE\.]+)\s*,?\s*"Unit"\s*:\s*"([^"]+)"',
+        flags=re.DOTALL
+    )
+    match_no_braces = fallback_pattern_no_braces.search(output)
+    if match_no_braces:
+        quantity_str = match_no_braces.group(1)
+        unit_str = match_no_braces.group(2)
+        try:
+            return {
+                "Quantity": float(quantity_str),
+                "Unit": unit_str
+            }
+        except ValueError:
+            pass  # Couldn't parse float
+
+    # -- If none of the above succeeded, raise an error --
+    raise ValueError(f"Failed to extract JSON for unit conversion: {output}")
+
+def time_conversion(user_quantity, user_time_period, db_standard_time_period, product, llm):
+    time_conversion_prompt = """
+    You are an expert in time period conversion. Convert a given quantity with a time period into a different time period.
+
+    Instructions:
+    1. Convert the given quantity from the user's time period to the specified Database standard time period.
+    2. If a product is specified, consider its characteristics (e.g., density) for any conversions that might involve the product's physical properties.
+    3. Ensure the output quantity is always a valid number (integer or decimal). It must not contain commas, fractions, or any special symbols (e.g., "1,23,456", "2012/2" are not allowed).
+    4. Always output the converted value with exact precision (do not round off any values).
+    5. Do not include any extra text or explanation in the output. Only return a JSON object.
+
+    Inputs:
+    - User Quantity: {user_quantity}
+    - User Time Period: {user_time_period}
+    - Database Standard Time Period: {db_standard_time_period}
+    - Product: {product}
+
+    Output:
+    {{
+        "Quantity": <converted_quantity>,
+        "Time Period": "<db_standard_time_period>"
+    }}
+    """
+
+    prompt = PromptTemplate(
+        input_variables=["user_quantity", "user_time_period", "db_standard_time_period", "product"],
+        template=time_conversion_prompt
+    )
+    chain = prompt | llm
+    response = chain.invoke({
+        "user_quantity": user_quantity,
+        "user_time_period": user_time_period,
+        "db_standard_time_period": db_standard_time_period,
+        "product": product
+    })
+    return extract_json_time_conversion(response.content.strip())
+ 
+def unit_conversion(user_quantity, user_unit, db_standard_unit, product, llm):
+    unit_conversion_prompt = """
+    You are an expert in unit conversion. Convert a given quantity with a unit into a different unit.
+
+    Instructions:
+    1. Convert the given quantity from the user's unit to the specified standard unit.
+    2. If a product is specified, consider its characteristics (e.g., density) for any conversions that might involve the product's physical properties.
+    3. Ensure the output quantity is always a valid number (integer or decimal). It must not contain commas, fractions, or any special symbols (e.g., "1,23,456", "240,00,144.0", "2012/2" are not allowed).
+    4. Always output the converted value with exact precision (do not round off any values).
+    5. Do not include any extra text or explanation in the output. Only return a JSON object.
+
+    Inputs:
+    - User Quantity: {user_quantity}
+    - User Unit: {user_unit}
+    - Database Standard Unit: {db_standard_unit}
+    - Product: {product}
+
+    Output:
+    {{
+        "Quantity": <converted_quantity>,
+        "Unit": "<db_standard_unit>"
+    }}
+    """
+
+    prompt = PromptTemplate(
+        input_variables=["user_quantity", "user_unit", "db_standard_unit", "product"],
+        template=unit_conversion_prompt
+    )
+    chain = prompt | llm
+    response = chain.invoke({
+        "user_quantity": user_quantity,
+        "user_unit": user_unit,
+        "db_standard_unit": db_standard_unit,
+        "product": product
+    })
+    return extract_json_unit_conversion(response.content.strip())
+
+def convert_to_standard_unit(user_quantity, user_unit, user_time_period, db_standard_unit, db_standard_time_period, product, llm):
+    """
+    Perform the full conversion in two steps:
+    1. Convert unit.
+    2. Convert time period.
+
+    Returns:
+    - dict: A dictionary with the fully converted quantity and capacity unit.
+    """
+    # Step 1: Unit Conversion
+    unit_converted = unit_conversion(user_quantity, user_unit, db_standard_unit, product, llm)
+    unit_converted_quantity = unit_converted["Quantity"]
+
+    # Step 2: Time Conversion
+    time_converted = time_conversion(unit_converted_quantity, user_time_period, db_standard_time_period, product, llm)
+    return {
+        "Capacity": time_converted["Quantity"],
+        "Capacity Unit": f"{db_standard_unit}",
+        "Time Period": f"{time_converted['Time Period']}"
+    }
+
+def extract_json_unit_split(output):
+    """
+    Extract JSON-like structure specific to unit and time period split.
+
+    Args:
+    - output (str): The raw output string from the LLM.
+
+    Returns:
+    - dict: A dictionary with 'unit' and 'time_period'.
+
+    Raises:
+    - ValueError: If no valid JSON-like structure is found.
+    """
+    pattern = r'\{\s*"unit":\s*"([^"]+)",\s*"time_period":\s*"([^"]+)"\s*\}'
+    match = re.search(pattern, output)
+
+    if match:
+        unit = match.group(1)  # Extract the unit as a string
+        time_period = match.group(2)  # Extract the time period as a string
+        return {
+            "unit": unit,
+            "time_period": time_period
+        }
+    else:
+        raise ValueError(f"Failed to extract JSON for unit splitting: {output}")
+
+def split_unit_and_time_period(input_string, llm):
+    """
+    Splits a given unit string into two parts: unit and time period, using an LLM.
+    
+    If no time period is found, defaults it to "per annum".
+
+    Parameters:
+        input_string (str): The input string containing the unit and potentially a time period.
+        llm: The LLM instance to use for processing.
+
+    Returns:
+        dict: A dictionary with keys "unit" and "time_period".
+    """
+    split_unit_prompt = """
+    You are an expert in understanding units of measure and identifying time periods associated with them.
+
+    Instructions:
+    1. Analyze the given input string and split it into:
+       - "unit": The actual unit without the time period (e.g., "TPA (Ton per Annum)" -> "Ton").
+       - "time_period": The time period if specified (e.g., "per annum"). If no time period is present, set it to "per annum".
+    2. Ensure the output is always a valid JSON object.
+
+    Input:
+    - Unit String: {input_string}
+
+    Output:
+    {{
+        "unit": "<unit>",
+        "time_period": "<time_period>"
+    }}
+    """
+    
+    # Use PromptTemplate to format the input for the LLM
+    prompt = PromptTemplate(
+        input_variables=["input_string"],
+        template=split_unit_prompt
+    )
+    chain = prompt | llm
+    
+    # Get response from the LLM
+    response = chain.invoke({
+        "input_string": input_string
+    })
+    return extract_json_unit_split(response.content.strip())
+
+def entry_build_from_scratch(input,chatId):
+    final_json = get_json_for_industry()
+    main_industry = get_main_industry(final_json)
+    k = gather_industry_details(input,main_industry,llm_70b_vers,chatId)
+    chat_history = get_chat(f"QIND_chat_{chatId}")
+    with open("log3.txt", "a") as file:
+        file.write(f"chat history {chat_history}")
+    if k['Is_confirmation']:
+        s = do_unit_conversion(k['state'])
+        with open("\nlog2.txt", "a") as file:
+            file.write(f"s {s}")
+        k['state'].update(s)
+        save_state(k['state'],f"QIND_state_{chatId}")
+        return k
+    else:
+        return k
+
+def get_json_for_industry():
+    final_json = {}
+    query = """
+            SELECT sgt.segment, indmappedsst.sub_sector_name, indmappedsst.industry_name
+            FROM `tabSegment` AS sgt
+            JOIN (
+                SELECT sst.name, sst.sub_sector_name, indt.industry_name
+                FROM `tabSub Sector` AS sst
+                JOIN `tabIndustry` AS indt
+                WHERE sst.industry_id = indt.name
+            ) AS indmappedsst
+            WHERE sgt.sub_sector = indmappedsst.name
+            """
+    s = frappe.db.sql(query,as_dict=True)
+    for item in s:
+        industry = item['industry_name']
+        sub_sector = item['sub_sector_name']
+        segment = item['segment']
+
+        if industry not in final_json:
+            final_json[industry] = {}
+        if sub_sector not in final_json[industry]:
+            final_json[industry][sub_sector] = []
+        
+        final_json[industry][sub_sector].append(segment)
+    return final_json
+
+def get_main_industry(final_json):
+    """Returns a list of main industries."""
+    return list(final_json.keys())
+
+def get_all_sub_sectors(final_json):
+    """Returns a list of sub-sectors for all main industry."""
+    sub_sectors = []
+    for industry in final_json.values():
+        sub_sectors.extend(industry.keys())
+    return sub_sectors
+
+def get_sub_sectors(final_json,main_industry):
+    """Returns a list of sub-sectors for a given main industry."""
+    return  list(final_json.get(main_industry, {}).keys())
+
+def get_segments(final_json, main_industry, sub_sector):
+    """Returns a list of segments for a given main industry and sub-sector."""
+    return final_json.get(main_industry, {}).get(sub_sector, [])
+
+def get_keys_for_capicity(chatId):
+    keys = ["Capacity","Capacity Unit","Time Period"]
+    state = get_state(f"QIND_state_{chatId}")
+    filtered_data = {key for key, value in state.items() if key in keys and value == "None" }
+    return filtered_data
+
+def do_unit_conversion(state):
+    query = f"""
+    select distinct jcrla.capacity_unit
+    from (
+        select crla.capacity_unit, crla.sub_sector, sst.sub_sector_name
+        from `tabIndustry Capacity Rule` as crla
+        join `tabSub Sector` as sst
+        on crla.sub_sector = sst.name
+    ) as jcrla
+    where jcrla.sub_sector_name = '{state['Sub-Sector']}'
+    """
+
+    results = frappe.db.sql(query)
+    db_unit_for_ss = results[0][0]
+    standard_unit_time = split_unit_and_time_period(db_unit_for_ss, llm_70b_vers)
+    product_name = state["Product"]
+    user_quantity = state["Capacity"]
+    user_unit = state["Capacity Unit"]
+    user_time_period = state["Time Period"]
+    db_standard_unit = standard_unit_time["unit"]
+    db_standard_time_period = standard_unit_time["time_period"]
+
+    converted_output = convert_to_standard_unit(
+        user_quantity, user_unit, user_time_period, db_standard_unit, db_standard_time_period, product_name, llm_70b_vers
+    )
+
+    return converted_output
