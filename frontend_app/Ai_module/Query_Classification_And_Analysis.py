@@ -1,18 +1,22 @@
 import os
 import re
+from typing import List, Dict, Tuple
 # from dotenv import load_dotenv
 from langchain.prompts import PromptTemplate
-from langchain_groq import ChatGroq 
+from langchain_groq import ChatGroq
+from rapidfuzz import fuzz, process
+import frappe  
 # from langchain_openai import ChatOpenAI
 
 # load_dotenv()
-groq_api_key = "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"
+groq_api_key = "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"
 # openai_key = os.getenv("OPENAI_API_KEY")
 
 # Initialize LLM    
 llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.0)
 llm_70b_vers_creative = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.7)
 llm_8b_inst=ChatGroq(groq_api_key=groq_api_key,model_name="llama-3.3-8b-instant", temperature=0.0)
+llm_deepseek = ChatGroq(groq_api_key=groq_api_key, model_name="deepseek-r1-distill-llama-70b", temperature=0.0)
 # llm_openai = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_mini = ChatOpenAI(model="gpt-4o-mini", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_4o = ChatOpenAI(model="gpt-4o", temperature=0.0, api_key=openai_key)
@@ -20,7 +24,7 @@ llm_8b_inst=ChatGroq(groq_api_key=groq_api_key,model_name="llama-3.3-8b-instant"
 # llm_openai_inf_3_5 = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0.0, api_key=openai_key)
 
 # Define a function to refine the query using history
-def refine_query_with_history(history, latest_query, llm=llm_70b_vers):
+def refine_query_with_history(history, latest_query, llm):
     # Define retriever prompt
     retriever_prompt_template = """  
     Given the chat history and the latest user input, reformulate a standalone query that maintains the intent and structure of the latest user input.  
@@ -30,13 +34,25 @@ def refine_query_with_history(history, latest_query, llm=llm_70b_vers):
     1. Preserve the original structure of the user input.  
     - If the user’s latest input is a statement, the reformulated query must remain a statement.  
     - If the user’s latest input is a question, the reformulated query must remain a question.  
+
     2. If the latest user input is completely different and unrelated to the past conversation, return it as-is without modification.  
+
     3. If the latest user input is related to the past conversation, refine it by integrating relevant details from the chat history while ensuring clarity.  
-    4. Strictly do not infer or carry forward any industries or products from past AI responses unless the user explicitly acknowledges, agrees to, or repeats those industries or products in their latest input.  
-    5. Strictly do not infer or carry forward any industries or products from past user inputs unless they are explicitly mentioned in the latest user input.  
-    6. If the latest user input mentions only one industry or product, ensure only that industry or product appears in the reformulated query.  
+
+    4. Strictly do NOT infer or modify any numerical values, units, or metrics.  
+    - If the user provides a metric value (e.g., "1 TPA", "500 MW"), retain it exactly as it is.  
+    - Do NOT expand, convert, or modify abbreviations of units (e.g., keep "TPA" as "TPA" and do not change it to "Ton Per Annum").  
+    - If no metric is provided by the user, do NOT infer one.  
+
+    5. Strictly do not infer or carry forward any industries, products, or metrics from past AI responses unless the user explicitly acknowledges, agrees to, or repeats those industries, products, or metrics in their latest input.  
+
+    6. Strictly do not infer or carry forward any industries, products, or metrics from past user inputs unless they are explicitly mentioned in the latest user input.  
+
+    7. If the latest user input mentions only one industry or product, ensure only that industry or product appears in the reformulated query.  
     - Do not include multiple industries or products unless the user explicitly mentions multiple ones in their latest query.  
-    7. Do not add any explanations, reasoning, or justifications in the reformulated standalone query. The output must be a clean and direct reformulation of the user’s intent without unnecessary elaboration.  
+
+    8. Do NOT add any explanations, reasoning, or justifications in the reformulated standalone query.  
+    - The output must be a clean and direct reformulation of the user’s intent without unnecessary elaboration.  
 
     Chat History:  
     {history}  
@@ -65,6 +81,7 @@ def refine_query_with_history(history, latest_query, llm=llm_70b_vers):
     return refined_text
 
 # Define the function
+@frappe.whitelist()
 def classify_query(user_query):
     # Define the refined prompt template
     prompt_template = """
@@ -128,46 +145,707 @@ def classify_query(user_query):
     category = chain.invoke({"query": user_query})
 
     return category.content.strip()
+
+def extract_location_from_query(user_input: str, available_areas: List[str], available_cities: List[str], available_states: List[str], llm) -> Dict[str, Dict[str, str]]:
+    """
+    Extract the location mentioned in the user query and classify it into area, city, or state.
+
+    Parameters:
+        user_input (str): The user-provided query.
+        available_areas (List[str]): List of all available areas.
+        available_cities (List[str]): List of all available cities.
+        available_states (List[str]): List of all available states.
+        llm: The language model instance to use for processing.
+
+    Returns:
+        Dict[str, Dict[str, str]]: A dictionary containing the extracted location and its classification.
+    """
+
+    # Define the prompt
+    prompt_template = """
+    You are an expert in analyzing user queries and accurately extracting location information.  
+    Your task is to identify and extract the **most relevant location** from the user query.  
+    Do not classify the location into area, city, or state. Simply extract the correct location name.
+
+    Key Extraction Rules:
+
+    1. Extract the Most Relevant Location Based on Context:
+    - If the query contains multiple locations, analyze the intent and extract only the one location that is most relevant for the user's request.
+    - Ignore locations that are mentioned for personal reference or additional context (e.g., "I live in X but want to know about Y" → Extract only Y).
+    - Even if multiple locations are mentioned, extract only one location that is most relevant to the user's search intent.
+
+    2. Preserve Location Abbreviations:
+    - If a location is followed by an abbreviation (e.g., "SEZ", "PCPIR", "GIDC", "MIDC", etc.), always extract the full location name including the abbreviation.
+    - Do not remove or separate the abbreviation from the location name under any circumstances.
+
+    3. Handle Spelling Errors & Variations:
+    - If a location contains spelling mistakes, correct it and return the corrected value.
+
+    4. Ensure the Official Location Name is Used:
+    - If the location has multiple variants, always return the official name of the location instead of alternative or outdated names.
+    - Some common examples:
+        - "Bombay" → "Mumbai"
+        - "Baroda" → "Vadodara"
+        - "Kashi" → "Varanasi"
+        - "Calcutta" → "Kolkata"
+        - "Bangalore" → "Bengaluru"
+        - "Pondicherry" → "Puducherry"
+    - Ensure all locations are recognized and standardized to their official designation.
+
+    5. Only Return a Location if One is Mentioned:
+    - If no location is found, return `"None"` as the value.
+
+    6. Majority of Locations Will Be from India:
+    - Assume most locations will be from India.
+    - If the location is outside India, still extract and return it.
+
+    7. No Additional Explanations:
+    - The output must only contain the extracted location.
+    - Do not provide reasoning, context, or explanations.
+
+    User Query:
+    {query}
+
+    Output Format:
+    Provide only the extracted location in the following JSON format:
+    {{
+        "Location": "<Extracted Location or 'None'>"
+    }}
+    """
+
+    # Create a PromptTemplate and LLM chain
+    prompt = PromptTemplate(
+        input_variables=["query"],
+        template=prompt_template
+    )
+    chain = prompt | llm
+
+    # Run the LLM chain
+    response = chain.invoke({"query": user_input})
+
+    # Extract location from the model response
+    location_match = re.search(r'"Location":\s*"([^"]+)"', response.content.strip())
+    extracted_location = location_match.group(1) if location_match else "None"
+
+    # **Return immediately if no location was extracted**
+    if extracted_location == "None":
+        Extracted_Data = {"Location": extracted_location}
+        Validated_Data = {"Area": "None", "City": "None", "State": "None"}
+        return Extracted_Data, Validated_Data
+
+    # Function to find the best match using fuzzy logic
+    def get_best_match(location: str, choices: List[str], threshold: int = 85) -> str:
+        """
+        Finds the best match for a given location from a list of choices using fuzzy matching.
+        
+        Parameters:
+            location (str): The location extracted from the user query.
+            choices (List[str]): List of available areas, cities, or states.
+            threshold (int): Minimum similarity score required to consider a match.
+
+        Returns:
+            str: The best-matching location from the choices or "Not Available in List" if no match is found.
+        """
+        if not location.strip():
+            return "Not Available in List"
+        
+        # Convert location and choices to lowercase for case-insensitive matching
+        location_lower = location.lower()
+        choices_lower = [choice.lower() for choice in choices]
+
+        # Extract the best match (handle None case)
+        result = process.extractOne(location_lower, choices_lower, scorer=fuzz.ratio)
+        print("="*100,"\nFuzz Result: \n",result, "\n","="*100)
+        # If no match is found, return "Not Available in List"
+        if result is None:
+            return "Not Available in List"
+
+        match_lower, score, _ = result  # Safely unpack the three values
+
+        # Retrieve the original case-sensitive name from `choices`
+        match_original = next((choice for choice in choices if choice.lower() == match_lower), "Not Available in List")
+
+        return match_original if score >= threshold else "Not Available in List"
+
+
+    # Validate using fuzzy matching
+    best_city_match = get_best_match(extracted_location, available_cities, threshold=80)
+    best_area_match = get_best_match(extracted_location, available_areas, threshold=80)
+    best_state_match = get_best_match(extracted_location, available_states, threshold=80)
+
+    # **If no match is found, return "Not Available in List" immediately**
+    if best_city_match == "Not Available in List" and best_area_match == "Not Available in List" and best_state_match == "Not Available in List":
+        Extracted_Data = {"Location": extracted_location}
+        Validated_Data = {"Area": "Not Available in List", "City": "Not Available in List", "State": "Not Available in List"}
+        return Extracted_Data, Validated_Data
+    # **Prioritize classification: City > Area > State**
+    validated_classification = {
+        "Area": "None",
+        "City": "None",
+        "State": "None"
+    }
+
+    if best_city_match != "Not Available in List":
+        validated_classification["City"] = best_city_match
+    elif best_area_match != "Not Available in List":
+        validated_classification["Area"] = best_area_match
+    elif best_state_match != "Not Available in List":
+        validated_classification["State"] = best_state_match
+
+    Extracted_Data = {"Location": extracted_location}
+    Validated_Data = validated_classification
+    return Extracted_Data, Validated_Data
+
+def extract_comparison_locations(user_input: str, available_areas: List[str], available_cities: List[str], available_states: List[str], llm) -> Dict[str, Dict[str, str]]:
+    """
+    Extract multiple locations mentioned in the user query and classify them into area, city, or state.
+
+    Parameters:
+        user_input (str): The user-provided query.
+        available_areas (List[str]): List of all available areas.
+        available_cities (List[str]): List of all available cities.
+        available_states (List[str]): List of all available states.
+        llm: The language model instance to use for processing.
+
+    Returns:
+        Dict[str, Dict[str, str]]: A dictionary containing the extracted locations and their classification.
+    """
+
+    # Define the prompt
+    prompt_template = """
+    You are an expert in analyzing user queries and accurately extracting **multiple locations** for comparison purposes.
+    Your task is to identify and extract **all relevant locations** mentioned in the user query.
+    Do not classify the locations into area, city, or state. Simply extract the correct location names.
+
+    Key Extraction Rules:
+
+    1. Extract All Relevant Locations:
+    - Identify and extract all locations mentioned in the query that are relevant to the comparison.
+    - Ignore locations that are mentioned for personal reference or additional context (e.g., "I live in X but want to compare Y and Z" → Extract only Y and Z).
+
+    2. Preserve Location Abbreviations:
+    - If a location is followed by an abbreviation (e.g., "SEZ", "PCPIR", "GIDC", "MIDC", etc.), always extract the full location name including the abbreviation.
+    - Do not remove or separate the abbreviation from the location name under any circumstances.
+
+    3. Handle Spelling Errors & Variations:
+    - If a location contains spelling mistakes, correct it and return the corrected value.
+
+    4. Ensure the Official Location Name is Used:
+    - If a location has multiple variants, always return the official name of the location instead of alternative or outdated names.
+    - Some common examples:
+        - "Bombay" → "Mumbai"
+        - "Baroda" → "Vadodara"
+        - "Kashi" → "Varanasi"
+        - "Calcutta" → "Kolkata"
+        - "Bangalore" → "Bengaluru"
+        - "Pondicherry" → "Puducherry"
+    - Ensure all locations are recognized and standardized to their official designation.
+
+    5. Only Return Locations if Mentioned:
+    - If no locations are found, return `"None"` as the value.
+
+    6. Majority of Locations Will Be from India:
+    - Assume most locations will be from India.
+    - If a location is outside India, still extract and return it.
+
+    7. No Additional Explanations:
+    - The output must only contain the extracted locations.
+    - Do not provide reasoning, context, or explanations.
+
+    User Query:
+    {query}
+
+    Output Format:
+    Provide only the extracted locations in the following **JSON format**:
+    {{
+        "Locations": ["<Extracted Location 1>", "<Extracted Location 2>", ...] or ["None"]
+    }}
+    """
+
+    # Create a PromptTemplate and LLM chain
+    prompt = PromptTemplate(
+        input_variables=["query"],
+        template=prompt_template
+    )
+    chain = prompt | llm
+
+    # Run the LLM chain
+    response = chain.invoke({"query": user_input})
+
+    # Extract locations from the model response
+    locations_match = re.search(r'"Locations":\s*\[([^\]]*)\]', response.content.strip())
+    extracted_locations = [loc.strip().strip('"') for loc in locations_match.group(1).split(",") if loc] if locations_match else ["None"]
+
+    # **Return immediately if no location was extracted**
+    if extracted_locations == ["None"]:
+        Extracted_Data = {"Locations": extracted_locations}
+        Validated_Data = {"Area": "None", "City": "None", "State": "None"}
+        return Extracted_Data, Validated_Data
+
+    # Function to find the best match using fuzzy logic
+    def get_best_match(location: str, choices: List[str], threshold: int = 85) -> str:
+        """
+        Finds the best match for a given location from a list of choices using fuzzy matching.
+
+        Parameters:
+            location (str): The location extracted from the user query.
+            choices (List[str]): List of available areas, cities, or states.
+            threshold (int): Minimum similarity score required to consider a match.
+
+        Returns:
+            str: The best-matching location from the choices or "Not Available in List" if no match is found.
+        """
+        if not location.strip():
+            return "Not Available in List"
+
+        # Convert location and choices to lowercase for case-insensitive matching
+        location_lower = location.lower()
+        choices_lower = [choice.lower() for choice in choices]
+
+        # Extract the best match (handle None case)
+        result = process.extractOne(location_lower, choices_lower, scorer=fuzz.ratio)
+        if result is None:
+            return "Not Available in List"
+
+        match_lower, score, _ = result  # Safely unpack the three values
+
+        # Retrieve the original case-sensitive name from `choices`
+        match_original = next((choice for choice in choices if choice.lower() == match_lower), "Not Available in List")
+
+        return match_original if score >= threshold else "Not Available in List"
+
+    # Validate and classify multiple locations
+    validated_classification = {"Area": [], "City": [], "State": []}
+
+    for extracted_location in extracted_locations:
+        best_city_match = get_best_match(extracted_location, available_cities, threshold=70)
+        best_area_match = get_best_match(extracted_location, available_areas, threshold=70)
+        best_state_match = get_best_match(extracted_location, available_states, threshold=70)
+
+        # **If no match is found, classify as "Not Available in List"**
+        if best_city_match == "Not Available in List" and best_area_match == "Not Available in List" and best_state_match == "Not Available in List":
+            validated_classification["Area"].append("Not Available in List")
+            validated_classification["City"].append("Not Available in List")
+            validated_classification["State"].append("Not Available in List")
+        else:
+            # **Prioritize classification: City > Area > State**
+            if best_city_match != "Not Available in List":
+                validated_classification["City"].append(best_city_match)
+            elif best_area_match != "Not Available in List":
+                validated_classification["Area"].append(best_area_match)
+            elif best_state_match != "Not Available in List":
+                validated_classification["State"].append(best_state_match)
+
+    # Format as comma-separated strings or "None" if empty
+    for key in validated_classification:
+        validated_classification[key] = ", ".join(validated_classification[key]) if validated_classification[key] else "None"
+    Extracted_Data = {"Locations": extracted_locations}
+    Validated_Data = validated_classification
+    return Extracted_Data, Validated_Data
+
+def extract_main_industry_and_product_universal(user_query: str, main_industries: List[str], llm) -> Dict[str, str]:
+    """
+    Extract the Main-Industry and Product mentioned in the user query.
+
+    Parameters:
+        user_query (str): The user-provided query.
+        main_industries (List[str]): List of all available main industries.
+        llm: The language model instance to use for processing.
+
+    Returns:
+        Dict[str, str]: A dictionary containing the extracted Main-Industry and Product.
+    """
+    # Convert the list into a formatted string for the prompt
+    main_industries_str = ", ".join(main_industries)
     
-# user_query = input("\n\nWrite your query here: ").strip()
-# classified_class = classify_query(user_query)
-# print("\n\nClassified Intention is:", classified_class)
+    # Define the universal prompt
+    prompt_template = """
+    You are an expert in analyzing industry-related queries and extracting specific details.
+    Based on the user's query, identify the following details:
 
-# if "Query to build industry from Scratch" in classified_class:
-#     main_industry = ["Cement", "Pharmaceuticals", "Automobile", "Chemical", "Renewable", "Textile", "Food", "agricultural"]
-#     sub_sector = ["Cement", "Allopathy", "Ayurvedic", "Homeopathy", "Vehicle Manufacture", "Automotive Components", "Chemical", "Wind Energy", "Solar Energy", "Textile", "Beverages", "Snacks", "agricultural chemical"]
+    1. Main-Industry: Infer or predict the main industry based on the context of the query.  
+    - Users may phrase their queries in different ways, such as:
+        - "What incentives are available for the automobile sector?"
+        - "Which approvals are needed for the pharmaceutical industry?"
+        - "I am looking for steel vendors."
+    - In all such cases, identify the relevant industry even if the query is vague or incomplete.  
+    - If the inferred main industry can logically match any category from the provided list of Main-Industries, return the matched category from the list and set `"Forced-Mapping": "No"`.  
+    - If no logical match is possible but a mapping must still be provided, forcefully map the inferred main industry to the closest match from the provided list and set `"Forced-Mapping": "Yes"`.  
+    - If no main industry can be inferred from the query, return `"None"` for both `"Original-Inferred-Main-Industry"` and `"Main-Industry"`.  
 
-#     gathered_details = gather_industry_details(user_query, main_industry, sub_sector)
-#     if len(gathered_details) == 3:
-#         msg,complete_details, chat_history = gathered_details
-#         print("\n\nComplete Extracted Data:\n", complete_details)
-#         print("\nUser Message:\n", msg)
-#         print("\nConversation History:\n", "\n".join(chat_history))
-#         # Example Usage
-#         # product_name = "Crude Oil"
-#         # user_quantity = 1000
-#         # user_unit = "kg"
-#         # user_time_period = "per annum"
-#         # db_standard_unit = "Metric tonne"
-#         # db_standard_time_period = "per annum"
+    2. Product (if applicable): Identify the specific product mentioned in the query (e.g., "Cement," "Steel Rods").  
+    - If the inferred term logically represents a product, include it in the output.  
+    - If no product is mentioned or it does not logically fit as a product, return `"None"`.  
 
-#         # converted_output = convert_to_standard_unit(
-#         #     user_quantity, user_unit, user_time_period, db_standard_unit, db_standard_time_period, product_name, llm_70b_vers
-#         # )
-#         # print(converted_output)
-#     else:
-#         complete_details, chat_history = gathered_details
-#         print("\n\nComplete Extracted Data:\n", complete_details)
-#         print("\nConversation History:\n", "\n".join(chat_history))
-#         # Example Usage
-#         # product_name = "Cement"
-#         # user_quantity = "1 million"
-#         # user_unit = "units"
-#         # user_time_period = "per annum"
-#         # db_standard_unit = "tonne"
-#         # db_standard_time_period = "per annum"
+    Logical Matching for Main Industries:
+    - A logical match occurs when the inferred main industry and an available main industry from the list are conceptually or functionally similar.  
+    - Examples of logical matches:  
+        - Inferred: "Chemical Processing" → Available: "Chemical Manufacturing" (`Forced-Mapping`: "No`).  
+        - Inferred: "Electronics Production" → Available: "Electronics Manufacturing" (`Forced-Mapping`: "No`).  
+    - Examples of forced mappings:  
+        - Inferred: "Nanotechnology Development" → Available: "Advanced Manufacturing" (`Forced-Mapping`: "Yes`).  
+        - Inferred: "Eco-friendly Energy Solutions" → Available: "Green Manufacturing" (`Forced-Mapping`: "Yes`).  
 
-#         # converted_output = convert_to_standard_unit(
-#         #     user_quantity, user_unit, user_time_period, db_standard_unit, db_standard_time_period, product_name, llm_70b_vers
-#         # )
-#         # print(converted_output)
+    Provided List of Main-Industries:  
+    {main_industries}  
+
+    Important Notes:
+    - Always assume that the query is related to an industry-specific inquiry, whether it is about incentives, approvals, or vendors.
+    - Ensure that the output is strictly limited to the required JSON format and contains no explanations, reasoning, or comments.  
+    - Do not provide additional text, explanations, or reasoning within the fields of the JSON object.  
+    - Each field in the JSON must only contain the exact extracted information or the specified fallback values (e.g., "None").  
+
+    Output Format:
+    Output the result strictly as a JSON object in the following format:  
+    {{
+        "Main-Industry": <Mapped Main-Industry>,
+        "Original-Inferred-Main-Industry": <Inferred Main-Industry or 'None'>,
+        "Forced-Mapping": <'Yes' or 'No'>,
+        "Product": <Extracted Product or 'None'>
+    }}
+
+    Query: {query}  
+
+    Provide only the JSON object in the required format.  
+    """
+
+    # Create the prompt using the provided variables
+    prompt = PromptTemplate(
+        input_variables=["query", "main_industries"],
+        template=prompt_template
+    )
+    
+    # Create the LLM chain
+    chain = prompt | llm
+    
+    # Invoke the LLM
+    result = chain.invoke({
+        "query": user_query,
+        "main_industries": main_industries_str,
+    })
+    
+    # Extract JSON response
+    result_content = result.content.strip()
+
+    # Define regex patterns for Main-Industry and Product
+    main_industry_pattern = r'"Main-Industry":\s*"([^"]+)"'
+    original_inferred_main_industry_pattern = r'"Original-Inferred-Main-Industry":\s*"([^"]+)"'
+    forced_mapping_pattern = r'"Forced-Mapping":\s*"([^"]+)"'
+    product_pattern = r'"Product":\s*"([^"]+)"'
+
+    # Extract details using regex
+    main_industry_match = re.search(main_industry_pattern, result_content)
+    original_inferred_main_industry_match = re.search(original_inferred_main_industry_pattern, result_content)
+    forced_mapping_match = re.search(forced_mapping_pattern, result_content)
+    product_match = re.search(product_pattern, result_content)
+
+    # Extract values or default to "None"
+    main_industry = main_industry_match.group(1).strip() if main_industry_match else "None"
+    original_inferred_main_industry = original_inferred_main_industry_match.group(1).strip() if original_inferred_main_industry_match else "None"
+    forced_mapping = forced_mapping_match.group(1).strip() if forced_mapping_match else "No"
+    product = product_match.group(1).strip() if product_match else "None"
+
+    extracted_data = {
+        "Main-Industry": main_industry,
+        "Original-Inferred-Main-Industry": original_inferred_main_industry,
+        "Forced-Mapping": forced_mapping,
+        "Product": product
+    }
+
+    # Validate against the provided list of Segments
+    validated_data = extracted_data.copy()
+    if main_industry not in main_industries and main_industry != "None":
+        validated_data["Main-Industry"] = "Not Available in list"
+
+    return extracted_data, validated_data
+
+def extract_sub_sector_and_product_universal(
+    user_query: str,
+    sub_sectors: List[str],
+    llm,
+    main_industry: str = None,
+    product: str = None
+) -> Dict[str, str]:
+    """
+    Extract the Sub-Sector and Product mentioned in the user query, optionally using inferred Main-Industry and Product.
+
+    Parameters:
+        user_query (str): The user-provided query.
+        sub_sectors (List[str]): List of all available sub-sectors.
+        llm: The language model instance to use for processing.
+        main_industry (str): Inferred Main-Industry to provide additional context (default: None).
+        product (str): Inferred Product to provide additional context (default: None).
+
+    Returns:
+        Dict[str, str]: A dictionary containing the extracted Sub-Sector, Original-Inferred Sub-Sector,
+                        Forced-Mapping, and Product.
+    """    
+    # Convert the list into a formatted string for the prompt
+    sub_sectors_str = ", ".join(sub_sectors)
+
+    # Define additional context for Main-Industry and Product if available
+    context_lines = []
+    if main_industry and main_industry not in ["None", "Not Available in list"]:
+        context_lines.append(f"Inferred Main-Industry: {main_industry}")
+    if product and product != "None":
+        context_lines.append(f"Inferred Product: {product}")
+    context = "\n".join(context_lines)
+
+    # Define the universal prompt
+    prompt_template = """
+    You are an expert in analyzing industry-related queries and extracting specific details.  
+    Sub-Sector is the functional or operational category that immediately follows the Main-Industry in the hierarchy.  
+    It encompasses broader categories of related activities, processes, or areas of focus that form part of the Main-Industry.  
+
+    For example:  
+    - In the "Automobile" Main-Industry, possible Sub-Sectors include "Vehicle Assembly," "Automotive Components," or "Electric Vehicles."
+    - In the "Pharmaceuticals" Main-Industry, possible Sub-Sectors include "Allopathic Medicines," "Ayurvedic Medicines," or "Biotechnology."
+    - In the "Renewable Energy" Main-Industry, possible Sub-Sectors include "Solar Energy," "Wind Power," or "Hydropower."
+    - Sub-Sectors are broad categories and are not tied to individual products but rather industry segments.
+
+    {context}
+
+    Based on the user's query, identify the following details:
+
+    1. Sub-Sector Extraction:  
+    - The query may relate to industry incentives, approvals, or vendor searches. Identify the most relevant sub-sector.  
+    - If the inferred sub-sector can logically match any category from the provided list, return the matched category from the list and set `"Forced-Mapping"` to `"No"`.  
+    - If no logical match is possible but a mapping must still be provided, forcefully map the inferred sub-sector to the closest match from the provided list and set `"Forced-Mapping"` to `"Yes"`.  
+    - If no sub-sector can be inferred from the query, return `"None"` for `"Original-Inferred-Sub-Sector"` and `"Sub-Sector"`.  
+
+    2. Product Extraction (if applicable):  
+    - If the product context is provided, return the same product in the output JSON exactly as mentioned in the query.  
+    - If the inferred term logically represents a product, include it in the output.  
+    - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
+
+    Important Notes:
+    - Do NOT assume that all queries are related to manufacturing. Queries may relate to incentives, approvals, or vendors across various industries.  
+    - Logical Matching for Sub-Sectors:  
+    - A logical match occurs when the inferred sub-sector and an available sub-sector from the list are conceptually or functionally similar.  
+    - Examples of Logical Matches:  
+        - Incentives: "Tax Benefits for Renewable Energy" → Available: "Renewable Energy" (`Forced-Mapping`: `"No"`).  
+        - Approvals: "Environmental Clearance for Chemical Plants" → Available: "Chemical Manufacturing" (`Forced-Mapping`: `"No"`).  
+        - Vendors: "Suppliers of Medical Equipment" → Available: "Medical Devices" (`Forced-Mapping`: `"No"`).  
+    - Examples of Forced Mappings:  
+        - "Government Grants for AI Startups" → Available: "Technology & IT Services" (`Forced-Mapping`: `"Yes"`).  
+        - "Supply Chain for Nano-Materials" → Available: "Advanced Materials" (`Forced-Mapping`: `"Yes"`).  
+    - If no logical match exists, set `"Forced-Mapping"` to `"Yes"`.
+
+    Output Constraints:  
+    - Strictly limit the output to the required JSON format and ensure that it contains no explanations, reasoning, or additional text.  
+    - Do not provide reasoning like *"This matches because..."* or *"Assumed based on context."*  
+    - Each field in the JSON must contain only the extracted information or the specified fallback values (`"None"`).  
+
+    Provided List of Sub-Sectors:  
+    {sub_sectors_str}  
+
+    Output Format:  
+    Output the result strictly as a JSON object in the following format:  
+    {{
+        "Sub-Sector": <Mapped Sub-Sector>,
+        "Original-Inferred-Sub-Sector": <Inferred Sub-Sector or 'None'>,
+        "Forced-Mapping": <'Yes' or 'No'>,
+        "Product": <Extracted Product or 'None'>
+    }}
+
+    Query: {user_query}  
+
+    Provide only the JSON object in the required format.  
+    """
+
+
+    # Create the prompt using the provided variables
+    prompt = PromptTemplate(
+        input_variables=["user_query", "sub_sectors_str", "context"],
+        template=prompt_template
+    )
+    
+    # Create the LLM chain
+    chain = prompt | llm
+    
+    # Invoke the LLM
+    result = chain.invoke({
+        "user_query": user_query,
+        "sub_sectors_str": sub_sectors_str,
+        "context": context
+    })
+    
+    # Extract JSON response
+    result_content = result.content.strip()
+
+    # Define regex patterns for Sub-Sector and Product
+    sub_sector_pattern = r'"Sub-Sector":\s*"([^"]+)"'
+    original_inferred_sub_sector_pattern = r'"Original-Inferred-Sub-Sector":\s*"([^"]+)"'
+    forced_mapping_pattern = r'"Forced-Mapping":\s*"([^"]+)"'
+    product_pattern = r'"Product":\s*"([^"]+)"'
+
+    # Extract details using regex
+    sub_sector_match = re.search(sub_sector_pattern, result_content)
+    original_inferred_sub_sector_match = re.search(original_inferred_sub_sector_pattern, result_content)
+    forced_mapping_match = re.search(forced_mapping_pattern, result_content)
+    product_match = re.search(product_pattern, result_content)
+
+    # Extract values or default to "None"
+    sub_sector = sub_sector_match.group(1).strip() if sub_sector_match else "None"
+    original_inferred_sub_sector = original_inferred_sub_sector_match.group(1).strip() if original_inferred_sub_sector_match else "None"
+    forced_mapping = forced_mapping_match.group(1).strip() if forced_mapping_match else "No"
+    product = product_match.group(1).strip() if product_match else "None"
+
+    extracted_data = {
+        "Sub-Sector": sub_sector,
+        "Original-Inferred-Sub-Sector": original_inferred_sub_sector,
+        "Forced-Mapping": forced_mapping,
+        "Product": product
+    }
+
+    # Validate against the provided list of Segments
+    validated_data = extracted_data.copy()
+    if sub_sector not in sub_sectors and sub_sector != "None":
+        validated_data["Sub-Sector"] = "Not Available in list"
+
+    return extracted_data, validated_data
+
+def extract_segment_and_product_universal(
+    user_query: str,
+    segments: List[str],
+    llm,
+    main_industry: str = None,
+    sub_sector: str = None,
+    product: str = None
+) -> Dict[str, Dict[str, str]]:
+    """
+    Extract the Segment and Product mentioned in the user query, optionally using inferred Main-Industry and Sub-Sector.
+
+    Parameters:
+        user_query (str): The user-provided query.
+        segments (List[str]): List of all available segments.
+        llm: The language model instance to use for processing.
+        main_industry (str): Inferred Main-Industry to provide additional context (default: None).
+        sub_sector (str): Inferred Sub-Sector to provide additional context (default: None).
+
+    Returns:
+        Dict[str, Dict[str, str]]: A dictionary containing the extracted and validated Segment, Original-Inferred-Segment, Forced-Mapping, and Product.
+    """
+    # Convert the list into a formatted string for the prompt
+    segments_str = ", ".join(segments)
+
+    # Define additional context for Main-Industry and Sub-Sector if available
+    context_lines = []
+    if main_industry and main_industry not in ["None", "Not Available in list"]:
+        context_lines.append(f"Inferred Main-Industry: {main_industry}")
+    if sub_sector and sub_sector not in ["None", "Not Available in list"]:
+        context_lines.append(f"Inferred Sub-Sector: {sub_sector}")
+    if product and product != "None":
+        context_lines.append(f"Inferred Product: {product}")
+    context = "\n".join(context_lines)
+
+    # Define the prompt
+    prompt_template = """
+    You are an expert in analyzing industry-related queries and extracting specific details.
+    A Segment is a logical grouping of products or services that come immediately next in the hierarchy after the Sub-Sector.
+    The Sub-Sector itself is a functional or operational category following the Main-Industry in the hierarchy.
+
+    For example:
+    - In the "Automobile" industry, a Sub-Sector like "Automotive Components" may have Segments such as "Engines," "Batteries," or "Tires."
+    - In the "Pharmaceuticals" industry, a Sub-Sector like "Allopathic Medicines" may have Segments such as "Antibiotics" or "Analgesics."
+    - In the "Textile" industry, a Sub-Sector like "Fabric Production" may have Segments such as "Cotton Weaving" or "Synthetic Fiber Manufacturing."
+
+    Based on the user's query, identify the following details:
+
+    {context}
+
+    1. Segment: First, infer or predict the segment based on the context of the query.
+    - In most cases, users may not explicitly mention "business activity" or "sector-specific terms," but they are referring to industry-related segments. Assume the query relates to an industry segment unless it is clearly illogical to do so.
+    - The query may sometimes be vague or incomplete. In such cases, analyze the implied intent and context to infer the appropriate segment.
+    - If the inferred segment can logically match any category from the provided list of Segments, return the matched category from the list and set `Forced-Mapping` to `No`.
+    - If no logical match is possible but a mapping must still be provided, forcefully map the inferred segment to the closest match from the provided list and set `Forced-Mapping` to `Yes`.
+    - If no segment can be inferred from the query, return `"None"` for both `Original-Inferred-Segment` and `Segment`.
+
+    2. Product: If the product context is provided, return the same product in the output JSON as it is in the context.  
+    - Identify the specific product or service the query refers to (e.g., "Cement," "Steel Rods," "Industrial Equipment").  
+    - If the inferred term logically represents a product or service, include it in the output.  
+    - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
+
+    Important Notes:
+
+    Logical Matching for Segments:
+    - A logical match occurs when the inferred segment and an available segment from the list are conceptually or functionally similar.
+    - Examples of logical matches:
+        - Inferred: "Tax Incentives for Startups" → Available: "Government Grants & Subsidies" (Not forced, `Forced-Mapping`: No).
+        - Inferred: "Pollution Control Compliance" → Available: "Environmental Approvals" (Not forced, `Forced-Mapping`: No).
+    - Examples of forced mappings:
+        - Inferred: "Renewable Energy Investment Benefits" → Available: "Green Industry Incentives" (Forced, `Forced-Mapping`: Yes).
+        - Inferred: "Vendor Sourcing for Construction" → Available: "Building Materials Suppliers" (Forced, `Forced-Mapping`: Yes).
+    - If no logical match exists, set `Forced-Mapping` to `Yes`.
+
+    Provided List of Segments:  
+    {segments_str}  
+
+    Output Format:
+    - Ensure that the output strictly adheres to the specified JSON format without any additional reasoning, explanations, or comments.
+    - Do not include any reasoning or justification in the fields. For example, avoid entries such as `"This matches because..."` or `"Assumed based on the context..."`.
+    - Each field should only contain the extracted information or the specified fallback values (e.g., "None").
+
+    Output the result strictly as a JSON object in the following format:
+    {{
+        "Segment": <Mapped Segment>,
+        "Original-Inferred-Segment": <Inferred Segment or 'None'>,
+        "Forced-Mapping": <'Yes' or 'No'>,
+        "Product": <Extracted Product or 'None'>
+    }}
+
+    Query: {user_query}
+
+    Provide only the JSON object in the required format.
+    """
+
+    # Create the prompt using the provided variables
+    prompt = PromptTemplate(
+        input_variables=["user_query", "segments_str", "context"],
+        template=prompt_template
+    )
+
+    # Create the LLM chain
+    chain = prompt | llm
+
+    # Invoke the LLM
+    result = chain.invoke({
+        "user_query": user_query,
+        "segments_str": segments_str,
+        "context": context
+    })
+
+    # Extract JSON response
+    result_content = result.content.strip()
+
+    # Define regex patterns for Segment, Original-Inferred-Segment, Forced-Mapping, and Product
+    segment_pattern = r'"Segment":\s*"([^"]+)"'
+    original_inferred_segment_pattern = r'"Original-Inferred-Segment":\s*"([^"]+)"'
+    forced_mapping_pattern = r'"Forced-Mapping":\s*"([^"]+)"'
+    product_pattern = r'"Product":\s*"([^"]+)"'
+
+    # Extract details using regex
+    segment_match = re.search(segment_pattern, result_content)
+    original_inferred_segment_match = re.search(original_inferred_segment_pattern, result_content)
+    forced_mapping_match = re.search(forced_mapping_pattern, result_content)
+    product_match = re.search(product_pattern, result_content)
+
+    # Extract values or default to "None"
+    segment = segment_match.group(1).strip() if segment_match else "None"
+    original_inferred_segment = original_inferred_segment_match.group(1).strip() if original_inferred_segment_match else "None"
+    forced_mapping = forced_mapping_match.group(1).strip() if forced_mapping_match else "No"
+    product = product_match.group(1).strip() if product_match else "None"
+
+    extracted_data = {
+        "Segment": segment,
+        "Original-Inferred-Segment": original_inferred_segment,
+        "Forced-Mapping": forced_mapping,
+        "Product": product
+    }
+
+    # Validate against the provided list of Segments
+    validated_data = extracted_data.copy()
+    if segment not in segments and segment != "None":
+        validated_data["Segment"] = "Not Available in list"
+
+    return extracted_data, validated_data

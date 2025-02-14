@@ -16,8 +16,8 @@ function ChatScreen() {
     try {
       
       const response = await call.get(
-        "frontend_app.Management_Class.Ai_management.build.build_from_scratch",
-        { input: userInput } // Pass user input to the call method
+        "frontend_app.Management_Class.AI.ai_module_call",
+        { input: userInput ,chatId: "s30" } // Pass user input to the call method
       );
       console.log("response is",response.message);
       

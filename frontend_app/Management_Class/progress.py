@@ -59,10 +59,6 @@
 #         frappe.log_error(f"Error updating process: {e}")
 #         logging.error(f"Error updating process: {e}")
 import frappe
-import logging
-
-# Set up logging configuration
-logging.basicConfig(level=logging.INFO)
 
 @frappe.whitelist()
 def insert_process(parentId, process_name, process_value, status):
@@ -91,10 +87,8 @@ def insert_process(parentId, process_name, process_value, status):
         frappe.log_error(f"event is pulished with {parentId}{process_name}")
         frappe.db.commit()
 
-        logging.info(f"Process inserted successfully: {process_name} for parentId: {parentId}")
     except Exception as e:
         frappe.log_error(f"Error inserting process: {e}")
-        logging.error(f"Error inserting process: {e}")
 
 
 @frappe.whitelist()
@@ -113,7 +107,6 @@ def update_process(parentId, process_name, new_status):
         )
 
         if not child_row:
-            logging.warning(f"No process found with name: {process_name} for parentId: {parentId}")
             return
 
         # Get the specific row document
@@ -132,7 +125,5 @@ def update_process(parentId, process_name, new_status):
         )
         frappe.db.commit()
 
-        logging.info(f"Process updated successfully: {process_name} for parentId: {parentId} with status: {new_status}")
     except Exception as e:
         frappe.log_error(f"Error updating process: {e}")
-        logging.error(f"Error updating process: {e}")

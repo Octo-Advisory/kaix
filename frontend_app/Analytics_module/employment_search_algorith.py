@@ -2,8 +2,7 @@ import frappe
 import pandas as pd
 import pandas as pd
 import matplotlib.pyplot as plt
-from pandas.api.types import CategoricalDtype
-import logging
+# from pandas.api.types import CategoricalDtype
 import warnings
 from frontend_app.Management_Class.progress import insert_process,update_process
 import time
@@ -66,142 +65,148 @@ def employment_search_algo(intention, input_data,chatId):
     """
     Employment search algorithm based on user intention.
     """
-    frappe.log_error(f"use intension is{intention}")
-    frappe.log_error(f"chatid is now {chatId}")
-    insert_process(chatId,"Analyzing Your Query","Analyzing Your query","Pending")
-    insert_process(chatId,"Fetching Data","Fetching Data Based On Your Query","Pending")
-    insert_process(chatId,"Analyzing Data","Analyzing Gathered Data","Pending")   
-    insert_process(chatId,"Preparing Result","Preparing Result","Pending")
-    time.sleep(1)   
-    update_process(chatId,"Analyzing Your Query","Processing")
-    time.sleep(3)
-    update_process(chatId,"Analyzing Your Query","Complete")
-    #get Employement status
-    update_process(chatId,"Fetching Data","Processing")
-    Employment_Status = get_employment_status()
-    time.sleep(3)
-    update_process(chatId,"Fetching Data","Complete")
-    update_process(chatId,"Analyzing Data","Processing")
-    time.sleep(3)
-    if intention == "Individual employment status":
-        state = input_data.get("state")
-        city = input_data.get("city_name")
-        
-        if not state and not city:
-            #print("Invalid Choice")
-            update_process(chatId,"Analyzing Data","Fail")
-            response = {
-                "Analytics_response": "Invalid Choice",
-                "Is_Error" : True
-            }
-            return response
-        
-        elif state and not city:
-            # State-wise Employment Status
-            state_data = Employment_Status[Employment_Status['state'] == state]
-            if state_data.empty:
-                #print(f"No data available for state: {state}")
+    try:
+        with open("log.txt", "a") as file:
+            file.write(f"\nentering in the function")
+        frappe.log_error(f"use intension is{intention}")
+        frappe.log_error(f"chatid is now {chatId}")
+        insert_process(chatId,"Analyzing Your Query","Analyzing Your query","Pending")
+        insert_process(chatId,"Fetching Data","Fetching Data Based On Your Query","Pending")
+        insert_process(chatId,"Analyzing Data","Analyzing Gathered Data","Pending")   
+        insert_process(chatId,"Preparing Result","Preparing Result","Pending")
+        time.sleep(1)   
+        update_process(chatId,"Analyzing Your Query","Processing")
+        time.sleep(3)
+        update_process(chatId,"Analyzing Your Query","Complete")
+        #get Employement status
+        update_process(chatId,"Fetching Data","Processing")
+        Employment_Status = get_employment_status()
+        time.sleep(3)
+        update_process(chatId,"Fetching Data","Complete")
+        update_process(chatId,"Analyzing Data","Processing")
+        time.sleep(3)
+        if intention == "Individual employment status":
+            state = input_data.get("state")
+            city = input_data.get("city_name")
+            
+            if not state and not city:
+                #print("Invalid Choice")
                 update_process(chatId,"Analyzing Data","Fail")
                 response = {
-                    "Analytics_response": "No data available for state",
+                    "Analytics_response": "Invalid Choice",
                     "Is_Error" : True
                 }
                 return response
             
-            # Calculate aggregated employment type data
-            state_data["employment_type"] = state_data["employment_type"]
-            state_summary = state_data.groupby("employment_type")["availability"].sum()
-            img_base64 = plot_pie_chart(state_summary, f"State-wise Employment Status: {state}")
-            #print(f"There are {state_data['city_name'].nunique()} cities in {state}.")
-            response = {
-                "Analytics_response": state_summary,
-                "Is_Error" : False,
-                "chart_base64": img_base64
-            }
-            update_process(chatId,"Analyzing Data","Complete")
-            update_process(chatId,"Preparing Result","Processing")
-            time.sleep(3)
-            update_process(chatId,"Preparing Result","Complete")
-            return response
-        
-        elif state and city:
-            # City-wise Employment Status
-            city_data = Employment_Status[
-                (Employment_Status['state'] == state) & 
-                (Employment_Status['city_name'] == city)
-            ]
-            if city_data.empty:
-                #print(f"No data available for city: {city} in state: {state}")
+            elif state and not city:
+                # State-wise Employment Status
+                state_data = Employment_Status[Employment_Status['state'] == state]
+                if state_data.empty:
+                    #print(f"No data available for state: {state}")
+                    update_process(chatId,"Analyzing Data","Fail")
+                    response = {
+                        "Analytics_response": "No data available for state",
+                        "Is_Error" : True
+                    }
+                    return response
+                
+                # Calculate aggregated employment type data
+                state_data["employment_type"] = state_data["employment_type"]
+                state_summary = state_data.groupby("employment_type")["availability"].sum()
+                img_base64 = plot_pie_chart(state_summary, f"State-wise Employment Status: {state}")
+                #print(f"There are {state_data['city_name'].nunique()} cities in {state}.")
                 response = {
-                    "Analytics_response": f"No data available for city: {city} in state: {state}",
-                    "Is_Error" : True
+                    "Analytics_response": state_summary,
+                    "Is_Error" : False,
+                    "chart_base64": img_base64
                 }
+                update_process(chatId,"Analyzing Data","Complete")
+                update_process(chatId,"Preparing Result","Processing")
+                time.sleep(3)
+                update_process(chatId,"Preparing Result","Complete")
+                return response
+            
+            elif state and city:
+                # City-wise Employment Status
+                city_data = Employment_Status[
+                    (Employment_Status['state'] == state) & 
+                    (Employment_Status['city_name'] == city)
+                ]
+                if city_data.empty:
+                    #print(f"No data available for city: {city} in state: {state}")
+                    response = {
+                        "Analytics_response": f"No data available for city: {city} in state: {state}",
+                        "Is_Error" : True
+                    }
+                    update_process(chatId,"Analyzing Data","Fail")
+                    return response
+                
+                city_data["employment_type"] = city_data["employment_type"]
+                city_summary = city_data.groupby("employment_type")["availability"].sum()
+                img_base64 = plot_pie_chart(city_summary, f"City-wise Employment Status: {city}, {state}")
+                response = {
+                    "Analytics_response": city_summary,
+                    "Is_Error" : False,
+                    "chart_base64": img_base64
+                }
+                update_process(chatId,"Analyzing Data","Complete")
+                update_process(chatId,"Preparing Result","Processing")
+                time.sleep(5)
+                update_process(chatId,"Preparing Result","Complete")
+                return response
+            
+        elif intention == "Comparison between cities, states, or areas":
+            cities = input_data.get("cities")
+            if not cities or len(cities) < 2:
+                #print("Comparison requires at least two cities.")
+                response = {
+                        "Analytics_response": "Comparison requires at least two cities",
+                        "Is_Error" : True
+                    }
                 update_process(chatId,"Analyzing Data","Fail")
                 return response
             
+            # Check if cities are in the same state
+            city_data = Employment_Status[Employment_Status['city_name'].isin(cities)]
+            states = city_data['state'].unique()
+            
+            if len(states) != 1:
+                #print("Cities must belong to the same state for comparison.")
+                response = {
+                        "Analytics_response": "Cities must belong to the same state for comparison.",
+                        "Is_Error" : True
+                    }
+                update_process(chatId,"Analyzing Data","Fail")
+                return response
+            
+            # Comparison of cities
             city_data["employment_type"] = city_data["employment_type"]
-            city_summary = city_data.groupby("employment_type")["availability"].sum()
-            img_base64 = plot_pie_chart(city_summary, f"City-wise Employment Status: {city}, {state}")
+            comparison_data = city_data.groupby(['city_name', 'employment_type'])["availability"].sum().unstack()
+            # comparison_data = comparison_data.reindex(columns=employment_order.categories)  # Reorder columns
+            comparison_data_percentage = comparison_data.div(comparison_data.sum(axis=1), axis=0) * 100
+            img_base64 = plot_bar_chart(comparison_data_percentage, f"Comparison Between Cities: {', '.join(cities)}")
             response = {
-                "Analytics_response": city_summary,
-                "Is_Error" : False,
-                "chart_base64": img_base64
-            }
+                    "Analytics_response": comparison_data_percentage,
+                    "Is_Error" : False,
+                    "chart_base64": img_base64
+                }
             update_process(chatId,"Analyzing Data","Complete")
             update_process(chatId,"Preparing Result","Processing")
             time.sleep(5)
             update_process(chatId,"Preparing Result","Complete")
             return response
         
-    elif intention == "Comparison between cities, states, or areas":
-        cities = input_data.get("cities")
-        if not cities or len(cities) < 2:
-            #print("Comparison requires at least two cities.")
+        else:
+            #print("Invalid intention provided.")
             response = {
-                    "Analytics_response": "Comparison requires at least two cities",
-                    "Is_Error" : True
-                }
+                        "Analytics_response": "Invalid intention provided.",
+                        "Is_Error" : True
+                    }
             update_process(chatId,"Analyzing Data","Fail")
             return response
-        
-        # Check if cities are in the same state
-        city_data = Employment_Status[Employment_Status['city_name'].isin(cities)]
-        states = city_data['state'].unique()
-        
-        if len(states) != 1:
-            #print("Cities must belong to the same state for comparison.")
-            response = {
-                    "Analytics_response": "Cities must belong to the same state for comparison.",
-                    "Is_Error" : True
-                }
-            update_process(chatId,"Analyzing Data","Fail")
-            return response
-        
-        # Comparison of cities
-        city_data["employment_type"] = city_data["employment_type"]
-        comparison_data = city_data.groupby(['city_name', 'employment_type'])["availability"].sum().unstack()
-        # comparison_data = comparison_data.reindex(columns=employment_order.categories)  # Reorder columns
-        comparison_data_percentage = comparison_data.div(comparison_data.sum(axis=1), axis=0) * 100
-        img_base64 = plot_bar_chart(comparison_data_percentage, f"Comparison Between Cities: {', '.join(cities)}")
-        response = {
-                "Analytics_response": comparison_data_percentage,
-                "Is_Error" : False,
-                "chart_base64": img_base64
-            }
-        update_process(chatId,"Analyzing Data","Complete")
-        update_process(chatId,"Preparing Result","Processing")
-        time.sleep(5)
-        update_process(chatId,"Preparing Result","Complete")
-        return response
-    
-    else:
-        #print("Invalid intention provided.")
-        response = {
-                    "Analytics_response": "Invalid intention provided.",
-                    "Is_Error" : True
-                }
-        update_process(chatId,"Analyzing Data","Fail")
-        return response
+    except Exception as e:
+        frappe.log_error(f"error is {e}")
+        return e
 
 # def plot_pie_chart(data, title):
     """

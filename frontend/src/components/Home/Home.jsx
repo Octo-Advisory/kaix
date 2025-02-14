@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { gsap } from 'gsap'; // Import GSAP for animations
 import logo2 from '../../assets/logo2.png'; // Company logo
 import marsBg from '../../assets/mars-bg.jpg'; // Background image
 import Chatscreen from '../Chatscreen/Chatscreen';
+import { useSelector } from 'react-redux';
+import { FrappeContext } from 'frappe-react-sdk';
 import ProgressScreen from '../ProgressScreen/ProgressScreen';
-import TestComponent from '../TestComponent/TestComponent';
-import { useFrappeDocumentEventListener } from 'frappe-react-sdk';
+import Solutionscreen from '../SolutionScreen/Solutionscreen';
+// import TestComponent from '../TestComponent/TestComponent';
+// import { useFrappeDocumentEventListener } from 'frappe-react-sdk';
 
 function Home() {
   const [stage, setStage] = useState(1);
@@ -40,6 +43,7 @@ function Home() {
     </div>):(<Chatscreen />)}
       {/* <TestComponent/> */}
       {/* <ProgressScreen/> */}
+      {/* <Solutionscreen/> */}
     </>
   );
 }

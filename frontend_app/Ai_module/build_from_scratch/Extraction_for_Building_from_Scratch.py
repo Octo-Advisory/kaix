@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from typing import List, Dict, Tuple, Union
 from langchain.prompts import PromptTemplate
 from langchain.schema import HumanMessage, AIMessage
-from frontend_app.Ai_module.Query_Classification_And_Analysis import refine_query_with_history, classify_query, llm_70b_vers, llm_70b_vers_creative
+from frontend_app.Ai_module.Query_Classification_And_Analysis import refine_query_with_history, classify_query, llm_70b_vers, llm_70b_vers_creative,llm_deepseek
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
 
@@ -632,7 +632,10 @@ def gather_industry_details(query, main_industries, llm,chatId):
     extracted_data,validated_data =  extract_main_industry_and_product_for_scratch(refined_query,main_industries,llm)
     if validated_data['Main-Industry'] != 'None' and validated_data["Main-Industry"] != state['Main-Industry']:
         # state = get_state(f"QIND_state_{chatId}")
-        state.update(validated_data)
+        # state.update(validated_data)
+        state["Main-Industry"] = validated_data["Main-Industry"]
+        state["Product"] = validated_data["Product"]
+        state["Segment"] = 'None'
         state['Capacity'] = 'None'
         state["Capacity Unit"] = 'None'
         state["Time Period"] = 'None'
@@ -702,12 +705,14 @@ def gather_industry_details(query, main_industries, llm,chatId):
         state = get_state(f"QIND_state_{chatId}")
         if state['Sub-Sector'] != 'None':
             segments = get_segments(final_json,state["Main-Industry"],state['Sub-Sector'])
+            with open("log.txt", "a") as file:
+                file.write(f"\n segments and main industry {segments}{main_industries}")
             segment_extracted_data,segment_validated_data = extract_segment_and_product_for_scratch(refined_query,segments,llm,main_industries,state['Sub-Sector'],state["Product"])
             with open("log.txt", "a") as file:
                 file.write(f"\n segment_validated_data {segment_validated_data}")
             state = get_state(f"QIND_state_{chatId}")
-            state["Segment"] = segment_validated_data["Segment"]
-            state["Product"] = segment_validated_data["Product"]
+            state["Segment"] = segment_validated_data["Segment"] or None
+            state["Product"] = segment_validated_data["Product"] or None
             # state.update(segment_validated_data)
             save_state(state,f"QIND_state_{chatId}")
             capicity_pending_list = get_keys_for_capicity(chatId)
@@ -769,100 +774,76 @@ def gather_industry_details(query, main_industries, llm,chatId):
 
 def extract_json_time_conversion(output):
     """
-    Extract JSON-like structure for time conversion from an LLM output.
-    Tries multiple strategies:
-      1) Direct JSON parsing of the entire output (if it's valid JSON).
-      2) Extracting code blocks enclosed in triple backticks and parsing each as JSON.
-      3) Regex fallbacks:
-         (a) JSON-like with braces
-         (b) Partial JSON without braces
+    Extracts the "Multiplier" value from the LLM output for time conversion.
+    
+    It handles multiple cases:
+    1) Direct JSON parsing of the entire output (if it's valid JSON).
+    2) Extracting code blocks enclosed in triple backticks and parsing as JSON.
+    3) Regex fallbacks:
+       - (a) JSON-like pattern with curly braces
+       - (b) Partial JSON without curly braces
 
-    Returns
+    Returns:
     -------
-    dict
+    dict:
         {
-            "Quantity": float,
-            "Time Period": str
+            "Multiplier": float
         }
 
-    Raises
-    ------
-    ValueError
-        If extraction fails.
+    If extraction fails, returns a safe fallback:
+        {"Multiplier": 1.0}
     """
 
-    # 1) Direct JSON parsing (entire output).
+    # --- 1) Direct JSON parsing (entire output) ---
     try:
         entire_data = json.loads(output.strip())
-        if (
-            isinstance(entire_data, dict)
-            and "Quantity" in entire_data
-            and "Time Period" in entire_data
-        ):
-            return {
-                "Quantity": float(entire_data["Quantity"]),
-                "Time Period": str(entire_data["Time Period"])
-            }
+        if isinstance(entire_data, dict) and "Multiplier" in entire_data:
+            return {"Multiplier": float(entire_data["Multiplier"])}
     except json.JSONDecodeError:
         pass  # Not valid JSON in the entire string
 
-    # 2) Extract code blocks (with or without language hints) and parse each as JSON.
+    # --- 2) Extract code blocks (wrapped in triple backticks) and parse as JSON ---
     code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', output, flags=re.DOTALL)
     for block in code_blocks:
         text_block = block.strip()
         try:
             block_data = json.loads(text_block)
-            if (
-                isinstance(block_data, dict)
-                and "Quantity" in block_data
-                and "Time Period" in block_data
-            ):
-                return {
-                    "Quantity": float(block_data["Quantity"]),
-                    "Time Period": str(block_data["Time Period"])
-                }
+            if isinstance(block_data, dict) and "Multiplier" in block_data:
+                return {"Multiplier": float(block_data["Multiplier"])}
         except json.JSONDecodeError:
             pass  # Not valid JSON in this block
 
-    # 3) Fallback approaches
+    # --- 3) Fallback approaches ---
 
-    # 3a) Regex for JSON with braces
+    # --- 3a) Regex for JSON-like structure with curly braces ---
     pattern_with_braces = re.compile(
-        r'\{\s*"Quantity"\s*:\s*([\-\+\deE\.]+)\s*,\s*"Time Period"\s*:\s*"([^"]+)"\s*\}',
+        r'\{\s*"Multiplier"\s*:\s*([\-\+\deE\.]+)\s*\}',
         flags=re.DOTALL
     )
     match_braces = pattern_with_braces.search(output)
     if match_braces:
-        quantity_str = match_braces.group(1)
-        time_period_str = match_braces.group(2)
+        multiplier_str = match_braces.group(1)
         try:
-            return {
-                "Quantity": float(quantity_str),
-                "Time Period": time_period_str
-            }
+            return {"Multiplier": float(multiplier_str)}
         except ValueError:
-            pass  # Could not convert quantity to float
+            pass  # Could not convert to float
 
-    # 3b) Regex for partial JSON (no braces):
-    #     e.g. "Quantity": 1e-06, "Time Period": "per annum"
+    # --- 3b) Regex for partial JSON (no curly braces) ---
+    # Example: `"Multiplier": 8760`
     pattern_no_braces = re.compile(
-        r'"Quantity"\s*:\s*([\-\+\deE\.]+)\s*,?\s*"Time Period"\s*:\s*"([^"]+)"',
+        r'"Multiplier"\s*:\s*([\-\+\deE\.]+)',
         flags=re.DOTALL
     )
     match_no_braces = pattern_no_braces.search(output)
     if match_no_braces:
-        quantity_str = match_no_braces.group(1)
-        time_period_str = match_no_braces.group(2)
+        multiplier_str = match_no_braces.group(1)
         try:
-            return {
-                "Quantity": float(quantity_str),
-                "Time Period": time_period_str
-            }
+            return {"Multiplier": float(multiplier_str)}
         except ValueError:
-            pass  # Could not convert quantity to float
+            pass  # Could not convert to float
 
-    # If none of these methods worked, raise a ValueError.
-    raise ValueError(f"Failed to extract JSON for time conversion: {output}")
+    # --- 4) If all methods fail, return a default fallback multiplier of 1.0 ---
+    return {"Multiplier": 1.0}
 
 def extract_json_unit_conversion(output):
     """
@@ -872,156 +853,185 @@ def extract_json_unit_conversion(output):
     1) Direct JSON parsing of the entire output (if the output is valid JSON).
     2) Extracting code blocks within triple backticks and parsing each as JSON.
     3) Fallback to two regex approaches:
-       - A pattern with curly braces
-       - A pattern without curly braces (just "Quantity": ..., "Unit": ...)
+       - A pattern with curly braces.
+       - A pattern without curly braces (just "Multiplier": ...).
 
     Returns:
     -------
     dict:
         A dictionary with:
         {
-            "Quantity": float,
-            "Unit": str
+            "Multiplier": float
         }
-
-    Raises:
+    
+    Notes:
     ------
-    ValueError:
-        If no valid JSON-like structure is found.
+    - If extraction fails in all methods, **returns a default "Multiplier": 1.0**.
+    - Ensures multiplier is always a **valid float**.
     """
 
     # -- 1) Direct JSON parsing (entire output) --
     try:
         data_entire = json.loads(output.strip())
-        if isinstance(data_entire, dict) and "Quantity" in data_entire and "Unit" in data_entire:
+        if isinstance(data_entire, dict) and "Multiplier" in data_entire:
             return {
-                "Quantity": float(data_entire["Quantity"]),
-                "Unit": str(data_entire["Unit"])
+                "Multiplier": float(data_entire["Multiplier"])
             }
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, ValueError, TypeError):
         pass  # Not valid JSON in the entire output
 
     # -- 2) Extract code blocks and try JSON parsing on each --
-    #    Allows optional language marker after ```
     code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', output, flags=re.DOTALL)
     for block in code_blocks:
         text_block = block.strip()
-        # Try direct JSON parsing of each block
         try:
             block_data = json.loads(text_block)
-            if (
-                isinstance(block_data, dict)
-                and "Quantity" in block_data
-                and "Unit" in block_data
-            ):
+            if isinstance(block_data, dict) and "Multiplier" in block_data:
                 return {
-                    "Quantity": float(block_data["Quantity"]),
-                    "Unit": str(block_data["Unit"])
+                    "Multiplier": float(block_data["Multiplier"])
                 }
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError, TypeError):
             pass  # Not valid JSON in this code block
-
-        # If block isn't valid JSON, we can try direct regex on the text_block
-        # in case it's just partial JSON (no braces).
-        # (We'll still do the global fallback below, so we can skip here.)
 
     # -- 3) Fallback: Regex search in the entire output --
     #    a) Pattern with curly braces
     fallback_pattern_braces = re.compile(
-        r'\{\s*"Quantity"\s*:\s*([\-\+\deE\.]+)\s*,\s*"Unit"\s*:\s*"([^"]+)"\s*\}',
+        r'\{\s*"Multiplier"\s*:\s*([\-\+\deE\.]+)\s*\}',
         flags=re.DOTALL
     )
     match_braces = fallback_pattern_braces.search(output)
     if match_braces:
-        quantity_str = match_braces.group(1)
-        unit_str = match_braces.group(2)
         try:
             return {
-                "Quantity": float(quantity_str),
-                "Unit": unit_str
+                "Multiplier": float(match_braces.group(1))
             }
         except ValueError:
             pass  # Couldn't parse float
 
     #    b) Pattern without curly braces (partial JSON)
-    #       Allows optional comma between "Quantity": ... and "Unit": ...
     fallback_pattern_no_braces = re.compile(
-        r'"Quantity"\s*:\s*([\-\+\deE\.]+)\s*,?\s*"Unit"\s*:\s*"([^"]+)"',
+        r'"Multiplier"\s*:\s*([\-\+\deE\.]+)',
         flags=re.DOTALL
     )
     match_no_braces = fallback_pattern_no_braces.search(output)
     if match_no_braces:
-        quantity_str = match_no_braces.group(1)
-        unit_str = match_no_braces.group(2)
         try:
             return {
-                "Quantity": float(quantity_str),
-                "Unit": unit_str
+                "Multiplier": float(match_no_braces.group(1))
             }
         except ValueError:
             pass  # Couldn't parse float
 
-    # -- If none of the above succeeded, raise an error --
-    raise ValueError(f"Failed to extract JSON for unit conversion: {output}")
-
+    # -- If nothing worked, return a default safe multiplier --
+    return {"Multiplier": 1.0}
+ 
 def time_conversion(user_quantity, user_time_period, db_standard_time_period, product, llm):
+    """
+    Convert a given quantity from one time period to another by retrieving a conversion multiplier from LLM.
+
+    Parameters:
+        user_quantity (float): The quantity provided by the user.
+        user_time_period (str): The time period associated with the user's quantity.
+        db_standard_time_period (str): The standard time period to which conversion is required.
+        llm: The language model instance to use for processing.
+
+    Returns:
+        float: The converted quantity after applying the LLM-provided multiplier.
+    """
+
+    # Define the prompt
     time_conversion_prompt = """
-    You are an expert in time period conversion. Convert a given quantity with a time period into a different time period.
+    You are an expert in time period conversion. Your task is to determine the multiplier required to convert a given quantity from one time period to another.
 
     Instructions:
-    1. Convert the given quantity from the user's time period to the specified Database standard time period.
-    2. If a product is specified, consider its characteristics (e.g., density) for any conversions that might involve the product's physical properties.
-    3. Ensure the output quantity is always a valid number (integer or decimal). It must not contain commas, fractions, or any special symbols (e.g., "1,23,456", "2012/2" are not allowed).
-    4. Always output the converted value with exact precision (do not round off any values).
-    5. Do not include any extra text or explanation in the output. Only return a JSON object.
+    1. Determine the exact multiplier needed to convert from the user's time period to the standard time period.
+    2. Do NOT perform any multiplication with the user quantity. The user quantity is provided for reference only. The actual multiplication will be handled separately in the Python code.
+    3. Ensure that the multiplier is logically accurate for various time scales (e.g., per minute to per annum, per week to per decade).
+    4. If the conversion is not straightforward (e.g., "per decade to per second"), return the most reasonable multiplier that allows for practical computation.
+    5. Do NOT return 0 or an empty value in any case. Always return a logical, usable multiplier.
+    6. The output must be strictly numerical, without any units, symbols, or explanations.
+    7. Do NOT infer multipliers incorrectly. Use real-world time conversions based on logical calculations.
+
+    Example Conversions:
+    - "Per hour" → "Per day" → Multiplier: `24`
+    - "Per 3 hours" → "Per annum" → Multiplier: `(3 * 8 * 365) = 8760`
+    - "Per second" → "Per year" → Multiplier: `(60 * 60 * 24 * 365) = 31,536,000`
+    - "Per decade" → "Per second" → Return a practical approximation.
 
     Inputs:
-    - User Quantity: {user_quantity}
+    - User Quantity: {user_quantity} (For reference only, do not use it in calculations)
     - User Time Period: {user_time_period}
     - Database Standard Time Period: {db_standard_time_period}
-    - Product: {product}
+    - Product: {product} (Not needed for time period conversion, ignore)
 
-    Output:
+    Output Format:
+    Provide only the extracted multiplier in the following JSON format:
     {{
-        "Quantity": <converted_quantity>,
-        "Time Period": "<db_standard_time_period>"
+        "Multiplier": <conversion_multiplier>
     }}
     """
 
+    # Define prompt structure
     prompt = PromptTemplate(
         input_variables=["user_quantity", "user_time_period", "db_standard_time_period", "product"],
         template=time_conversion_prompt
     )
     chain = prompt | llm
+
+    # Invoke LLM for multiplier retrieval
     response = chain.invoke({
         "user_quantity": user_quantity,
         "user_time_period": user_time_period,
         "db_standard_time_period": db_standard_time_period,
         "product": product
     })
-    return extract_json_time_conversion(response.content.strip())
+
+    # Extract multiplier using helper function
+    multiplier_data = extract_json_time_conversion(response.content.strip())
+
+    return {
+        "Quantity": user_quantity * multiplier_data["Multiplier"],
+        "Time Period": db_standard_time_period
+    }
  
 def unit_conversion(user_quantity, user_unit, db_standard_unit, product, llm):
+    """
+    Convert a given quantity from the user's unit to the standard unit using a multiplier.
+
+    Parameters:
+        user_quantity (float): The quantity provided by the user.
+        user_unit (str): The unit associated with the user's quantity.
+        db_standard_unit (str): The required standard unit for conversion.
+        product (str): The product name (if applicable) for density-based conversions.
+        llm: The language model instance for determining the conversion multiplier.
+
+    Returns:
+        dict: A dictionary containing the converted quantity and standard unit.
+    """
+
     unit_conversion_prompt = """
-    You are an expert in unit conversion. Convert a given quantity with a unit into a different unit.
+    You are an expert in unit conversion. Your task is to determine the conversion multiplier required to transform a given unit from the user's unit to the standard unit.
 
     Instructions:
-    1. Convert the given quantity from the user's unit to the specified standard unit.
-    2. If a product is specified, consider its characteristics (e.g., density) for any conversions that might involve the product's physical properties.
-    3. Ensure the output quantity is always a valid number (integer or decimal). It must not contain commas, fractions, or any special symbols (e.g., "1,23,456", "240,00,144.0", "2012/2" are not allowed).
-    4. Always output the converted value with exact precision (do not round off any values).
-    5. Do not include any extra text or explanation in the output. Only return a JSON object.
+    1. Return ONLY the multiplier required to convert 1 unit of the user's unit into the standard unit.
+    2. DO NOT perform any multiplication with the user quantity. The multiplier must always represent the conversion factor for just 1 unit of the user's unit.
+    3. If the product's density affects the unit conversion, carefully factor it into the multiplier.
+    4. If the conversion seems illogical, still return a non-zero multiplier that is the most logically valid.
+    5. The output must always be a valid numerical multiplier (integer or decimal).  
+    - DO NOT return text, explanations, or symbols.  
+    - DO NOT modify, infer, or manipulate the user quantity.  
+    6. If the conversion requires a product’s density but is missing, return a safe estimated multiplier instead of inferring an inaccurate conversion factor.
+    7. Strict JSON Output: Ensure the output follows the exact format.
 
     Inputs:
-    - User Quantity: {user_quantity}
+    - User Quantity (Reference Only): {user_quantity}
     - User Unit: {user_unit}
-    - Database Standard Unit: {db_standard_unit}
+    - Standard Unit: {db_standard_unit}
     - Product: {product}
 
-    Output:
+    Output Format:
     {{
-        "Quantity": <converted_quantity>,
-        "Unit": "<db_standard_unit>"
+        "Multiplier": <conversion_multiplier>
     }}
     """
 
@@ -1036,8 +1046,21 @@ def unit_conversion(user_quantity, user_unit, db_standard_unit, product, llm):
         "db_standard_unit": db_standard_unit,
         "product": product
     })
-    return extract_json_unit_conversion(response.content.strip())
 
+    # Extract JSON response from model output
+    multiplier_data = extract_json_unit_conversion(response.content.strip())
+
+    # Ensure the extracted multiplier is valid
+    multiplier = multiplier_data.get("Multiplier", 1)
+
+    # Final conversion using Python
+    converted_quantity = float(user_quantity) * float(multiplier)
+
+    return {
+        "Quantity": converted_quantity,
+        "Unit": db_standard_unit
+    }
+ 
 def convert_to_standard_unit(user_quantity, user_unit, user_time_period, db_standard_unit, db_standard_time_period, product, llm):
     """
     Perform the full conversion in two steps:
@@ -1129,7 +1152,7 @@ def split_unit_and_time_period(input_string, llm):
         "input_string": input_string
     })
     return extract_json_unit_split(response.content.strip())
-
+ 
 def entry_build_from_scratch(input,chatId):
     final_json = get_json_for_industry()
     main_industry = get_main_industry(final_json)
@@ -1222,7 +1245,7 @@ def do_unit_conversion(state):
     db_standard_time_period = standard_unit_time["time_period"]
 
     converted_output = convert_to_standard_unit(
-        user_quantity, user_unit, user_time_period, db_standard_unit, db_standard_time_period, product_name, llm_70b_vers
+        user_quantity, user_unit, user_time_period, db_standard_unit, db_standard_time_period, product_name, llm_deepseek
     )
 
     return converted_output
