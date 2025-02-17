@@ -65,10 +65,10 @@ def insert_process(parentId, process_name, process_value, status):
     try:
         # Create a new child table row using Frappe ORM
         child_row = frappe.get_doc({
-            "doctype": "Progress",  # Replace with the actual child table doctype name
+            "doctype": "Progress",
             "parent": parentId,
             "parentfield": "progress",
-            "parenttype": "Session",  # Replace with the actual parent doctype name
+            "parenttype": "Session",
             "process_name": process_name,
             "process_value": process_value,
             "status": status
@@ -77,8 +77,6 @@ def insert_process(parentId, process_name, process_value, status):
         # Save the new row to the database
         child_row.insert(ignore_permissions=True)
 
-        # Commit the transaction
-        # child_row.save()
         frappe.publish_realtime(
             event="progress_update",
             message={"parentId": parentId, "process_name": process_name, "new_status": status},
@@ -96,7 +94,7 @@ def update_process(parentId, process_name, new_status):
     try:
         # Find the child row using Frappe ORM
         child_row = frappe.get_list(
-            "Progress",  # Replace with the actual child table doctype name
+            "Progress",
             filters={
                 "parent": parentId,
                 "parentfield": "progress",
@@ -116,8 +114,6 @@ def update_process(parentId, process_name, new_status):
         row_doc.status = new_status
         row_doc.save(ignore_permissions=True)
 
-        # Commit the transaction
-        # child_row.save()
         frappe.publish_realtime(
             event="progress_update",
             message={"parentId": parentId, "process_name": process_name, "status": new_status},

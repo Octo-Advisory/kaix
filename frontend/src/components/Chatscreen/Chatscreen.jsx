@@ -11,9 +11,9 @@ import '../Chatscreen/Chatscreen.css';
 import userIcon from '../../assets/user.png'
 import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
-import { FrappeContext, useFrappeCreateDoc, useFrappeGetCall } from 'frappe-react-sdk'
+import { FrappeContext, useFrappeCreateDoc, useFrappeGetCall, useFrappeGetDoc } from 'frappe-react-sdk'
 import ProgressScreen from '../ProgressScreen/ProgressScreen'
-import { addAIresponse } from '../../Redux/Store/Featuresilces/aiResponse';
+import { addAIresponse,clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
 
 function Chatscreen() {
   const [message, setMessage] = useState('');
@@ -31,6 +31,7 @@ function Chatscreen() {
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const [isProgressVisible, setIsProgressVisible] = useState(false);
+  const responseAi = useSelector((state)=>state.ai.aiReponse)
 
   //Create frappe context to call apis
   const {call} = useContext(FrappeContext)
@@ -44,7 +45,7 @@ function Chatscreen() {
 
   const fetchAIResponse = async (message,chatId) => {
     try {
-      const result = await call.get("frontend_app.Management_Class.AI.ai_module_call", {
+      const result = await call.get("frontend_app.Management_Class.Ai_management.AI.ai_module_call", {
         input: message,
         chatId: chatId
       });
@@ -154,6 +155,41 @@ function Chatscreen() {
     }
   };
 
+  const validationCall = async (aiResponse,user_intension) => {
+    try {
+      const result = await call.get("frontend_app.Validations.validate.validation", {
+        aiResponse: aiResponse,
+        user_intension: user_intension
+      });
+      console.log("validation result",result);
+      
+    } catch (error) {
+      console.log("error 🤣",error);
+      
+    }
+  }
+
+  const hanldeValidation = async () =>{
+   try {
+    const respo = await fetch(`api/resource/Session?fields=["user_intension"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
+      method: 'GET',
+      headers: {
+        // 'Authorization': 'token your_api_token', // Replace with actual token
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const userIntesion = await respo.json()
+    const user_intension = userIntesion['data'][0]['user_intension']
+    
+    await validationCall(responseAi,user_intension)
+    
+   } catch (error) {
+    console.log("error is",error);
+    
+   }
+  }
+
   const handleConfirmation = (response) => {
     setConfirmationPending(false);
     const confirmationMessage = {
@@ -178,9 +214,10 @@ function Chatscreen() {
         timestamp: new Date().toISOString(),
       };
       dispatch(addMessage(newAIMessage));
+      // hanldeValidation()
       setTimeout(() => {
         setIsProgressVisible(true)
-      }, 1000);
+      }, 0);
     }else{
       const newAIMessage = {
         sender: 'ai',
@@ -188,6 +225,7 @@ function Chatscreen() {
         timestamp: new Date().toISOString(),
       };
       dispatch(addMessage(newAIMessage));
+      dispatch(clearAiresponse())
     }
   };
 
@@ -198,9 +236,7 @@ function Chatscreen() {
   useEffect(()=>{
     if (messages.length === 0 && !chatId) {
       createSessionid();
-      // return;
-      console.log("created bro!");
-      
+      // return;    
     }
   },[])
 

@@ -1,23 +1,25 @@
 import frappe
 from langchain.prompts import PromptTemplate
 from frontend_app.Ai_module.Query_Classification_And_Analysis import classify_query,llm_70b_vers_creative
-from frontend_app.Ai_module.Extraction_for_employement_search import call_handle_employment_query
+from frontend_app.Ai_module.employement_query.Extraction_for_employement_search import call_handle_employment_query
 from frontend_app.Ai_module.build_from_scratch.Extraction_for_Building_from_Scratch import entry_build_from_scratch
 from frontend_app.Ai_module.incentive_query.Extraction_for_incentive_search import call_incentive_search
+from frontend_app.Ai_module.approval_query.Extraction_for_approval_search import call_handle_approval_query
+from frontend_app.Ai_module.vendor_query.Extraction_for_vendor_search import call_handle_vendor_query
 
 @frappe.whitelist(allow_guest=True)
 def ai_module_call(input,chatId):
     try:
-        # Check user intension if already get
+        # Check if user intention is already determined
         user_intension = check_user_intension(chatId)
-        frappe.log_error(f"user_intension {user_intension}")
-        if user_intension == None:    # if user intension already there use it
+
+        if user_intension == None:    # If not, classify the query
             user_intension = classify_query(input)
-            frappe.log_error(f"cataory found {user_intension}")
-            if user_intension != "Valueless queries":   
-                update_user_intension(user_intension,chatId)  
             
-        frappe.log_error(f"user_intension {user_intension}")
+            if user_intension != "Valueless queries":   
+                update_user_intension(user_intension,chatId)  # Store the classified intention for future use
+        
+         # Handle different user intentions
         if user_intension == "Query to build industry from Scratch":
             try:
                 response = entry_build_from_scratch(input,chatId)
@@ -26,7 +28,7 @@ def ai_module_call(input,chatId):
                 response = { 
                     "Ai_response": "Internal Server Error! Please Try After Some Time....",
                     "Is_confirmation" : None,
-                    "Error":e
+                    "Error":e,
                 }
                 return response
             
@@ -42,16 +44,17 @@ def ai_module_call(input,chatId):
                 }
                 return response
             
-        # elif user_intension == "Query to search Vendors":
-        #     try:
-        #         response = call_handle_employment_query(input,chatId)
-        #         return response
-        #     except Exception as e:
-        #         response = { 
-        #             "Ai_response": "Internal Server Error! Please Try After Some Time....",
-        #             "Is_confirmation" : None,
-        #         }
-        #         return response
+        elif user_intension == "Query to search Vendors":
+            try:
+                response = call_handle_vendor_query(input,chatId)
+                return response
+            except Exception as e:
+                response = { 
+                    "Ai_response": "Internal Server Error! Please Try After Some Time....",
+                    "Is_confirmation" : None,
+                    "error": e
+                }
+                return response
             
         elif user_intension == "Query to search Incentives":
             try:
@@ -65,16 +68,17 @@ def ai_module_call(input,chatId):
                 }
                 return response
             
-        # elif user_intension == "Query to Get Approvals":
-        #     try:
-        #         response = call_handle_employment_query(input,chatId)
-        #         return response
-        #     except Exception as e:
-        #         response = { 
-        #             "Ai_response": "Internal Server Error! Please Try After Some Time....",
-        #             "Is_confirmation" : None,
-        #         }
-        #         return response
+        elif user_intension == "Query to Get Approvals":
+            try:
+                response = call_handle_approval_query(input,chatId)
+                return response
+            except Exception as e:
+                response = { 
+                    "Ai_response": "Internal Server Error! Please Try After Some Time....",
+                    "Is_confirmation" : None,
+                    "error": e
+                }
+                return response
         else:
             message = generate_dynamic_message(input)
             response = { 
@@ -102,42 +106,43 @@ def update_user_intension(user_intension,chatId):
     frappe.db.sql(query, (user_intension, chatId))
     frappe.db.commit() 
 
-@frappe.whitelist()
 def generate_dynamic_message(user_message: str) -> str:
     """
-    Generates a concise dynamic response based on user input.
+    Generates a concise and relevant response based on user input, ensuring the query is valid and within context.
     
     Parameters:
         user_message (str): The latest user input.
     
     Returns:
-        str: A refined question, clarification request, or response (short and clear).
+        str: A refined question, clarification request, or response that ensures user queries remain relevant.
     """
-
+    
     prompt = """
-    You are a highly skilled assistant that provides **brief and effective** responses.
+    You are a professional and user-friendly AI assistant. Your goal is to guide users to provide relevant and meaningful queries.
     
     Your task:
-    1. **Understand the User’s Input**:
-       - If the input is vague or incomplete, suggest a **clear and well-formed query (max 10 words).**
-       - If the input lacks details, **ask for more specifics in one sentence.**
-       - If the input is valid, generate a **concise response in one or two sentences.**
-
-    2. **Ensure Responses Are Short & Direct**:
-       - Keep the response **under 20 words.**
-       - Avoid unnecessary explanations or long-winded replies.
-       - If the query is **off-topic**, politely **redirect in one short sentence.**
-
+    1. **Process the User’s Input**:
+       - If the input is a greeting (e.g., "Hello", "Hi", "Hey"), respond with a friendly AI introduction.
+       - If the input is vague, incomplete, or off-topic, politely guide the user to provide a valid query.
+       - If details are missing, ask for clarification in a friendly and professional manner.
+       - If the query is relevant, respond concisely and informatively.
+    
+    2. **Ensure Responses Are Polite, Clear & On-Topic**:
+       - If the input is a greeting: "Hello! How can I assist you today?"
+       - If the input is unclear or off-topic: "I'm here to help with relevant queries. Could you provide more details?"
+       - If the input lacks details: "Could you clarify your request so I can assist better?"
+       - If the input is valid: A short and relevant response (max 20 words).
+    
     ## User's Input:
     "{user_message}"
-
+    
     ## Expected Output:
-    - If the query is unclear, rewrite it as a **better, shorter question (max 10 words).**
-    - If details are missing, **ask for more specifics (max 15 words).**
-    - If the query is valid, **respond concisely in 1-2 short sentences (max 20 words).**
-    - If the query is off-topic, **redirect politely in one sentence.**
+    - If greeting detected: "Hello! How can I assist you today?"
+    - If the query is off-topic: "I'm here to assist with [your context]. Please provide a relevant question."
+    - If the query is unclear: "Could you clarify your request?"
+    - If the query is valid: A short and helpful response.
     """
-
+    
     llm = llm_70b_vers_creative  # Your LLM instance
     prompt_template = PromptTemplate(
         input_variables=["user_message"],
@@ -145,5 +150,5 @@ def generate_dynamic_message(user_message: str) -> str:
     )
     chain = prompt_template | llm
     message = chain.invoke({"user_message": user_message})
-
+    
     return message.content.strip()

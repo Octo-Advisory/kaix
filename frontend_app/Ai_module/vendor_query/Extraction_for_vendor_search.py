@@ -1,0 +1,1704 @@
+import warnings
+import re
+import pandas as pd
+from typing import List, Dict, Tuple, Union, Any, Optional
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers,llm_70b_vers_creative, extract_main_industry_and_product_universal, extract_sub_sector_and_product_universal, extract_segment_and_product_universal
+from langchain.schema import HumanMessage, AIMessage
+from rapidfuzz import process, fuzz
+import spacy
+import frappe
+from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
+
+warnings.filterwarnings("ignore")
+
+# Load SpaCy model (medium or large recommended)
+nlp = spacy.load("en_core_web_lg")
+
+def fetch_query_results(query):
+    """
+    Executes a given SQL query and returns the results.
+    
+    :param query: SQL query to execute
+    :return: List of tuples containing query results
+    """
+    try:
+        results = frappe.db.sql(query)
+        return results
+
+    except:
+        return None
+
+# Define a function to refine the query using history for vendor search
+def refine_query_with_history_for_vendor(history, latest_query, llm):
+   """
+   Refine and structure the user's vendor search query using conversational history as reference 
+   while ensuring that only explicitly mentioned details (location, industry, supply) are considered.
+
+   Parameters:
+   - history (List[str]): The chat history for context, but not for inference.
+   - latest_query (str): The most recent user query that needs refinement.
+   - llm: The language model instance for query refinement.
+
+   Returns:
+   - str: A clean, standalone, and contextually accurate reformulated vendor search query.
+   """
+
+   # Define retriever prompt  
+   retriever_prompt_template = """  
+   Given the chat history and the latest user input, reformulate a standalone query that maintains the intent and structure of the latest user input.  
+   Use the AI's messages for context only to understand the user's intent better, but DO NOT take examples, assumptions, or suggestions from AI responses as the user's actual input unless the user explicitly agrees or repeats them.  
+
+   Instructions:
+   1. Preserve the Original Structure of the User Input.  
+      - If the user’s latest input is a statement, the reformulated query must remain a statement.  
+      - If the user’s latest input is a question, the reformulated query must remain a question.  
+
+   2. Strictly Extract Information Only from the Latest User Input.  
+      - Do NOT infer, assume, or carry forward any Industry (Main-Industry, Sub-Sector, Segment), Location (Area, City, State), or Supply Details (Raw Material, Service, Equipment) from past conversations unless explicitly mentioned in the latest user input.  
+      - If the user does not mention any industry, location, or supply information in the latest query, do NOT include any from past messages.  
+
+   3. Chat History is Only for Reference.  
+      - Use the chat history only to understand the flow of the conversation but not to infer missing details.  
+      - If the user explicitly refers to a past message (e.g., “same as before” or “like I mentioned earlier”), then and only then consider details from history.  
+
+   4. Handling Multiple Information Types in Vendor Search.  
+      - The vendor search query may include any of the following details:  
+      - Industry Details: Main-Industry, Sub-Sector, Segment.  
+      - Location Details: Area, City, State.  
+      - Supply Details: Raw Material, Equipment, or Service.  
+      - If the user mentions multiple details, include them exactly as they appear in the latest query.
+
+   5. Do NOT Modify the Intent of the Query.  
+      - The reformulated query must retain the user’s original intent without additional modifications.  
+      - Do NOT alter the meaning of the query, even if restructuring is required for clarity.  
+
+   6. No Explanations, Reasoning, or Justifications.  
+      - The output must be a clean and direct reformulation of the user’s intent without unnecessary elaboration.  
+      - Do NOT add any reasons like "Based on your past conversation..."  
+
+   ---
+
+   Inputs:
+   - Chat History (for reference only):  
+   {history}  
+
+   - Latest User Query:  
+   {latest_query}  
+
+   Reformulated Standalone Query:  
+   """
+
+   # Create prompt template
+   prompt = PromptTemplate(
+      input_variables=["history", "latest_query"],
+      template=retriever_prompt_template
+   )
+
+   # Invoke the LLM chain
+   chain = prompt | llm
+   refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
+   refined_text = refined_query.content.strip()
+
+   # Extract the reformulated standalone query
+   match = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', refined_text, re.IGNORECASE)
+   if match:
+      # Return the captured group that is not None
+      return next(group for group in match.groups() if group)
+
+   # Fallback to the entire response if no match is found
+   return refined_text
+
+def classify_vendor_query(query, llm):
+   """
+   Classify the user's vendor search query into the following categories:
+
+   1. Vendor Search for location without industry and supply details.
+   2. Vendor Search for industry without location details.
+   3. Vendor Search for supply without location details.
+   4. Vendor Search for industry with location details.
+   5. Vendor Search for supply with location details.
+   6. Other Intent.
+
+   Args:
+      query (str): The user's input query.
+      llm: The language model instance.
+
+   Returns:
+      dict: A dictionary with the raw prompt, classification category, and explanation if needed.
+   """
+
+   # Define the category mapping
+   category_mapping = {
+      1: "Vendor Search for location without industry and supply details",
+      2: "Vendor Search for industry without location details",
+      3: "Vendor Search for supply without location details",
+      4: "Vendor Search for industry with location details",
+      5: "Vendor Search for supply with location details",
+      6: "Other Intent",
+   }
+
+   # Define the raw prompt string
+   raw_prompt = """
+   You are an expert in analyzing user queries related to vendor searches. Your task is to classify the user's intention into one of the following categories:
+
+   1. Vendor Search for a Location without Industry or Supply Details  
+      - The user only mentions a location but does not specify any industry or supply details.  
+      - Example: "I need vendor details in Gujarat."  
+
+   2. Vendor Search for an Industry without a Location  
+      - The user mentions an industry, sector, or product but does not specify a location or specific supply details.  
+      - Example: "Who are the top vendors for pharmaceuticals?"  
+
+   3. Vendor Search for a Specific Supply without a Location  
+      - The user mentions a specific supply (raw material, equipment, or service) but does not provide a location.  
+      - Example: "I need a supplier for industrial chemicals."  
+
+   4. Vendor Search for an Industry with a Location  
+      - The user mentions both an industry and a location, but does not mention a specific supply.  
+      - Example: "Looking for vendors in the textile industry in Surat."  
+
+   5. Vendor Search for a Specific Supply with a Location  
+      - The user mentions both a supply and a location.  
+      - Example: "Need API suppliers in Gujarat."  
+
+   6. Other Intent  
+      - If the query does not match any of the above categories or is unrelated to vendor search.  
+      - Example: "What are the government incentives for setting up a business?"  
+
+   ---
+
+   Important Classification Guidelines:
+
+   1️. Industry vs. Supply Search - Sentence Structure Matters
+   - If the sentence structure places an industry or product in focus, classify it as Industry Search.
+   - If the sentence structure places a material/service/equipment in focus, classify it as Supply Search.
+   - Example:  
+   - "Need vendors for steel manufacturing." → Industry Search (Focus = industry)  
+   - "Need stainless steel for steel manufacturing." → Supply Search (Focus = specific material)  
+
+   2️. Handling Queries That Mention Both a Product & Supply
+   - If a specific supply is explicitly mentioned, it overrides the product mention → Supply Search.
+   - If the product is mentioned without supply details, it means they need all supplies for production → Industry Search.
+   - Example:  
+   - "I need rubber for making tires." → Supply Search  
+   - "I need vendors for tire production." → Industry Search  
+
+   3️. Handling Raw Materials, Equipment, and Services
+   - If a query says "raw materials for production", classify it as Industry Search.
+   - If a query mentions a specific raw material, classify it as Supply Search.
+   - If a query mentions equipment or services, classify it as Supply Search.
+   - Example:  
+   - "I need raw materials for plastic production." → Industry Search  
+   - "I need polymer granules for plastic production." → Supply Search  
+   - "Where can I find machinery for the pharmaceutical sector?" → Supply Search  
+
+   4️. Ensure Robust Classification for Vague Queries
+   - Even if the query is vague, incomplete, or not in full sentences, attempt to classify it accurately.
+   - Do NOT assume an answer is Supply Search by default—always check context.
+
+   ---
+
+   Final Output Format
+   - Classify the query into one of the categories (1, 2, 3, 4, 5, or 6).
+   - Provide the classification number ONLY.
+
+   Query: {query}
+
+   Output:  
+   Classification Number
+   """
+
+
+   # Create a PromptTemplate for chaining
+   prompt_template = PromptTemplate(
+      input_variables=["query"],
+      template=raw_prompt,
+   )
+
+   # Use the prompt in a chain
+   chain = prompt_template | llm
+   # Run the chain and capture the response
+   response = chain.invoke({"query": query})
+
+   # Use regex to extract a valid classification number
+   match = re.search(r"^\s*([1-6])\s*$", response.content.strip())
+   if match:
+      classification_number = int(match.group(1))
+      classification_category = category_mapping[classification_number]
+      return {
+         "raw_prompt": raw_prompt,
+         "classification_number": classification_number,
+         "classification_category": classification_category,
+      }
+   else:
+      raise ValueError(f"Unexpected or invalid response from LLM: {response}")
+
+def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
+   """
+   Extract the location mentioned in the user query and classify it into Area, City, State, or Country.
+   Additionally, determine if the extracted location is within India.
+
+   Parameters:
+      user_input (str): The user-provided query.
+      llm: The language model instance to use for processing.
+
+   Returns:
+      Dict[str, str]: A dictionary containing the extracted location, classification, and country check.
+   """
+
+   # Define the updated prompt
+   prompt_template = """
+   You are an expert in analyzing user queries and accurately extracting location information.  
+   Your task is to identify and extract the most relevant location from the user query and classify it into one of the following categories:
+   - Area: A specific sub-region or locality within a city.
+   - City: A well-known city.
+   - State: A state or province.
+   - Country: A country.
+
+   Key Extraction Rules:
+
+   1. Extract the Most Relevant Location Based on Context:
+   - If the query contains multiple locations, analyze the intent and extract only the most relevant.
+   - Ignore locations mentioned for personal reference or additional context (e.g., "I live in X but want to know about Y" → Extract only Y).
+   - Even if multiple locations are mentioned, extract only one that best aligns with the user's intent.
+
+   2. Do NOT Auto-Correct or Modify Spelling Unnecessarily:
+   - If the location name is extracted but uncertain, keep it as it is instead of attempting a correction.
+   - Some locations have similar names, and automatic correction can introduce errors (e.g., "Rinali" should not become "Ranoli").
+   - Only apply spelling corrections if the misspelling is obvious and widely known.
+
+   3. Preserve Abbreviations & Contextual Terms:
+   - If a location includes an abbreviation (e.g., "SEZ", "GIDC", "MIDC"), always retain it in the extracted name.
+   - Examples:
+      - "Dahej SEZ" → Extract as "Dahej SEZ" (not just "Dahej").
+      - "Sanand GIDC" → Extract as "Sanand GIDC" (not just "Sanand").
+   - Do not remove or alter these abbreviations.
+
+   4. Classify the Location Correctly (Default to Area if Unclear):
+   - Based on sentence structure and logical context, determine if the extracted location is an Area, City, State, or Country.
+   - Example Classifications:
+      - "Looking for vendors in Andheri" → Area: Andheri
+      - "Need approvals in Ahmedabad" → City: Ahmedabad
+      - "What are the rules for businesses in Maharashtra?" → State: Maharashtra
+      - "What are the import duties in Germany?" → Country: Germany
+   - If the classification is unclear, default to `"Area"` instead of making incorrect assumptions.
+
+   5. Check if the Location is from India:
+   - If the extracted location belongs to India, set `"From_India": "Yes"`.
+   - If the location is outside India, set `"From_India": "No"`.
+   - Assume that most locations mentioned will be from India.
+
+   6. Ensure the Official Location Name is Used (Without Unnecessary Changes):
+   - If a location has multiple variants, use the official name, but ONLY if it is widely accepted.
+   - Examples:
+      - "Bombay" → "Mumbai"
+      - "Calcutta" → "Kolkata"
+      - "Madras" → "Chennai"
+   - Do NOT change names that are already valid and contextually correct.
+
+   7. Only Return a Location if One is Mentioned:
+   - If no location is found in the query, return `"None"` as the value.
+
+   8. No Additional Explanations:
+   - The output must only contain the extracted location, classification, and country check.
+   - Do NOT provide reasoning, context, or explanations.
+
+   User Query:
+   {query}
+
+   Output Format:
+   Provide the extracted location, classification, and India check in the following JSON format:
+   {{
+      "Extracted_Location": "<Location or 'None'>",
+      "Classification": "<Area | City | State | Country | None>",
+      "From_India": "<Yes | No>"
+   }}
+   """
+
+   # Create a PromptTemplate and LLM chain
+   prompt = PromptTemplate(
+      input_variables=["query"],
+      template=prompt_template
+   )
+   chain = prompt | llm
+
+   # Run the LLM chain
+   response = chain.invoke({"query": user_input})
+
+   # Extract the response content
+   extracted_data = response.content.strip()
+
+   # Use regex to extract JSON-like structure
+   location_match = re.search(r'"Extracted_Location":\s*"([^"]+)"', extracted_data)
+   classification_match = re.search(r'"Classification":\s*"([^"]+)"', extracted_data)
+   from_india_match = re.search(r'"From_India":\s*"([^"]+)"', extracted_data)
+
+   # Assign extracted values
+   extracted_location = location_match.group(1) if location_match else "None"
+   classification = classification_match.group(1) if classification_match else "Area"  # Default to Area if missing
+   from_india = from_india_match.group(1) if from_india_match else "No"  # Default to "No" if missing
+
+   # Return extracted location, classification, and country check
+   return {
+      "Extracted_Location": extracted_location,
+      "Classification": classification,
+      "From_India": from_india
+   }
+
+def get_best_supply_match(extracted_supplies: List[str], available_supplies: List[str], fuzzy_threshold: int = 75, spacy_threshold: float = 0.65) -> List[str]:
+    """
+    Finds the best matches for extracted supplies using both SpaCy similarity and fuzzy matching.
+
+    Parameters:
+        extracted_supplies (List[str]): List of extracted supplies from user query.
+        available_supplies (List[str]): List of known available supplies.
+        fuzzy_threshold (int): Minimum score for fuzzy matching.
+        spacy_threshold (float): Minimum similarity threshold for SpaCy matching.
+
+    Returns:
+        List[str]: List of best-matching supplies from available choices.
+    """
+    validated_supplies = []
+    
+    for supply in extracted_supplies:
+        if not supply.strip():
+            validated_supplies.append("Not Available in List")
+            continue
+
+        # Fuzzy Matching
+        best_fuzzy_match = process.extractOne(supply, available_supplies, scorer=fuzz.ratio)
+        fuzzy_match_name, fuzzy_score = best_fuzzy_match[:2] if best_fuzzy_match else (None, 0)
+
+        # SpaCy Similarity Matching
+        supply_doc = nlp(supply.lower())
+        spacy_match_name = None
+        best_spacy_score = 0
+
+        for available_supply in available_supplies:
+            available_doc = nlp(available_supply.lower())
+            similarity_score = supply_doc.similarity(available_doc)
+
+            if similarity_score > best_spacy_score:
+                best_spacy_score = similarity_score
+                spacy_match_name = available_supply
+
+        # Use the best matching method
+        if fuzzy_score >= fuzzy_threshold:
+            validated_supplies.append(fuzzy_match_name)
+        elif best_spacy_score >= spacy_threshold:
+            validated_supplies.append(spacy_match_name)
+        else:
+            validated_supplies.append("Not Available in List")
+
+    return validated_supplies
+
+def extract_supplies_from_query(user_input: str, available_supplies: List[str], llm) -> Dict[str, List[str]]:
+    """
+    Extracts multiple supplies mentioned in the user query and validates them against a provided list of available supplies.
+
+    Parameters:
+        user_input (str): The user-provided query.
+        available_supplies (List[str]): List of all available supplies.
+        llm: The language model instance to use for processing.
+
+    Returns:
+        Dict[str, List[str]]: A dictionary containing lists of extracted and validated supplies.
+    """
+
+    # Define the prompt
+    prompt_template = """
+    You are an expert in analyzing user queries and accurately extracting supply-related information.  
+    Your task is to identify and extract all relevant supplies (raw materials, equipment, or services) mentioned in the user's query with the highest level of precision.  
+
+    ---
+    Key Extraction Rules:
+    
+    1. Extract All Relevant Supplies as Comma-Separated Values:
+    - If multiple supplies are mentioned, extract them as a comma-separated list.
+    - Ignore supplies that are mentioned only for example or comparison, unless they are part of the actual request.
+    - Example:  
+        - Query: "I need vendors for chemicals, machinery, and glass vials."  
+        - Extracted Output: `"Chemicals, Machinery, Glass Vials"`
+
+    2. Correct Spelling Mistakes & Typing Errors:
+    - Ensure high accuracy in recognizing supply names even if the user makes typos, spelling mistakes, or keyboard proximity errors.
+    - Example:
+        - Query: "I need vensors for steeel plates and cermic coatings."
+        - Extracted Output: `"Steel Plates, Ceramic Coatings"`
+    
+    3. Preserve Abbreviations & Standard Industry Names:
+    - If a supply has a widely used abbreviation, extract both full name and abbreviation together.
+    - Example:
+        - Query: "Need suppliers for HDPE and industrial ethanol."
+        - Extracted Output: `"High-Density Polyethylene (HDPE), Industrial Ethanol"`
+
+    4. Use Industry-Standard Naming Conventions:
+    - If a supply is mentioned using a lesser-known name, return the widely used industry name instead.
+    - Example:
+        - Query: "Suppliers for ethen and ethenol."
+        - Extracted Output: `"Ethylene, Ethanol"`
+
+    5. Do NOT Modify Correctly Spelled Supplies:
+    - If a supply is already correct, retain its exact name.
+    - Do NOT autocorrect or reword names unless an industry-standard term exists.
+
+    6. Retain Contextually Relevant Abbreviations & Short Forms:
+    - If an abbreviation is commonly used in the industry, extract both full name and abbreviation together.
+    - Example:
+        - Query: "Looking for PET resin suppliers."
+        - Extracted Output: `"Polyethylene Terephthalate (PET)"`
+
+    7. Ensure Consistent Extraction Format:
+    - The extracted supplies must always be comma-separated.
+    - If no supplies are found, return an empty list.
+
+    ---
+    User Query:
+    {query}
+
+    Output Format:
+    Provide only the extracted supplies in the following JSON format:
+    {{
+        "Supplies": "<Comma-Separated Extracted Supplies or Empty String>"
+    }}
+    """
+
+
+    # Create a PromptTemplate and LLM chain
+    prompt = PromptTemplate(
+        input_variables=["query"],
+        template=prompt_template
+    )
+    chain = prompt | llm
+
+    # Run the LLM chain
+    response = chain.invoke({"query": user_input})
+
+    # Extract supplies from the model response
+    supplies_match = re.search(r'"Supplies":\s*"([^"]*)"', response.content.strip())
+    
+    # Convert the extracted text into a list, ensuring comma separation
+    extracted_supplies = (
+        [s.strip() for s in supplies_match.group(1).split(",") if s.strip()] if supplies_match else []
+    )
+
+    # Return immediately if no supplies were extracted
+    if not extracted_supplies:
+        return {"Extracted_Supplies": [], "Validated_Supplies": []}
+
+
+    # Validate using fuzzy matching
+    validated_supplies = get_best_supply_match(extracted_supplies, available_supplies)
+
+    # Return extracted and validated supplies
+    return {
+        "Extracted_Supplies": extracted_supplies,
+        "Validated_Supplies": validated_supplies
+    }
+
+def generate_dynamic_message_for_vendor(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm) -> str:
+   """
+   Generate a dynamic follow-up message using LLM based on the latest context and static follow-up requirement for Vendor-related queries.
+
+   Parameters:
+      chat_history_for_context (List[dict]): The list of conversation history with user and AI messages.
+      static_follow_up (str): The static follow-up message to send to the user.
+      llm: The language model instance.
+
+   Returns:
+      str: The dynamically generated follow-up message.
+   """
+
+   # Prepare the conversation history context
+   recent_history = "\n".join(chat_history_for_context)  
+
+   # Define the prompt
+   prompt = """
+   You are a highly skilled assistant specializing in creating professional, engaging, and contextually relevant messages.
+   Your goal is to craft a polished follow-up message that seamlessly incorporates the provided static follow-up message while aligning with the tone and context of the recent conversation.
+
+   Key Instructions  
+   - The static follow-up message is only a reference.  
+   - Do NOT copy it word-for-word—instead, use it as guidance to create a well-crafted, natural response that follows all instructions.  
+   - Ignore placeholders like "None" or "Not Available in List"—they should NEVER be included in the final response.  
+   - Do NOT reference any industry (Main-Industry, Sub-Sector, Segment), location (Area, City, State), or supply (Raw Material, Equipment, Service) details from chat history or user messages unless explicitly mentioned in the static follow-up message.  
+   - In no circumstances should the model respond to off-topic queries. If a query is unrelated, handle it according to the specified instructions.  
+
+   Inputs
+   1. User’s Latest Message  
+   - This is the most recent message from the user. Use this to determine the appropriate tone, greetings, or redirection.  
+   - {user_message}  
+
+   2. Recent Conversation History  
+   - This contains past exchanges between the user and the assistant.  
+   - Chat history is only for reference. Do NOT infer, assume, or use any details about industry, supply, or location unless explicitly mentioned in the static follow-up message.  
+   - {recent_history}  
+
+   3. Static Follow-Up Message  
+   - This is the reference message containing the key details to be included in the final response.  
+   - Your task is to reword and refine this message into a polished, professional, and conversational follow-up.  
+   - Static Message: "{static_follow_up}"  
+
+   Response Guidelines
+
+   1. Proper Acknowledgment of Provided Details  
+   - If the user has already provided Industry details (Main-Industry, Sub-Sector, or Segment), Location (Area, City, or State), or Supply (Raw Material, Equipment, Service), acknowledge them clearly and explicitly.  
+   - Do NOT make a vague or partial acknowledgment—always specify exactly what was provided.  
+   - Example:  
+     - Correct: "You're looking for vendors for Cement in Mumbai."  
+     - Wrong: "You're looking for vendors." (Too vague)  
+   - If multiple details are provided, combine them logically:  
+     - Example: "You're looking for vendors for Steel (Armor Grade) in Chennai."  
+
+   2. Clearly Differentiate Between Searching for Supplies vs. Vendors for a Product  
+   - If the static message implies a distinction between looking for vendors of a specific supply vs. looking for all supplies required for a product, ensure this is conveyed naturally.  
+   - *Example Message Integration:*  
+     - "You can either specify a particular supply or simply tell us the product you want to produce—we’ll identify all the necessary supplies and connect you with the right vendors."  
+
+   3. If Details Are Missing, Request Them Separately  
+   - If Industry details (Main-Industry, Sub-Sector, or Segment) are missing, ask for them in a natural, concise way.  
+   - If Location details (Area, City, or State) are missing, ask the user to specify.  
+   - If Supply details (Raw Material, Equipment, or Service) are missing, request them politely.  
+   - Ensure missing details are requested AFTER acknowledgment.  
+   - Example:  
+     - Correct: "You're looking for vendors for Cement. Could you share the location—whether it's an area, city, or state—so we can find the best options for you?"  
+     - Wrong: "Could you confirm if you're looking for vendors for Cement and provide a location?" (Confirmation not needed)  
+
+   4. Ensure Acknowledgment & Request for Missing Details Are Clearly Separated  
+   - If acknowledgment is present, add a smooth transition before asking for missing details.  
+   - Example:  
+     - Correct: "You're looking for vendors for Industrial Chemicals. To find the best options, could you share the location where you're looking for them?"  
+     - Wrong: "You're looking for vendors for Industrial Chemicals. Could you confirm that and provide a location?" (Confirmation not required)  
+
+   5. Do NOT Copy the Static Message As-Is  
+   - Instead, use it as a reference to create a well-structured, smooth, and conversational response.
+   - The final response must not sound robotic or overly formal.
+   - Ensure the message is clear, natural, and engaging.
+
+   6. Intelligent Use of Conjunctions  
+   - Analyze the static follow-up message before adding conjunctions.
+   - If the message already has a natural transition, do not add an unnecessary conjunction.
+   - If the static message consists of two distinct parts (acknowledgment + request for missing details), place a proper conjunction between them where appropriate.
+   - The conjunction should not be at the very beginning of the message unless it naturally requires it.
+
+   7. Do NOT Address Off-Topic Queries  
+   - If the user’s query is unrelated to industry, supply, or vendor searches, politely inform them:
+      - *"I specialize in assisting with vendor-related queries for industries, supplies, and locations."*
+   - DO NOT attempt to answer off-topic queries—instead, redirect to the static follow-up message with a smooth transition.
+
+   8. Handling Greetings  
+   - If the user greets (e.g., "Hi", "Hello", "Good morning"), respond with an appropriate greeting.
+   - Ensure the transition to the follow-up message is smooth and natural using proper conjunctions.
+
+   9. Handling Special Events  
+   - If the user mentions a special occasion (e.g., birthday, anniversary), acknowledge and celebrate it first.
+   - Then transition smoothly into the static follow-up message using proper conjunctions.
+
+   10. Handling Negative Emotions  
+   - If the user expresses sadness, frustration, or anger, address their emotions with empathy first.
+   - Then transition seamlessly into the static follow-up message using a natural, logical flow.
+
+   Final Output Requirements
+   - Do NOT copy the static follow-up message word-for-word.
+   - Craft a clear, polished response that aligns with the user’s latest message.
+   - Ensure a smooth and engaging conversational flow.
+   - NEVER include placeholders like "None" or "Not Available in List" in the response.
+   - NEVER infer or use industry, supply, or location details unless they appear in the static follow-up message.
+   - NEVER address off-topic queries—redirect them properly.
+   - Keep the response concise (maximum 3 lines) while fully incorporating the static follow-up message.
+   - Ensure the message is professional, user-friendly, and free of unnecessary elaboration or additional context.
+   """
+
+
+   # Prepare input to the model
+   prompt_template = PromptTemplate(
+      input_variables=["user_message", "recent_history", "static_follow_up"],
+      template=prompt
+   )
+   chain = prompt_template | llm
+   message = chain.invoke({
+      "user_message": user_message,
+      "recent_history": recent_history,
+      "static_follow_up": static_follow_up
+   })
+
+   # Append AI message to chat history
+   chat_history_for_context.append(AIMessage(content=f"{message.content.strip()}"))
+   return message.content.strip()
+
+def get_static_follow_up_for_vendor(vendor_state: Dict[str, Dict[str, Optional[str]]], user_intention: str) -> str:
+    """
+    Generates a follow-up message based on available vendor search details.
+    
+    Ensures that at least one of the two required sets of information is provided:
+    1. (Industry Info + Location Info) or
+    2. (Supply Info + Location Info).
+
+    If any key details are missing, it constructs a natural and engaging message asking for them.
+
+    Parameters:
+        vendor_state (Dict[str, Dict[str, Optional[str]]]): The state containing extracted vendor search details.
+
+    Returns:
+        str: A refined follow-up message prompting the user for missing details.
+    """
+
+    # Extract state details
+    location_info = vendor_state.get("Location_info", {})
+    industry_info = vendor_state.get("Industry_info", {})
+    supply_info = vendor_state.get("Supply_info", {})
+
+    # Extract values
+    location = location_info.get("Location")
+    location_category = location_info.get("Location Category")
+
+    main_industry = industry_info.get("Main-Industry")
+    sub_sector = industry_info.get("Sub-Sector")
+    segment = industry_info.get("Segment")
+    product = industry_info.get("Product")
+
+    supplies = supply_info.get("Supplies", [])
+
+    # Check missing details
+    location_missing = location is None
+    industry_missing = main_industry is None
+    supply_missing = not supplies  # True if no supplies provided
+    sub_sector_missing = sub_sector is None
+
+    # Store provided details for acknowledgment
+    provided_details = []
+    missing_details = []
+    if user_intention == "Vendor Search for location without industry and supply details":
+        # **Handling Provided Information**
+        if location:
+            provided_details.append(f"You're looking for vendors in {location}.")
+        
+        if supplies:
+            provided_details.append(f"You're searching for vendors supplying {', '.join(supplies)}.")
+
+        if main_industry and sub_sector:
+            if product:
+                provided_details.append(f"You're looking for vendors for {product}.")
+            else:
+                provided_details.append(f"You're searching for vendors in the {sub_sector} sector under {main_industry}.")
+
+        # **Handling Missing Information**
+        
+        # **Case 1: If only Main-Industry is present, ask for product (which leads to sub-sector identification)**
+        if main_industry and sub_sector_missing:
+            if product is None:
+                return (
+                    f"We see that you're looking for vendors in the {main_industry} industry. Could you share more details about the specific product or service you need? This will help us refine our search and connect you with the most relevant vendors."
+                )
+            else:
+                return (
+                    f"We see that you're looking for vendors for {product}. Could you share more details about the specific product or service you need? This will help us refine our search and connect you with the most relevant vendors."
+                )
+            
+        # **Case 2: If Industry is provided but Location is missing**
+        if not location and main_industry:
+            missing_details.append(
+                "Could you share the location—whether it's an area, city, or state—where you're looking for vendors? This will help us find the best options for you."
+                )
+
+        # **Case 3: If Supply is provided but Location is missing**
+        if not location and supplies:
+            missing_details.append(
+                "Could you share the location—whether it's an area, city, or state—where you're looking for vendors? This will help us find the best options for you."
+                )
+
+        # **Case 4: If only Location is provided, ask whether they need vendors for an Industry or Specific Supply**
+        if location and industry_missing and supply_missing:
+            missing_details.append(
+                "To help you find the right vendors, please share what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll identify all the necessary supplies and connect you with the right vendors"
+            )
+
+        # **Case 5: No details provided at all**
+        if location_missing and industry_missing and supply_missing:
+            return (
+                "To help you find the right vendors, please share the location (area or city) and what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll find all the necessary supplies and their vendors for you."
+                )
+
+        # **Constructing the Follow-Up Message**
+        message = " ".join(provided_details)
+
+        if missing_details:
+            if len(missing_details) == 2:
+                message += f" However, I still need more details. {missing_details[0]} {missing_details[1]}"
+            else:
+                message += f" But {missing_details[0]}"
+
+        return message
+
+    elif user_intention == "Vendor Search for industry without location details":
+        # **Handling Provided Information**
+        if location:
+            provided_details.append(f"You're looking for vendors in {location}.")
+
+        if main_industry and sub_sector:
+            if product:
+                provided_details.append(f"You're looking for vendors for {product}.")
+            else:
+                provided_details.append(f"You're searching for vendors in the {sub_sector} sector under {main_industry}.")
+
+        # **Handling Missing Information**
+        
+        # **Case 1: If only Main-Industry is present, ask for product (which leads to sub-sector identification)**
+        if main_industry and sub_sector_missing:
+            if product is None:
+                return (
+                    f"We see that you're looking for vendors in the {main_industry} industry. Could you share more details about the specific product or service you need? This will help us refine our search and connect you with the most relevant vendors."
+                )
+            else:
+                return (
+                    f"We see that you're looking for vendors for {product}. Could you share more details about the specific product or service you need? This will help us refine our search and connect you with the most relevant vendors."
+                )
+            
+        # **Case 2: If Industry is provided but Location is missing**
+        if not location and main_industry:
+            missing_details.append(
+                "Could you share the location—whether it's an area, city, or state—where you're looking for vendors? This will help us find the best options for you."
+                )
+
+        # **Case 3: If only Location is provided, ask whether they need vendors for an Industry or Specific Supply**
+        if location and industry_missing and supply_missing:
+            missing_details.append(
+                "To help you find the right vendors, please share what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll identify all the necessary supplies and connect you with the right vendors"
+            )
+
+        # **Case 4: No details provided at all**
+        if location_missing and industry_missing and supply_missing:
+            return (
+                "To help you find the right vendors, please share the location (area or city) and what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll find all the necessary supplies and their vendors for you."
+                )
+
+        # **Constructing the Follow-Up Message**
+        message = " ".join(provided_details)
+
+        if missing_details:
+            if len(missing_details) == 2:
+                message += f" However, I still need more details. {missing_details[0]} {missing_details[1]}"
+            else:
+                message += f" But {missing_details[0]}"
+
+        return message
+    
+    elif user_intention == "Vendor Search for supply without location details":
+        # **Handling Provided Information**
+        if location:
+            provided_details.append(f"You're looking for vendors in {location}.")
+        
+        if supplies:
+            provided_details.append(f"You're searching for vendors supplying {', '.join(supplies)}.")
+
+
+        # **Handling Missing Information**
+
+        # **Case 1: If Supply is provided but Location is missing**
+        if not location and supplies:
+            missing_details.append(
+                "Could you share the location—whether it's an area, city, or state—where you're looking for vendors? This will help us find the best options for you."
+                )
+
+        # **Case 2: If only Location is provided, ask whether they need vendors for an Industry or Specific Supply**
+        if location and industry_missing and supply_missing:
+            missing_details.append(
+                "To help you find the right vendors, please share what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll identify all the necessary supplies and connect you with the right vendors"
+            )
+
+        # **Case 3: No details provided at all**
+        if location_missing and industry_missing and supply_missing:
+            return (
+                "To help you find the right vendors, please share the location (area or city) and what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll find all the necessary supplies and their vendors for you."
+                )
+
+        # **Constructing the Follow-Up Message**
+        message = " ".join(provided_details)
+
+        if missing_details:
+            if len(missing_details) == 2:
+                message += f" However, I still need more details. {missing_details[0]} {missing_details[1]}"
+            else:
+                message += f" But {missing_details[0]}"
+
+        return message
+    
+    elif user_intention == "Vendor Search for industry with location details":
+                # **Handling Provided Information**
+        if location:
+            provided_details.append(f"You're looking for vendors in {location}.")
+
+        if main_industry and sub_sector:
+            if product:
+                provided_details.append(f"You're looking for vendors for {product}.")
+            else:
+                provided_details.append(f"You're searching for vendors in the {sub_sector} sector under {main_industry}.")
+
+        # **Handling Missing Information**
+        
+        # **Case 1: If only Main-Industry is present, ask for product (which leads to sub-sector identification)**
+        if main_industry and sub_sector_missing:
+            if product is None:
+                return (
+                    f"We see that you're looking for vendors in the {main_industry} industry. Could you share more details about the specific product or service you need? This will help us refine our search and connect you with the most relevant vendors."
+                )
+            else:
+                return (
+                    f"We see that you're looking for vendors for {product}. Could you share more details about the specific product or service you need? This will help us refine our search and connect you with the most relevant vendors."
+                )
+            
+        # **Case 2: If Industry is provided but Location is missing**
+        if not location and main_industry:
+            missing_details.append(
+                "Could you share the location—whether it's an area, city, or state—where you're looking for vendors? This will help us find the best options for you."
+                )
+
+        # **Case 3: If only Location is provided, ask whether they need vendors for an Industry or Specific Supply**
+        if location and industry_missing and supply_missing:
+            missing_details.append(
+                "To help you find the right vendors, please share what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll identify all the necessary supplies and connect you with the right vendors"
+            )
+
+        # **Case 4: No details provided at all**
+        if location_missing and industry_missing and supply_missing:
+            return (
+                "To help you find the right vendors, please share the location (area or city) and what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll find all the necessary supplies and their vendors for you."
+                )
+
+        # **Constructing the Follow-Up Message**
+        message = " ".join(provided_details)
+
+        if missing_details:
+            if len(missing_details) == 2:
+                message += f" However, I still need more details. {missing_details[0]} {missing_details[1]}"
+            else:
+                message += f" But {missing_details[0]}"
+
+        return message
+    
+    elif user_intention == "Vendor Search for supply with location details":
+        # **Handling Provided Information**
+        if location:
+            provided_details.append(f"You're looking for vendors in {location}.")
+        
+        if supplies:
+            provided_details.append(f"You're searching for vendors supplying {', '.join(supplies)}.")
+
+
+        # **Handling Missing Information**
+
+        # **Case 1: If Supply is provided but Location is missing**
+        if not location and supplies:
+            missing_details.append(
+                "Could you share the location—whether it's an area, city, or state—where you're looking for vendors? This will help us find the best options for you."
+                )
+
+        # **Case 2: If only Location is provided, ask whether they need vendors for an Industry or Specific Supply**
+        if location and industry_missing and supply_missing:
+            missing_details.append(
+                "To help you find the right vendors, please share what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll identify all the necessary supplies and connect you with the right vendors"
+            )
+
+        # **Case 3: No details provided at all**
+        if location_missing and industry_missing and supply_missing:
+            return (
+                "To help you find the right vendors, please share the location (area or city) and what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll find all the necessary supplies and their vendors for you."
+                )
+
+        # **Constructing the Follow-Up Message**
+        message = " ".join(provided_details)
+
+        if missing_details:
+            if len(missing_details) == 2:
+                message += f" However, I still need more details. {missing_details[0]} {missing_details[1]}"
+            else:
+                message += f" But {missing_details[0]}"
+
+        return message
+    
+    else:
+        # **Handling Provided Information**
+        if location:
+            provided_details.append(f"You're looking for vendors in {location}.")
+        
+        if supplies:
+            provided_details.append(f"You're searching for vendors supplying {', '.join(supplies)}.")
+
+        if main_industry and sub_sector:
+            if product:
+                provided_details.append(f"You're looking for vendors for {product}.")
+            else:
+                provided_details.append(f"You're searching for vendors in the {sub_sector} sector under {main_industry}.")
+
+        # **Handling Missing Information**
+        
+        # **Case 1: If only Main-Industry is present, ask for product (which leads to sub-sector identification)**
+        if main_industry and sub_sector_missing:
+            if product is None:
+                return (
+                    f"We see that you're looking for vendors in the {main_industry} industry. Could you share more details about the specific product or service you need? This will help us refine our search and connect you with the most relevant vendors."
+                )
+            else:
+                return (
+                    f"We see that you're looking for vendors for {product}. Could you share more details about the specific product or service you need? This will help us refine our search and connect you with the most relevant vendors."
+                )
+            
+        # **Case 2: If Industry is provided but Location is missing**
+        if not location and main_industry:
+            missing_details.append(
+                "Could you share the location—whether it's an area, city, or state—where you're looking for vendors? This will help us find the best options for you."
+                )
+
+        # **Case 3: If Supply is provided but Location is missing**
+        if not location and supplies:
+            missing_details.append(
+                "Could you share the location—whether it's an area, city, or state—where you're looking for vendors? This will help us find the best options for you."
+                )
+
+        # **Case 4: If only Location is provided, ask whether they need vendors for an Industry or Specific Supply**
+        if location and industry_missing and supply_missing:
+            missing_details.append(
+                "To help you find the right vendors, please share what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll identify all the necessary supplies and connect you with the right vendors"
+            )
+
+        # **Case 5: No details provided at all**
+        if location_missing and industry_missing and supply_missing:
+            return (
+                "To help you find the right vendors, please share the location (area or city) and what you need. You can either specify a particular supply or simply tell us the product you want to produce—we’ll find all the necessary supplies and their vendors for you."
+                )
+
+        # **Constructing the Follow-Up Message**
+        message = " ".join(provided_details)
+
+        if missing_details:
+            if len(missing_details) == 2:
+                message += f" However, I still need more details. {missing_details[0]} {missing_details[1]}"
+            else:
+                message += f" But {missing_details[0]}"
+
+        return message
+
+def handle_vendor_query(
+    user_input: str,
+    main_industry_to_subsector_mapped_dict: Dict[str, Dict[str, List[str]]],
+    available_supplies: List[str],
+    extracted_state: Dict[str, Dict[str, Any]],
+    state: Dict[str, Dict[str, Any]],
+    llm: Any,
+    chatId
+) -> Union[Dict[str, Any], str]:
+    """
+    Handles vendor queries by analyzing user input, extracting relevant data, and responding accordingly.
+
+    Parameters:
+        user_input (str): The user query related to vendor search.
+        main_industry_to_subsector_mapped_dict (Dict[str, Dict[str, List[str]]]): Mapping of main industries to their respective subsectors and segments.
+        available_supplies (List[str]): List of available supplies.
+        extracted_state (Dict[str, Dict[str, Any]]): A dictionary containing extracted information about the query.
+        state (Dict[str, Dict[str, Any]]): A dictionary maintaining the state of the conversation.
+        llm (Any): The language model used for query refinement and classification.
+
+    Returns:
+        Union[Dict[str, Any], str]: A response containing AI-generated messages and extracted data.
+    """
+    
+    if state["Location_info"]["Location"] is not None:
+        perfect_location_data = True
+    else:
+        perfect_location_data = False
+    if state["Industry_info"]["Main-Industry"] is not None and state["Industry_info"]["Sub-Sector"] is not None:
+        perfect_industry_data = True
+    else:
+        perfect_industry_data = False
+    if not state["Supply_info"]["Supplies"]:
+        perfect_supply_data = False
+    else:
+        perfect_supply_data = True
+    
+    chat_history = get_chat(f"QVND_chat_{chatId}") or []
+
+    Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+
+    refined_user_input = refine_query_with_history_for_vendor(Chat_history_normal, user_input, llm)
+    chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
+    save_chat(chat_history,f"QVND_chat_{chatId}")
+    result = classify_vendor_query(refined_user_input, llm)
+    user_intention = result["classification_category"]
+    frappe.log_error(f"user _intesnion {user_intention}")
+
+    if user_intention == "Vendor Search for location without industry and supply details":
+        extracted_data = extract_location_from_vendor_query(refined_user_input, llm)
+        given_loacation = extracted_data["Extracted_Location"]
+        given_location_category = extracted_data["Classification"]
+        location_from_india = extracted_data["From_India"]
+
+        extracted_state["Location_info"]["Location"] = given_loacation if given_loacation != "None" else None
+        extracted_state["Location_info"]["Location Category"] = given_location_category if given_location_category != "None" else None
+        extracted_state["Location_info"]["From_India"] = location_from_india if (given_loacation != "None" and given_location_category != "None") else None
+        state["Location_info"] = extracted_state["Location_info"].copy()
+        save_state(state,f"QVND_state_{chatId}")
+
+        if state["Location_info"]["Location"] is not None:
+            perfect_location_data = True
+        else:
+            perfect_location_data = False
+        
+        if (perfect_industry_data or perfect_supply_data) and perfect_location_data:
+            if (state["Industry_info"]["Main-Industry"] != "Not Available in list" and state["Industry_info"]["Sub-Sector"] != "Not Available in list") or (not all(item == "Not Available in List" for item in state["Supply_info"]["Supplies"])):
+                message = "We found something for you"
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : True,
+                    "Extracted Data": extracted_state,
+                    "Validation Data": state,
+                    "User Intention": user_intention
+                }
+                return response
+            else:
+                message = "Not Available In List"
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": extracted_state,
+                    "Validation Data": state,
+                    "User Intention": user_intention
+                }
+                return response
+        else:
+            response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+            message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+            chat_history.append(AIMessage(content=message))  # Log user query
+            save_chat(chat_history,f"QVND_chat_{chatId}")
+            response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : None,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+            return response
+    
+    elif user_intention == "Vendor Search for industry without location details":
+        state["Supply_info"]["Supplies"] = []
+        save_state(state,f"QVND_state_{chatId}")
+        main_industry_list = list(main_industry_to_subsector_mapped_dict.keys())
+        extracted_data, validated_data = extract_main_industry_and_product_universal(refined_user_input, main_industry_list, llm)
+        main_industry_name = validated_data["Main-Industry"]
+        product_name = validated_data["Product"]
+        extracted_state["Industry_info"]["Main-Industry"] = extracted_data["Main-Industry"]
+        extracted_state["Industry_info"]["Product"] = extracted_data["Product"] if extracted_data["Product"] != "None" else None
+        if main_industry_name != "Not Available in list":
+            if main_industry_name != "None":
+                state["Industry_info"]["Main-Industry"] = main_industry_name
+                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                save_state(state,f"QVND_state_{chatId}")
+                sub_sector_list = list(main_industry_to_subsector_mapped_dict[main_industry_name].keys())
+                extracted_data, validated_data = extract_sub_sector_and_product_universal(refined_user_input, sub_sector_list, llm, main_industry_name, product_name)
+                sub_sector_name = validated_data["Sub-Sector"]
+                product_name = validated_data["Product"]
+                extracted_state["Industry_info"]["Sub-Sector"] = extracted_data["Sub-Sector"]
+                extracted_state["Industry_info"]["Product"] = extracted_data["Product"] if extracted_data["Product"] != "None" else None
+                if sub_sector_name != "Not Available in list":
+                    if sub_sector_name != "None":
+                        state["Industry_info"]["Sub-Sector"] = sub_sector_name
+                        state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                        save_state(state,f"QVND_state_{chatId}")
+                        segment_list = main_industry_to_subsector_mapped_dict[main_industry_name][sub_sector_name]
+                        extracted_data, validated_data = extract_segment_and_product_universal(refined_user_input, segment_list, llm, main_industry_name, sub_sector_name, product_name)
+                        segment_name = validated_data["Segment"]
+                        product_name = validated_data["Product"]
+                        extracted_state["Industry_info"]["Segment"] = extracted_data["Segment"]
+                        if segment_name != "Not Available in list":
+                            if segment_name != "None":
+                                state["Industry_info"]["Segment"] = segment_name
+                                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                                save_state(state,f"QVND_state_{chatId}")
+                            else:
+                                state["Industry_info"]["Segment"] = None
+                                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                                save_state(state,f"QVND_state_{chatId}")
+                        else:
+                            state["Industry_info"]["Segment"] = "Not Available in list"
+                            state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                            save_state(state,f"QVND_state_{chatId}")
+                    else:
+                        state["Industry_info"]["Sub-Sector"] = None
+                        state["Industry_info"]["Segment"] = None
+                        state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                        save_state(state,f"QVND_state_{chatId}")
+                                
+                    if state["Industry_info"]["Main-Industry"] is not None and state["Industry_info"]["Sub-Sector"] is not None:
+                        perfect_industry_data = True
+                    else:
+                        perfect_industry_data = False
+                    
+                    if perfect_industry_data and perfect_location_data:
+                        message = "We found something for you"
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        response = {
+                            "Ai_response": "We found something for you",
+                            "Is_confirmation" : True,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                        return response
+                        
+                    else:
+                        response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                        message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                        return response
+   
+                else:
+                    state["Industry_info"]["Sub-Sector"] = "Not Available in list"
+                    state["Industry_info"]["Segment"] = "Not Available in list"
+                    state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                    save_state(state,f"QVND_state_{chatId}")
+                    if perfect_location_data:
+                        message = "Not Available In List"
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                        return response
+                    else:
+                        response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                        message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                        return response
+            else:
+                state["Industry_info"]["Main-Industry"] = None
+                state["Industry_info"]["Sub-Sector"] = None
+                state["Industry_info"]["Segment"] = None
+                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                save_state(state,f"QVND_state_{chatId}")
+                response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": extracted_state,
+                    "Validation Data": state,
+                    "User Intention": user_intention
+                }
+                return response
+        else:
+            state["Industry_info"]["Main-Industry"] = "Not Available in list"
+            state["Industry_info"]["Sub-Sector"] = "Not Available in list"
+            state["Industry_info"]["Segment"] = "Not Available in list"
+            state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+            save_state(state,f"QVND_state_{chatId}")
+            if perfect_location_data:
+                message = "Not Available In List"
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": extracted_state,
+                    "Validation Data": state,
+                    "User Intention": user_intention
+                }
+                return response
+            else:
+                response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": extracted_state,
+                    "Validation Data": state,
+                    "User Intention": user_intention
+                }
+                return response
+
+    elif user_intention == "Vendor Search for supply without location details":
+
+        state["Industry_info"] = {
+            "Main-Industry": None,
+            "Sub-Sector": None,
+            "Segment": None,
+            "Product": None,
+        }
+        save_state(state,f"QVND_state_{chatId}")
+
+        supply_query_result = extract_supplies_from_query(refined_user_input, available_supplies, llm)
+        extracted_supply = supply_query_result["Extracted_Supplies"]
+        validated_supply = supply_query_result["Validated_Supplies"]
+
+        extracted_state["Supply_info"]["Supplies"] = extracted_supply
+        state["Supply_info"]["Supplies"] = validated_supply
+        save_state(state,f"QVND_state_{chatId}")
+
+        if not all(supply == "Not Available in List" for supply in state["Supply_info"]["Supplies"]):
+            if state["Supply_info"]["Supplies"]:
+                if perfect_location_data:
+                    message = "We found something for you"
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"QVND_chat_{chatId}")
+                    response = {
+                        "Ai_response": "We found something for you",
+                        "Is_confirmation" : True,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
+                else:
+                    response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                    
+                    message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"QVND_chat_{chatId}")
+                    response = {
+                                "Ai_response": message,
+                                "Is_confirmation" : None,
+                                "Extracted Data": extracted_state,
+                                "Validation Data": state,
+                                "User Intention": user_intention
+                            }
+                    return response
+            else:
+                response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                
+                message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                return response
+        else:
+            if perfect_location_data: 
+                message = "Not Available In List"
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": extracted_state,
+                    "Validation Data": state,
+                    "User Intention": user_intention
+                }
+                return response
+            else:
+                response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                
+                message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                return response
+            
+    elif user_intention == "Vendor Search for industry with location details":
+        state["Supply_info"]["Supplies"] = []
+        save_state(state,f"QVND_state_{chatId}")
+        extracted_data = extract_location_from_vendor_query(refined_user_input, llm)
+        given_loacation = extracted_data["Extracted_Location"]
+        given_location_category = extracted_data["Classification"]
+        location_from_india = extracted_data["From_India"]
+        extracted_state["Location_info"]["Location"] = given_loacation if given_loacation != "None" else None
+        extracted_state["Location_info"]["Location Category"] = given_location_category if given_location_category != "None" else None
+        extracted_state["Location_info"]["From_India"] = location_from_india if (given_loacation != "None" and given_location_category != "None") else None
+        state["Location_info"] = extracted_state["Location_info"].copy()
+        save_state(state,f"QVND_state_{chatId}")
+
+        if state["Location_info"]["Location"] is not None:
+            perfect_location_data = True
+        else:
+            perfect_location_data = False
+
+        main_industry_list = list(main_industry_to_subsector_mapped_dict.keys())
+        ind_extracted_data, ind_validated_data = extract_main_industry_and_product_universal(refined_user_input, main_industry_list, llm)
+        main_industry_name = ind_validated_data["Main-Industry"]
+        product_name = ind_validated_data["Product"]
+        extracted_state["Industry_info"]["Main-Industry"] = ind_extracted_data["Main-Industry"]
+        extracted_state["Industry_info"]["Product"] = ind_extracted_data["Product"] if ind_extracted_data["Product"] != "None" else None
+
+        if main_industry_name != "Not Available in list":
+            if main_industry_name != "None":
+                state["Industry_info"]["Main-Industry"] = main_industry_name
+                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                save_state(state,f"QVND_state_{chatId}")
+                sub_sector_list = list(main_industry_to_subsector_mapped_dict[main_industry_name].keys())
+                extracted_data, validated_data = extract_sub_sector_and_product_universal(refined_user_input, sub_sector_list, llm, main_industry_name, product_name)
+                sub_sector_name = validated_data["Sub-Sector"]
+                product_name = validated_data["Product"]
+                extracted_state["Industry_info"]["Sub-Sector"] = extracted_data["Sub-Sector"]
+                extracted_state["Industry_info"]["Product"] = extracted_data["Product"] if extracted_data["Product"] != "None" else None
+                if sub_sector_name != "Not Available in list":
+                    if sub_sector_name != "None":
+                        state["Industry_info"]["Sub-Sector"] = sub_sector_name
+                        state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                        save_state(state,f"QVND_state_{chatId}")
+                        segment_list = main_industry_to_subsector_mapped_dict[main_industry_name][sub_sector_name]
+                        extracted_data, validated_data = extract_segment_and_product_universal(refined_user_input, segment_list, llm, main_industry_name, sub_sector_name, product_name)
+                        segment_name = validated_data["Segment"]
+                        product_name = validated_data["Product"]
+                        extracted_state["Industry_info"]["Segment"] = extracted_data["Segment"]
+                        if segment_name != "Not Available in list":
+                            if segment_name != "None":
+                                state["Industry_info"]["Segment"] = segment_name
+                                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                                save_state(state,f"QVND_state_{chatId}")
+                            else:
+                                state["Industry_info"]["Segment"] = None
+                                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                                save_state(state,f"QVND_state_{chatId}")
+                        else:
+                            state["Industry_info"]["Segment"] = "Not Available in list"
+                            state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                            save_state(state,f"QVND_state_{chatId}")
+                    else:
+                        state["Industry_info"]["Sub-Sector"] = None
+                        state["Industry_info"]["Segment"] = None
+                        state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                        save_state(state,f"QVND_state_{chatId}")
+                                
+                    if state["Industry_info"]["Main-Industry"] is not None and state["Industry_info"]["Sub-Sector"] is not None:
+                        perfect_industry_data = True
+                    else:
+                        perfect_industry_data = False
+                    
+                    if perfect_industry_data and perfect_location_data:
+                        message = "We found something for you"
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : True,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                        return response
+                        
+                    else:
+                        response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                        message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                        return response
+                else:
+                    state["Industry_info"]["Sub-Sector"] = "Not Available in list"
+                    state["Industry_info"]["Segment"] = "Not Available in list"
+                    state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                    save_state(state,f"QVND_state_{chatId}")
+                    if perfect_location_data:
+                        message = "Not Available In List"
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                        return response
+                    else:
+                        response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                        message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                        return response
+            else:
+                state["Industry_info"]["Main-Industry"] = None
+                state["Industry_info"]["Sub-Sector"] = None
+                state["Industry_info"]["Segment"] = None
+                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                save_state(state,f"QVND_state_{chatId}")
+                response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": extracted_state,
+                    "Validation Data": state,
+                    "User Intention": user_intention
+                }
+                return response
+
+        else:
+            state["Industry_info"]["Main-Industry"] = "Not Available in list"
+            state["Industry_info"]["Sub-Sector"] = "Not Available in list"
+            state["Industry_info"]["Segment"] = "Not Available in list"
+            state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+            save_state(state,f"QVND_state_{chatId}")
+            if perfect_location_data: 
+                message = "Not Available In List"
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": extracted_state,
+                    "Validation Data": state,
+                    "User Intention": user_intention
+                }
+                return response
+            else:
+                response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                
+                message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                return response
+
+    elif user_intention == "Vendor Search for supply with location details":
+        state["Industry_info"] = {
+            "Main-Industry": None,
+            "Sub-Sector": None,
+            "Segment": None,
+            "Product": None,
+        }
+        save_state(state,f"QVND_state_{chatId}")
+        extracted_data = extract_location_from_vendor_query(refined_user_input, llm)
+        given_loacation = extracted_data["Extracted_Location"]
+        given_location_category = extracted_data["Classification"]
+        location_from_india = extracted_data["From_India"]
+
+        extracted_state["Location_info"]["Location"] = given_loacation if given_loacation != "None" else None
+        extracted_state["Location_info"]["Location Category"] = given_location_category if given_location_category != "None" else None
+        extracted_state["Location_info"]["From_India"] = location_from_india if (given_loacation != "None" and given_location_category != "None") else None
+        state["Location_info"] = extracted_state["Location_info"].copy()
+        save_state(state,f"QVND_state_{chatId}")
+
+        if state["Location_info"]["Location"] is not None:
+            perfect_location_data = True
+        else:
+            perfect_location_data = False
+
+        supply_query_result = extract_supplies_from_query(refined_user_input, available_supplies, llm)
+        extracted_supply = supply_query_result["Extracted_Supplies"]
+        validated_supply = supply_query_result["Validated_Supplies"]
+
+        extracted_state["Supply_info"]["Supplies"] = extracted_supply
+        state["Supply_info"]["Supplies"] = validated_supply
+        save_state(state,f"QVND_state_{chatId}")
+
+        if not state["Supply_info"]["Supplies"]:
+            perfect_supply_data = False
+        else:
+            perfect_supply_data = True
+        
+        
+        if not all(supply == "Not Available in List" for supply in state["Supply_info"]["Supplies"]):
+            if state["Supply_info"]["Supplies"]:
+                if perfect_location_data and perfect_supply_data:
+                    
+                    message = "We found something for you"
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"QVND_chat_{chatId}")
+                    response = {
+                        "Ai_response": "We found something for you",
+                        "Is_confirmation" : True,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
+                else:
+                    response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                   
+                    message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"QVND_chat_{chatId}")
+                    response = {
+                                "Ai_response": message,
+                                "Is_confirmation" : None,
+                                "Extracted Data": extracted_state,
+                                "Validation Data": state,
+                                "User Intention": user_intention
+                            }
+                    return response
+            else:
+                response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                
+                message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                return response
+        else:
+            if perfect_location_data and perfect_supply_data: 
+                message = "Not Available In List"
+                chat_history.append(AIMessage(content=message))  # Log user query
+                save_chat(chat_history,f"QVND_chat_{chatId}")
+                response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": extracted_state,
+                    "Validation Data": state,
+                    "User Intention": user_intention
+                }
+                return response
+            else:
+                response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+                
+                message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=message))  # Log user query
+                response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                return response
+
+    else:
+        response_static_message = get_static_follow_up_for_vendor(state, user_intention)
+        
+        message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+        chat_history.append(AIMessage(content=message))  # Log user query
+        save_chat(chat_history,f"QVND_chat_{chatId}")
+        response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": extracted_state,
+                    "Validation Data": state,
+                    "User Intention": user_intention
+                }
+        return response
+
+def call_handle_vendor_query(input,chatId):
+
+    query = """
+    select distinct supply
+    from `tabVendor Supply Capacity`
+    """
+
+    results = fetch_query_results(query=query)
+    unique_supply_list = [row[0] for row in results]
+
+    query = """
+    SELECT sgt.segment, indmappedsst.sub_sector_name, indmappedsst.industry_name
+    FROM `tabSegment` as sgt
+    JOIN (
+        SELECT sst.name,sst.sub_sector_name, indt.industry_name
+        FROM `tabSub Sector` as sst
+        JOIN `tabIndustry` as indt
+        WHERE sst.industry_id = indt.name
+    ) as indmappedsst
+    WHERE sgt.sub_sector = indmappedsst.name
+    """
+
+    Industry_data_results = fetch_query_results(query)
+
+    Industry_data_df_for_vendor = pd.DataFrame(Industry_data_results, columns=["Segment","Sub-Sector", "Main-Industry"])
+
+    # Initialize an empty dictionary
+    Industry_data_for_vendor = {}
+
+    # Iterate through each row of the DataFrame
+    for _, row in Industry_data_df_for_vendor.iterrows():
+        main_industry = row["Main-Industry"]
+        sub_sector = row["Sub-Sector"]
+        segment = row["Segment"]
+        
+        # Create the hierarchy step by step
+        if main_industry not in Industry_data_for_vendor:
+            Industry_data_for_vendor[main_industry] = {}
+        if sub_sector not in Industry_data_for_vendor[main_industry]:
+            Industry_data_for_vendor[main_industry][sub_sector] = []
+        if segment not in Industry_data_for_vendor[main_industry][sub_sector]:
+            Industry_data_for_vendor[main_industry][sub_sector].append(segment)
+
+    state = get_state(f"QVND_state_{chatId}") or None
+
+    if not state:
+        state = {
+            "Location_info":{
+                "Location":None,
+                "Location Category": None,
+                "From_India": None
+            },
+            "Industry_info":{
+                "Main-Industry": None,
+                "Sub-Sector": None,
+                "Segment": None,
+                "Product": None,
+            },
+            "Supply_info": {
+                "Supplies": []
+            }
+        }
+        save_state(state,f"QVND_state_{chatId}")
+
+    extracted_state = state.copy()
+
+    response_of_ven_query = handle_vendor_query(input, Industry_data_for_vendor, unique_supply_list, extracted_state, state, llm_70b_vers,chatId)
+
+    return response_of_ven_query
