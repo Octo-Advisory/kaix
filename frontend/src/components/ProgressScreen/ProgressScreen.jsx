@@ -21,13 +21,15 @@ function ProgressScreen() {
   const [loading, setLoading] = useState(true);
   const [intervalId, setIntervalId] = useState(null);
 
-  const fetchAnalyticsResponse = async (aiReponse) => {
+  const fetchAnalyticsResponse = async () => {
     try {
-      const result = await call.get("frontend_app.Management_Class.Analytics.analytics_module_call", { aiReponse: aiReponse,chatId:chatId });
+      console.log("chat id in progress",chatId);
+      
+      const result = await call.get("frontend_app.Management_Class.Analytics.analytics_module_call", { aiReponse: aiResponse,chatId:chatId });
       console.log("analytics message", result);
       setresult(result.message)
       // return result.message;  // Return the result so that the calling function gets it.
-    } catch (err) {
+    } catch (err) { 
       console.log("error occurred 😂", err);
       throw err;  // Rethrow the error if you want to catch it in the caller function.
     }
@@ -57,22 +59,22 @@ function ProgressScreen() {
     }
   }
 
-  // useEffect(() => {
-  //   // Start the interval only if no failures and not all are complete
-  //   if (!showfailure && !allsuccess) {
-  //     const interval = setInterval(() => {
-  //       fetchData(); // Fetch data every second
-  //     }, 1000);
+  useEffect(() => {
+    // Start the interval only if no failures and not all are complete
+    if (!showfailure && !allsuccess) {
+      const interval = setInterval(() => {
+        fetchData(); // Fetch data every second
+      }, 1000);
   
-  //     // Cleanup the interval when conditions change or component unmounts
-  //     return () => clearInterval(interval);
-  //   }
-  // }, [showfailure, allsuccess, messages]);
+      // Cleanup the interval when conditions change or component unmounts
+      return () => clearInterval(interval);
+    }
+  }, [showfailure, allsuccess, messages]);
 
-  // useEffect(()=>{
-  //   console.log("new use effect call");
-  //   fetchData()
-  // },[])
+  useEffect(()=>{
+    console.log("new use effect call");
+    fetchData()
+  },[])
 
   useEffect(() => {
     console.log("ai response is in progress", aiResponse);
@@ -92,8 +94,6 @@ function ProgressScreen() {
     
     if (messages) {
       const noPending = messages.some((msg)=>msg.status !== 'Pending')
-      console.log("no prnding",noPending);
-      console.log("loading",loading);
       if(noPending) setLoading(false)
       const allSuccess = messages.every((msg) => msg.status === 'Complete');
       setAllsuccess(allSuccess);
@@ -122,7 +122,7 @@ function ProgressScreen() {
     }, [data]);
   
   return (
-    <div className="overflow-auto bg-white rounded-lg shadow-inner flex justify-center items-center h-[90%] w-[80%] relative shadow-mg">
+    <div className="overflow-auto bg-white shadow-inner flex justify-center items-center h-full w-full relative shadow-mg">
       {loading ? (
         <div className="loading-indicator">Loading...</div> // Add a loading indicator here
       ) : showfailure ? (

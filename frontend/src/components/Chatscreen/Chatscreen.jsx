@@ -42,7 +42,7 @@ function Chatscreen() {
     createDoc("Session", doc).then((resp) => dispatch(addChatId(resp.name)));
   }
 
-  const fetchAIResponse = async (message) => {
+  const fetchAIResponse = async (message,chatId) => {
     try {
       const result = await call.get("frontend_app.Management_Class.AI.ai_module_call", {
         input: message,
@@ -85,22 +85,22 @@ function Chatscreen() {
 
   const handleSendbtn = async () => {
     if (message.trim()) {
+      // if (messages.length === 0 && !chatId) {
+      //   createSessionid();
+      //   return;
+      // }
       const newUserMessage = {
         sender: 'user',
         text: message,
         timestamp: new Date().toISOString(),
       };
 
-      if (messages.length === 0 && !chatId) {
-        createSessionid();
-      }
-
       dispatch(addMessage(newUserMessage));
       setMessage('');
       setLoading(true)
       // setDisabled(true)
 
-      const resp = await fetchAIResponse(message);
+      const resp = await fetchAIResponse(message,chatId);
       console.log("ai response is",resp);
       const aiResponse = resp.Ai_response
       console.log("reponse is",aiResponse);
@@ -194,6 +194,15 @@ function Chatscreen() {
   useEffect(() => {
     storeChatInChildTable();
   }, [messages])
+
+  useEffect(()=>{
+    if (messages.length === 0 && !chatId) {
+      createSessionid();
+      // return;
+      console.log("created bro!");
+      
+    }
+  },[])
 
   const ref = useChatScroll(messages);
 

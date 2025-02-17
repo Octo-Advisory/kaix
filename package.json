@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "frappe-client": "^2.0.2"
+    "frappe-client": "^2.0.2",
+    "redux-persist": "^6.0.0"
   }
 }
