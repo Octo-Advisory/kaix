@@ -661,6 +661,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
         return {"Ai_response": message,
                 "Is_confirmation" : False,
                 "state":state}
+    
     elif state["Main-Industry"] == 'Not Available in List' and state["Product"] == 'None':
         capacity_json = extract_capacity_details(refined_query,llm)
         if capacity_json["Capacity"] != 'None' or capacity_json["Capacity Unit"] != 'None' or capacity_json["Time Period"] != 'None':
@@ -700,7 +701,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
             state = get_state(f"QIND_state_{chatId}")
             state["Sub-Sector"] = sub_validated_data["Sub-Sector"]
             state["Product"] = sub_validated_data["Product"]
-            # state.update(sub_validated_data)
+            
             save_state(state,f"QIND_state_{chatId}")
         state = get_state(f"QIND_state_{chatId}")
         if state['Sub-Sector'] != 'None':
@@ -713,7 +714,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
             state = get_state(f"QIND_state_{chatId}")
             state["Segment"] = segment_validated_data["Segment"] or None
             state["Product"] = segment_validated_data["Product"] or None
-            # state.update(segment_validated_data)
+            
             save_state(state,f"QIND_state_{chatId}")
             capicity_pending_list = get_keys_for_capicity(chatId)
             if len(capicity_pending_list) > 0:
@@ -728,7 +729,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
                     "state":state}
             else:
                 response = {
-                    "Ai_response": "We have Found Something",
+                    "Ai_response" : f"We have identified details like {', '.join(str(v) for v in [state.get('Product'), capacity_json.get('Capacity'), capacity_json.get('Capacity Unit'), capacity_json.get('Time Period')] if v)} based on your query. Please confirm if this information is correct.",
                     "Is_confirmation" : True,
                     "validated_data" : segment_validated_data,
                     "state" : state
@@ -766,7 +767,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
     
     else:
         response = {
-            "Ai_response": "InValid query",
+            "Ai_response": "Please enter valid query with some details.",
             "Is_confirmation" : False,
             "state":state
         }
@@ -1158,8 +1159,7 @@ def entry_build_from_scratch(input,chatId):
     main_industry = get_main_industry(final_json)
     k = gather_industry_details(input,main_industry,llm_70b_vers,chatId)
     chat_history = get_chat(f"QIND_chat_{chatId}")
-    with open("log3.txt", "a") as file:
-        file.write(f"chat history {chat_history}")
+
     if k['Is_confirmation']:
         s = do_unit_conversion(k['state'])
         with open("\nlog2.txt", "a") as file:

@@ -55,9 +55,7 @@ const ConfirmationBox = ({result}) => {
           className="Success-text relative  font-bold sm:text-md md:text-xl lg:text-2xl"
         >
           All the pieces are in place – here are the results!
-        </div></div>): (<div
-      className="ConfirmationBox h-[90%] w-[80%] flex flex-col justify-evenly items-center absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 bg-white"
-    ><Solutionscreen result={result}/></div>)}
+        </div></div>): (<Solutionscreen result={result}/>)}
     </>
   );
 };

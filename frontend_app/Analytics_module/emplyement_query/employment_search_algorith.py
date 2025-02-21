@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 # from pandas.api.types import CategoricalDtype
 import warnings
-from frontend_app.Management_Class.progress import insert_process,update_process
+from frontend_app.Management_Class.helpers.progress import insert_process,update_process
 import time
 import io
 import base64
