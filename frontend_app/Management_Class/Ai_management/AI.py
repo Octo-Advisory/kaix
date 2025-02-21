@@ -6,6 +6,7 @@ from frontend_app.Ai_module.build_from_scratch.Extraction_for_Building_from_Scra
 from frontend_app.Ai_module.incentive_query.Extraction_for_incentive_search import call_incentive_search
 from frontend_app.Ai_module.approval_query.Extraction_for_approval_search import call_handle_approval_query
 from frontend_app.Ai_module.vendor_query.Extraction_for_vendor_search import call_handle_vendor_query
+import traceback
 
 @frappe.whitelist(allow_guest=True)
 def ai_module_call(input,chatId):
@@ -89,10 +90,13 @@ def ai_module_call(input,chatId):
          
 
     except Exception as e:
+        error_details = traceback.format_exc()
+        with open("log3.txt", "a") as file:
+            file.write(f"error_details from AI {error_details}")
         response = { 
-            "Ai_response": "Internal Server Error! Please Try After Some Time....",
+            "Ai_response": "Internal Server Error! Please Try After Some Time...",
             "Is_confirmation" : None,
-            "Error":e
+            "Error":error_details
         }
         return response
 

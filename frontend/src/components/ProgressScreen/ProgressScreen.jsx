@@ -128,7 +128,7 @@ function ProgressScreen() {
       ) : allsuccess ? (
         <Confirmation result={result} />
       ) : (
-        <div className="progress-container flex flex-col items-start w-[80%] self-center justify-self-center mb-2 gap-8 h-auto sm:w-[60%] sm:pl-10 md:pl-32 lg:pl-36 md:w-[60%]  p-5 relative custom-top">
+        <div className="progress-container flex flex-col items-start w-[80%] self-center justify-self-center mb-2 gap-8 h-auto sm:w-[60%] sm:pl-10 md:pl-32 lg:pl-72 md:w-[60%]  p-5 relative custom-top">
           {messages?.map((msg, index) => (
             <div
               className={`progress-step ${msg.status === 'Complete'

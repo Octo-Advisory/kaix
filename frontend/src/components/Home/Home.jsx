@@ -7,6 +7,10 @@ import { useSelector } from 'react-redux';
 import { FrappeContext } from 'frappe-react-sdk';
 import ProgressScreen from '../ProgressScreen/ProgressScreen';
 import Solutionscreen from '../SolutionScreen/Solutionscreen';
+import Industryresult from '../ResultScreens/Industryresult';
+import Incentiveresult from '../ResultScreens/Incentiveresult';
+import Approvalresult from '../ResultScreens/Approvalresult';
+import Test from '../TestComponent/Test';
 // import TestComponent from '../TestComponent/TestComponent';
 // import { useFrappeDocumentEventListener } from 'frappe-react-sdk';
 
@@ -44,6 +48,10 @@ function Home() {
       {/* <TestComponent/> */}
       {/* <ProgressScreen/> */}
       {/* <Solutionscreen/> */}
+      {/* <Industryresult/> */}
+      {/* <Incentiveresult/> */}
+      {/* <Approvalresult/> */}
+      {/* <Test/> */}
     </>
   );
 }

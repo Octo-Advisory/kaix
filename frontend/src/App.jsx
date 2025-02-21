@@ -6,10 +6,9 @@ import ProgressScreen from './components/ProgressScreen/ProgressScreen'
 import TestComponent from './components/TestComponent/TestComponent';
 import Test from './components/TestComponent/Test';
 
-
 function App() {
   return (
-    <BrowserRouter basename="/frontend">
+    <BrowserRouter basename="/">
       <Routes>
         <Route path="/" element={<Home />} />
         {/* <Route path="solution" element={<Solution />} /> */}

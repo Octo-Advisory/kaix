@@ -213,7 +213,7 @@ function Chatscreen() {
         text: "Thank you for response",
         timestamp: new Date().toISOString(),
       };
-      dispatch(addMessage(newAIMessage));
+      dispatch(addMessage(newAIMessage)); 
       // hanldeValidation()
       setTimeout(() => {
         setIsProgressVisible(true)
