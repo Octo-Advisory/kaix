@@ -8,6 +8,97 @@ from frontend_app.Ai_module.Query_Classification_And_Analysis import refine_quer
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
 
+def extract_json_main_industry_details(output: str) -> Dict[str, str]:
+    """
+    Extracts structured industry-related details from LLM output.
+
+    Ensures:
+    - Proper parsing of various JSON formats (valid JSON, inside code blocks, or loose text).
+    - Default values for missing fields.
+    - Forced mapping handling for industry categorization.
+
+    Returns:
+    -------
+    dict:
+        {
+            "Main-Industry": str,
+            "Original-Inferred-Main-Industry": str,
+            "Forced-Mapping": str ("Yes" or "No"),
+            "Product": str
+        }
+    """
+
+    # -- 1) Direct JSON Parsing --
+    try:
+        data_entire = json.loads(output.strip())
+        if isinstance(data_entire, dict) and "Main-Industry" in data_entire:
+            return {
+                "Main-Industry": data_entire.get("Main-Industry", "None"),
+                "Original-Inferred-Main-Industry": data_entire.get("Original-Inferred-Main-Industry", "None"),
+                "Forced-Mapping": data_entire.get("Forced-Mapping", "No"),
+                "Product": data_entire.get("Product", "None"),
+            }
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass  # JSON parsing failed
+
+    # -- 2) Extract JSON blocks inside triple backticks --
+    code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', output, flags=re.DOTALL)
+    for block in code_blocks:
+        text_block = block.strip()
+        try:
+            block_data = json.loads(text_block)
+            if isinstance(block_data, dict) and "Main-Industry" in block_data:
+                return {
+                    "Main-Industry": block_data.get("Main-Industry", "None"),
+                    "Original-Inferred-Main-Industry": block_data.get("Original-Inferred-Main-Industry", "None"),
+                    "Forced-Mapping": block_data.get("Forced-Mapping", "No"),
+                    "Product": block_data.get("Product", "None"),
+                }
+        except (json.JSONDecodeError, ValueError, TypeError):
+            pass  # JSON parsing failed
+
+    # -- 3) Fallback: Regex-based extraction --
+    #    a) Pattern with curly braces (full JSON structure)
+    fallback_pattern_braces = re.compile(
+        r'\{\s*"Main-Industry"\s*:\s*"([^"]+)"\s*,\s*"Original-Inferred-Main-Industry"\s*:\s*"([^"]+)"\s*,'
+        r'\s*"Forced-Mapping"\s*:\s*"([^"]+)"\s*,\s*"Product"\s*:\s*"([^"]+)"\s*\}',
+        flags=re.DOTALL
+    )
+    match_braces = fallback_pattern_braces.search(output)
+    if match_braces:
+        return {
+            "Main-Industry": match_braces.group(1),
+            "Original-Inferred-Main-Industry": match_braces.group(2),
+            "Forced-Mapping": match_braces.group(3),
+            "Product": match_braces.group(4),
+        }
+
+    #    b) Pattern without curly braces (loose JSON structure)
+    fallback_pattern_no_braces = re.compile(
+        r'"Main-Industry"\s*:\s*"([^"]+)"|'
+        r'"Original-Inferred-Main-Industry"\s*:\s*"([^"]+)"|'
+        r'"Forced-Mapping"\s*:\s*"([^"]+)"|'
+        r'"Product"\s*:\s*"([^"]+)"',
+        flags=re.DOTALL
+    )
+    matches = fallback_pattern_no_braces.findall(output)
+
+    extracted_values = {
+        "Main-Industry": "None",
+        "Original-Inferred-Main-Industry": "None",
+        "Forced-Mapping": "No",
+        "Product": "None"
+    }
+    
+    for match in matches:
+        if match[0]: extracted_values["Main-Industry"] = match[0]
+        if match[1]: extracted_values["Original-Inferred-Main-Industry"] = match[1]
+        if match[2]: extracted_values["Forced-Mapping"] = match[2]
+        if match[3]: extracted_values["Product"] = match[3]
+
+    # -- If nothing worked, return a default response --
+    return extracted_values
+
 def extract_main_industry_and_product_for_scratch(user_query: str, main_industries: List[str], llm) -> Dict[str, str]:
     """
     Extract the Main-Industry and Product mentioned in the user query.
@@ -22,6 +113,7 @@ def extract_main_industry_and_product_for_scratch(user_query: str, main_industri
     """
     # Convert the list into a formatted string for the prompt
     main_industries_str = ", ".join(main_industries)
+    
     # Define the prompt
     prompt_template = """
     You are an expert in analyzing industry-building queries and extracting specific details.
@@ -36,7 +128,18 @@ def extract_main_industry_and_product_for_scratch(user_query: str, main_industri
     - If no main industry can be inferred from the query, return `"None"` for both `"Original-Inferred-Main-Industry"` and `"Main-Industry"`.  
 
     2. Product: Identify the specific product the query refers to (e.g., "Cement", "Steel Rods").  
-    - If the inferred term logically represents a product, include it in the output.  
+    - Always extract the widely recognized industry-standard name for the product.  
+    - If the product is given as an abbreviation, acronym, or chemical formula, return the full name instead.  
+    - Example:
+        - "NaCl" → "Sodium Chloride"
+        - "PVC" → "Polyvinyl Chloride"
+        - "PET" → "Polyethylene Terephthalate"
+        - "H₂SO₄" → "Sulfuric Acid"  
+    - If a product has multiple common names, choose the most widely used commercial name.  
+    - Example:
+        - "Isopropanol" → "Isopropyl Alcohol"
+        - "Ethene" → "Ethylene"
+        - "Acetic Acid" → "Vinegar" (if referring to food-grade usage)
     - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
 
     Logical Matching for Main Industries:
@@ -71,7 +174,6 @@ def extract_main_industry_and_product_for_scratch(user_query: str, main_industri
     Provide only the JSON object in the required format.  
     """
 
-
     # Create the prompt using the provided variables
     prompt = PromptTemplate(
         input_variables=["query", "main_industries"],
@@ -87,39 +189,106 @@ def extract_main_industry_and_product_for_scratch(user_query: str, main_industri
         "main_industries": main_industries_str,
     })
     
-    # Extract JSON response
-    result_content = result.content.strip()
+    result_text = result.content.strip()
 
-    # Define regex patterns for Main-Industry and Product
-    main_industry_pattern = r'"Main-Industry":\s*"([^"]+)"'
-    original_inferred_main_industry_pattern = r'"Original-Inferred-Main-Industry":\s*"([^"]+)"'
-    forced_mapping_pattern = r'"Forced-Mapping":\s*"([^"]+)"'
-    product_pattern = r'"Product":\s*"([^"]+)"'
+    # Extract JSON industry details using the new function
+    extracted_details = extract_json_main_industry_details(result_text)
 
-    # Extract details using regex
-    main_industry_match = re.search(main_industry_pattern, result_content)
-    original_inferred_main_industry_match = re.search(original_inferred_main_industry_pattern, result_content)
-    forced_mapping_match = re.search(forced_mapping_pattern, result_content)
-    product_match = re.search(product_pattern, result_content)
+    # Validate against the provided list of Main Industries
+    validated_data = extracted_details.copy()
+    if extracted_details["Main-Industry"] not in main_industries and extracted_details["Main-Industry"] != "None":
+        validated_data["Main-Industry"] = "Not Available in list"
 
-    # Extract values or default to "None"
-    main_industry = main_industry_match.group(1).strip() if main_industry_match else "None"
-    original_inferred_main_industry = original_inferred_main_industry_match.group(1).strip() if original_inferred_main_industry_match else "None"
-    forced_mapping = forced_mapping_match.group(1).strip() if forced_mapping_match else "No"
-    product = product_match.group(1).strip() if product_match else "None"
+    return extracted_details, validated_data
 
-    extracted_data = {
-        "Main-Industry": main_industry,
-        "Original-Inferred-Main-Industry": original_inferred_main_industry,
-        "Forced-Mapping": forced_mapping,
-        "Product": product
+def extract_json_sub_sector_product(output: str) -> Dict[str, str]:
+    """
+    Extracts Sub-Sector and Product-related details from an LLM-generated response.
+
+    Ensures:
+    - Parsing of multiple JSON formats (valid JSON, inside code blocks, or loose text).
+    - Properly structured and validated output.
+    - Fallback handling in case of missing values.
+
+    Returns:
+    -------
+    dict:
+        {
+            "Sub-Sector": str,
+            "Original-Inferred-Sub-Sector": str,
+            "Forced-Mapping": str,
+            "Product": str
+        }
+    """
+
+    # -- 1) Direct JSON Parsing --
+    try:
+        data_entire = json.loads(output.strip())
+        if isinstance(data_entire, dict) and "Sub-Sector" in data_entire:
+            return {
+                "Sub-Sector": data_entire.get("Sub-Sector", "None"),
+                "Original-Inferred-Sub-Sector": data_entire.get("Original-Inferred-Sub-Sector", "None"),
+                "Forced-Mapping": data_entire.get("Forced-Mapping", "No"),
+                "Product": data_entire.get("Product", "None"),
+            }
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass
+
+    # -- 2) Extract JSON blocks inside triple backticks --
+    code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', output, flags=re.DOTALL)
+    for block in code_blocks:
+        text_block = block.strip()
+        try:
+            block_data = json.loads(text_block)
+            if isinstance(block_data, dict) and "Sub-Sector" in block_data:
+                return {
+                    "Sub-Sector": block_data.get("Sub-Sector", "None"),
+                    "Original-Inferred-Sub-Sector": block_data.get("Original-Inferred-Sub-Sector", "None"),
+                    "Forced-Mapping": block_data.get("Forced-Mapping", "No"),
+                    "Product": block_data.get("Product", "None"),
+                }
+        except (json.JSONDecodeError, ValueError, TypeError):
+            pass
+
+    # -- 3) Fallback: Regex-based extraction --
+    #    a) Pattern with curly braces (full JSON structure)
+    fallback_pattern_braces = re.compile(
+        r'\{\s*"Sub-Sector"\s*:\s*"([^"]+)"\s*,\s*"Original-Inferred-Sub-Sector"\s*:\s*"([^"]+)"\s*,\s*"Forced-Mapping"\s*:\s*"([^"]+)"\s*,\s*"Product"\s*:\s*"([^"]+)"\s*\}',
+        flags=re.DOTALL
+    )
+    match_braces = fallback_pattern_braces.search(output)
+    if match_braces:
+        return {
+            "Sub-Sector": match_braces.group(1),
+            "Original-Inferred-Sub-Sector": match_braces.group(2),
+            "Forced-Mapping": match_braces.group(3),
+            "Product": match_braces.group(4),
+        }
+
+    #    b) Pattern without curly braces (loose JSON structure)
+    fallback_pattern_no_braces = re.compile(
+        r'"Sub-Sector"\s*:\s*"([^"]+)"|'
+        r'"Original-Inferred-Sub-Sector"\s*:\s*"([^"]+)"|'
+        r'"Forced-Mapping"\s*:\s*"([^"]+)"|'
+        r'"Product"\s*:\s*"([^"]+)"',
+        flags=re.DOTALL
+    )
+    matches = fallback_pattern_no_braces.findall(output)
+
+    extracted_values = {
+        "Sub-Sector": "None",
+        "Original-Inferred-Sub-Sector": "None",
+        "Forced-Mapping": "No",
+        "Product": "None"
     }
 
-    # Validate against the provided list of Segments
-    validated_data = extracted_data.copy()
-    if main_industry not in main_industries and main_industry != "None":
-        validated_data["Main-Industry"] = "Not Available in list"
-    return extracted_data, validated_data
+    for match in matches:
+        if match[0]: extracted_values["Sub-Sector"] = match[0]
+        if match[1]: extracted_values["Original-Inferred-Sub-Sector"] = match[1]
+        if match[2]: extracted_values["Forced-Mapping"] = match[2]
+        if match[3]: extracted_values["Product"] = match[3]
+
+    return extracted_values
 
 def extract_sub_sector_and_product_for_scratch(
     user_query: str,
@@ -175,14 +344,22 @@ def extract_sub_sector_and_product_for_scratch(
     - If no logical match is possible but a mapping must still be provided, forcefully map the inferred sub-sector to the closest match from the provided list and set `"Forced-Mapping"` to `"Yes"`.  
     - If no sub-sector can be inferred from the query, return `"None"` for the `"Original-Inferred-Sub-Sector"` and `"Sub-Sector"`.  
 
-    2. Product: If the product context is provided, return the same product in the output JSON as it is in the context.  
-    - Identify the specific product the query refers to (e.g., "Cement," "Steel Rods").  
-    - If the inferred term logically represents a product, include it in the output.  
+    2. Product: Identify the specific product the query refers to (e.g., "Cement," "Steel Rods").  
+    - Always extract the widely recognized industry-standard name for the product.  
+    - If the product is given as an abbreviation, acronym, or chemical formula, return the full name instead.  
+    - Example:
+        - "NaCl" → "Sodium Chloride"
+        - "PVC" → "Polyvinyl Chloride"
+        - "PET" → "Polyethylene Terephthalate"
+        - "H₂SO₄" → "Sulfuric Acid"  
+    - If a product has multiple common names, choose the most widely used commercial name.  
+    - Example:
+        - "Isopropanol" → "Isopropyl Alcohol"
+        - "Ethene" → "Ethylene"
+        - "Acetic Acid" → "Vinegar" (if referring to food-grade usage)
     - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
 
-    Important Notes:
-
-    Logical Matching for Sub-Sectors:  
+    Logical Matching for Sub-Sectors:
     - A logical match occurs when the inferred sub-sector and an available sub-sector from the list are conceptually or functionally similar.  
     - Examples of logical matches:  
         - Inferred: "Electric Cars" → Available: "Electric Vehicles" (`Forced-Mapping`: `"No"`).  
@@ -214,7 +391,6 @@ def extract_sub_sector_and_product_for_scratch(
     Provide only the JSON object in the required format.  
     """
 
-
     # Create the prompt using the provided variables
     prompt = PromptTemplate(
         input_variables=["user_query", "sub_sectors_str", "context"],
@@ -231,40 +407,103 @@ def extract_sub_sector_and_product_for_scratch(
         "context": context
     })
     
-    # Extract JSON response
-    result_content = result.content.strip()
+    # Extract JSON response using the new function
+    extracted_details = extract_json_sub_sector_product(result.content.strip())
 
-    # Define regex patterns for Sub-Sector and Product
-    sub_sector_pattern = r'"Sub-Sector":\s*"([^"]+)"'
-    original_inferred_sub_sector_pattern = r'"Original-Inferred-Sub-Sector":\s*"([^"]+)"'
-    forced_mapping_pattern = r'"Forced-Mapping":\s*"([^"]+)"'
-    product_pattern = r'"Product":\s*"([^"]+)"'
-
-    # Extract details using regex
-    sub_sector_match = re.search(sub_sector_pattern, result_content)
-    original_inferred_sub_sector_match = re.search(original_inferred_sub_sector_pattern, result_content)
-    forced_mapping_match = re.search(forced_mapping_pattern, result_content)
-    product_match = re.search(product_pattern, result_content)
-
-    # Extract values or default to "None"
-    sub_sector = sub_sector_match.group(1).strip() if sub_sector_match else "None"
-    original_inferred_sub_sector = original_inferred_sub_sector_match.group(1).strip() if original_inferred_sub_sector_match else "None"
-    forced_mapping = forced_mapping_match.group(1).strip() if forced_mapping_match else "No"
-    product = product_match.group(1).strip() if product_match else "None"
-
-    extracted_data = {
-        "Sub-Sector": sub_sector,
-        "Original-Inferred-Sub-Sector": original_inferred_sub_sector,
-        "Forced-Mapping": forced_mapping,
-        "Product": product
-    }
-
-    # Validate against the provided list of Segments
-    validated_data = extracted_data.copy()
-    if sub_sector not in sub_sectors and sub_sector != "None":
+    # Validation: Check if the extracted sub-sector exists in the provided list
+    validated_data = extracted_details.copy()
+    if extracted_details["Sub-Sector"] not in sub_sectors and extracted_details["Sub-Sector"] != "None":
         validated_data["Sub-Sector"] = "Not Available in list"
 
-    return extracted_data, validated_data
+    return extracted_details, validated_data
+def extract_json_segment_and_product(output: str) -> Dict[str, str]:
+    """
+    Extracts segment and product details from an LLM-generated response.
+
+    Ensures:
+    - Parsing of multiple JSON formats (valid JSON, inside code blocks, or loose text).
+    - Fields return "None" if missing.
+    
+    Returns:
+    -------
+    dict:
+        {
+            "Segment": str,
+            "Original-Inferred-Segment": str,
+            "Forced-Mapping": str,
+            "Product": str
+        }
+    """
+
+    # -- 1) Direct JSON Parsing --
+    try:
+        data_entire = json.loads(output.strip())
+        if isinstance(data_entire, dict) and "Segment" in data_entire:
+            return {
+                "Segment": data_entire.get("Segment", "None"),
+                "Original-Inferred-Segment": data_entire.get("Original-Inferred-Segment", "None"),
+                "Forced-Mapping": data_entire.get("Forced-Mapping", "No"),
+                "Product": data_entire.get("Product", "None"),
+            }
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass
+
+    # -- 2) Extract JSON blocks inside triple backticks --
+    code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', output, flags=re.DOTALL)
+    for block in code_blocks:
+        text_block = block.strip()
+        try:
+            block_data = json.loads(text_block)
+            if isinstance(block_data, dict) and "Segment" in block_data:
+                return {
+                    "Segment": block_data.get("Segment", "None"),
+                    "Original-Inferred-Segment": block_data.get("Original-Inferred-Segment", "None"),
+                    "Forced-Mapping": block_data.get("Forced-Mapping", "No"),
+                    "Product": block_data.get("Product", "None"),
+                }
+        except (json.JSONDecodeError, ValueError, TypeError):
+            pass
+
+    # -- 3) Fallback: Regex-based extraction --
+    #    a) Pattern with curly braces (full JSON structure)
+    fallback_pattern_braces = re.compile(
+        r'\{\s*"Segment"\s*:\s*"([^"]+)"\s*,\s*"Original-Inferred-Segment"\s*:\s*"([^"]+)"\s*,\s*"Forced-Mapping"\s*:\s*"([^"]+)"\s*,\s*"Product"\s*:\s*"([^"]+)"\s*\}',
+        flags=re.DOTALL
+    )
+    match_braces = fallback_pattern_braces.search(output)
+    if match_braces:
+        return {
+            "Segment": match_braces.group(1),
+            "Original-Inferred-Segment": match_braces.group(2),
+            "Forced-Mapping": match_braces.group(3),
+            "Product": match_braces.group(4),
+        }
+
+    #    b) Pattern without curly braces (loose JSON structure)
+    fallback_pattern_no_braces = re.compile(
+        r'"Segment"\s*:\s*"([^"]+)"|'
+        r'"Original-Inferred-Segment"\s*:\s*"([^"]+)"|'
+        r'"Forced-Mapping"\s*:\s*"([^"]+)"|'
+        r'"Product"\s*:\s*"([^"]+)"',
+        flags=re.DOTALL
+    )
+    matches = fallback_pattern_no_braces.findall(output)
+
+    extracted_values = {
+        "Segment": "None",
+        "Original-Inferred-Segment": "None",
+        "Forced-Mapping": "No",
+        "Product": "None"
+    }
+
+    for match in matches:
+        if match[0]: extracted_values["Segment"] = match[0]
+        if match[1]: extracted_values["Original-Inferred-Segment"] = match[1]
+        if match[2]: extracted_values["Forced-Mapping"] = match[2]
+        if match[3]: extracted_values["Product"] = match[3]
+
+    # -- If nothing worked, return a default response --
+    return extracted_values
 
 def extract_segment_and_product_for_scratch(
     user_query: str,
@@ -319,11 +558,21 @@ def extract_segment_and_product_for_scratch(
     - The query may sometimes be vague or incomplete. In such cases, try to understand the implied intent and context to infer the appropriate segment.
     - If the inferred segment can logically match any category from the provided list of Segments, return the matched category from the list and set `Forced-Mapping` to `No`.
     - If no logical match is possible but a mapping must still be provided, forcefully map the inferred segment to the closest match from the provided list and set `Forced-Mapping` to `Yes`.
-    - If no segment can be inferred from the query, return "None" for the `Original-Inferred-Segment` and `Segment`.
+    - If no segment can be inferred from the query, return `"None"` for both `"Original-Inferred-Segment"` and `"Segment"`.
 
-    2. Product: If the product context is provided, return the same product in the output JSON as it is in the context.  
-    - Identify the specific product the query refers to (e.g., "Cement," "Steel Rods").  
-    - If the inferred term logically represents a product, include it in the output.  
+    2. Product: Identify the specific product the query refers to (e.g., "Cement," "Steel Rods").  
+    - Always extract the widely recognized industry-standard name for the product.  
+    - If the product is given as an abbreviation, acronym, or chemical formula, return the full name instead.  
+    - Example:
+        - "NaCl" → "Sodium Chloride"
+        - "PVC" → "Polyvinyl Chloride"
+        - "PET" → "Polyethylene Terephthalate"
+        - "H₂SO₄" → "Sulfuric Acid"  
+    - If a product has multiple common names, choose the most widely used commercial name.  
+    - Example:
+        - "Isopropanol" → "Isopropyl Alcohol"
+        - "Ethene" → "Ethylene"
+        - "Acetic Acid" → "Vinegar" (if referring to food-grade usage)
     - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
 
     Important Notes:
@@ -331,11 +580,11 @@ def extract_segment_and_product_for_scratch(
     Logical Matching for Segments:
     - A logical match occurs when the inferred segment and an available segment from the list are conceptually or functionally similar.
     - Examples of logical matches:
-        - Inferred: "Metal Equipment" → Available: "Metalworking Machinery" (Not forced, `Forced-Mapping`: No).
-        - Inferred: "Metal Fabrication Tools" → Available: "Metalworking Machinery" (Not forced, `Forced-Mapping`: No).
+        - Inferred: "Metal Equipment" → Available: "Metalworking Machinery" (`Forced-Mapping`: No).
+        - Inferred: "Metal Fabrication Tools" → Available: "Metalworking Machinery" (`Forced-Mapping`: No).
     - Examples of forced mappings:
-        - Inferred: "Advanced Robotics Systems" → Available: "Automation Equipment" (Forced, `Forced-Mapping`: Yes).
-        - Inferred: "Metal Gear Production" → Available: "Metalworking Machinery" (Forced, `Forced-Mapping`: Yes).
+        - Inferred: "Advanced Robotics Systems" → Available: "Automation Equipment" (`Forced-Mapping`: Yes).
+        - Inferred: "Metal Gear Production" → Available: "Metalworking Machinery" (`Forced-Mapping`: Yes).
     - If no logical match exists, set `Forced-Mapping` to `Yes`.
 
     Provided List of Segments:  
@@ -359,7 +608,6 @@ def extract_segment_and_product_for_scratch(
     Provide only the JSON object in the required format.
     """
 
-
     # Create the prompt using the provided variables
     prompt = PromptTemplate(
         input_variables=["user_query", "segments_str", "context"],
@@ -376,88 +624,171 @@ def extract_segment_and_product_for_scratch(
         "context": context
     })
 
-    # Extract JSON response
+    # Extract JSON response using the robust function
     result_content = result.content.strip()
-
-    # Define regex patterns for Segment, Original-Inferred-Segment, Forced-Mapping, and Product
-    segment_pattern = r'"Segment":\s*"([^"]+)"'
-    original_inferred_segment_pattern = r'"Original-Inferred-Segment":\s*"([^"]+)"'
-    forced_mapping_pattern = r'"Forced-Mapping":\s*"([^"]+)"'
-    product_pattern = r'"Product":\s*"([^"]+)"'
-
-    # Extract details using regex
-    segment_match = re.search(segment_pattern, result_content)
-    original_inferred_segment_match = re.search(original_inferred_segment_pattern, result_content)
-    forced_mapping_match = re.search(forced_mapping_pattern, result_content)
-    product_match = re.search(product_pattern, result_content)
-
-    # Extract values or default to "None"
-    segment = segment_match.group(1).strip() if segment_match else "None"
-    original_inferred_segment = original_inferred_segment_match.group(1).strip() if original_inferred_segment_match else "None"
-    forced_mapping = forced_mapping_match.group(1).strip() if forced_mapping_match else "No"
-    product = product_match.group(1).strip() if product_match else "None"
-
-    extracted_data = {
-        "Segment": segment,
-        "Original-Inferred-Segment": original_inferred_segment,
-        "Forced-Mapping": forced_mapping,
-        "Product": product
-    }
+    extracted_data = extract_json_segment_and_product(result_content)
 
     # Validate against the provided list of Segments
     validated_data = extracted_data.copy()
-    if segment not in segments and segment != "None":
+    if extracted_data["Segment"] not in segments and extracted_data["Segment"] != "None":
         validated_data["Segment"] = "Not Available in list"
 
     return extracted_data, validated_data
+
+def extract_json_capacity_details(output: str) -> Dict[str, Union[float, str]]:
+    """
+    Extracts capacity-related details from an LLM-generated response.
+
+    Ensures:
+    - Parsing of multiple JSON formats (valid JSON, inside code blocks, or loose text).
+    - Numeric values are properly formatted as valid floats.
+    - Fields return "None" if missing.
+
+    Returns:
+    -------
+    dict:
+        {
+            "Capacity": float or "None",
+            "Capacity Unit": str or "None",
+            "Time Period": str or "None"
+        }
+    """
+
+    def normalize_number(value):
+        """
+        Ensures extracted capacity values are always valid floats, removing commas if necessary.
+        Converts word-based numbers into numeric format when possible.
+        """
+        if value is None:
+            return "None"
+
+        # NEW FIX: If already a number, return as float
+        if isinstance(value, (int, float)):
+            return float(value)
+
+        # Remove commas and spaces from numeric values
+        value = str(value).replace(",", "").strip()
+
+        # Convert to float if possible
+        try:
+            return float(value)
+        except ValueError:
+            return "None"  # If conversion fails, return "None"
+
+    # -- 1) Direct JSON Parsing --
+    try:
+        data_entire = json.loads(output.strip())
+        if isinstance(data_entire, dict) and "Capacity" in data_entire:
+            return {
+                "Capacity": normalize_number(data_entire.get("Capacity", "None")),
+                "Capacity Unit": data_entire.get("Capacity Unit", "None"),
+                "Time Period": data_entire.get("Time Period", "None"),
+            }
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass
+
+    # -- 2) Extract JSON blocks inside triple backticks --
+    code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', output, flags=re.DOTALL)
+    for block in code_blocks:
+        text_block = block.strip()
+        try:
+            block_data = json.loads(text_block)
+            if isinstance(block_data, dict) and "Capacity" in block_data:
+                return {
+                    "Capacity": normalize_number(block_data.get("Capacity", "None")),
+                    "Capacity Unit": block_data.get("Capacity Unit", "None"),
+                    "Time Period": block_data.get("Time Period", "None"),
+                }
+        except (json.JSONDecodeError, ValueError, TypeError):
+            pass
+
+    # -- 3) Fallback: Regex-based extraction --
+    #    a) Pattern with curly braces (full JSON structure)
+    fallback_pattern_braces = re.compile(
+        r'\{\s*"Capacity"\s*:\s*"([^"]+)"\s*,\s*"Capacity Unit"\s*:\s*"([^"]+)"\s*,\s*"Time Period"\s*:\s*"([^"]+)"\s*\}',
+        flags=re.DOTALL
+    )
+    match_braces = fallback_pattern_braces.search(output)
+    if match_braces:
+        return {
+            "Capacity": normalize_number(match_braces.group(1)),
+            "Capacity Unit": match_braces.group(2),
+            "Time Period": match_braces.group(3),
+        }
+
+    #    b) Pattern without curly braces (loose JSON structure)
+    fallback_pattern_no_braces = re.compile(
+        r'"Capacity"\s*:\s*"([^"]+)"|'
+        r'"Capacity Unit"\s*:\s*"([^"]+)"|'
+        r'"Time Period"\s*:\s*"([^"]+)"',
+        flags=re.DOTALL
+    )
+    matches = fallback_pattern_no_braces.findall(output)
+
+    extracted_values = {"Capacity": "None", "Capacity Unit": "None", "Time Period": "None"}
+    
+    for match in matches:
+        if match[0]: extracted_values["Capacity"] = normalize_number(match[0])
+        if match[1]: extracted_values["Capacity Unit"] = match[1]
+        if match[2]: extracted_values["Time Period"] = match[2]
+
+    # -- If nothing worked, return a default response --
+    return extracted_values
 
 def extract_capacity_details(user_query, llm):
     """
     Extracts details related to capacity, capacity unit, and time period from the user query.
 
+    Uses an LLM to analyze the query and return structured details.
+
     Args:
         user_query (str): The message input from the user.
 
     Returns:
-        dict: A dictionary containing "Capacity", "Capacity Unit", and "Time Period".
+        dict: A dictionary containing "Capacity" (float), "Capacity Unit" (string), and "Time Period" (string).
     """
 
+    # Define the prompt
     prompt_template = """
     You are an expert in analyzing industry-building queries and extracting specific details. 
     Your task is to analyze the provided query and extract the following information, ensuring accurate interpretation of industry-specific abbreviations and logical inference for missing details.
 
     Extract the following details from the query:
 
-    1. Capacity: The numeric or descriptive quantity being referred to (e.g., "1", "100", "50,000").  
-       - This represents the actual quantity or amount the user wants to produce, build, or manufacture.  
-       - Extract the numeric part separately from any units or time-related context.  
-       - If no capacity is found in the query, return `"None"`.  
+    1. Capacity: The numeric or descriptive quantity being referred to (e.g., "1", "100", "50000").  
+    - This represents the actual quantity or amount the user wants to produce, build, or manufacture.  
+    - Extract the numeric part separately from any units or time-related context.  
+    - Ensure that numbers are always extracted in plain numeric format (without commas or spaces).  
+    - DO NOT return numbers with commas (e.g., "1,000,000"). Convert it to "1000000".  
+    - If the capacity is written in words (e.g., "Fifty Thousand", "Five Million"), convert it into numeric format (e.g., "50000", "5000000").  
+    - If no capacity is found in the query, return `"None"`.  
 
     2. Capacity Unit: The unit of measurement associated with the capacity.  
-       - For measurable products (e.g., cement, chemicals, oil), identify logical units like "Tonnes", "Liters", "MegaWatts".  
-       - For countable products (e.g., bottles, bags, books), use the product name as the unit if explicitly mentioned (e.g., "1,000 Bottles").  
-       - Recognize and interpret common industry abbreviations:
-           - "MTPA" → Capacity Unit: "Million Tonnes", Time Period: "Per Annum".
-           - "TPA" → Capacity Unit: "Tonnes", Time Period: "Per Annum".
-           - "MW" → Capacity Unit: "MegaWatts", Time Period: "None" (if not explicitly stated).  
-       - If no logical unit is specified or the unit is illogical, return `"None"`.  
+    - For measurable products (e.g., cement, chemicals, oil), identify logical units like "Tonnes", "Liters", "MegaWatts".  
+    - For countable products (e.g., bottles, bags, books), use the product name as the unit if explicitly mentioned (e.g., "1000 Bottles").  
+    - Recognize and interpret common industry abbreviations:
+        - "MTPA" → Capacity Unit: "Million Tonnes", Time Period: "Per Annum".
+        - "TPA" → Capacity Unit: "Tonnes", Time Period: "Per Annum".
+        - "MW" → Capacity Unit: "MegaWatts", Time Period: "None" (if not explicitly stated).  
+    - If no logical unit is specified or the unit is illogical, return `"None"`.  
 
     3. Time Period: The recurring frequency at which the capacity is achieved.  
-       - Examples include "Per Annum" (Yearly), "Per Month", or "Per Day".  
-       - If the time period is unconventional but can be inferred from the context (e.g., from abbreviations like "MTPA"), return the inferred value.  
-       - If no time period is mentioned or cannot be inferred, return `"None"`.  
+    - Examples include "Per Annum" (Yearly), "Per Month", or "Per Day".  
+    - If the time period is unconventional but can be inferred from the context (e.g., from abbreviations like "MTPA"), return the inferred value.  
+    - If no time period is mentioned or cannot be inferred, return `"None"`.  
 
     Important Notes:  
+    - Strictly enforce numeric formatting: Extract numbers in pure numeric format (no commas or formatting).  
+    - If a number is written in words, convert it into numeric format before returning it.  
     - Abbreviations like "MTPA", "TPA", and "MW" must be interpreted correctly, and their components split into Capacity, Capacity Unit, and Time Period.  
-    - Handle vague or incomplete queries logically. For example:
-        - Query: "1 MTPA Cement Factory" → Capacity: "1", Capacity Unit: "Million Tonnes", Time Period: "Per Annum".
-        - Query: "100 MW Plant" → Capacity: "100", Capacity Unit: "MegaWatts", Time Period: "None".
-    - Ensure that the output is strictly limited to the required JSON format and contains no explanations, reasoning, or comments.  
+    - Handle vague or incomplete queries logically. Example:  
+        - Query: `"1 MTPA Cement Factory"` → Capacity: `"1"`, Capacity Unit: `"Million Tonnes"`, Time Period: `"Per Annum"`.  
+        - Query: `"100 MW Plant"` → Capacity: `"100"`, Capacity Unit: `"MegaWatts"`, Time Period: `"None"`.  
 
-    Output Format:
-    Output the result strictly as a JSON object in the following format:
+    Output Format:  
+    Return the extracted values strictly as a JSON object:  
     {{
-        "Capacity": <Extracted Capacity or 'None'>,
+        "Capacity": <Extracted Capacity as float or 'None'>,
         "Capacity Unit": <Extracted Capacity Unit or 'None'>,
         "Time Period": <Extracted Time Period or 'None'>
     }}
@@ -477,30 +808,12 @@ def extract_capacity_details(user_query, llm):
     chain = prompt | llm
 
     # Invoke the query through the chain
-    result = chain.invoke({
-        "query": user_query
-    })
+    result = chain.invoke({"query": user_query})
+    result_text = result.content.strip()
 
-    result = result.content.strip()
+    # Extract JSON capacity details using the new function
+    extracted_details = extract_json_capacity_details(result_text)
 
-    # Define regex patterns to extract details
-    capacity_pattern = r'"Capacity":\s*"([^"]+)"'
-    capacity_unit_pattern = r'"Capacity Unit":\s*"([^"]+)"'
-    time_period_pattern = r'"Time Period":\s*"([^"]+)"'
-
-    # Extract details using regex
-    capacity = re.search(capacity_pattern, result)
-    capacity_unit = re.search(capacity_unit_pattern, result)
-    time_period = re.search(time_period_pattern, result)
-
-    # Convert to a dictionary
-    extracted_details = {
-        "Capacity": capacity.group(1) if capacity else "None",
-        "Capacity Unit": capacity_unit.group(1) if capacity_unit else "None",
-        "Time Period": time_period.group(1) if time_period else "None",
-    }
-    with open("log2.txt", "a") as file:
-        file.write(f"\n extracted_details {extracted_details}")
     return extracted_details
 
 def generate_ai_message(state, history, missing_fields, attempt_count, llm):
@@ -624,15 +937,13 @@ def gather_industry_details(query, main_industries, llm,chatId):
     refined_query = refine_query_with_history(Chat_history_normal, query, llm)
     chat_history.append(HumanMessage(content=refined_query))
     save_chat(chat_history,f"QIND_chat_{chatId}")
-    # state = get_state(f"QIND_state_{chatId}")    
+  
     with open("log.txt", "a") as file:
             file.write(f"\nstate2 {state}")
     # Extract industry details from the refined query
     is_changed = False
     extracted_data,validated_data =  extract_main_industry_and_product_for_scratch(refined_query,main_industries,llm)
     if validated_data['Main-Industry'] != 'None' and validated_data["Main-Industry"] != state['Main-Industry']:
-        # state = get_state(f"QIND_state_{chatId}")
-        # state.update(validated_data)
         state["Main-Industry"] = validated_data["Main-Industry"]
         state["Product"] = validated_data["Product"]
         state["Segment"] = 'None'
@@ -662,7 +973,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
                 "Is_confirmation" : False,
                 "state":state}
     
-    elif state["Main-Industry"] == 'Not Available in List' and state["Product"] == 'None':
+    elif state["Main-Industry"] == 'Not Available in list' and state["Product"] == 'None':
         capacity_json = extract_capacity_details(refined_query,llm)
         if capacity_json["Capacity"] != 'None' or capacity_json["Capacity Unit"] != 'None' or capacity_json["Time Period"] != 'None':
             state = get_state(f"QIND_state_{chatId}")
@@ -703,8 +1014,8 @@ def gather_industry_details(query, main_industries, llm,chatId):
             state["Product"] = sub_validated_data["Product"]
             
             save_state(state,f"QIND_state_{chatId}")
-        state = get_state(f"QIND_state_{chatId}")
-        if state['Sub-Sector'] != 'None':
+        # state = get_state(f"QIND_state_{chatId}")
+        if state['Sub-Sector'] != 'None' and state['Sub-Sector'] != 'Not Available in list':
             segments = get_segments(final_json,state["Main-Industry"],state['Sub-Sector'])
             with open("log.txt", "a") as file:
                 file.write(f"\n segments and main industry {segments}{main_industries}")
@@ -712,8 +1023,8 @@ def gather_industry_details(query, main_industries, llm,chatId):
             with open("log.txt", "a") as file:
                 file.write(f"\n segment_validated_data {segment_validated_data}")
             state = get_state(f"QIND_state_{chatId}")
-            state["Segment"] = segment_validated_data["Segment"] or None
-            state["Product"] = segment_validated_data["Product"] or None
+            state["Segment"] = segment_validated_data["Segment"] 
+            state["Product"] = segment_validated_data["Product"]
             
             save_state(state,f"QIND_state_{chatId}")
             capicity_pending_list = get_keys_for_capicity(chatId)
@@ -736,7 +1047,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
                 }
                 return response
 
-        elif state['Sub-Sector'] != ' Not Available in List':
+        elif state['Sub-Sector'] == 'Not Available in list':
             capicity_pending_list = get_keys_for_capicity(chatId)
             if len(capicity_pending_list) > 0:
                 chat_history = get_chat(f"QIND_chat_{chatId}")

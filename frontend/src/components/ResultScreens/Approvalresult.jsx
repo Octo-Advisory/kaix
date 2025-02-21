@@ -9,8 +9,28 @@ function Approvalresult({ result }) {
     const approval_data = JSON.parse(Analytics_response["Approval Data"])
     // console.log("approval_dataa", approval_data);
     const approval_name = approval_data["Approval Name"]
+    const stages = approval_data["Stages"]
     const approvals = Object.values(approval_name)
     // console.log("approvals", approvals);
+    // Convert the JSON data into an array of objects for easier manipulation
+    const items = Object.keys(approval_name).map(key => ({
+        approvalName: approval_name[key],
+        stage: stages[key]
+      }));
+
+      console.log("stages",items);
+
+    const finalData = items.reduce((acc,item)=>{
+        if(!acc[item.stage]){
+            acc[item.stage] = [];
+        }
+        acc[item.stage].push(item.approvalName);
+        return acc
+    },{})
+    
+    console.log("finalData",finalData);
+    
+      
     return (
         <div className='h-screen w-full flex flex-col items-center justify-center bg-[#242f6a] p-6'>
             {/* Title */}

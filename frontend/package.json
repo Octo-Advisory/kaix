@@ -11,8 +11,10 @@
     "copy-html-entry": "cp ../frontend_app/public/frontend/index.html ../frontend_app/www/frontend.html"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.0",
     "@material-tailwind/react": "^2.1.10",
     "@reduxjs/toolkit": "^2.5.0",
+    "@shadcn/ui": "^0.0.4",
     "axios": "^1.7.9",
     "embla-carousel-react": "^8.5.2",
     "frappe-client": "^2.0.2",
