@@ -6,7 +6,6 @@ import ProgressScreen from './components/ProgressScreen/ProgressScreen'
 import TestComponent from './components/TestComponent/TestComponent';
 import Test from './components/TestComponent/Test';
 
-
 function App() {
   return (
     <BrowserRouter basename="/frontend">

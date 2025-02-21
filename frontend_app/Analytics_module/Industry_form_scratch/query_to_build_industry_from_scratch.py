@@ -5,6 +5,7 @@ import json
 import sys
 from numpy import average
 import numpy as np
+import traceback
 
 def fetch_query_results(query):
     """
@@ -464,41 +465,6 @@ def get_property_and_employement(zone_id,area_id_list,required_LowerMargin_land_
         found_employment = False
         return None,None
     
-# def get_incentive(sub_sector_id,industry_id,area_id_list,city_id_list,state_id_list):
-#     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
-#     city_id_str = ', '.join(f"'{area_id}'" for area_id in city_id_list)
-#     state_id_str = ', '.join(f"'{state_id}'" for state_id in state_id_list)
-#     today_date = datetime.now().strftime('%Y-%m-%d 00:00:00')
-#     sql_query = f"""
-#     SELECT i.name, iim.sub_sector, iim.area, iim.city, iim.state, i.incentive_rank
-#     FROM `tabIncentive Industry Mapping` iim
-#     JOIN `tabIncentive` i
-#         ON i.name = iim.incentive
-#     WHERE (
-#         (iim.sub_sector = '{sub_sector_id}')
-#         OR (iim.sub_sector IS NULL AND iim.industry = '{industry_id}')
-#         OR (iim.pan_industries = 1)
-#         )
-#     AND 
-#         (
-#         (iim.area IN ({area_id_str}))  
-#         OR (iim.area IS NULL AND iim.city IN ({city_id_str}) OR iim.city_level = 1)
-#         OR (iim.area IS NULL AND iim.city IS NULL AND iim.state IN ({state_id_str}) OR iim.state_level = 1)
-#         OR (iim.country_level = 1)
-#     )
-#     AND '{today_date}' between i.incentive_operation_start_date and i.incentive_operation_end_date;
-#     """
-
-#     # Execute the query using the provided fetch_query_results function
-#     results = fetch_query_results(sql_query)
-
-#     if results:
-#         Incentive_only_df = pd.DataFrame(results, columns=['incentive_id', 'sub_sector_id', 'area_id', 
-#                                             'city_id', 'state_id', 'incentive_rank'])
-#         return Incentive_only_df
-#     else:
-#         return None
-    
 def get_property_incentive_mapped(industry_id,sub_sector_id,area_id_list,city_id_list,state_id_list,property_id_list,found_incentive):
     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
     city_id_str = ', '.join(f"'{area_id}'" for area_id in city_id_list)
@@ -506,37 +472,37 @@ def get_property_incentive_mapped(industry_id,sub_sector_id,area_id_list,city_id
     property_id_list_str = ', '.join(f"'{property_id}'" for property_id in property_id_list)
     today_date = datetime.now().strftime('%Y-%m-%d 00:00:00')
     sql_query = f"""
-    SELECT i.name, iim.sub_sector, iim.area, iim.city, iim.state, i.incentive_rank,
-        p.name, p.area AS property_area_id, iim.city_level, iim.state_level, iim.country_level, iim.pan_industries
-    FROM `tabIncentive Industry Mapping` iim
-    JOIN `tabIncentive` i
-        ON i.name = iim.incentive
-    JOIN `tabSurvey No` p
-        ON (iim.area = p.area)  -- Join on area_id
-        OR (iim.area IS NULL AND iim.city = p.city OR iim.city_level = 1)
-        OR (iim.area IS NULL AND iim.city IS NULL AND iim.state = p.state OR iim.state_level = 1)
-        OR (iim.country_level = 1)
-    WHERE
-        (iim.sub_sector = '{sub_sector_id}')
-        OR (iim.sub_sector IS NULL AND iim.industry = '{industry_id}')
-        OR (iim.pan_industries = 1)
-    AND (
-        (iim.area IN ({area_id_str}))  
-        OR (iim.area IS NULL AND iim.city IN ({city_id_str}) OR iim.city_level = 1)
-        OR (iim.area IS NULL AND iim.city IS NULL AND iim.state IN ({state_id_str}) OR iim.state_level = 1)
-        OR (iim.country_level = 1)
-    )
-    AND (p.name IN ({property_id_list_str}))
-    AND '{today_date}' BETWEEN i.incentive_operation_start_date AND i.incentive_operation_end_date;
+    SELECT i.name, i.incentive_name, i.incentive_type, i.incentive_operation_start_date, i.incentive_operation_end_date, i.quantum_of_assistance, iim.sub_sector, iim.area, iim.city, iim.state, i.incentive_rank,
+       p.name, p.area AS property_area_id
+FROM `tabIncentive Industry Mapping` iim
+JOIN `tabIncentive` i
+    ON i.name = iim.incentive
+JOIN `tabSurvey No` p
+    ON (iim.area = p.area)  -- Join on area_id
+    OR (iim.area IS NULL AND iim.city = p.city OR iim.city_level = 1)
+    OR (iim.area IS NULL AND iim.city IS NULL AND iim.state = p.state OR iim.state_level = 1)
+    OR (iim.country_level = 1)
+WHERE
+    (iim.sub_sector = '{sub_sector_id}')
+    OR (iim.sub_sector IS NULL AND iim.industry = '{industry_id}')
+    OR (iim.pan_industries = 1)
+  AND (
+      (iim.area IN ({area_id_str}))  
+      OR (iim.area IS NULL AND iim.city IN ({city_id_str}) OR iim.city_level = 1)
+      OR (iim.area IS NULL AND iim.city IS NULL AND iim.state IN ({state_id_str}) OR iim.state_level = 1)
+      OR (iim.country_level = 1)
+  )
+  AND (p.name IN ({property_id_list_str}))
+  AND '{today_date}' BETWEEN i.incentive_operation_start_date AND i.incentive_operation_end_date;
     """
 
     # Execute the query using the provided fetch_query_results function
     results = fetch_query_results(sql_query)
 
     if results:
-        property_incentive_mapped_df = pd.DataFrame(results, columns=['incentive_id', 'sub_sector_id', 'area_id', 
-                                            'city_id', 'state_id', 'incentive_rank',
-                                            'property_id', 'property_area_id', "city_level", "state_level", "country_level", "pan_industries"])
+        property_incentive_mapped_df = pd.DataFrame(results, columns=['incentive_id', "incentive_name", "incentive_type", "incentive_operation_start_date", 'incentive_operation_end_date', "quantum_of_assistance", 'sub_sector_id', 'area_id', 
+                                        'city_id', 'state_id', 'incentive_rank',
+                                        'property_id', 'property_area_id'])
         found_incentive = True
         return property_incentive_mapped_df,found_incentive
     else:
@@ -562,7 +528,7 @@ def calculate_property_suitability(df, preference_power_plant=5, preference_road
     distance_columns = ['distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source',"distance_from_nearest_airport","road_connectivity"]
     for col in distance_columns:
         df[col] = pd.to_numeric(df[col], errors='coerce')  # Convert to numeric, coercing errors to NaN
-    
+    df.fillna(0, inplace=True)
     total_preference_score = (preference_power_plant + preference_road + preference_railway + preference_seaport + preference_airport)
 
     # Define weightages
@@ -618,6 +584,8 @@ def calculate_employment_availability_score(df, sub_sector_id):
     mod_skill = required_skill_type["mod_skill"]
     low_skill = required_skill_type["low_skill"]
 
+    df.fillna(0, inplace=True)
+
     # Define the weightages (you can customize these weights if needed)
     weights = {
         high_skill: 60 / 100,  # High required skill type
@@ -667,7 +635,7 @@ def calculate_incentive_weighted_score(scores):
 def calculate_property_wise_incentive_scores(df):
     # Convert the 'incentive_rank' to numeric (in case it's stored as strings like '1', '2', etc.)
     df["incentive_rank"] = pd.to_numeric(df["incentive_rank"], errors='coerce')
-
+    df.fillna(0, inplace=True)
     # Group by property_id and get the list of incentive ranks for each property
     property_incentives = df.groupby("property_id")["incentive_rank"].apply(list).reset_index()
 
@@ -723,51 +691,50 @@ def get_property_approval_mapped(industry_id,sub_sector_id,area_id_list,city_id_
     state_id_str = ', '.join(f"'{state_id}'" for state_id in state_id_list)
     property_id_list_str = ', '.join(f"'{property_id}'" for property_id in property_id_list)
     query = f"""
-    SELECT a.name, a.business_location_type as ABLT, a.land_type as ALT, a.vicinity_detail as AVD, a.cross_following_details as ACFD,a.road_cutting, a.delivery_schedule_in_working_days, a.mode_of_application, a.stage, a.is_dependent, a.depends_on, a.area, p.name,  p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport
-    FROM `tabLicenses and Approvals Type` a
-    JOIN `tabSurvey No` p
-        ON (a.area = p.area)  -- Join on area_id
-        OR (a.area IS NULL AND a.city = p.city OR a.city_level = 1)
-        OR (a.area IS NULL AND a.city IS NULL AND a.state = p.state OR a.state_level = 1)
-        OR (a.country_level = 1)
-    WHERE
-        (a.sub_sector = '{sub_sector_id}')
-        OR (a.sub_sector IS NULL AND a.industry = '{industry_id}')
-        OR (a.pan_industries = "Yes")
-    AND (
-        (a.area IN ({area_id_str}))  
-        OR (a.area IS NULL AND a.city IN ({city_id_str}) OR a.city_level = 1)
-        OR (a.area IS NULL AND a.city IS NULL AND a.state IN ({state_id_str}) OR a.state_level = 1)
-        OR (a.country_level = 1)
-    )
-    AND (
-        ((a.cross_following_details =  'None of the above')
-        AND (a.vicinity_detail = 'None of the above')
-        AND (a.road_cutting = "No")
-        AND (a.tree_cutting = "No")
-        AND (a.business_location_type IS NULL)
-        AND (a.land_type IS NULL)
-        AND (a.require_pole_shifting = "No")
-        )
-        OR (a.cross_following_details = p.will_your_industry_cross_the_following)
-        OR (a.vicinity_detail = p.vicinity_of)
-        OR (a.road_cutting = "Yes" and p.road_cutting_involved = "Yes")
-        OR (a.tree_cutting = "Yes" AND p.tree_cutting_involved = "Yes")
-        OR (a.business_location_type = p.business_location_type AND a.land_type = p.land_type)
-        OR ((a.business_location_type = p.business_location_type) AND (a.land_type IS NULL))
-        OR (a.require_pole_shifting = "Yes" AND p.require_shifting_of_any_electricity_line_or_pole = "Yes")
-    )
-    AND (p.name IN ({property_id_list_str}))
+    SELECT a.name, a.license_approval, a.government_department, a.business_location_type as ABLT, a.land_type as ALT, a.vicinity_detail as AVD, a.cross_following_details as ACFD,a.road_cutting, a.delivery_schedule_in_working_days, a.mode_of_application, a.stage, a.is_dependent, a.depends_on, a.area, p.name,  p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following
+FROM `tabLicenses and Approvals Type` a
+JOIN `tabSurvey No` p
+    ON (a.area = p.area)  -- Join on area_id
+    OR (a.area IS NULL AND a.city = p.city OR a.city_level = 1)
+    OR (a.area IS NULL AND a.city IS NULL AND a.state = p.state OR a.state_level = 1)
+    OR (a.country_level = 1)
+WHERE
+    (a.sub_sector = '{sub_sector_id}')
+    OR (a.sub_sector IS NULL AND a.industry = '{industry_id}')
+    OR (a.pan_industries = "Yes")
+  AND (
+      (a.area IN ({area_id_str}))  
+      OR (a.area IS NULL AND a.city IN ({city_id_str}) OR a.city_level = 1)
+      OR (a.area IS NULL AND a.city IS NULL AND a.state IN ({state_id_str}) OR a.state_level = 1)
+      OR (a.country_level = 1)
+  )
+  AND (
+      ((a.cross_following_details =  'None of the above')
+      AND (a.vicinity_detail = 'None of the above')
+      AND (a.road_cutting = "No")
+      AND (a.tree_cutting = "No")
+      AND (a.business_location_type IS NULL)
+      AND (a.land_type IS NULL)
+      AND (a.require_pole_shifting = "No")
+      )
+      OR (a.cross_following_details = p.will_your_industry_cross_the_following)
+      OR (a.vicinity_detail = p.vicinity_of)
+      OR (a.road_cutting = "Yes" and p.road_cutting_involved = "Yes")
+      OR (a.tree_cutting = "Yes" AND p.tree_cutting_involved = "Yes")
+      OR (a.business_location_type = p.business_location_type AND a.land_type = p.land_type)
+      OR ((a.business_location_type = p.business_location_type) AND (a.land_type IS NULL))
+      OR (a.require_pole_shifting = "Yes" AND p.require_shifting_of_any_electricity_line_or_pole = "Yes")
+  )
+  AND (p.name IN ({property_id_list_str}))
     """
     # Call the fetch_query_results function to get the results from the query
     results = fetch_query_results(query)
     # Check if there are results
     if results:
-        property_approval_mapped_df = pd.DataFrame(results, columns=['approval_id', 'Approval_business_location', 'Approval_land_type', 'Approval_vicinity_detail', 'Approval_cross_following', 'Approval_Road_cutiing', 'time_taken', 'online_or_offline', 
-                                            'stages', 'is_dependent', 'dependent_approval_ids', 
-                                            'area_id', 'property_id',"business_location_type", "land_type","pole_shifting", 
-                                            "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following_?", 
-                                            "road_connectivity", "distance_from_nearest_airport"])
+        property_approval_mapped_df = pd.DataFrame(results, columns=['approval_id', "approval_name", "government_department", 'Approval_business_location', 'Approval_land_type', 'Approval_vicinity_detail', 'Approval_cross_following', 'Approval_Road_cutiing', 'time_taken', 'online_or_offline', 
+                                        'stages', 'is_dependent', 'dependent_approval_ids', 
+                                        'area_id', 'property_id',"business_location_type", "land_type","pole_shifting", 
+                                        "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following_?"])
         return property_approval_mapped_df,found_approval
     else:
        found_approval = False
@@ -992,6 +959,7 @@ def get_supply_rule(industry_id, sub_sector_id, segment_id,required_capacity_by_
         supply_rules_df.drop_duplicates(subset=["supply_id"], inplace=True)
         supply_rules_df["minimum_supply_requirement"] = (required_capacity_by_user*supply_rules_df["minimum_supply_requirement"])
         supply_rules_df["minimum_supply_requirement"] = pd.to_numeric(supply_rules_df["minimum_supply_requirement"])
+        supply_rules_df.fillna(0, inplace=True)
         return supply_rules_df
     else:
         return None
@@ -1008,10 +976,11 @@ def get_vendor_df(supply_rules_df):
     ON V.name = VSC.parent
     WHERE supply IN ({supply_id_str})
     """
-
+    log_to_file("vendor_fetching_query",vendor_fetching_query)
+    log_to_file("supply_id_str",supply_id_str)
     # Execute the query using the fetch_query_results function
     results = fetch_query_results(vendor_fetching_query)
-
+    log_to_file("result",results)
     # Convert the query results to a pandas DataFrame
     if results:
         # Define the column names corresponding to the SELECT statement
@@ -1023,7 +992,12 @@ def get_vendor_df(supply_rules_df):
 
         return vendor_df
     else:
-        return None
+        vendor_df = pd.DataFrame(results, columns=['vendor_id', 'supply_id', 'vendor_supply_capacity', 
+                                            'years_of_experience', 'no_of_locations', 'no_of_past_clients', 
+                                            'no_of_servieces', 'no_of_employees', 'latitude_longitude'])
+        # columns_to_convert = ["vendor_supply_capacity", "years_of_experience", "no_of_past_clients", "no_of_locations", "no_of_servieces", "no_of_employees"]
+        # vendor_df[columns_to_convert] = vendor_df[columns_to_convert].apply(pd.to_numeric, errors='coerce')
+        return vendor_df
     
 def transform_data_for_map_call(vendor_latlong_df, property_latlong_df):
     input_data = {
@@ -1118,72 +1092,71 @@ def calculate_adjustment_factor(series, threshold):
 
 def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_range, tolerable_range):
     try:
-        vendor_latlong_df = vendor_df[["vendor_id", "latitude_longitude"]].drop_duplicates()
-        log_to_file("vendor_latlong_df",str(vendor_latlong_df))
-        log_to_file("property_latlong_df",str(property_latlong_df))
-        input_data_for_map = transform_data_for_map_call(vendor_latlong_df, property_latlong_df)
-        log_to_file("input_data_for_map",str(input_data_for_map))
-        vendor_property_distance = calculate_vendor_property_distances(input_data_for_map)
-        log_to_file("vendor_property_distance1",str(vendor_property_distance))
-        missing_vendor_from_distance_dict = list(set(list(vendor_df["vendor_id"].unique())) ^ set(vendor_property_distance.keys()))
-        log_to_file("missing_vendor_from_distance_dict",str(missing_vendor_from_distance_dict))
-        if len(missing_vendor_from_distance_dict) > 0:
-            vendor_df = vendor_df[~vendor_df["vendor_id"].isin(missing_vendor_from_distance_dict)]
         final_results = []  # Store results for all property-supply combinations
         better_results = []
-        # Loop through all properties
-        for _, property_row in property_latlong_df.iterrows():
-            property_id = property_row['property_id']
-            if all(property_id in vendor_property_distance[ven_id].keys() for ven_id in list(vendor_property_distance.keys())):
-                # Loop through all supplies
-                for _, supply_row in supply_rules_df.iterrows():
-                    supply_id = supply_row['supply_id']
-                    minimum_supply_requirement = supply_row['minimum_supply_requirement']
-                    essential = (supply_row['essentials_items']).lower() == "yes"
-                    
-                    # Filter vendors for the current supply
-                    vendors_for_supply = vendor_df[vendor_df['supply_id'] == supply_id].copy()
-                    # Calculate distances between property and vendors
-                    if not vendors_for_supply.empty:
-                        vendors_for_supply['Dist'] = vendors_for_supply['vendor_id'].apply(
-                            lambda vendor_unique_id: vendor_property_distance[vendor_unique_id][property_id]
-                        )                
+        ### Checking if vendor df is empty
+        if not vendor_df.empty:
+            vendor_latlong_df = vendor_df[["vendor_id", "latitude_longitude"]].drop_duplicates()
+            supply_rules_df.fillna(0, inplace=True)
+            vendor_df.fillna(0, inplace=True)
+            input_data_for_map = transform_data_for_map_call(vendor_latlong_df, property_latlong_df)
+            vendor_property_distance = calculate_vendor_property_distances(input_data_for_map)
+            missing_vendor_from_distance_dict = list(set(list(vendor_df["vendor_id"].unique())) ^ set(vendor_property_distance.keys()))
+            if len(missing_vendor_from_distance_dict) > 0:
+                vendor_df = vendor_df[~vendor_df["vendor_id"].isin(missing_vendor_from_distance_dict)]
+            # Loop through all properties
+            for _, property_row in property_latlong_df.iterrows():
+                property_id = property_row['property_id']
+                if all(property_id in vendor_property_distance[ven_id].keys() for ven_id in list(vendor_property_distance.keys())):
+                    # Loop through all supplies
+                    for _, supply_row in supply_rules_df.iterrows():
+                        supply_id = supply_row['supply_id']
+                        minimum_supply_requirement = supply_row['minimum_supply_requirement']
+                        essential = (supply_row['essentials_items']).lower() == "yes"
                         
-                        # Add normalized columns and calculate scores
-                        vendors_for_supply['Diff_cap'] = vendors_for_supply['vendor_supply_capacity'].apply(
-                            lambda x: max(0, minimum_supply_requirement - x)
-                        )
-                        vendors_for_supply["R_C"] = normalize_series(vendors_for_supply["Diff_cap"])
-                        vendors_for_supply["R_d"] = normalize_series(vendors_for_supply["Dist"])
-                        vendors_for_supply["Ranking"] = (0.7 * vendors_for_supply["R_C"]) + (0.3 * vendors_for_supply["R_d"])
-                        vendors_for_supply["Adjustment Factor"] = calculate_adjustment_factor(
-                            vendors_for_supply["vendor_supply_capacity"], threshold=minimum_supply_requirement
-                        )
-                        vendors_for_supply["Final Ranking"] = vendors_for_supply["Ranking"] + vendors_for_supply["Adjustment Factor"]
-                        vendors_for_supply["rank_exp"] = normalize_series(vendors_for_supply["years_of_experience"], highest_is_worst=False)
-                        vendors_for_supply["rank_loc"] = normalize_series(vendors_for_supply["no_of_locations"], highest_is_worst=False)
-                        vendors_for_supply["rank_pc"] = normalize_series(vendors_for_supply["no_of_past_clients"], highest_is_worst=False)
-                        vendors_for_supply["rank_n_ser"] = normalize_series(vendors_for_supply["no_of_servieces"], highest_is_worst=False)
-                        vendors_for_supply["Fea_rank"] = (
-                            0.4 * vendors_for_supply["rank_exp"] +
-                            0.3 * vendors_for_supply["rank_loc"] +
-                            0.2 * vendors_for_supply["rank_n_ser"] +
-                            0.1 * vendors_for_supply["rank_pc"]
-                        )
-                        vendors_for_supply["Final_Score_With_Features"] = (
-                            0.7 * vendors_for_supply["Final Ranking"] +
-                            0.3 * vendors_for_supply["Fea_rank"]
-                        )
-                        
-                        # Find the best vendor based on the logic provided
-                        req_cap = minimum_supply_requirement
-                        pref_r = prefered_range
-                        best_ranked_row = vendors_for_supply.loc[
-                            vendors_for_supply["Final_Score_With_Features"].idxmax()
-                        ]
-                        
-                        if best_ranked_row["vendor_supply_capacity"] >= req_cap:
-                            final_results.append({
+                        # Filter vendors for the current supply
+                        vendors_for_supply = vendor_df[vendor_df['supply_id'] == supply_id].copy()
+                        # Calculate distances between property and vendors
+                        if not vendors_for_supply.empty:
+                            vendors_for_supply['Dist'] = vendors_for_supply['vendor_id'].apply(
+                                lambda vendor_unique_id: vendor_property_distance[vendor_unique_id][property_id]
+                            )                
+                            
+                            # Add normalized columns and calculate scores
+                            vendors_for_supply['Diff_cap'] = vendors_for_supply['vendor_supply_capacity'].apply(
+                                lambda x: max(0, minimum_supply_requirement - x)
+                            )
+                            vendors_for_supply["R_C"] = normalize_series(vendors_for_supply["Diff_cap"])
+                            vendors_for_supply["R_d"] = normalize_series(vendors_for_supply["Dist"])
+                            vendors_for_supply["Ranking"] = (0.7 * vendors_for_supply["R_C"]) + (0.3 * vendors_for_supply["R_d"])
+                            vendors_for_supply["Adjustment Factor"] = calculate_adjustment_factor(
+                                vendors_for_supply["vendor_supply_capacity"], threshold=minimum_supply_requirement
+                            )
+                            vendors_for_supply["Final Ranking"] = vendors_for_supply["Ranking"] + vendors_for_supply["Adjustment Factor"]
+                            vendors_for_supply["rank_exp"] = normalize_series(vendors_for_supply["years_of_experience"], highest_is_worst=False)
+                            vendors_for_supply["rank_loc"] = normalize_series(vendors_for_supply["no_of_locations"], highest_is_worst=False)
+                            vendors_for_supply["rank_pc"] = normalize_series(vendors_for_supply["no_of_past_clients"], highest_is_worst=False)
+                            vendors_for_supply["rank_n_ser"] = normalize_series(vendors_for_supply["no_of_servieces"], highest_is_worst=False)
+                            vendors_for_supply["Fea_rank"] = (
+                                0.4 * vendors_for_supply["rank_exp"] +
+                                0.3 * vendors_for_supply["rank_loc"] +
+                                0.2 * vendors_for_supply["rank_n_ser"] +
+                                0.1 * vendors_for_supply["rank_pc"]
+                            )
+                            vendors_for_supply["Final_Score_With_Features"] = (
+                                0.7 * vendors_for_supply["Final Ranking"] +
+                                0.3 * vendors_for_supply["Fea_rank"]
+                            )
+                            
+                            # Find the best vendor based on the logic provided
+                            req_cap = minimum_supply_requirement
+                            pref_r = prefered_range
+                            best_ranked_row = vendors_for_supply.loc[
+                                vendors_for_supply["Final_Score_With_Features"].idxmax()
+                            ]
+                            
+                            if best_ranked_row["vendor_supply_capacity"] >= req_cap:
+                                final_results.append({
                                 "property_id": property_id,
                                 "supply_id": supply_id,
                                 "essential": essential,
@@ -1191,44 +1164,60 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                 "supply_score": best_ranked_row["Final_Score_With_Features"],
                                 "vendor_id": best_ranked_row["vendor_id"],
                                 "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
+                                "years_of_experience": best_ranked_row["years_of_experience"],
+                                "no_of_locations": best_ranked_row["no_of_locations"],
+                                "no_of_past_clients": best_ranked_row["no_of_past_clients"],
+                                "no_of_servieces": best_ranked_row["no_of_servieces"],
+                                "no_of_employees": best_ranked_row["no_of_employees"],
+                                "latitude_longitude": best_ranked_row["latitude_longitude"],
                                 "Distance": best_ranked_row["Dist"],
-                                
+                                "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                             })
-                        else:
-                            # log_to_file("vendors_for_supply",vendors_for_supply["Dist"])
-                            # log_to_file("pref_r",pref_r[1])
-                            g_cap = vendors_for_supply[
-                                (vendors_for_supply["vendor_supply_capacity"] >= req_cap) &
-                                (vendors_for_supply["Dist"] <= pref_r[1])
-                            ]
-                            if not g_cap.empty:
-                                best_g_cap_row = g_cap.loc[g_cap["Final_Score_With_Features"].idxmax()]
-                                better_results.append(
-                                    {
+                            else:
+                                g_cap = vendors_for_supply[
+                                    (vendors_for_supply["vendor_supply_capacity"] >= req_cap) &
+                                    (vendors_for_supply["Dist"] <= pref_r[1])
+                                ]
+                                if not g_cap.empty:
+                                    best_g_cap_row = g_cap.loc[g_cap["Final_Score_With_Features"].idxmax()]
+                                    better_results.append(
+                                        {
+                                            "property_id": property_id,
+                                            "supply_id": supply_id,
+                                            "essential": essential,
+                                            "minimum_supply_requirement": minimum_supply_requirement,
+                                            "supply_score": best_ranked_row["Final_Score_With_Features"],
+                                            "vendor_id": best_ranked_row["vendor_id"],
+                                            "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
+                                            "years_of_experience": best_ranked_row["years_of_experience"],
+                                            "no_of_locations": best_ranked_row["no_of_locations"],
+                                            "no_of_past_clients": best_ranked_row["no_of_past_clients"],
+                                            "no_of_servieces": best_ranked_row["no_of_servieces"],
+                                            "no_of_employees": best_ranked_row["no_of_employees"],
+                                            "latitude_longitude": best_ranked_row["latitude_longitude"],
+                                            "Distance": best_ranked_row["Dist"],
+                                            "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
+                                        }
+                                    )
+                                    final_results.append({
                                         "property_id": property_id,
                                         "supply_id": supply_id,
                                         "essential": essential,
                                         "minimum_supply_requirement": minimum_supply_requirement,
-                                        "supply_score": best_ranked_row["Final_Score_With_Features"],
-                                        "vendor_id": best_ranked_row["vendor_id"],
-                                        "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
-                                        "Distance": best_ranked_row["Dist"],
-                                        
-                                    }
-                                )
-                                final_results.append({
-                                    "property_id": property_id,
-                                    "supply_id": supply_id,
-                                    "essential": essential,
-                                    "minimum_supply_requirement": minimum_supply_requirement,
-                                    "supply_score": best_g_cap_row["Final_Score_With_Features"],
-                                    "vendor_id": best_g_cap_row["vendor_id"],
-                                    "vendor_supply_capacity": best_g_cap_row["vendor_supply_capacity"],
-                                    "Distance": best_g_cap_row["Dist"],
-                                    
-                                    })
-                            else:
-                                final_results.append({
+                                        "supply_score": best_g_cap_row["Final_Score_With_Features"],
+                                        "vendor_id": best_g_cap_row["vendor_id"],
+                                        "vendor_supply_capacity": best_g_cap_row["vendor_supply_capacity"],
+                                        "years_of_experience": best_g_cap_row["years_of_experience"],
+                                        "no_of_locations": best_g_cap_row["no_of_locations"],
+                                        "no_of_past_clients": best_g_cap_row["no_of_past_clients"],
+                                        "no_of_servieces": best_g_cap_row["no_of_servieces"],
+                                        "no_of_employees": best_g_cap_row["no_of_employees"],
+                                        "latitude_longitude": best_g_cap_row["latitude_longitude"],
+                                        "Distance": best_g_cap_row["Dist"],
+                                        "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
+                                        })
+                                else:
+                                    final_results.append({
                                     "property_id": property_id,
                                     "supply_id": supply_id,
                                     "essential": essential,
@@ -1236,8 +1225,14 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                     "supply_score": best_ranked_row["Final_Score_With_Features"],
                                     "vendor_id": best_ranked_row["vendor_id"],
                                     "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
+                                    "years_of_experience": best_ranked_row["years_of_experience"],
+                                    "no_of_locations": best_ranked_row["no_of_locations"],
+                                    "no_of_past_clients": best_ranked_row["no_of_past_clients"],
+                                    "no_of_servieces": best_ranked_row["no_of_servieces"],
+                                    "no_of_employees": best_ranked_row["no_of_employees"],
+                                    "latitude_longitude": best_ranked_row["latitude_longitude"],
                                     "Distance": best_ranked_row["Dist"],
-                                    
+                                    "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                 })
 
         # Convert results to DataFrame
@@ -1247,7 +1242,8 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
         better_df = pd.DataFrame(better_results)
         return final_df, better_df
     except Exception as e:
-        log_to_file("Execprion form anaytics",str(e))
+        error_details = traceback.format_exc()
+        log_to_file("Execprion form anaytics",str(error_details))
         return None,None
 
 def calculate_final_supply_mapped_property_scores_with_condition(property_mapped_supply_individual_score, property_latlong_df_for_no_supply, weight_distance=0.7, weight_capacity=0.3):
@@ -1332,3 +1328,93 @@ def calculate_final_supply_mapped_property_scores_with_condition(property_mapped
             "final_score": [5]*(len(unique_property_list))
         })
         return final_scores_df
+
+def process_incentive_df_to_send_solution_screen(df):
+    grouped_df = (
+        df.sort_values(by=['property_id', 'incentive_rank'], ascending=[True, False])
+        .groupby('property_id')
+        .agg({
+            'incentive_id': lambda x: list(x),  # List of incentives
+            'incentive_name': lambda x: list(x),
+            'incentive_name': lambda x: list(x),
+            'incentive_type': lambda x: list(x),
+            'incentive_operation_start_date': lambda x: list(x),
+            'incentive_operation_end_date': lambda x: list(x),
+            'quantum_of_assistance': lambda x: list(x),
+            'incentive_rank': lambda x: list(x),  # Corresponding scores
+        })
+        .reset_index()
+    )
+    return grouped_df
+
+def process_approval_df_to_send_solution_screen(df):
+    # Define custom stage order
+    stage_order = {'Pre-Requisite': 1, 'Pre-Establishment': 2, 'Pre-Operation': 3, 'Others': 4}
+
+    df['stage_order'] = df['stages'].map(stage_order)
+
+    grouped_df = (
+        df.sort_values(by=['property_id', 'stage_order', "time_taken"], ascending=[True, True, True])
+        .groupby('property_id')
+        .agg({
+            'approval_id': lambda x: list(x),  # List of incentives
+            'approval_name': lambda x: list(x),
+            'government_department': lambda x: list(x),
+            'time_taken': lambda x: list(x),
+            'online_or_offline': lambda x: list(x),
+            'stages': lambda x: list(x),
+        })
+        .reset_index()
+    )
+    return grouped_df
+
+def process_supply_vendor_df_to_send_solution_screen(df):
+    log_to_file("df is",str(df))
+    if not df.empty:
+        essential_supply_df = df[df["essential"]]
+        non_essential_supply_df = df[~df["essential"]]
+        grouped_essential_df = (
+            essential_supply_df.sort_values(by=['property_id', 'No_of_vendors_found'], ascending=[True, False])
+            .groupby('property_id')
+            .agg({
+                'supply_id': lambda x: list(x),  # List of incentives
+                'vendor_id': lambda x: list(x),  # List of incentives
+                'minimum_supply_requirement': lambda x: list(x),
+                'vendor_supply_capacity': lambda x: list(x),
+                'years_of_experience': lambda x: list(x),
+                'no_of_locations': lambda x: list(x),
+                'no_of_past_clients': lambda x: list(x),
+                'no_of_servieces': lambda x: list(x),
+                'no_of_employees': lambda x: list(x),
+                'latitude_longitude': lambda x: list(x),
+                'Distance': lambda x: list(x),
+                'No_of_vendors_found': lambda x: list(x),
+            })
+            .reset_index()
+        )
+        grouped_non_essential_df = (
+            non_essential_supply_df.sort_values(by=['property_id', 'No_of_vendors_found'], ascending=[True, False])
+            .groupby('property_id')
+            .agg({
+                'supply_id': lambda x: list(x),  # List of incentives
+                'vendor_id': lambda x: list(x),  # List of incentives
+                'minimum_supply_requirement': lambda x: list(x),
+                'vendor_supply_capacity': lambda x: list(x),
+                'years_of_experience': lambda x: list(x),
+                'no_of_locations': lambda x: list(x),
+                'no_of_past_clients': lambda x: list(x),
+                'no_of_servieces': lambda x: list(x),
+                'no_of_employees': lambda x: list(x),
+                'latitude_longitude': lambda x: list(x),
+                'Distance': lambda x: list(x),
+                'No_of_vendors_found': lambda x: list(x),
+            })
+            .reset_index()
+        )
+        return grouped_essential_df, grouped_non_essential_df
+    else:
+        return pd.DataFrame(), pd.DataFrame()
+
+def sort_by_scores(df, scores_df):
+    df_sorted = df.set_index('property_id').reindex(scores_df['Property_ID']).reset_index()
+    return df_sorted

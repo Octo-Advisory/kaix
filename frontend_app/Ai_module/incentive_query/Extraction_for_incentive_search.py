@@ -277,13 +277,16 @@ def get_available_area_city_state():
     df_area_for_incentive_extraction = pd.DataFrame(result_of_query, columns=columns)
     df_area_for_incentive_extraction = df_area_for_incentive_extraction.drop_duplicates()
 
+    city_area_mapped_dict =  df_area_for_incentive_extraction.groupby("city_name")["area_name"].apply(list).to_dict()
+    state_city_mapped_dict =  df_area_for_incentive_extraction.groupby("state_name")["city_name"].apply(lambda x: list(x.unique())).to_dict()
+
     unique_area_list = list(df_area_for_incentive_extraction.area_name.unique())
 
     unique_city_list = list(df_area_for_incentive_extraction.city_name.unique())
 
     unique_state_list = list(df_area_for_incentive_extraction.state_name.unique())
 
-    return unique_area_list,unique_city_list,unique_state_list
+    return unique_area_list,unique_city_list,unique_state_list,city_area_mapped_dict,state_city_mapped_dict
 
 # Entry point of Incentive search
 def call_incentive_search(input,chatId):
@@ -311,10 +314,10 @@ def call_incentive_search(input,chatId):
                 }
         return response
     else:
-        area_list, city_list, state_list = get_available_area_city_state()
+        area_list, city_list, state_list, city_area_mapped_dict, state_city_mapped_dict = get_available_area_city_state()
         final_json = get_json_for_industry()
         main_industries = get_main_industry(final_json)
-        location_follow_up = get_location_from_query(refine_user_input,area_list,city_list,state_list,state,llm_70b_vers,chatId)
+        location_follow_up = get_location_from_query(refine_user_input,area_list,city_list,state_list,city_area_mapped_dict, state_city_mapped_dict,state,llm_70b_vers,chatId)
         log_to_file("location_follow_up",location_follow_up)
         main_industry_extracted_data,main_industry_validated_data = extract_main_industry_and_product_universal(refine_user_input,main_industries,llm_70b_vers)
         log_to_file("main_industry_validated_data",main_industry_validated_data)
@@ -405,13 +408,25 @@ def get_sub_sectors(final_json,main_industry):
     """Returns a list of sub-sectors for a given main industry."""
     return  list(final_json.get(main_industry, {}).keys())
 
-def get_location_from_query(user_query,area_list,city_list,state_list,state,llm,chatId):   
+def get_location_from_query(user_query,area_list,city_list,state_list,city_area_mapped_dict, state_city_mapped_dict,state,llm,chatId):   
     loc_extracted_data,loc_validated_data = extract_location_from_query(user_query,area_list,city_list,state_list,llm)
     log_to_file("loc_validated_data",loc_validated_data)
     if loc_validated_data["Area"] != 'None' or loc_validated_data["City"] != 'None' or loc_validated_data["State"] != 'None':
         state["Area"] = loc_validated_data["Area"] 
         state['City'] = loc_validated_data["City"]
         state['State'] = loc_validated_data["State"]
+        save_state(state,f"QINC_state_{chatId}")
+        if state["Area"] != 'Not Available in List' and state["Area"] != 'None' :
+            parent_city = next((key for key, value in city_area_mapped_dict.items() if state["Area"] in value), None)
+            parent_state = next((key for key, value in state_city_mapped_dict.items() if parent_city in value), None)
+            log_to_file("parent_city",parent_city)
+            log_to_file("parent_state1",parent_state)
+            state['City'] = parent_city
+            state['State'] = parent_state
+        if state['City'] != 'Not Available in List' and state["City"] != 'None' :
+            parent_state = next((key for key, value in state_city_mapped_dict.items() if state["City"] in value), None)
+            log_to_file("parent_state2",parent_state)
+            state['State'] = parent_state
         save_state(state,f"QINC_state_{chatId}")
         if state['Area'] == state['City'] == state['State'] == "Not Available in List":
             return "Could you provide the area, city, or state? This will help me give you better details."

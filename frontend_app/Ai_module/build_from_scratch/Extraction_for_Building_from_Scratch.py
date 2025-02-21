@@ -1179,9 +1179,9 @@ def get_json_for_industry():
                 SELECT sst.name, sst.sub_sector_name, indt.industry_name
                 FROM `tabSub Sector` AS sst
                 JOIN `tabIndustry` AS indt
-                WHERE sst.industry_id = indt.name
+                ON sst.industry_id = indt.name
             ) AS indmappedsst
-            WHERE sgt.sub_sector = indmappedsst.name
+            ON sgt.sub_sector = indmappedsst.name
             """
     s = frappe.db.sql(query,as_dict=True)
     for item in s:

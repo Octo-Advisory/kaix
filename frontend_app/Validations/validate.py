@@ -1,6 +1,7 @@
 import frappe
 import json
 from frontend_app.Validations.approval_validation import approval_validation
+from frontend_app.Validations.Validation_for_build_Industry_from_strach import search_industry
 
 @frappe.whitelist()
 def validation(aiResponse,user_intension):
@@ -19,6 +20,14 @@ def validation(aiResponse,user_intension):
                 file.write(f"\nparam {param}")
         
             return approval_validation(param)
+        elif user_intension == "Query to build industry from Scratch":
+             state = aiResponse['state']
+             capacity = state.get('Capacity')
+             main_industry = state.get('Main-Industry')
+             sub_sector = state.get('Sub-Sector')
+             segment = state.get('Segment')
+             return search_industry(main_industry,sub_sector,segment,capacity)
+
     except Exception as e:
         with open("log.txt", "a") as file:
                 file.write(f"\nExeption {e}")
