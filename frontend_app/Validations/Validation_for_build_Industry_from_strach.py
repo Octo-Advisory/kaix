@@ -312,6 +312,7 @@ def search_all_supply(INDUSTRY_NAME, SUB_SECTOR, SEGMENT):
                     "supply_not_across_table": None
                 }
 
+@frappe.whitelist()
 def search_industry(INDUSTRY_NAME, SUB_SECTOR, SEGMENT, user_cap):
     # Check the Industry Name is exits in the "industry table "
     query = """

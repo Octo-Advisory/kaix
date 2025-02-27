@@ -5,6 +5,8 @@ import frappe
 import json
 from datetime import datetime
 from geopy.point import Point
+# from frontend_app.frontend_app.Management_Class.helpers.utility import checkApiThreshold
+from frontend_app.Management_Class.helpers.utility import checkApiThreshold
 #endregion
 
 #region Global Varialble Declaration
@@ -20,14 +22,6 @@ def is_valid_lat_long_geopy(lat, lon):
         return True
     except ValueError:
         return False
-
-def makeMapboxApiCall(url):
-    profile = "mapbox/driving"
-    #access_token="pk.eyJ1IjoidmlzaGFsY2hhdWhhbjUyNSIsImEiOiJjbHo1M2J5cmszdXF3MmtzaHFyaW9qazMxIn0.7vJesIZKhldn0HKYoAfgpw"  
-    access_token = ""
-    response = requests.get(url)
-    responseJson = (response.json())  # Convert the response to JSON
-    return responseJson
 
 #create batch of a list
 def createBatch(destinations):
@@ -289,98 +283,105 @@ def CalculatePropVenDistance(data):
 
 @frappe.whitelist()
 def get_geocode(address):
-    # config_data = frappe.db.get_list('Mars Config', filters=[['title', '=', "Matrix api"]], fields=['*'])
-    # if len(config_data)>0:
-    #     item = config_data[0]
-    #     dailyMinLimit = item.daily_min_count
-    #     dailyMaxLimit = item.daily_max_count
-        
-    #     monthlyMinLimit = item.monthly_min_count
-    #     monthlyMaxLimit = item.monthly_max_count
-        
-    #     currentDailyCount = item.current_daily_count
-    #     currentMonthlyCount = item.current_monthly_count
-        
-    #     currentDailyCount = currentDailyCount+1
-    #     currentMonthlyCount = currentMonthlyCount+1
-        
-    #     if currentDailyCount == dailyMinLimit:
-    #         print("send email daily limit exceed ")
-        
-    #     if currentMonthlyCount == monthlyMinLimit:
-    #         print("exceed send email monthly limit ")
+    isProcessFurther = checkApiThreshold("Goolge Geocoding Api")
+    if(isProcessFurther):
+        if address  != None and address != "" and address != " ":
+                    try:
+                        actualAddress = copy.deepcopy(address)
+                        address = str(address).upper()
+                        updatedAddress = address+",Gujarat"
+                        #API request
+                        url = f"https://maps.googleapis.com/maps/api/geocode/json?address={updatedAddress}&key=AIzaSyCgESPN3REByWpiQYiRKGpDWwBZLwQEnVA"
+                        response = requests.get(url)
+                        data = response.json()  #parse the JSON data
+                        
+                        if data['status'] == 'OK' and len(data['results']) > 0:
+                            for item in data['results']:
+                                formatted_address = item['formatted_address']
+                                formatted_address = formatted_address.upper()
+                                frappe.log_error(formatted_address)
+                                isAddressPresent = address in formatted_address
+                                frappe.log_error(isAddressPresent)
+                                if isAddressPresent:
+                                    
+                                    location = item['geometry']['location']
+                                    latitude_longitude = f"{location['lat']},{location['lng']}"
+                                    # location_name = item['address_components'][0]['long_name']
+                                    isAddressPresent = address in formatted_address
+                                    from_gujarat = "Gujarat" in formatted_address
+                                    from_india = "India" in formatted_address
+                                    return {
+                                        'location_info': {
+                                            'location_name': actualAddress,
+                                            'latitude_longitude': latitude_longitude,
+                                            'from_gujarat': from_gujarat,
+                                            'from_india': from_india,
+                                        },
+                                        'isError': False
+                                    }
+                            # formatted_address = data['results'][0]['formatted_address']
+                            # location = data['results'][0]['geometry']['location']
+                            # latitude_longitude = f"{location['lat']},{location['lng']}"
+                            # location_name = data['results'][0]['address_components'][0]['long_name']
+                            
+                            # from_gujarat = "Gujarat" in formatted_address
+                            # from_india = "India" in formatted_address
+                            
+                            return {
+                                'location_info': {
+                                    'location_name': None,
+                                    'latitude_longitude': None,
+                                    'from_gujarat': None,
+                                    'from_india': None,
+                                },
+                                'isError': False
+                            }
+                        else:
+                            #no valid result found, return False
+                            return {
+                                'location_info': {
+                                    'location_name': None,
+                                    'latitude_longitude': None,
+                                    'from_gujarat': None,
+                                    'from_india': None,
+                                },
+                                'isError': True,
+                                'error_message':data['status']
+                            }
 
-    #     print(currentMonthlyCount,monthlyMaxLimit)
-    #     if not(currentDailyCount > dailyMaxLimit or currentMonthlyCount > monthlyMaxLimit) :
-    #         doc = frappe.get_doc('Mars Config', item.name)
-    #         doc.current_daily_count = currentDailyCount
-    #         doc.current_monthly_count = currentDailyCount
-    #         doc.save()
-
-    #         print("continue")
-    #     else:
-    #         print("stop")
-
-    
-    if address  != None and address != "" and address != " ":
-        try:
-            address = str(address)
-            #API request
-            url = f"https://maps.googleapis.com/maps/api/geocode/json?address={address}&key=AIzaSyCgESPN3REByWpiQYiRKGpDWwBZLwQEnVA"
-            response = requests.get(url)
-            data = response.json()  #parse the JSON data
-            
-            if data['status'] == 'OK' and len(data['results']) > 0:
-                formatted_address = data['results'][0]['formatted_address']
-                location = data['results'][0]['geometry']['location']
-                latitude_longitude = f"{location['lat']},{location['lng']}"
-                location_name = data['results'][0]['address_components'][0]['long_name']
-                
-                from_gujarat = "Gujarat" in formatted_address
-                from_india = "India" in formatted_address
-                
-                return {
-                    'location_info': {
-                        'location_name': location_name,
-                        'latitude_longitude': latitude_longitude,
-                        'from_gujarat': from_gujarat,
-                        'from_india': from_india,
-                    },
-                    'isError': False
-                }
-            else:
-                #no valid result found, return False
-                return {
+                    except Exception as e:
+                        # If any error occurs,
+                        return {
+                            'location_info': {
+                                'location_name': None,
+                                'latitude_longitude': None,
+                                'from_gujarat': None,
+                                'from_india': None,
+                            },
+                            'isError': True,
+                            'error_message': str(e)  
+                        }
+        else:
+            return {
                     'location_info': {
                         'location_name': None,
                         'latitude_longitude': None,
                         'from_gujarat': None,
                         'from_india': None,
                     },
-                    'isError': False
-                }
-
-        except Exception as e:
-            # If any error occurs,
-            return {
-                'location_info': {
-                    'location_name': None,
-                    'latitude_longitude': None,
-                    'from_gujarat': None,
-                    'from_india': None,
-                },
-                'isError': True,
-                'error_message': str(e)  
+                    'isError': True,
+                    'error_message': "Invalid Address" 
             }
     else:
         return {
-                'location_info': {
-                    'location_name': None,
-                    'latitude_longitude': None,
-                    'from_gujarat': None,
-                    'from_india': None,
-                },
-                'isError': False
+            'location_info': {
+                'location_name': None,
+                'latitude_longitude': None,
+                'from_gujarat': None,
+                'from_india': None,
+            },
+            'isError': True,
+            'error_message': "Api Limit Exceed"  
         }
 
 

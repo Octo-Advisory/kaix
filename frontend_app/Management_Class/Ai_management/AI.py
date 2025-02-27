@@ -13,10 +13,12 @@ def ai_module_call(input,chatId):
     try:
         # Check if user intention is already determined
         user_intension = check_user_intension(chatId)
-
+        with open("testlog.txt", "a") as file:
+            file.write(f"\nuser_intension {user_intension} for chatId {chatId}")
         if user_intension == None:    # If not, classify the query
             user_intension = classify_query(input)
-            
+            with open("testlog.txt", "a") as file:
+                file.write(f"\nuser_intension found {user_intension} for chatId {chatId}")
             if user_intension != "Valueless queries":   
                 update_user_intension(user_intension,chatId)  # Store the classified intention for future use
         

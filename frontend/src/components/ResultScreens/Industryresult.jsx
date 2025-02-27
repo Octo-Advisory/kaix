@@ -12,8 +12,8 @@ import './Industryresult.css'
 import Model from './Model';
 
 function Industryresult({ result }) {
-// function Industryresult() {
-    console.log("result in indeustry solution screen",result);
+    // function Industryresult() {
+    console.log("result in indeustry solution screen", result);
     const analytics_response = result["Analytics_response"]
     console.log("Analytics_response", analytics_response);
 
@@ -74,13 +74,19 @@ function Industryresult({ result }) {
 
         // for supply and vendors
         const Essential_supply_vendor_lookup_df = JSON.parse(analytics_response['Essential_supply_vendor_lookup_df'])
+        console.log("Essential_supply_vendor_lookup_df", Essential_supply_vendor_lookup_df);
+
         const nonEssential_supply_vendor_lookup_df = JSON.parse(analytics_response['Non_essential_supply_vendor_lookup_df'])
+        console.log("nonEssential_supply_vendor_lookup_df", nonEssential_supply_vendor_lookup_df);
 
         // for employemnt 
         const Employment_lookup_df = JSON.parse(analytics_response['Employment_lookup_df'])
+        console.log("Employment_lookup_df", Employment_lookup_df);
+
 
         // for incenetive
         const Solution_lookup_df = JSON.parse(analytics_response['Solution_lookup_df'])
+        console.log("Solution_lookup_df", Solution_lookup_df);
 
         //for approvals
         const Approval_lookup_df = JSON.parse(analytics_response['Approval_lookup_df'])
@@ -91,7 +97,7 @@ function Industryresult({ result }) {
             try {
                 const get_data = await fetchData(value)
                 const data = get_data[0]
-                // console.log("actual result data", data);
+                console.log("actual result data", data);
 
                 if (data) {
                     const latLong = data.latitude_longitude
@@ -109,28 +115,36 @@ function Industryresult({ result }) {
                     const distance_from_nearest_railway_station = data.distance_from_nearest_railway_station
                     const distance_from_nearest_airport = data.distance_from_nearest_airport
                     const distance_from_nearest_seaport = data.distance_from_nearest_seaport
-                    console.log("hahah😒",Essential_supply_vendor_lookup_df["supply_id"]);
-                    
-                    const ess_supply_id = Essential_supply_vendor_lookup_df["supply_id"][key]
-                    const ess_No_of_vendors_found = Essential_supply_vendor_lookup_df["No_of_vendors_found"][key]
-                    const ess_Distance = Essential_supply_vendor_lookup_df["Distance"][key]
-
-                    const noness_supply_id = nonEssential_supply_vendor_lookup_df["supply_id"][key]
-                    const noness_No_of_vendors_found = nonEssential_supply_vendor_lookup_df["No_of_vendors_found"][key]
-                    const noness_Distance = nonEssential_supply_vendor_lookup_df["Distance"][key]
-
+                    console.log("hahah😒", Essential_supply_vendor_lookup_df["supply_id"]);
 
                     const essential_supply_and_vendor = []
                     const nonessential_supply_and_vendor = []
 
-                    ess_supply_id.forEach((supply, index) => {
-                        const supply_vendor = { supply: supply, total_vendor: ess_No_of_vendors_found[index], nearest_venodor_distance: ess_Distance[index],status: get_status_for_distance(ess_Distance[index])}
-                        essential_supply_and_vendor.push(supply_vendor)
-                    })
-                    noness_supply_id.forEach((supply, index) => {
-                        const supply_vendor = { supply: supply, total_vendor: noness_No_of_vendors_found[index], nearest_venodor_distance: noness_Distance[index],status: get_status_for_distance(noness_Distance[index]) }
-                        nonessential_supply_and_vendor.push(supply_vendor)
-                    })
+                    if (Essential_supply_vendor_lookup_df["No_of_vendors_found"][key] > 0) {
+                        const ess_supply_id = Essential_supply_vendor_lookup_df["supply_id"][key]
+                        const ess_No_of_vendors_found = Essential_supply_vendor_lookup_df["No_of_vendors_found"][key]
+                        const ess_Distance = Essential_supply_vendor_lookup_df["Distance"][key]
+
+                        ess_supply_id.forEach((supply, index) => {
+                            const supply_vendor = { supply: supply, total_vendor: ess_No_of_vendors_found[index], nearest_venodor_distance: ess_Distance[index], status: get_status_for_distance(ess_Distance[index]) }
+                            essential_supply_and_vendor.push(supply_vendor)
+                        })
+                    }
+
+                    if (nonEssential_supply_vendor_lookup_df["No_of_vendors_found"][key] > 0) {
+                        const noness_supply_id = nonEssential_supply_vendor_lookup_df["supply_id"][key]
+                        const noness_No_of_vendors_found = nonEssential_supply_vendor_lookup_df["No_of_vendors_found"][key]
+                        const noness_Distance = nonEssential_supply_vendor_lookup_df["Distance"][key]
+
+                        noness_supply_id.forEach((supply, index) => {
+                            const supply_vendor = { supply: supply, total_vendor: noness_No_of_vendors_found[index], nearest_venodor_distance: noness_Distance[index], status: get_status_for_distance(noness_Distance[index]) }
+                            nonessential_supply_and_vendor.push(supply_vendor)
+                        })
+                    }
+
+
+                    console.log("essential_supply_and_vendor", essential_supply_and_vendor);
+
 
                     const emp_skill_type = Employment_lookup_df['Skill_Type'][key]
                     const count = Employment_lookup_df[`${emp_skill_type}`][key]
@@ -293,16 +307,29 @@ function Industryresult({ result }) {
                                         <div className="section-title text-start text-xl text-dodgerblue">Vendors & Suppliers Mapping</div>
                                         <div className="Content flex px-2 py-2 gap-2">
                                             <div className="left flex flex-1 text-start flex-col gap-3 border-r border-black">
-                                                {solution.essential_vendors.slice(0, 5).map((item, ind) => {
-                                                    return (<div key={ind} className="items flex gap-3"><div className="icon">{statusIcon[item.status]}</div><div className="text">{item.total_vendor} suppliers for {item.supply} with the top choice {item.nearest_venodor_distance} km away</div></div>)
-                                                })}
+                                                {solution.essential_vendors.length > 0 ? (
+                                                    solution.essential_vendors.slice(0, 5).map((item, ind) => {
+                                                        const roundedDistance = parseFloat(item.nearest_vendor_distance.toFixed(2));
+                                                        return (
+                                                            <div key={ind} className="items flex gap-3">
+                                                                <div className="icon">{statusIcon[item.status]}</div>
+                                                                <div className="text">
+                                                                    {item.total_vendor} suppliers for {item.supply} with the top choice {roundedDistance} km away
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <div>No supplier available</div>
+                                                )}
                                                 {solution.essential_vendors.length > 5 && <button className='text-sm' onClick={() => toggleModal(solution.essential_vendors, 'Vendors')}>Show More...</button>}
                                             </div>
                                             <div className="right flex-1 text-start flex flex-col gap-3">
                                                 {solution.nonessential_vendors.slice(0, 5).map((item, index) => {
-                                                    return (<div key={index} className="items flex gap-3"><div className="icon">{statusIcon[item.status]}</div><div className="text">{item.total_vendor} suppliers for {item.supply} with the top choice {item.nearest_venodor_distance} km away</div></div>)
+                                                    const roundedDistance = parseFloat(item.nearest_venodor_distance.toFixed(2));
+                                                    return (<div key={index} className="items flex gap-3"><div className="icon">{statusIcon[item.status]}</div><div className="text">{item.total_vendor} suppliers for {item.supply} with the top choice {roundedDistance} km away</div></div>)
                                                 })}
-                                                {solution.nonessential_vendors.length >5 &&<button className='text-sm' onClick={() => toggleModal(solution.nonessential_vendors, 'Vendors')}>Show More...</button>}
+                                                {solution.nonessential_vendors.length > 5 && <button className='text-sm' onClick={() => toggleModal(solution.nonessential_vendors, 'Vendors')}>Show More...</button>}
                                             </div>
                                         </div>
                                     </div>
@@ -320,7 +347,7 @@ function Industryresult({ result }) {
                                                 {solution.approvals.slice(0, 5).map((item, index) => {
                                                     return (<div key={index} className="items flex gap-3"><div className="icon"><FaCheckCircle size={20} color="green" /></div><div className="text">{item.approval_name}</div></div>)
                                                 })}
-                                                {solution.approvals.length >5 && <button className='text-sm' onClick={() => toggleModal(solution.approvals, 'Approvals')}>Show More...</button>}
+                                                {solution.approvals.length > 5 && <button className='text-sm' onClick={() => toggleModal(solution.approvals, 'Approvals')}>Show More...</button>}
                                             </div>
                                         </div>
                                     </div>
@@ -331,7 +358,7 @@ function Industryresult({ result }) {
                 </div>
                 <button className="embla__prev" onClick={goToPrev}>Prev</button>
                 <button className="embla__next" onClick={goToNext}>Next</button>
-                <Model isOpen={isModalOpen} onClose={() =>(setIsModalOpen(false))} title={modalTitle} data={modalData}/>
+                <Model isOpen={isModalOpen} onClose={() => (setIsModalOpen(false))} title={modalTitle} data={modalData} />
             </div>
         </div>
     )

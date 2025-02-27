@@ -143,7 +143,6 @@ def classify_approval_query(query, llm):
     else:
         raise ValueError(f"Unexpected or invalid response from LLM: {response}")
 
-
 def generate_dynamic_message_for_approval(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm) -> str:
     """
     Generate a dynamic follow-up message using LLM based on the latest context and static follow-up requirement for approval-related queries.
@@ -562,7 +561,6 @@ def get_static_follow_up_for_approval(approval_state: Dict[str, Dict[str, Option
                     message += f" But {missing_details[0]}"
 
             return message
-
 
 def handle_approval_query(
     user_input: str,
@@ -1225,6 +1223,6 @@ def call_handle_approval_query(user_input,chatId):
     extracted_state = state.copy()
 
     
-    response_of_app_query = handle_approval_query(user_input, unique_area_list, unique_city_list, unique_state_list, Industry_data_for_approval, city_area_mapped_dict, state_city_mapped_dict, extracted_state, state, llm_70b_vers_creative,chatId)
+    response_of_app_query = handle_approval_query(user_input, unique_area_list, unique_city_list, unique_state_list, Industry_data_for_approval, city_area_mapped_dict, state_city_mapped_dict, extracted_state, state, llm_70b_vers,chatId)
     return response_of_app_query
         

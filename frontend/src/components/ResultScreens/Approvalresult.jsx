@@ -1,72 +1,85 @@
-import React from 'react'
+import React, { useState } from 'react';
 
 function Approvalresult({ result }) {
-    console.log("resulkt from approval screen", result);
+    const [viewMode, setViewMode] = useState("Pre-Operation");
+
     const Analytics_response = result["Analytics_response"];
-    // console.log("Analytics_response", Analytics_response);
-    const total_effective_time = Analytics_response["Total Effective Time"]
-    const online_percentage = Analytics_response["Online Percentage"]
-    const approval_data = JSON.parse(Analytics_response["Approval Data"])
-    // console.log("approval_dataa", approval_data);
-    const approval_name = approval_data["Approval Name"]
-    const stages = approval_data["Stages"]
-    const approvals = Object.values(approval_name)
-    // console.log("approvals", approvals);
-    // Convert the JSON data into an array of objects for easier manipulation
+    const approval_data = JSON.parse(Analytics_response["Approval Data"]);
+    const approval_name = approval_data["Approval Name"];
+    const stages = approval_data["Stages"];
+
+    const total_effective_time = Analytics_response["Total Effective Time"];
+    const online_percentage = Analytics_response["Online Percentage"];
+
     const items = Object.keys(approval_name).map(key => ({
         approvalName: approval_name[key],
         stage: stages[key]
-      }));
+    }));
 
-      console.log("stages",items);
-
-    const finalData = items.reduce((acc,item)=>{
-        if(!acc[item.stage]){
+    const finalData = items.reduce((acc, item) => {
+        if (!acc[item.stage]) {
             acc[item.stage] = [];
         }
         acc[item.stage].push(item.approvalName);
-        return acc
-    },{})
-    
-    console.log("finalData",finalData);
-    
-      
-    return (
-        <div className='h-screen w-full flex flex-col items-center justify-center bg-[#242f6a] p-6'>
-            {/* Title */}
-            <div className="text-2xl font-bold text-white mb-4">Approvals</div>
+        return acc;
+    }, {});
 
-            {/* Table Container */}
-            <div className="w-full bg-white rounded-lg shadow-lg flex-1 flex flex-col overflow-hidden">
-                <div className="overflow-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-[#166d5b] text-white text-center">
-                                <th colSpan={2} className="p-4 text-lg font-semibold">
-                                    Total Effective Time: <span className="font-normal">{total_effective_time} Days</span> | Online Percentage: <span className="font-normal">{online_percentage} %</span>
-                                </th>
-                            </tr>
-                            <tr className="bg-[#19a282] text-white sticky top-0">
-                                <th className="p-4 text-lg font-semibold">No.</th>
-                                <th className="p-4 text-lg font-semibold">Approval Name</th>
+    return (
+        <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
+            <div className="w-[95%] h-[95%] mx-auto my-5 p-5 bg-white rounded-lg shadow-md">
+                <div className="title w-full p-1 h-[10%]">
+                    <div className="text-5xl text-center">Approvals</div>
+                </div>
+
+                <div className="select-sections py-2 h-[10%] flex items-center justify-between w-full">
+                    <div className="flex gap-2">
+                        {["Pre-Operation", "Pre-Establishment", "Pre-Requisite", "Others"].map(mode => (
+                            <button
+                                key={mode}
+                                className={`bg-gradient-to-r text-white px-3 py-2 rounded-md ${
+                                    viewMode === mode ? "from-gray-600 to-gray-800" : 
+                                    mode === "Pre-Operation" ? "from-green-400 to-green-600" :
+                                    mode === "Pre-Establishment" ? "from-yellow-400 to-yellow-600" :
+                                    mode === "Pre-Requisite" ? "from-blue-400 to-blue-600" :
+                                    "from-gray-400 to-gray-600"
+                                }`}
+                                onClick={() => setViewMode(mode)}
+                            >
+                                {mode}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex gap-4 text-gray-700 text-lg">
+                        <span><strong>Total Effective Time:</strong> {total_effective_time}</span>
+                        <span><strong>Online Percentage:</strong> {online_percentage}%</span>
+                    </div>
+                </div>
+
+                <div className="py-5 h-[80%] overflow-auto">
+                    <table className="w-full border border-gray-300 rounded-lg overflow-hidden shadow-md">
+                        <thead className="bg-blue-500 text-white sticky top-0">
+                            <tr>
+                                <th className="p-3 border border-gray-300">Approval Name</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {approvals.map((approval, index) => (
-                                <tr
-                                    key={index}
-                                    className={`${index % 2 === 0 ? "bg-gray-100" : "bg-white"} hover:bg-[#19a282]/20 transition-all`}
-                                >
-                                    <td className="p-4 text-gray-800">{index + 1}</td>
-                                    <td className="p-4 text-gray-800">{approval}</td>
+                        <tbody className="bg-white">
+                            {finalData[viewMode] && finalData[viewMode].length > 0 ? (
+                                finalData[viewMode].map((item, index) => (
+                                    <tr key={index} className="border border-gray-300 text-center hover:bg-gray-100">
+                                        <td className="p-3 border border-gray-300">{item}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr className="border border-gray-300 hover:bg-gray-100">
+                                    <td className="p-3 border border-gray-300 text-center" colSpan="100%">No data Available</td>
                                 </tr>
-                            ))}
+                            )}
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
-    )
+    );
 }
 
-export default Approvalresult
+export default Approvalresult;

@@ -1,44 +1,59 @@
 import React from 'react';
 
 function Incentiveresult({ result }) {
-    console.log("result from incentive ", result);
-    const Analytics_response = JSON.parse(result["Analytics_response"]);
-    // console.lo g("Analytics_response", Analytics_response);
-    const incentive_name = Analytics_response["Incentive Name"];
-    const incentive_type = Analytics_response["Incentive Type"];
+    console.log("Result from incentive:", result);
 
-    const incentives = Object.values(incentive_name);
-    const incentive_types = Object.values(incentive_type);
+    // Safely parse JSON and handle errors
+    let Analytics_response;
+    try {
+        Analytics_response = JSON.parse(result?.Analytics_response || '{}');
+    } catch (error) {
+        console.error("Error parsing Analytics_response:", error);
+        Analytics_response = {};
+    }
+
+    // Extract incentives and types with fallback values
+    const incentives = Object.values(Analytics_response["Incentive Name"] || {});
+    const incentive_types = Object.values(Analytics_response["Incentive Type"] || {});
 
     return (
-        <div className='h-screen w-full flex flex-col items-center justify-center bg-[#242f6a] p-6'>
-            {/* Title */}
-            <div className="text-2xl font-bold text-white mb-4">Incentives</div>
-            
-            {/* Table Container */}
-            <div className="w-full bg-white rounded-lg shadow-lg flex-1 flex flex-col overflow-hidden">
-                <div className="overflow-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-[#19a282] text-white sticky top-0">
-                                <th className="p-4 text-lg font-semibold">No.</th>
-                                <th className="p-4 text-lg font-semibold">Incentive Name</th>
-                                <th className="p-4 text-lg font-semibold">Incentive Type</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {incentives.map((incentive, index) => (
-                                <tr
-                                    key={index}
-                                    className={`${index % 2 === 0 ? "bg-gray-100" : "bg-white"} hover:bg-[#19a282]/20 transition-all`}
-                                >
-                                    <td className="p-4 text-gray-800">{index + 1}</td>
-                                    <td className="p-4 text-gray-800">{incentive}</td>
-                                    <td className="p-4 text-gray-800">{incentive_types[index]}</td>
+        <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
+            <div className="w-[95%] h-[95%] mx-auto my-5 p-5 bg-white rounded-lg shadow-md">
+                {/* Title Section */}
+                <div className="w-full p-1 h-[10%]">
+                    <h1 className="text-5xl text-center font-semibold text-gray-800">Incentives</h1>
+                </div>
+                
+                {/* Incentive Data */}
+                <div className="py-3 h-[90%] overflow-auto">
+                    <div className="h-full overflow-auto border border-gray-300 rounded-lg">
+                        <table className="w-full border-collapse">
+                            <thead className="sticky top-0 bg-[#19a282] text-white">
+                                <tr>
+                                    <th className="p-4 text-lg font-semibold border border-gray-300">No.</th>
+                                    <th className="p-4 text-lg font-semibold border border-gray-300">Incentive Name</th>
+                                    <th className="p-4 text-lg font-semibold border border-gray-300">Incentive Type</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {incentives.length > 0 ? (
+                                    incentives.map((incentive, index) => (
+                                        <tr key={index} className="hover:bg-[#19a282]/20 transition-all">
+                                            <td className="p-4 text-gray-800 border border-gray-300">{index + 1}</td>
+                                            <td className="p-4 text-gray-800 border border-gray-300">{incentive}</td>
+                                            <td className="p-4 text-gray-800 border border-gray-300">{incentive_types[index]}</td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan="3" className="p-4 text-center text-gray-500 border border-gray-300">
+                                            No incentives found
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>  
                 </div>
             </div>
         </div>

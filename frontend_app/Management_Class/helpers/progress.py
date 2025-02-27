@@ -60,7 +60,7 @@
 #         logging.error(f"Error updating process: {e}")
 import frappe
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def insert_process(parentId, process_name, process_value, status):
     try:
         # Create a new child table row using Frappe ORM
@@ -81,6 +81,7 @@ def insert_process(parentId, process_name, process_value, status):
             event="progress_update",
             message={"parentId": parentId, "process_name": process_name, "new_status": status},
             doctype="Session",
+            user=frappe.session.user if frappe.session.user != "Guest" else "Guest" 
         )
         frappe.log_error(f"event is pulished with {parentId}{process_name}")
         frappe.db.commit()
@@ -89,7 +90,7 @@ def insert_process(parentId, process_name, process_value, status):
         frappe.log_error(f"Error inserting process: {e}")
 
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def update_process(parentId, process_name, new_status):
     try:
         # Find the child row using Frappe ORM
@@ -118,6 +119,7 @@ def update_process(parentId, process_name, new_status):
             event="progress_update",
             message={"parentId": parentId, "process_name": process_name, "status": new_status},
             doctype="Session",
+            user=frappe.session.user if frappe.session.user != "Guest" else "Guest"
         )
         frappe.db.commit()
 
