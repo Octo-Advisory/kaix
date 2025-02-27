@@ -416,6 +416,7 @@ def extract_sub_sector_and_product_for_scratch(
         validated_data["Sub-Sector"] = "Not Available in list"
 
     return extracted_details, validated_data
+
 def extract_json_segment_and_product(output: str) -> Dict[str, str]:
     """
     Extracts segment and product details from an LLM-generated response.
@@ -966,7 +967,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
         chat_history = get_chat(f"QIND_chat_{chatId}")
         state['product_attempt_count'] = state['product_attempt_count'] + 1
         save_state(state,f"QIND_state_{chatId}")
-        message = generate_ai_message(state,chat_history,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
+        message = generate_ai_message(state,Chat_history_normal,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
         chat_history.append(AIMessage(content=f"{message}"))
         save_chat(chat_history,f"QIND_chat_{chatId}")
         return {"Ai_response": message,
@@ -989,7 +990,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
             chat_history = get_chat(f"QIND_chat_{chatId}")
             state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
             save_state(state,f"QIND_state_{chatId}")
-            message = generate_ai_message(state,chat_history,missing_fields,state['capacity_attempt_count'],llm_70b_vers_creative)
+            message = generate_ai_message(state,Chat_history_normal,missing_fields,state['capacity_attempt_count'],llm_70b_vers_creative)
             chat_history.append(AIMessage(content=f"{message}"))
             save_chat(chat_history,f"QIND_chat_{chatId}")
             return {"Ai_response": message,
@@ -1032,7 +1033,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
                 chat_history = get_chat(f"QIND_chat_{chatId}")
                 state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
                 save_state(state,f"QIND_state_{chatId}")
-                message = generate_ai_message(state,chat_history,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
+                message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=f"{message}"))
                 save_chat(chat_history,f"QIND_chat_{chatId}")
                 return {"Ai_response": message,
@@ -1053,7 +1054,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
                 chat_history = get_chat(f"QIND_chat_{chatId}")
                 state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
                 save_state(state,f"QIND_state_{chatId}")
-                message = generate_ai_message(state,chat_history,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
+                message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=f"{message}"))
                 save_chat(chat_history,f"QIND_chat_{chatId}")
                 return {"Ai_response": message,
@@ -1069,7 +1070,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
             chat_history = get_chat(f"QIND_chat_{chatId}")
             state['product_attempt_count'] = state['product_attempt_count'] + 1
             save_state(state,f"QIND_state_{chatId}")
-            message = generate_ai_message(state,chat_history,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
+            message = generate_ai_message(state,Chat_history_normal,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
             chat_history.append(AIMessage(content=f"{message}"))
             save_chat(chat_history,f"QIND_chat_{chatId}")
             return {"Ai_response": message,

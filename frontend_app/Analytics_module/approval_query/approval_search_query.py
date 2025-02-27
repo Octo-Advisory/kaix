@@ -46,7 +46,7 @@ def fetch_industry_details(given_industry_by_user):
 def fetch_sub_sector_details(given_sub_sector_by_user):
     if given_sub_sector_by_user != None:
         query = f"""
-        SELECT name, zone_id
+        SELECT name
         FROM `tabSub Sector`
         WHERE sub_sector_name = "{given_sub_sector_by_user}"
         """
@@ -55,7 +55,6 @@ def fetch_sub_sector_details(given_sub_sector_by_user):
         # Assign variables based on results
         if results:
             sub_sector_id = results[0][0]  # Get the first row, first column
-            # zone_id = results[0][1]
             return sub_sector_id
         else:
             sub_sector_id = None

@@ -12,11 +12,10 @@ import json
 def industry_from_scratch(aiResponse,chatId):
     try:
         insert_process(chatId,"Analyzing Your Query","Analyzing Your query","Pending")
+        update_process(chatId,"Analyzing Your Query","Processing")
         insert_process(chatId,"Fetching Data","Fetching Data Based On Your Query","Pending")
         insert_process(chatId,"Analyzing Data","Analyzing Gathered Data","Pending")   
         insert_process(chatId,"Preparing Result","Preparing Result","Pending")
-
-        update_process(chatId,"Analyzing Your Query","Processing")
         time.sleep(3)
         update_process(chatId,"Analyzing Your Query","Complete")
         update_process(chatId,"Fetching Data","Processing")
@@ -231,7 +230,7 @@ def industry_from_scratch(aiResponse,chatId):
             "Essential_supply_vendor_lookup_df": Solution_screen_essential_supply_vendor_lookup_df.to_json(),
             "Non_essential_supply_vendor_lookup_df": Solution_screen_non_essential_supply_vendor_lookup_df.to_json()
         }
-
+        time.sleep(2)
         update_process(chatId,"Analyzing Data","Complete")
         update_process(chatId,"Preparing Result","Processing")
         time.sleep(5)

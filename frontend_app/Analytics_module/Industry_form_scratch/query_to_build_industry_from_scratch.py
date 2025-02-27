@@ -469,6 +469,7 @@ def get_property_incentive_mapped(industry_id,sub_sector_id,area_id_list,city_id
     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
     city_id_str = ', '.join(f"'{area_id}'" for area_id in city_id_list)
     state_id_str = ', '.join(f"'{state_id}'" for state_id in state_id_list)
+    log_to_file("property_id_list",str(property_id_list))
     property_id_list_str = ', '.join(f"'{property_id}'" for property_id in property_id_list)
     today_date = datetime.now().strftime('%Y-%m-%d 00:00:00')
     sql_query = f"""
@@ -925,7 +926,7 @@ def fetch_supply_data(industry_id, sub_sector_id=None, segment_id=None):
         supply_rules_query = f"""
         SELECT supply, minimum_supply_requirement, essential_items
         FROM `tabSupply Rules`
-        WHERE (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment IS NULL)
+        WHERE (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}')
         """
         results = fetch_query_results(supply_rules_query)
 
@@ -1012,67 +1013,67 @@ def transform_data_for_map_call(vendor_latlong_df, property_latlong_df):
     }
     return input_data
 
-def is_valid_latlong(latlong: str) -> bool:
-    try:
-        # Split the input string into lat and lon
-        lat, lon = map(float, latlong.split(","))
+# def is_valid_latlong(latlong: str) -> bool:
+#     try:
+#         # Split the input string into lat and lon
+#         lat, lon = map(float, latlong.split(","))
         
-        # Check if lat and lon are within valid ranges
-        if -90 <= lat <= 90 and -180 <= lon <= 180:
-            return True
-        else:
-            return False
-    except ValueError:
-        return False
+#         # Check if lat and lon are within valid ranges
+#         if -90 <= lat <= 90 and -180 <= lon <= 180:
+#             return True
+#         else:
+#             return False
+#     except ValueError:
+#         return False
 
-def calculate_distance(data):
-    """
-    Function to calculate the distance between vendors and properties.
-    It sends data to a Frappe API call and processes the response.
+# def calculate_distance(data):
+#     """
+#     Function to calculate the distance between vendors and properties.
+#     It sends data to a Frappe API call and processes the response.
 
-    Parameters:
-        data (dict): A dictionary containing vendor and property details with lat-long.
+#     Parameters:
+#         data (dict): A dictionary containing vendor and property details with lat-long.
 
-    Returns:
-        dict: A dictionary with vendor IDs as keys and property distances as values.
-    """
-    try:
-        # Call the Frappe function
+#     Returns:
+#         dict: A dictionary with vendor IDs as keys and property distances as values.
+#     """
+#     try:
+#         # Call the Frappe function
         
-        resp = frappe.call("frontend_app.Mapping_module.distance.CalculatePropVenDistance", data=data)
-        # log_to_file("response is",str(resp))
-        response = resp['result']
-        log_to_file("response is",str(response))
-        # Validate response
-        if not response or not isinstance(response, dict): 
-            raise ValueError("Invalid response received from Frappe API")
+#         resp = frappe.call("frontend_app.Mapping_module.distance.CalculatePropVenDistance", data=data)
+#         # log_to_file("response is",str(resp))
+#         response = resp['result']
+#         log_to_file("response is",str(response))
+#         # Validate response
+#         if not response or not isinstance(response, dict): 
+#             raise ValueError("Invalid response received from Frappe API")
 
-        # Process response and return formatted output
-        output = {}
-        for vendor_id, properties in response.items():
-            output[vendor_id] = {prop_id: round(distance, 2) for prop_id, distance in properties.items()}
+#         # Process response and return formatted output
+#         output = {}
+#         for vendor_id, properties in response.items():
+#             output[vendor_id] = {prop_id: round(distance, 2) for prop_id, distance in properties.items()}
 
-        return output
+#         return output
 
-    except Exception as e:
-        return e
+#     except Exception as e:
+#         return e
 
-def calculate_vendor_property_distances(input_data: dict) -> dict:
-    """
-    Computes distances between vendors and properties.
-    Uses `calculate_distance()` for distance calculation.
+# def calculate_vendor_property_distances(input_data: dict) -> dict:
+#     """
+#     Computes distances between vendors and properties.
+#     Uses `calculate_distance()` for distance calculation.
     
-    Parameters:
-    input_data (dict): Dictionary containing "Vendor" and "Property" lists.
+#     Parameters:
+#     input_data (dict): Dictionary containing "Vendor" and "Property" lists.
 
-    Returns:
-    dict: A nested dictionary where vendors map to properties with distances.
-    """
+#     Returns:
+#     dict: A nested dictionary where vendors map to properties with distances.
+#     """
 
-    distance = calculate_distance(input_data)
-    log_to_file("distance ",str(distance))
+#     distance = calculate_distance(input_data)
+#     log_to_file("distance ",str(distance))
 
-    return distance
+#     return distance
 
 
 def calculate_adjustment_factor(series, threshold):
@@ -1418,3 +1419,77 @@ def process_supply_vendor_df_to_send_solution_screen(df):
 def sort_by_scores(df, scores_df):
     df_sorted = df.set_index('property_id').reindex(scores_df['Property_ID']).reset_index()
     return df_sorted
+
+from math import radians, sin, cos, sqrt, atan2
+#Temp. Distance Calculations
+def calculate_distance(loc1: str, loc2: str) -> float:
+    # Check if both loc1 and loc2 are valid lat/lon strings
+    if not (is_valid_latlong(loc1) and is_valid_latlong(loc2)):
+        return 0.0  # Return 0 if any of the coordinates are invalid
+    
+    lat1, lon1 = map(float, loc1.split(","))
+    lat2, lon2 = map(float, loc2.split(","))
+    
+    # Convert degrees to radians
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+     
+    # Haversine formula
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    
+    return 6371 * c  # Earth's radius in kilometers
+
+def calculate_vendor_property_distances(input_data: dict) -> dict:
+    """
+    Computes distances between vendors and properties.
+    Uses `calculate_distance()` for distance calculation.
+    
+    Parameters:
+    input_data (dict): Dictionary containing "Vendor" and "Property" lists.
+
+    Returns:
+    dict: A nested dictionary where vendors map to properties with distances.
+    """
+    output = {}
+
+    for vendor in input_data.get("Vendor", []):
+        vendor_id = vendor["id"]
+        vendor_latlong = vendor["latlong"]
+
+        # Skip invalid vendor coordinates
+        if not is_valid_latlong(vendor_latlong):
+            continue
+
+        vendor_distances = {}
+        for property in input_data.get("Property", []):
+            property_id = property["id"]
+            property_latlong = property["latlong"]
+
+            # Skip invalid property coordinates
+            if not is_valid_latlong(property_latlong):
+                continue
+
+            # Calculate distance
+            distance = calculate_distance(vendor_latlong, property_latlong)
+            vendor_distances[property_id] = distance
+
+        # Only add vendor if it has valid distances
+        if vendor_distances:
+            output[vendor_id] = vendor_distances
+
+    return output
+
+def is_valid_latlong(latlong: str) -> bool:
+    try:
+        # Split the input string into lat and lon
+        lat, lon = map(float, latlong.split(","))
+        
+        # Check if lat and lon are within valid ranges
+        if -90 <= lat <= 90 and -180 <= lon <= 180:
+            return True
+        else:
+            return False
+    except ValueError:
+        return False  # In case conversion to float fails

@@ -4,8 +4,6 @@ from frontend_app.Analytics_module.emplyement_query.employment_search_algorith i
 
 def handle_employement_query(aiResponse,chatId):
     try:
-        # Parse the JSON string to a Python dictionary
-        aiResponse = aiResponse[0]
         user_intention = aiResponse.get('User Intention')
     
         if user_intention == "Individual employment status":

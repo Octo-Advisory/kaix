@@ -979,7 +979,7 @@ def get_static_follow_up_for_vendor(vendor_state: Dict[str, Dict[str, Optional[s
                 message += f" But {missing_details[0]}"
 
         return message
-
+# Entry Point
 def handle_vendor_query(
     user_input: str,
     main_industry_to_subsector_mapped_dict: Dict[str, Dict[str, List[str]]],

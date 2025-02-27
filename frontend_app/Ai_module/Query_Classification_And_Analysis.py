@@ -9,7 +9,8 @@ import frappe
 # from langchain_openai import ChatOpenAI
 
 # load_dotenv()
-groq_api_key = "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"
+# We need to get this from system config
+groq_api_key = "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"
 # openai_key = os.getenv("OPENAI_API_KEY")
 
 # Initialize LLM    

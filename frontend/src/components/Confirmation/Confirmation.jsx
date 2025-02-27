@@ -4,6 +4,8 @@ import completed from '../../assets/Screenshot 2025-01-07 171330.png'; // Assumi
 import Solutionscreen from '../SolutionScreen/Solutionscreen';
 
 const ConfirmationBox = ({result}) => {
+  console.log("result in confirmation",result);
+  
   const imageRef = useRef(null);
   const textRef = useRef(null);
   const [showResults, setShowresults] = useState(false)

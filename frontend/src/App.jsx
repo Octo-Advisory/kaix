@@ -8,7 +8,7 @@ import Test from './components/TestComponent/Test';
 
 function App() {
   return (
-    <BrowserRouter basename="/">
+    <BrowserRouter basename="/frontend">
       <Routes>
         <Route path="/" element={<Home />} />
         {/* <Route path="solution" element={<Solution />} /> */}

@@ -1,5 +1,5 @@
-import React from 'react'
-
+import React, { useState } from 'react';
+import { FaList, FaStar, FaClipboardList, FaEllipsisH } from "react-icons/fa";
 const approvalsData = {
   "Pre-Operation": [
     "Application for E-waste (Management and Handling)",
@@ -9,68 +9,88 @@ const approvalsData = {
     "Factory License Application",
     "GPCB - Consolidated Consent and Authorisation",
     "GPCB - Plastic Waste Registration",
+    "License for contractors under provision of The Contracts Labour",
+    "License for Principal Employer - under Contract Labour Act",
     "New HT Connection for DGVCL, MGVCL, PGVCL, UGVCL",
-    "Profession Tax (Enrollment Certificate)",
-    "Renewal of Consent to Operate"
+    "Profession Tax (Enrollment Certificate) - authority as per location chosen above",
+    "Solid Waste Authorization Module (under Solid Waste Management Rules, 2016)"
   ],
   "Pre-Establishment": [
     "Approval for Boiler manufacturer",
+    "Building and Other Construction Workers Permission",
     "Building Plan Approval - GIDC",
-    "Development Permission - DSIRDA",
+    "Certificate of non forest land/ NOC from forest dept.",
     "Encumbrance certificate",
+    "GIDC - Land Application",
     "GPCB - Consent To Establish",
-    "Incorporation of Company under Companies Act (SPICe+ Forms)",
+    "Industrial Entrepreneur Memorandum (IEM) Registration",
     "Land 65 NA Application (Online Revenue)",
     "MSME Intent Registration",
+    "NOC for Fire Department",
+    "Permission for Restricted Tree Cutting",
     "Property Registration",
-    "Udyam Registration for MSME"
-  ],
-  "Pre-Operation1": [
-    "Application for E-waste (Management and Handling)",
-    "Approval of Electrical Installation",
-    "Biomedical Waste Authorization (under Biomedical Waste Management Rules, 2016)",
-    "Electrical Installation Certification",
-    "Factory License Application",
-    "GPCB - Consolidated Consent and Authorisation",
-    "GPCB - Plastic Waste Registration",
-    "New HT Connection for DGVCL, MGVCL, PGVCL, UGVCL",
-    "Profession Tax (Enrollment Certificate)",
-    "Renewal of Consent to Operate"
-  ],
+    "Registration of Partnership Firms",
+    "Tree Cutting Application Under Forest Dept"
+  ]
 };
 
-function Test() {   
+function Test() {
+  const [viewMode, setViewMode] = useState("Pre-Operation");
+
   return (
-    <div className="w-full bg-white rounded-lg shadow-lg flex-1 h-screen flex flex-col overflow-hidden">
-    <div className="overflow-auto">
-        <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-white z-10">
-                <tr className="bg-[#166d5b] text-white text-center">
-                    <th colSpan={2} className="p-4 text-lg font-semibold">
-                        Total Effective Time: <span className="font-normal">80 Days</span> | Online Percentage: <span className="font-normal">92 %</span>
-                    </th>
-                </tr>
-                <tr className="bg-[#19a282] text-white sticky top-0">
-                    <th className="p-4 text-lg font-semibold">Stage</th>
-                    <th className="p-4 text-lg font-semibold">Approvals</th>
-                </tr>
+    <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
+      <div className="w-[95%] h-[95%] mx-auto my-5 p-5 bg-white rounded-lg shadow-md">
+        <div className="title w-full p-1 h-[10%]">
+          <div className="text-5xl text-center">Approvals</div>
+        </div>
+        <div className="select-sections py-2 h-[10%] flex items-center gap-2 justify-center">
+        <button 
+  className="bg-gradient-to-r from-green-400 to-green-600 text-white px-3 py-2 rounded-md"
+  onClick={() => setViewMode("Pre-Operation")}
+>
+  <FaList size={22} /> Pre-Operation
+</button>
+
+<button 
+  className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white px-3 py-2 rounded-md"
+  onClick={() => setViewMode("Pre-Establishment")}
+>
+  <FaStar size={22} /> Pre-Establishment
+</button>
+
+<button 
+  className="bg-gradient-to-r from-blue-400 to-blue-600 text-white px-3 py-2 rounded-md"
+  onClick={() => setViewMode("Pre-Requisite")}
+>
+  <FaClipboardList size={22} /> Pre-Requisite
+</button>
+
+<button 
+  className="bg-gradient-to-r from-gray-400 to-gray-600 text-white px-3 py-2 rounded-md"
+  onClick={() => setViewMode("Others")}
+>
+  <FaEllipsisH size={22} /> Others
+</button>
+        </div>
+        <div className="py-5 h-[80%] overflow-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="p-3 border">Approval Name</th>
+              </tr>
             </thead>
             <tbody>
-                {Object.entries(approvalsData).map(([stage, approvals], index) => (
-                    <tr key={index} className={`${index % 2 === 0 ? "bg-gray-100" : "bg-white"} hover:bg-[#19a282]/20 transition-all`}>
-                        <td className="p-4 text-gray-800">{stage}</td>
-                        <td className="p-4 text-gray-800">
-                            {approvals.map((item, idx) => (
-                                <div key={idx} className='p-1'>{item}</div>
-                            ))}
-                        </td>
-                    </tr>
-                ))}
+              {approvalsData[viewMode].map((item, index) => (
+                <tr key={index} className="border text-center hover:bg-gray-100">
+                  <td className="p-3 border">{item}</td>
+                </tr>
+              ))}
             </tbody>
-        </table>
+          </table>
+        </div>
+      </div>
     </div>
-</div>
-  )
+  );
 }
 
-export default Test
+export default Test;

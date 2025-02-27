@@ -5,13 +5,8 @@ import marsBg from '../../assets/mars-bg.jpg'; // Background image
 import Chatscreen from '../Chatscreen/Chatscreen';
 import { useSelector } from 'react-redux';
 import { FrappeContext } from 'frappe-react-sdk';
-import ProgressScreen from '../ProgressScreen/ProgressScreen';
-import Solutionscreen from '../SolutionScreen/Solutionscreen';
-import Industryresult from '../ResultScreens/Industryresult';
-import Incentiveresult from '../ResultScreens/Incentiveresult';
-import Approvalresult from '../ResultScreens/Approvalresult';
 import Test from '../TestComponent/Test';
-// import TestComponent from '../TestComponent/TestComponent';
+import TestComponent from '../TestComponent/TestComponent';
 // import { useFrappeDocumentEventListener } from 'frappe-react-sdk';
 
 function Home() {
@@ -45,13 +40,8 @@ function Home() {
         <img src={logo2} alt="" className='logo h-56 w-full relative'/>
       </div>
     </div>):(<Chatscreen />)}
-      {/* <TestComponent/> */}
-      {/* <ProgressScreen/> */}
-      {/* <Solutionscreen/> */}
-      {/* <Industryresult/> */}
-      {/* <Incentiveresult/> */}
-      {/* <Approvalresult/> */}
       {/* <Test/> */}
+      {/* <TestComponent/> */}
     </>
   );
 }

@@ -4,8 +4,8 @@ import '../ProgressScreen/ProgressScreen.css';
 import check from '../../assets/check.png';
 import Confirmation from '../Confirmation/Confirmation';
 import Failure from '../Failure/Failure';
-import { FrappeContext, useFrappeDocTypeEventListener, useFrappeDocumentEventListener, useFrappeEventListener, useFrappeGetDoc, useFrappeGetDocList, useSWRConfig } from 'frappe-react-sdk';
-import { useDispatch, useSelector } from 'react-redux';
+import { FrappeContext,useFrappeEventListener,useFrappeGetDocList} from 'frappe-react-sdk';
+import { useSelector } from 'react-redux';
 
 function ProgressScreen() {
 
@@ -18,13 +18,15 @@ function ProgressScreen() {
   const [result, setresult] = useState([]);
   const [loading, setLoading] = useState(true);
   const [intervalId, setIntervalId] = useState(null);
+  const validationResult = useSelector((state)=> state.validate.validation_result)
+  console.log("validation Result",validationResult);
 
   const fetchAnalyticsResponse = async () => {
     try {
       console.log("chat id in progress", chatId);
 
-      const result = await call.get("frontend_app.Management_Class.Analytics_management.Analytics.analytics_module_call", { aiReponse: aiResponse, chatId: chatId });
-      console.log("analytics message", result);
+      const result = await call.get("frontend_app.Management_Class.Analytics_management.Analytics.analytics_module_call", { aiResponse: aiResponse, chatId: chatId,validationResult:validationResult });
+      console.log("analytics message result", result);
       setresult(result.message)
       // return result.message;  // Return the result so that the calling function gets it.
     } catch (err) {
@@ -57,17 +59,17 @@ function ProgressScreen() {
     }
   }
 
-  useEffect(() => {
-    // Start the interval only if no failures and not all are complete
-    if (!showfailure && !allsuccess) {
-      const interval = setInterval(() => {
-        fetchData(); // Fetch data every second
-      }, 1000);
+  // useEffect(() => {
+  //   // Start the interval only if no failures and not all are complete
+  //   if (!showfailure && !allsuccess) {
+  //     const interval = setInterval(() => {
+  //       fetchData(); // Fetch data every second
+  //     }, 1000);
 
-      // Cleanup the interval when conditions change or component unmounts
-      return () => clearInterval(interval);
-    }
-  }, [showfailure, allsuccess, messages]);
+  //     // Cleanup the interval when conditions change or component unmounts
+  //     return () => clearInterval(interval);
+  //   }
+  // }, [showfailure, allsuccess, messages]);
 
   useEffect(() => {
     console.log("new use effect call");

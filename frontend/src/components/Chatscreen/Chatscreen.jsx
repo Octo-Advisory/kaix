@@ -4,24 +4,22 @@ import { FiSend } from 'react-icons/fi';
 import { useDispatch, useSelector } from 'react-redux';
 import { addChatId, addMessage } from '../../Redux/Store/Featuresilces/chat';
 import botLogo1 from '../../assets/favicon.jpeg';
-import { useAIResponse } from '../Hooks/useAIResponse';
 import useChatScroll from '../Hooks/useChatScroll'; // Import the hook
 import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
 import '../Chatscreen/Chatscreen.css';
 import userIcon from '../../assets/user.png'
 import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
-import { FrappeContext, useFrappeCreateDoc, useFrappeGetCall, useFrappeGetDoc } from 'frappe-react-sdk'
+import { FrappeContext, useFrappeCreateDoc } from 'frappe-react-sdk'
 import ProgressScreen from '../ProgressScreen/ProgressScreen'
-import { addAIresponse,clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
+import { addAIresponse, clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
+import { addResult } from '../../Redux/Store/Featuresilces/validation'
 
 function Chatscreen() {
   const [message, setMessage] = useState('');
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.chat.messages);
   const chatId = useSelector((state) => state.chat.chatID);
-  // const aiResponse = useSelector((state) => state.aiResponse.aiReponse)
-  // const { fetchAIResponse } = useAIResponse();
   const [loading, setLoading] = useState(false);
   const [dataloading, setDataloading] = useState(false);
   const [disabled, setDisabled] = useState(false);
@@ -31,10 +29,10 @@ function Chatscreen() {
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const [isProgressVisible, setIsProgressVisible] = useState(false);
-  const responseAi = useSelector((state)=>state.ai.aiReponse)
-
+  const responseAi = useSelector((state) => state.ai.aiReponse)
+  
   //Create frappe context to call apis
-  const {call} = useContext(FrappeContext)
+  const { call } = useContext(FrappeContext)
 
   const createSessionid = () => {
     const nowTime = new Date();
@@ -43,21 +41,21 @@ function Chatscreen() {
     createDoc("Session", doc).then((resp) => dispatch(addChatId(resp.name)));
   }
 
-  const fetchAIResponse = async (message,chatId) => {
+  const fetchAIResponse = async (message, chatId) => {
     try {
       const result = await call.get("frontend_app.Management_Class.Ai_management.AI.ai_module_call", {
         input: message,
         chatId: chatId
       });
-      console.log("message",result);
-      
+      console.log("message", result);
+
       return result.message;  // Return the result so that the calling function gets it.
     } catch (err) {
       console.log("error occurred 😂", err);
       throw err;  // Rethrow the error if you want to catch it in the caller function.
     }
   };
-  
+
 
   const storeChatInChildTable = async () => {
     const messageLength = messages.length
@@ -101,38 +99,45 @@ function Chatscreen() {
       setLoading(true)
       // setDisabled(true)
 
-      const resp = await fetchAIResponse(message,chatId);
-      console.log("ai response is",resp);
+      const resp = await fetchAIResponse(message, chatId);
+      console.log("ai response is", resp);
       const aiResponse = resp.Ai_response
-      console.log("reponse is",aiResponse);
+      console.log("reponse is", aiResponse);
 
       if (resp.Is_confirmation) {
-        const aiResponse1 = "Waiting For Confirmation"
-        let index = -1;
         setLoading(false)
-        const typingInterval = setInterval(() => {
-          setPartialResponse((prev) => prev + aiResponse1.charAt(index));
-          index++;
-          if (index >= aiResponse.length) {
-            clearInterval(typingInterval);
-            const newAIMessage = {
-              sender: 'ai',
-              text: aiResponse1,
-              timestamp: new Date().toISOString(),
-            };
-            dispatch(addMessage(newAIMessage));
-            setPartialResponse(''); // Clear partial response
-            setDisabled(false);
-          }
-        }, 5);
-          dispatch(addAIresponse(resp))
-          setConfirmationMessage(aiResponse);
-          setConfirmationPending(true);
-          setLoading(false);
-          // setDisabled(true);
-          return;
-        }
-      
+        const aiResponse1 = "Waiting For Confirmation"
+        const newAIMessage = {
+          sender: 'ai',
+          text: aiResponse1,
+          timestamp: new Date().toISOString(),
+        };
+        dispatch(addMessage(newAIMessage));
+        // let index = -1;
+
+        // const typingInterval = setInterval(() => {
+        //   setPartialResponse((prev) => prev + aiResponse1.charAt(index));
+        //   index++;
+        //   if (index >= aiResponse.length) {
+        //     clearInterval(typingInterval);
+        //     const newAIMessage = {
+        //       sender: 'ai',
+        //       text: aiResponse1,
+        //       timestamp: new Date().toISOString(),
+        //     };
+        //     dispatch(addMessage(newAIMessage));
+        //     setPartialResponse(''); // Clear partial response
+        //     setDisabled(false);
+        //   }
+        // }, 5);
+        dispatch(addAIresponse(resp))
+        setConfirmationMessage(aiResponse);
+        setConfirmationPending(true);
+        setLoading(false);
+        // setDisabled(true);
+        return;
+      }
+
       let index = -1;
       setLoading(false)
       const typingInterval = setInterval(() => {
@@ -155,42 +160,44 @@ function Chatscreen() {
     }
   };
 
-  const validationCall = async (aiResponse,user_intension) => {
+  const validationCall = async (aiResponse, user_intension) => {
     try {
       const result = await call.get("frontend_app.Validations.validate.validation", {
         aiResponse: aiResponse,
         user_intension: user_intension
       });
-      console.log("validation result",result);
-      
+      console.log("validation result", result);
+      return result.message
     } catch (error) {
-      console.log("error 🤣",error);
-      
+      console.log("error 🤣", error);
+
     }
   }
 
-  const hanldeValidation = async () =>{
-   try {
-    const respo = await fetch(`api/resource/Session?fields=["user_intension"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
-      method: 'GET',
-      headers: {
-        // 'Authorization': 'token your_api_token', // Replace with actual token
-        'Content-Type': 'application/json'
-      }
-    });
+  const hanldeValidation = async () => {
+    try {
+      const respo = await fetch(`api/resource/Session?fields=["user_intension"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
+        method: 'GET',
+        headers: {
+          // 'Authorization': 'token your_api_token', // Replace with actual token
+          'Content-Type': 'application/json'
+        }
+      });
 
-    const userIntesion = await respo.json()
-    const user_intension = userIntesion['data'][0]['user_intension']
-    
-    await validationCall(responseAi,user_intension)
-    
-   } catch (error) {
-    console.log("error is",error);
-    
-   }
+      const userIntesion = await respo.json()
+      const user_intension = userIntesion['data'][0]['user_intension']
+
+      const result = await validationCall(responseAi, user_intension)
+      dispatch(addResult(result))
+      return result
+
+    } catch (error) {
+      console.log("error is", error);
+
+    }
   }
 
-  const handleConfirmation = (response) => {
+  const handleConfirmation = async (response) => {
     setConfirmationPending(false);
     const confirmationMessage = {
       sender: 'user',
@@ -207,18 +214,26 @@ function Chatscreen() {
     // dispatch(addMessage(newAIMessage));
     // setDisabled(false);
 
-    if(response == 'yes'){
-      const newAIMessage = {
-        sender: 'ai',
-        text: "Thank you for response",
-        timestamp: new Date().toISOString(),
-      };
-      dispatch(addMessage(newAIMessage)); 
-      // hanldeValidation()
-      setTimeout(() => {
-        setIsProgressVisible(true)
-      }, 0);
-    }else{
+    if (response == 'yes') {
+      const validationResult = await hanldeValidation()
+      console.log("validation result", validationResult);
+      // console.log("validation result1", validationResult[0]);
+      const aiResp = validationResult && validationResult.length > 0
+    ? (validationResult[0] ? "Thank you for your response" : "We have your query, we will get back to you soon.")
+    : "We have your query, we will get back to you soon.";
+        const newAIMessage = {
+          sender: 'ai',
+          text: aiResp,
+          timestamp: new Date().toISOString(),
+        };
+      dispatch(addMessage(newAIMessage));
+      // if (validationResult[0]) {
+        setIsProgressVisible(true);
+        // setTimeout(() => {
+        //   setIsProgressVisible(true);
+        // }, 0); // Ensure setTimeout executes properly
+      // }
+    } else {
       const newAIMessage = {
         sender: 'ai',
         text: "Alright! If you ever feel like chatting or need help, just let me know.",
@@ -233,12 +248,12 @@ function Chatscreen() {
     storeChatInChildTable();
   }, [messages])
 
-  useEffect(()=>{
+  useEffect(() => {
     if (messages.length === 0 && !chatId) {
       createSessionid();
       // return;    
     }
-  },[])
+  }, [])
 
   const ref = useChatScroll(messages);
 
@@ -314,7 +329,7 @@ function Chatscreen() {
 
       {isProgressVisible && (
         <div className="absolute top-0 left-0 right-0 bottom-0 bg-opacity-50 bg-black z-50 flex justify-center items-center">
-            <ProgressScreen />
+          <ProgressScreen />
         </div>
       )}
       <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#19a282] rounded-full p-2 bg-white shadow-lg">
