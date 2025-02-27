@@ -3,6 +3,8 @@ import json
 from frontend_app.Validations.approval_validation import approval_validation
 from frontend_app.Validations.Validation_for_build_Industry_from_strach import search_industry
 from frontend_app.Validations.vendors_validation import vendor_validation
+from frontend_app.Validations.incentive_validation import incentive_validation
+from frontend_app.Validations.employeement_validation import employment_query_validation
 
 @frappe.whitelist(allow_guest=True)
 def validation(aiResponse,user_intension):
@@ -59,6 +61,18 @@ def validation(aiResponse,user_intension):
                 return (True, result)
             else:
                 return (False, result)
+            
+        elif user_intension == "Query to search Incentives":
+            param = aiResponse['State']
+            result = incentive_validation(param)
+            pass_to_analytics_module = result.get('pass_to_analytics')
+            return (pass_to_analytics_module,result)
+        
+        elif user_intension == "Query to Get Employee Search":
+            param = aiResponse
+            result = employment_query_validation(param)
+            pass_to_analytics_module = result.get('pass_to_analytics')
+            return (pass_to_analytics_module,result)
 
     except Exception as e:
         import traceback

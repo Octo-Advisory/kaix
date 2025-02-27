@@ -290,12 +290,16 @@ def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
    - If the location is outside India, set `"From_India": "No"`.
    - Assume that most locations mentioned will be from India.
 
-   6. Ensure the Official Location Name is Used (Without Unnecessary Changes):
-   - If a location has multiple variants, use the official name, but ONLY if it is widely accepted.
-   - Examples:
-      - "Bombay" → "Mumbai"
-      - "Calcutta" → "Kolkata"
-      - "Madras" → "Chennai"
+   6. Ensure the Official Location Name is Used:
+   - If the location has multiple variants, always return the official name of the location instead of alternative or outdated names.
+   - Some common examples:
+       - "Bombay" → "Mumbai"
+       - "Baroda" → "Vadodara"
+       - "Kashi" → "Varanasi"
+       - "Calcutta" → "Kolkata"
+       - "Bangalore" → "Bengaluru"
+       - "Pondicherry" → "Puducherry"
+   - Ensure all locations are recognized and standardized to their official designation.
    - Do NOT change names that are already valid and contextually correct.
 
    7. Only Return a Location if One is Mentioned:
