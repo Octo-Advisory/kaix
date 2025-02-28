@@ -193,7 +193,7 @@ def get_property_approval_data(sub_sector_id=None, industry_id=None, area_id=Non
     else:
         return None
     
-def normalize_series(series, highest_is_worst=False):
+def normalize_series(series, highest_is_worst=False):# this is to normalize
     min_val, max_val = series.min(), series.max()
     if min_val == max_val:
         return pd.Series([5] * len(series), index=series.index)  # Default to 5 if all values are the same
