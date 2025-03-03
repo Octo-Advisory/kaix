@@ -10,7 +10,7 @@ import frappe
 
 # load_dotenv()
 # We need to get this from system config
-groq_api_key = "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"
+groq_api_key = "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"
 # openai_key = os.getenv("OPENAI_API_KEY")
 
 # Initialize LLM    
