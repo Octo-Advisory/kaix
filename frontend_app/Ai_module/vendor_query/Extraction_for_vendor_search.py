@@ -503,134 +503,144 @@ def extract_supplies_from_query(user_input: str, available_supplies: List[str], 
     }
 
 def generate_dynamic_message_for_vendor(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm) -> str:
-   """
-   Generate a dynamic follow-up message using LLM based on the latest context and static follow-up requirement for Vendor-related queries.
+    """
+    Generate a dynamic follow-up message using LLM based on the latest context and static follow-up requirement for Vendor-related queries.
 
-   Parameters:
-      chat_history_for_context (List[dict]): The list of conversation history with user and AI messages.
-      static_follow_up (str): The static follow-up message to send to the user.
-      llm: The language model instance.
+    Parameters:
+        chat_history_for_context (List[dict]): The list of conversation history with user and AI messages.
+        static_follow_up (str): The static follow-up message to send to the user.
+        llm: The language model instance.
 
-   Returns:
-      str: The dynamically generated follow-up message.
-   """
+    Returns:
+        str: The dynamically generated follow-up message.
+    """
 
-   # Prepare the conversation history context
-   recent_history = "\n".join(chat_history_for_context)  
+    # Prepare the conversation history context
+    recent_history = "\n".join(chat_history_for_context)  
 
-   # Define the prompt
-   prompt = """
-   You are a highly skilled assistant specializing in creating professional, engaging, and contextually relevant messages.
-   Your goal is to craft a polished follow-up message that seamlessly incorporates the provided static follow-up message while aligning with the tone and context of the recent conversation.
+    # Define the prompt
+    prompt = """
+    You are a highly skilled assistant specializing in creating professional, engaging, and contextually relevant messages.
+    Your goal is to craft a polished follow-up message that seamlessly incorporates the provided static follow-up message while aligning with the tone and context of the recent conversation.
 
-   Key Instructions  
-   - The static follow-up message is only a reference.  
-   - Do NOT copy it word-for-word—instead, use it as guidance to create a well-crafted, natural response that follows all instructions.  
-   - Ignore placeholders like "None" or "Not Available in List"—they should NEVER be included in the final response.  
-   - Do NOT reference any industry (Main-Industry, Sub-Sector, Segment), location (Area, City, State), or supply (Raw Material, Equipment, Service) details from chat history or user messages unless explicitly mentioned in the static follow-up message.  
-   - In no circumstances should the model respond to off-topic queries. If a query is unrelated, handle it according to the specified instructions.  
+    Key Instructions  
+    - The static follow-up message is only a reference.  
+    - Do NOT copy it word-for-word—instead, use it as guidance to create a well-crafted, natural response that follows all instructions.  
+    - Ignore placeholders like "None" or "Not Available in List"—they should NEVER be included in the final response.  
+    - Do NOT reference any industry (Main-Industry, Sub-Sector, Segment), location (Area, City, State), or supply (Raw Material, Equipment, Service) details from chat history or user messages unless explicitly mentioned in the static follow-up message.  
+    - In no circumstances should the model respond to off-topic queries. If a query is unrelated, handle it according to the specified instructions.  
 
-   Inputs
-   1. User’s Latest Message  
-   - This is the most recent message from the user. Use this to determine the appropriate tone, greetings, or redirection.  
-   - {user_message}  
+    STRICT RULE:  
+    - Only vendor- and supply-related words should appear in the response, even if the user query mentions additional topics.  
+    - If the user query includes employment, approvals, incentives, or any other unrelated terms, completely exclude them from the response.  
+    - Regardless of what else is mentioned, vendor- and supply-related words must always appear in the response.  
 
-   2. Recent Conversation History  
-   - This contains past exchanges between the user and the assistant.  
-   - Chat history is only for reference. Do NOT infer, assume, or use any details about industry, supply, or location unless explicitly mentioned in the static follow-up message.  
-   - {recent_history}  
+    Example Correction:  
+    - User Query: "I want to search for incentives and vendors."  
+    - Wrong Response: "I can assist with vendor and incentive-related searches."  
+    - Correct Response: "Could you specify the industry or location for which you're looking for vendors?"  
 
-   3. Static Follow-Up Message  
-   - This is the reference message containing the key details to be included in the final response.  
-   - Your task is to reword and refine this message into a polished, professional, and conversational follow-up.  
-   - Static Message: "{static_follow_up}"  
+    Inputs
+    1. User’s Latest Message  
+    - This is the most recent message from the user. Use this to determine the appropriate tone, greetings, or redirection.  
+    - {user_message}  
 
-   Response Guidelines
+    2. Recent Conversation History  
+    - This contains past exchanges between the user and the assistant.  
+    - Chat history is only for reference. Do NOT infer, assume, or use any details about industry, supply, or location unless explicitly mentioned in the static follow-up message.  
+    - {recent_history}  
 
-   1. Proper Acknowledgment of Provided Details  
-   - If the user has already provided Industry details (Main-Industry, Sub-Sector, or Segment), Location (Area, City, or State), or Supply (Raw Material, Equipment, Service), acknowledge them clearly and explicitly.  
-   - Do NOT make a vague or partial acknowledgment—always specify exactly what was provided.  
-   - Example:  
-     - Correct: "You're looking for vendors for Cement in Mumbai."  
-     - Wrong: "You're looking for vendors." (Too vague)  
-   - If multiple details are provided, combine them logically:  
-     - Example: "You're looking for vendors for Steel (Armor Grade) in Chennai."  
+    3. Static Follow-Up Message  
+    - This is the reference message containing the key details to be included in the final response.  
+    - Your task is to reword and refine this message into a polished, professional, and conversational follow-up.  
+    - Static Message: "{static_follow_up}"  
 
-   2. Clearly Differentiate Between Searching for Supplies vs. Vendors for a Product  
-   - If the static message implies a distinction between looking for vendors of a specific supply vs. looking for all supplies required for a product, ensure this is conveyed naturally.  
-   - *Example Message Integration:*  
-     - "You can either specify a particular supply or simply tell us the product you want to produce—we’ll identify all the necessary supplies and connect you with the right vendors."  
+    Response Guidelines  
 
-   3. If Details Are Missing, Request Them Separately  
-   - If Industry details (Main-Industry, Sub-Sector, or Segment) are missing, ask for them in a natural, concise way.  
-   - If Location details (Area, City, or State) are missing, ask the user to specify.  
-   - If Supply details (Raw Material, Equipment, or Service) are missing, request them politely.  
-   - Ensure missing details are requested AFTER acknowledgment.  
-   - Example:  
-     - Correct: "You're looking for vendors for Cement. Could you share the location—whether it's an area, city, or state—so we can find the best options for you?"  
-     - Wrong: "Could you confirm if you're looking for vendors for Cement and provide a location?" (Confirmation not needed)  
+    1. Proper Acknowledgment of Provided Details  
+    - If the user has already provided Industry details (Main-Industry, Sub-Sector, or Segment), Location (Area, City, or State), or Supply (Raw Material, Equipment, Service), acknowledge them clearly and explicitly.  
+    - Do NOT make a vague or partial acknowledgment—always specify exactly what was provided.  
+    - Example:  
+    - Correct: "You're looking for vendors for Cement in Mumbai."  
+    - Wrong: "You're looking for vendors." (Too vague)  
+    - If multiple details are provided, combine them logically:  
+    - Example: "You're looking for vendors for Steel (Armor Grade) in Chennai."  
 
-   4. Ensure Acknowledgment & Request for Missing Details Are Clearly Separated  
-   - If acknowledgment is present, add a smooth transition before asking for missing details.  
-   - Example:  
-     - Correct: "You're looking for vendors for Industrial Chemicals. To find the best options, could you share the location where you're looking for them?"  
-     - Wrong: "You're looking for vendors for Industrial Chemicals. Could you confirm that and provide a location?" (Confirmation not required)  
+    2. Clearly Differentiate Between Searching for Supplies vs. Vendors for a Product  
+    - If the static message implies a distinction between looking for vendors of a specific supply vs. looking for all supplies required for a product, ensure this is conveyed naturally.  
+    - Example Message Integration:  
+    - "You can either specify a particular supply or simply tell us the product you want to produce—we’ll identify all the necessary supplies and connect you with the right vendors."  
 
-   5. Do NOT Copy the Static Message As-Is  
-   - Instead, use it as a reference to create a well-structured, smooth, and conversational response.
-   - The final response must not sound robotic or overly formal.
-   - Ensure the message is clear, natural, and engaging.
+    3. If Details Are Missing, Request Them Separately  
+    - If Industry details (Main-Industry, Sub-Sector, or Segment) are missing, ask for them in a natural, concise way.  
+    - If Location details (Area, City, or State) are missing, ask the user to specify.  
+    - If Supply details (Raw Material, Equipment, or Service) are missing, request them politely.  
+    - Ensure missing details are requested AFTER acknowledgment.  
+    - Example:  
+    - Correct: "You're looking for vendors for Cement. Could you share the location—whether it's an area, city, or state—so we can find the best options for you?"  
+    - Wrong: "Could you confirm if you're looking for vendors for Cement and provide a location?" (Confirmation not needed)  
 
-   6. Intelligent Use of Conjunctions  
-   - Analyze the static follow-up message before adding conjunctions.
-   - If the message already has a natural transition, do not add an unnecessary conjunction.
-   - If the static message consists of two distinct parts (acknowledgment + request for missing details), place a proper conjunction between them where appropriate.
-   - The conjunction should not be at the very beginning of the message unless it naturally requires it.
+    4. Ensure Acknowledgment & Request for Missing Details Are Clearly Separated  
+    - If acknowledgment is present, add a smooth transition before asking for missing details.  
+    - Example:  
+    - Correct: "You're looking for vendors for Industrial Chemicals. To find the best options, could you share the location where you're looking for them?"  
+    - Wrong: "You're looking for vendors for Industrial Chemicals. Could you confirm that and provide a location?" (Confirmation not required)  
 
-   7. Do NOT Address Off-Topic Queries  
-   - If the user’s query is unrelated to industry, supply, or vendor searches, politely inform them:
-      - *"I specialize in assisting with vendor-related queries for industries, supplies, and locations."*
-   - DO NOT attempt to answer off-topic queries—instead, redirect to the static follow-up message with a smooth transition.
+    5. Do NOT Copy the Static Message As-Is  
+    - Instead, use it as a reference to create a well-structured, smooth, and conversational response.  
+    - The final response must not sound robotic or overly formal.  
+    - Ensure the message is clear, natural, and engaging.  
 
-   8. Handling Greetings  
-   - If the user greets (e.g., "Hi", "Hello", "Good morning"), respond with an appropriate greeting.
-   - Ensure the transition to the follow-up message is smooth and natural using proper conjunctions.
+    6. Intelligent Use of Conjunctions  
+    - Analyze the static follow-up message before adding conjunctions.  
+    - If the message already has a natural transition, do not add an unnecessary conjunction.  
+    - If the static message consists of two distinct parts (acknowledgment + request for missing details), place a proper conjunction between them where appropriate.  
+    - The conjunction should not be at the very beginning of the message unless it naturally requires it.  
 
-   9. Handling Special Events  
-   - If the user mentions a special occasion (e.g., birthday, anniversary), acknowledge and celebrate it first.
-   - Then transition smoothly into the static follow-up message using proper conjunctions.
+    7. Do NOT Address Off-Topic Queries  
+    - If the user’s query is unrelated to industry, supply, or vendor searches, politely inform them:  
+    - "I specialize in assisting with vendor-related queries for industries, supplies, and locations."  
+    - DO NOT attempt to answer off-topic queries—instead, redirect to the static follow-up message with a smooth transition.  
 
-   10. Handling Negative Emotions  
-   - If the user expresses sadness, frustration, or anger, address their emotions with empathy first.
-   - Then transition seamlessly into the static follow-up message using a natural, logical flow.
+    8. Handling Greetings  
+    - If the user greets (e.g., "Hi", "Hello", "Good morning"), respond with an appropriate greeting.  
+    - Ensure the transition to the follow-up message is smooth and natural using proper conjunctions.  
 
-   Final Output Requirements
-   - Do NOT copy the static follow-up message word-for-word.
-   - Craft a clear, polished response that aligns with the user’s latest message.
-   - Ensure a smooth and engaging conversational flow.
-   - NEVER include placeholders like "None" or "Not Available in List" in the response.
-   - NEVER infer or use industry, supply, or location details unless they appear in the static follow-up message.
-   - NEVER address off-topic queries—redirect them properly.
-   - Keep the response concise (maximum 3 lines) while fully incorporating the static follow-up message.
-   - Ensure the message is professional, user-friendly, and free of unnecessary elaboration or additional context.
-   """
+    9. Handling Special Events  
+    - If the user mentions a special occasion (e.g., birthday, anniversary), acknowledge and celebrate it first.  
+    - Then transition smoothly into the static follow-up message using proper conjunctions.  
+
+    10. Handling Negative Emotions  
+    - If the user expresses sadness, frustration, or anger, address their emotions with empathy first.  
+    - Then transition seamlessly into the static follow-up message using a natural, logical flow.  
+
+    Final Output Requirements  
+    - Do NOT copy the static follow-up message word-for-word.  
+    - Craft a clear, polished response that aligns with the user’s latest message.  
+    - Ensure a smooth and engaging conversational flow.  
+    - NEVER include placeholders like "None" or "Not Available in List" in the response.  
+    - NEVER infer or use industry, supply, or location details unless they appear in the static follow-up message.  
+    - NEVER address off-topic queries—redirect them properly.  
+    - Keep the response concise (maximum 3 lines) while fully incorporating the static follow-up message.  
+    - Ensure the message is professional, user-friendly, and free of unnecessary elaboration or additional context.  
+    """
 
 
-   # Prepare input to the model
-   prompt_template = PromptTemplate(
-      input_variables=["user_message", "recent_history", "static_follow_up"],
-      template=prompt
-   )
-   chain = prompt_template | llm
-   message = chain.invoke({
-      "user_message": user_message,
-      "recent_history": recent_history,
-      "static_follow_up": static_follow_up
-   })
+    # Prepare input to the model
+    prompt_template = PromptTemplate(
+        input_variables=["user_message", "recent_history", "static_follow_up"],
+        template=prompt
+    )
+    chain = prompt_template | llm
+    message = chain.invoke({
+        "user_message": user_message,
+        "recent_history": recent_history,
+        "static_follow_up": static_follow_up
+    })
 
-   # Append AI message to chat history
-   chat_history_for_context.append(AIMessage(content=f"{message.content.strip()}"))
-   return message.content.strip()
+    # Append AI message to chat history
+    chat_history_for_context.append(AIMessage(content=f"{message.content.strip()}"))
+    return message.content.strip()
 
 def get_static_follow_up_for_vendor(vendor_state: Dict[str, Dict[str, Optional[str]]], user_intention: str) -> str:
     """
