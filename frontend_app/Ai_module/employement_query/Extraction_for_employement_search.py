@@ -2,7 +2,7 @@ import re
 from typing import List, Dict, Tuple, Union
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers, llm_70b_vers_creative
+from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers, llm_70b_vers_creative,extract_location_from_query,extract_comparison_locations
 from langchain.schema import HumanMessage, AIMessage
 import pandas as pd
 import frappe
@@ -172,231 +172,6 @@ def classify_employment_query(query, llm):
         }
     else:
         raise ValueError(f"Unexpected or invalid response from LLM: {response}")
-
-
-def extract_location_for_employment_query(user_input: str, available_areas: List[str], available_cities: List[str], available_states: List[str], llm) -> Dict[str, str]:
-    """
-    Extract the area, city, or state mentioned in the user query and validate against the available lists.
-
-    Parameters:
-        user_input (str): The user-provided query.
-        available_areas (List[str]): List of all available areas.
-        available_cities (List[str]): List of all available cities.
-        available_states (List[str]): List of all available states.
-        llm: The language model instance to use for processing.
-
-    Returns:
-        Dict[str, str]: A dictionary containing the extracted area, city, and state. Validation for presence
-        in the available lists happens outside the model's logic.
-    """
-    # Convert lists to strings
-    areas_string = ", ".join(available_areas)
-    cities_string = ", ".join(available_cities)
-    states_string = ", ".join(available_states)
-
-    # Define the prompt
-    prompt_template = """
-    You are an assistant designed to extract location information from user input with precision.
-    Your primary goal is to identify and accurately classify the area, city, or state mentioned in the user's query.
-
-    Instructions:
-    - Available Location Data:
-        - Areas: {areas_string}
-        - Cities: {cities_string}
-        - States: {states_string}
-    - Use these lists as references to classify and validate the user's query. Match the input with the closest location name from these lists whenever possible, accounting for typos or phonetic variations.
-
-    Guidelines:
-    1. India-Focused Context:
-        - Assume the majority of areas, cities, or states referenced in the user's query are located in India.
-        - If the identified location is outside India or does not logically belong to India, return `"None"` for the respective field(s).
-
-    2. Handling Explicit Location Mentions:
-        - If the user explicitly mentions a location in their query:
-            - Accurately extract and classify it as "Area," "City," or "State."
-            - If the location is not in India, return `"None"` for that field.
-
-    3. Vague or Incomplete Queries:
-        - Extract location information even when the query is vague, incomplete, or unstructured.
-        - Use similarity-based logic to identify the closest match from the provided lists while ensuring accuracy.
-
-    4. Precise Classification Rules:
-        - If the location is an area, put the name in the `"Area"` field and set `"City"` and `"State"` fields to `"None"`.
-        - If the location is a city, put the name in the `"City"` field and set `"Area"` and `"State"` fields to `"None"`.
-        - If the location is a state, put the name in the `"State"` field and set `"Area"` and `"City"` fields to `"None"`.
-        - If no identifiable area, city, or state is mentioned, set all fields to `"None"`.
-
-    5. Unmatched Locations:
-        - If a location cannot be matched to any entry in the provided lists but logically belongs to India, classify it under the most appropriate field.
-        - If it cannot be classified and does not belong to India, return `"None"`.
-
-    User Query:
-    {query}
-
-    Output Format:
-    Provide the output strictly as a JSON object in the following format:
-    {{
-        "Area": <Extracted Area or 'None'>,
-        "City": <Extracted City or 'None'>,
-        "State": <Extracted State or 'None'>
-    }}
-    """
-    
-    # Create a PromptTemplate and LLM chain
-    prompt = PromptTemplate(
-        input_variables=["query", "areas_string", "cities_string", "states_string"],
-        template=prompt_template
-    )
-    chain = prompt | llm
-    
-    # Run the LLM chain
-    response = chain.invoke({
-        "query": user_input,
-        "areas_string": areas_string,
-        "cities_string": cities_string,
-        "states_string": states_string
-    })
-
-    # Use regex to extract Area, City, and State values
-    area_match = re.search(r'"Area":\s*"([^"]+)"', response.content.strip())
-    city_match = re.search(r'"City":\s*"([^"]+)"', response.content.strip())
-    state_match = re.search(r'"State":\s*"([^"]+)"', response.content.strip())
-    
-    # Extract the matched values or default to "None"
-    area = area_match.group(1) if area_match else "None"
-    city = city_match.group(1) if city_match else "None"
-    state = state_match.group(1) if state_match else "None"
-    
-    # Create initial classification dictionary
-    classification = {
-        "Area": area,
-        "City": city,
-        "State": state
-    }
-
-    # Validate against the available lists
-    validated_classification = {
-        key: (value if value in available_areas + available_cities + available_states else "Not Available in List")
-        if value != "None" else "None"
-        for key, value in classification.items()
-    }
-
-    return classification,validated_classification
-
-def extract_comparison_locations(
-    user_input: str,
-    available_areas: List[str],
-    available_cities: List[str],
-    available_states: List[str],
-    llm
-) -> Tuple[Dict[str, str], Dict[str, str]]:
-    """
-    Extract multiple areas, cities, and states from the user's query for comparison purposes.
-    """
-    # Convert lists to strings
-    areas_string = ", ".join(available_areas)
-    cities_string = ", ".join(available_cities)
-    states_string = ", ".join(available_states)
-
-    # Define the prompt
-    prompt_template = """
-    You are an assistant designed to extract and classify multiple locations mentioned in a query for comparison purposes.
-    Your primary goal is to identify and accurately classify all areas, cities, or states mentioned in the user's query.
-
-    Instructions:
-    - Available Location Data:
-        - Areas: {areas_string}
-        - Cities: {cities_string}
-        - States: {states_string}
-    - Use these lists as references to classify and validate the user's query. Match the input with the closest location names from these lists whenever possible, accounting for typos or phonetic variations.
-
-    Guidelines:
-    1. India-Focused Context:
-        - Assume the majority of areas, cities, or states referenced in the user's query are located in India.
-        - If the identified location is outside India or does not logically belong to India, return `"None"` for the respective field(s).
-
-    2. Handling Explicit Location Mentions:
-        - If the user explicitly mentions locations in their query:
-            - Extract and classify them accurately as "Area," "City," or "State."
-            - If a location is not in India, return `"None"` for that field.
-
-    3. Vague or Incomplete Queries:
-        - Extract location information even when the query is vague, incomplete, or unstructured.
-        - Use similarity-based logic to identify the closest matches from the provided lists while ensuring accuracy.
-
-    4. Precise Classification Rules for Multiple Locations:
-        - If multiple areas are mentioned, list them all in the `"Area"` field, separated by commas, and enclosed in double quotes as a single string.
-        - If multiple cities are mentioned, list them all in the `"City"` field, separated by commas, and enclosed in double quotes as a single string.
-        - If multiple states are mentioned, list them all in the `"State"` field, separated by commas, and enclosed in double quotes as a single string.
-        - If no identifiable area, city, or state is mentioned, set all fields to `"None"`.
-
-    5. Unmatched Locations:
-        - If a location cannot be matched to any entry in the provided lists but logically belongs to India, classify it under the most appropriate field.
-        - If it cannot be classified and does not belong to India, return `"None"`.
-
-    Strict Formatting Rules:
-    - Ensure the output is deterministic, producing identical results for the same input every time.
-    - Output the final result strictly in the JSON format described below, ensuring all values are strings enclosed in double quotes:
-    {{
-        "Area": "<Extracted Areas (comma-separated) or 'None'>",
-        "City": "<Extracted Cities (comma-separated) or 'None'>",
-        "State": "<Extracted States (comma-separated) or 'None'>"
-    }}
-
-    - Do not provide intermediate results, notes, alternative outputs, or any other text. Only provide the final JSON object as described.
-
-    User Query:
-    {query}
-
-    Provide the final result strictly as a JSON object in the required format.
-    """
-
-    # Create a PromptTemplate and LLM chain
-    prompt = PromptTemplate(
-        input_variables=["query", "areas_string", "cities_string", "states_string"],
-        template=prompt_template
-    )
-    chain = prompt | llm
-
-    # Run the LLM chain
-    response = chain.invoke({
-        "query": user_input,
-        "areas_string": areas_string,
-        "cities_string": cities_string,
-        "states_string": states_string
-    })
-    # Use regex to extract Area, City, and State values
-    area_match = re.search(r'"Area":\s*"([^"]*)"', response.content.strip())
-    city_match = re.search(r'"City":\s*"([^"]*)"', response.content.strip())
-    state_match = re.search(r'"State":\s*"([^"]*)"', response.content.strip())
-
-    # Extract the matched values or default to "None"
-    area = area_match.group(1).strip() if area_match else "None"
-    city = city_match.group(1).strip() if city_match else "None"
-    state = state_match.group(1).strip() if state_match else "None"
-
-    # Create initial classification dictionary
-    classification = {
-        "Area": area,
-        "City": city,
-        "State": state
-    }
-
-    # Validate against the available lists
-    validated_classification = {
-        key: ", ".join(
-            [
-                loc.strip() if loc.strip() in available_areas + available_cities + available_states else "Not Available in List"
-                for loc in value.split(",") if value != "None"
-            ]
-        ) if value != "None" else "None"
-        for key, value in classification.items()
-    }
-
-    return classification, validated_classification
-
-# Chat history to maintain context
-# chat_history = get_chat(chatId) if get_chat("chat_history") else []
 
 def generate_dynamic_message(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm,chatId) -> str:
     """
@@ -617,7 +392,7 @@ def handle_employment_query(
     chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
     save_chat(chat_history,chatId=chatId)
     if user_intention == "Individual employment status":
-        classification_data, validated_data = extract_location_for_employment_query(refined_user_input, available_areas= available_areas, available_cities= available_cities, available_states= available_states, llm=llm_70b_vers)
+        classification_data, validated_data = extract_location_from_query(refined_user_input, available_areas= available_areas, available_cities= available_cities, available_states= available_states, llm=llm_70b_vers)
        
         # Extract validated details
         area = validated_data["Area"]
@@ -785,7 +560,7 @@ def handle_employment_query(
         
         else:
             classification_data_to_send =  {
-                key: [] if value == "None" else [i_value.strip() for i_value in value.split(",")]
+                key: [] if value == "None" else [i_value.strip() for i_value in value]
                 for key, value in classification_data.items()
             }
             validated_data_to_send = {

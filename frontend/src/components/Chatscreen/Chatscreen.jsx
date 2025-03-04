@@ -14,6 +14,9 @@ import { FrappeContext, useFrappeCreateDoc } from 'frappe-react-sdk'
 import ProgressScreen from '../ProgressScreen/ProgressScreen'
 import { addAIresponse, clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
 import { addResult } from '../../Redux/Store/Featuresilces/validation'
+import { useTypewriter } from "react-simple-typewriter";
+import { useNavigate } from "react-router-dom";
+import Details from '../Details/Details';
 
 function Chatscreen() {
   const [message, setMessage] = useState('');
@@ -30,9 +33,21 @@ function Chatscreen() {
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const [isProgressVisible, setIsProgressVisible] = useState(false);
   const responseAi = useSelector((state) => state.ai.aiReponse)
-  
+  const [placeholder, setPlaceholder] = useState("");
+  const [charIndex, setCharIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const navigate = useNavigate();
   //Create frappe context to call apis
   const { call } = useContext(FrappeContext)
+
+  const suggestions = [
+    "I want to build industry....",
+    "I want to see incetives for cement factory....",
+    "I want to get approvals to setup industry....",
+    "I want to see employement....",
+    "I want suppliers for industry...."
+  ]
 
   const createSessionid = () => {
     const nowTime = new Date();
@@ -216,7 +231,7 @@ function Chatscreen() {
 
     if (response == 'yes') {
       const validationResult = await hanldeValidation()
-      console.log("validation result", validationResult);
+      console.log("validation result from chatscreen", validationResult);
       // console.log("validation result1", validationResult[0]);
       const aiResp = validationResult && validationResult.length > 0
     ? (validationResult[0] ? "Thank you for your response" : "We have your query, we will get back to you soon.")
@@ -229,6 +244,7 @@ function Chatscreen() {
       dispatch(addMessage(newAIMessage));
       // if (validationResult[0]) {
         setIsProgressVisible(true);
+        navigate("/progress");
         // setTimeout(() => {
         //   setIsProgressVisible(true);
         // }, 0); // Ensure setTimeout executes properly
@@ -254,6 +270,29 @@ function Chatscreen() {
       // return;    
     }
   }, [])
+
+  useEffect(() => {
+    const suggestion = suggestions[suggestionIndex];
+
+    if (!isDeleting && charIndex < suggestion.length) {
+      const timeout = setTimeout(() => {
+        setPlaceholder(suggestion.substring(0, charIndex + 1));
+        setCharIndex(charIndex + 1);
+      }, 50);
+      return () => clearTimeout(timeout);
+    } else if (isDeleting && charIndex > 0) {
+      const timeout = setTimeout(() => {
+        setPlaceholder(suggestion.substring(0, charIndex - 1));
+        setCharIndex(charIndex - 1);
+      }, 30);
+      return () => clearTimeout(timeout);
+    } else if (!isDeleting && charIndex === suggestion.length) {
+      setTimeout(() => setIsDeleting(true), 1000);
+    } else if (isDeleting && charIndex === 0) {
+      setIsDeleting(false);
+      setSuggestionIndex((prev) => (prev + 1) % suggestions.length);
+    }
+  }, [charIndex, suggestionIndex, isDeleting]);
 
   const ref = useChatScroll(messages);
 
@@ -327,27 +366,28 @@ function Chatscreen() {
         </div>
       )}
 
-      {isProgressVisible && (
+      {/* {isProgressVisible && (
         <div className="absolute top-0 left-0 right-0 bottom-0 bg-opacity-50 bg-black z-50 flex justify-center items-center">
           <ProgressScreen />
         </div>
-      )}
+      )} */}
       <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#19a282] rounded-full p-2 bg-white shadow-lg">
         <div className="flex-grow">
-          <input
-            type="text-area"
-            placeholder="Message Mars 2.0"
-            className="w-full border-none outline-none bg-transparent text-[#242f6a] placeholder-[#242f6a] opacity-70 px-4 py-2"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                if (!disabled) {
-                  handleSendbtn();
-                }
+        <textarea
+          placeholder={messages.length > 0 ? "Message Mars 2.0" : placeholder}
+          className="w-full border-none outline-none bg-transparent text-black placeholder-[#242f6a] opacity-70 px-4 h-6 resize-none overflow-y-auto placeholder-opacity-75"
+          value={message}
+          maxLength={250}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              if (!disabled) {
+                handleSendbtn();
               }
-            }}
-          />
+            }
+          }}
+        />
         </div>
 
         {message && (
@@ -367,6 +407,7 @@ function Chatscreen() {
       <div className="alert-msg mb-5">
         <p className='text-xs text-[#242f6a]'>Mars 2.0 can make mistakes. Check important info.</p>
       </div>
+        <Details/>
     </div>
   );
 }

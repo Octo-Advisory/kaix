@@ -79,11 +79,10 @@ def refine_query_with_history_for_incentive(history, latest_query, llm):
 def classify_incentive_query(query, llm):
     """
     Classify the user's incentive search query into the following categories:
-    1. Incentive Search for individual area, city, or state.
-    2. Comparison between cities, states, or areas.
-    3. Comparison between industries or sub-sectors.
-    4. Incentive Search for individual industry without location.
-    5. Other Intent.
+    1. Incentive Search for area, city, or state without industry
+    2. Incentive Search for industry without location
+    3. Incentive Search for area, city, or state with industry
+    4. Other Intent
 
     Args:
         query (str): The user's input query.
@@ -333,7 +332,7 @@ def call_incentive_search(input,chatId):
         state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None'}
         save_state(state,f"QINC_state_{chatId}")
     log_to_file("state1",state)
-    query_intent = classify_incentive_query(refine_user_input,llm=llm_70b_vers)
+    query_intent = classify_incentive_query(input,llm=llm_70b_vers)
     query_intent = query_intent['classification_category']
     log_to_file("query intent",query_intent)
     if query_intent == 'Other Intent':
@@ -342,7 +341,7 @@ def call_incentive_search(input,chatId):
         response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
-                    "State" : state
+                    "State" : state 
                 }
         return response
     else:

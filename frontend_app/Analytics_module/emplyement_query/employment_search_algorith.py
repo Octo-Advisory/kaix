@@ -205,7 +205,6 @@ def employment_search_algo(intention, input_data,chatId):
             update_process(chatId,"Analyzing Data","Fail")
             return response
     except Exception as e:
-        frappe.log_error(f"error is {e}")
         return e
 
 # def plot_pie_chart(data, title):

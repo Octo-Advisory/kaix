@@ -2,13 +2,14 @@ import React, {useState, useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import completed from '../../assets/Screenshot 2025-01-07 171330.png'; // Assuming the completed image is imported
 import Solutionscreen from '../SolutionScreen/Solutionscreen';
+import { useNavigate } from "react-router-dom";
 
 const ConfirmationBox = ({result}) => {
   console.log("result in confirmation",result);
-  
+  const navigate = useNavigate();
   const imageRef = useRef(null);
   const textRef = useRef(null);
-  const [showResults, setShowresults] = useState(false)
+  // const [showResults, setShowresults] = useState(false)
 
   useEffect(() => {
     // Animation for image
@@ -26,7 +27,8 @@ const ConfirmationBox = ({result}) => {
     );
 
     const timer = setTimeout(() => {
-      setShowresults(true);
+      // setShowresults(true);
+      navigate("/solution")
     }, 3000);
 
     // Clean up timeout if component is unmounted
@@ -35,7 +37,8 @@ const ConfirmationBox = ({result}) => {
 
   return (
    <>
-      {!showResults ?( <div
+      {/* {!showResults ?( <div */}
+      <div
         className="ConfirmationBox h-[70%] w-[60%] flex flex-col justify-evenly items-center absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 bg-white"
       >
         {/* Container for the rectangles */}
@@ -57,7 +60,8 @@ const ConfirmationBox = ({result}) => {
           className="Success-text relative  font-bold sm:text-md md:text-xl lg:text-2xl"
         >
           All the pieces are in place – here are the results!
-        </div></div>): (<Solutionscreen result={result}/>)}
+        </div></div>
+        {/* </div></div>): (<Solutionscreen result={result}/>)} */}
     </>
   );
 };
