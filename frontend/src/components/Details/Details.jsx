@@ -58,7 +58,7 @@ function Details() {
       <ToastContainer position="top-right" autoClose={3000} />
       <div className="fixed bottom-8 right-6">
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => setIsOpen(prevState => !prevState)}
           className="relative flex items-center gap-2 bg-[#199b7d] text-white px-3 py-2 rounded-full shadow-lg transition"
         >
           <AiOutlineQuestionCircle size={30} className="text-white" />
@@ -71,7 +71,7 @@ function Details() {
         // <div className="fixed inset-0 flex justify-center items-center">
           
         // </div>
-        <div className="bg-[#40c6db] p-6 rounded-lg shadow-lg w-96 fixed bottom-16 right-6">
+        <div className="bg-[#40c6db] p-6 rounded-lg shadow-lg w-96 fixed bottom-20 right-6">
         {/* Close Button */}
         <button 
           className="absolute top-2 right-2 text-gray-600 hover:text-gray-900"
@@ -138,7 +138,7 @@ function Details() {
               name="description"
               value={formData.description}
               onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#242f6a] h-32"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#242f6a] h-32 resize-none"
             ></textarea>
           </div>
           <button

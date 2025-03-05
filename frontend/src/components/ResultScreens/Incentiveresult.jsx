@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
 import Details from '../Details/Details';
+import Backtochat from '../Backtochat/Backtochat';
 
 function Incentiveresult({ result }) {
     console.log("Result from incentive:", result);
@@ -27,14 +28,7 @@ function Incentiveresult({ result }) {
                                     <div className="title w-full p-1 h-[10%] flex-1">
                                         <div className="text-5xl">Incentives</div>
                                     </div>
-                                    <div className="p-1 text-center">
-                                        <button
-                                            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-2xl shadow-md hover:bg-blue-600 transition"
-                                            onClick={() => navigate("/")}
-                                        >
-                                            <FaArrowLeft /> Back to Chat
-                                        </button>
-                                    </div>
+                                    <Backtochat/>
                                 </div>
                 
                 {/* Incentive Data */}

@@ -1,13 +1,8 @@
 import React, { useState } from 'react';
-import Chatscreen from '../Chatscreen/Chatscreen';
-import { FaArrowLeft } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import Backtochat from '../Backtochat/Backtochat';
 
 function Approvalresult({ result }) {
-    const navigate = useNavigate();
     const [viewMode, setViewMode] = useState("Pre-Operation");
-    const [showChatscreen, setShowChatscreen] = useState(false)
-
     const Analytics_response = result["Analytics_response"];
     const approval_data = JSON.parse(Analytics_response["Approval Data"]);
     const approval_name = approval_data["Approval Name"];
@@ -36,14 +31,7 @@ function Approvalresult({ result }) {
                     <div className="title w-full p-1 h-[10%] flex-1">
                         <div className="text-5xl">Approvals</div>
                     </div>
-                    <div className="p-1 text-center">
-                        <button
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-2xl shadow-md hover:bg-blue-600 transition"
-                            onClick={() => navigate("/")}
-                        >
-                            <FaArrowLeft /> Back to Chat
-                        </button>
-                    </div>
+                    <Backtochat/>
                 </div>
 
                 <div className="select-sections py-2 h-[10%] flex items-center justify-between w-full">
