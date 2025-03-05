@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
+import Chatscreen from '../Chatscreen/Chatscreen';
+import { FaArrowLeft } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 function Approvalresult({ result }) {
+    const navigate = useNavigate();
     const [viewMode, setViewMode] = useState("Pre-Operation");
+    const [showChatscreen, setShowChatscreen] = useState(false)
 
     const Analytics_response = result["Analytics_response"];
     const approval_data = JSON.parse(Analytics_response["Approval Data"]);
@@ -27,8 +32,18 @@ function Approvalresult({ result }) {
     return (
         <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
             <div className="w-[95%] h-[95%] mx-auto my-5 p-5 bg-white rounded-lg shadow-md">
-                <div className="title w-full p-1 h-[10%]">
-                    <div className="text-5xl text-center">Approvals</div>
+                <div className="top-header flex items-center justify-between">
+                    <div className="title w-full p-1 h-[10%] flex-1">
+                        <div className="text-5xl">Approvals</div>
+                    </div>
+                    <div className="p-1 text-center">
+                        <button
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-2xl shadow-md hover:bg-blue-600 transition"
+                            onClick={() => navigate("/")}
+                        >
+                            <FaArrowLeft /> Back to Chat
+                        </button>
+                    </div>
                 </div>
 
                 <div className="select-sections py-2 h-[10%] flex items-center justify-between w-full">
@@ -36,13 +51,12 @@ function Approvalresult({ result }) {
                         {["Pre-Operation", "Pre-Establishment", "Pre-Requisite", "Others"].map(mode => (
                             <button
                                 key={mode}
-                                className={`bg-gradient-to-r text-white px-3 py-2 rounded-md ${
-                                    viewMode === mode ? "from-gray-600 to-gray-800" : 
-                                    mode === "Pre-Operation" ? "from-green-400 to-green-600" :
-                                    mode === "Pre-Establishment" ? "from-yellow-400 to-yellow-600" :
-                                    mode === "Pre-Requisite" ? "from-blue-400 to-blue-600" :
-                                    "from-gray-400 to-gray-600"
-                                }`}
+                                className={`bg-gradient-to-r text-white px-3 py-2 rounded-md ${viewMode === mode ? "from-gray-600 to-gray-800" :
+                                        mode === "Pre-Operation" ? "from-green-400 to-green-600" :
+                                            mode === "Pre-Establishment" ? "from-yellow-400 to-yellow-600" :
+                                                mode === "Pre-Requisite" ? "from-blue-400 to-blue-600" :
+                                                    "from-gray-400 to-gray-600"
+                                    }`}
                                 onClick={() => setViewMode(mode)}
                             >
                                 {mode}

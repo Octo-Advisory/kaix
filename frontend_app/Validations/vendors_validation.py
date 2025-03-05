@@ -103,9 +103,9 @@ def vendor_validation(param):
             supply_check = verify_supply()
 
             if location_check != True:
-                return [False, location_check]
+                return  {'pass_to_analytics_module': False, 'log': location_check, 'latitude_longitude': 'None',"location_name":'None', 'from_gujarat': 'None'}
             elif location_check == True and industry_check != True and supply_check != True:
-                return [False,industry_check]
+                return  {'pass_to_analytics_module': False, 'log': industry_check, 'latitude_longitude': 'None',"location_name":'None', 'from_gujarat': 'None'}
             elif location_check == True and industry_check == True and supply_check != True:
                 return location_and_industry()
             elif location_check == True and industry_check != True and supply_check == True:

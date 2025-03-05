@@ -1,5 +1,4 @@
 import frappe
-import json
 import time
 from datetime import datetime
 from frontend_app.Analytics_module.incentive_query.incentive_search_query import incentive_details,get_incentive_data,fetch_industry_details,fetch_city_details,fetch_area_details,fetch_query_results,fetch_state_details,fetch_sub_sector_details

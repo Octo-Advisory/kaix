@@ -934,7 +934,6 @@ def gather_industry_details(query, main_industries, llm,chatId):
 
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     
-    # Refine query based on history
     refined_query = refine_query_with_history(Chat_history_normal, query, llm)
     chat_history.append(HumanMessage(content=refined_query))
     save_chat(chat_history,f"QIND_chat_{chatId}")
@@ -955,15 +954,18 @@ def gather_industry_details(query, main_industries, llm,chatId):
         state['capacity_attempt_count'] = 0
         save_state(state,f"QIND_state_{chatId}")
         is_changed = True
-    with open("log.txt", "a") as file:
-        file.write(f"\nvalidated_data {validated_data}")
-        file.write(f"\nstate3 {state}")
+    
     if state['Main-Industry'] == 'None' and state['Product'] == 'None':
         capacity_json = extract_capacity_details(refined_query,llm)
-        if capacity_json["Capacity"] != 'None' or capacity_json["Capacity Unit"] != 'None' or capacity_json["Time Period"] != 'None':
-            state = get_state(f"QIND_state_{chatId}")
-            state.update(capacity_json)
+        
+         # Check if at least one value is not 'None'            
+        if any(value != 'None' for value in capacity_json.values()):
+             # Update only if the value is different and not 'None'
+            for key, value in capacity_json.items():
+                if value != 'None' and state.get(key) != value:
+                    state[key] = value
             save_state(state,f"QIND_state_{chatId}")
+
         chat_history = get_chat(f"QIND_chat_{chatId}")
         state['product_attempt_count'] = state['product_attempt_count'] + 1
         save_state(state,f"QIND_state_{chatId}")
@@ -976,9 +978,12 @@ def gather_industry_details(query, main_industries, llm,chatId):
     
     elif state["Main-Industry"] == 'Not Available in list' and state["Product"] == 'None':
         capacity_json = extract_capacity_details(refined_query,llm)
-        if capacity_json["Capacity"] != 'None' or capacity_json["Capacity Unit"] != 'None' or capacity_json["Time Period"] != 'None':
-            state = get_state(f"QIND_state_{chatId}")
-            state.update(capacity_json)
+        
+        if any(value != 'None' for value in capacity_json.values()):
+             # Update only if the value is different and not 'None'
+            for key, value in capacity_json.items():
+                if value != 'None' and state.get(key) != value:
+                    state[key] = value
             save_state(state,f"QIND_state_{chatId}")
         missing_fields = [field for field, value in capacity_json.items() if value == 'None']
         if len(missing_fields) == 0:
@@ -999,17 +1004,19 @@ def gather_industry_details(query, main_industries, llm,chatId):
         
     elif state["Main-Industry"] != 'None':
         capacity_json = extract_capacity_details(refined_query,llm)
-        if capacity_json["Capacity"] != 'None' or capacity_json["Capacity Unit"] != 'None' or capacity_json["Time Period"] != 'None':
-            state.update(capacity_json)
+
+        if any(value != 'None' for value in capacity_json.values()):
+             # Update only if the value is different and not 'None'
+            for key, value in capacity_json.items():
+                if value != 'None' and state.get(key) != value:
+                    state[key] = value
             save_state(state,f"QIND_state_{chatId}")
         final_json = get_json_for_industry()
         if state['Sub-Sector'] == 'None' or is_changed:
-            with open("log.txt", "a") as file:
-                file.write(f"\n sub_state {state}")
+            
             sub_sector = get_sub_sectors(final_json,state["Main-Industry"])
             sub_extracted_data,sub_validated_data = extract_sub_sector_and_product_for_scratch(refined_query,sub_sector,llm,state["Main-Industry"],state["Product"])
-            with open("log.txt", "a") as file:
-                file.write(f"\n sub_validated_data {sub_validated_data}")
+           
             state = get_state(f"QIND_state_{chatId}")
             state["Sub-Sector"] = sub_validated_data["Sub-Sector"]
             state["Product"] = sub_validated_data["Product"]
@@ -1018,11 +1025,9 @@ def gather_industry_details(query, main_industries, llm,chatId):
         # state = get_state(f"QIND_state_{chatId}")
         if state['Sub-Sector'] != 'None' and state['Sub-Sector'] != 'Not Available in list':
             segments = get_segments(final_json,state["Main-Industry"],state['Sub-Sector'])
-            with open("log.txt", "a") as file:
-                file.write(f"\n segments and main industry {segments}{main_industries}")
+
             segment_extracted_data,segment_validated_data = extract_segment_and_product_for_scratch(refined_query,segments,llm,main_industries,state['Sub-Sector'],state["Product"])
-            with open("log.txt", "a") as file:
-                file.write(f"\n segment_validated_data {segment_validated_data}")
+            
             state = get_state(f"QIND_state_{chatId}")
             state["Segment"] = segment_validated_data["Segment"] 
             state["Product"] = segment_validated_data["Product"]
@@ -1041,7 +1046,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
                     "state":state}
             else:
                 response = {
-                    "Ai_response" : f"We have identified details like {', '.join(str(v) for v in [state.get('Product'), capacity_json.get('Capacity'), capacity_json.get('Capacity Unit'), capacity_json.get('Time Period')] if v)} based on your query. Please confirm if this information is correct.",
+                    "Ai_response" : f"We have identified that you are looking for {state.get('Product') if state.get('Product') != 'None' else state.get('Main-Industry') if state.get('Main-Industry')!= 'None' else ''} based on your query. Please confirm if this information is correct.",
                     "Is_confirmation" : True,
                     "validated_data" : segment_validated_data,
                     "state" : state
@@ -1470,7 +1475,6 @@ def entry_build_from_scratch(input,chatId):
     final_json = get_json_for_industry()
     main_industry = get_main_industry(final_json)
     k = gather_industry_details(input,main_industry,llm_70b_vers,chatId)
-    chat_history = get_chat(f"QIND_chat_{chatId}")
 
     if k['Is_confirmation']:
         s = do_unit_conversion(k['state'])
@@ -1538,12 +1542,12 @@ def do_unit_conversion(state):
     query = f"""
     select distinct jcrla.capacity_unit
     from (
-        select crla.capacity_unit, crla.sub_sector, sst.sub_sector_name
+        select crla.capacity_unit, crla.sub_sector, sst.sub_sector_name, sst.industry_id
         from `tabIndustry Capacity Rule` as crla
         join `tabSub Sector` as sst
         on crla.sub_sector = sst.name
     ) as jcrla
-    where jcrla.sub_sector_name = '{state['Sub-Sector']}'
+    where jcrla.sub_sector_name = '{state['Sub-Sector']}' and jcrla.industry_id = '{state['Main-Industry']}'
     """
 
     results = frappe.db.sql(query)

@@ -1,8 +1,11 @@
 import React from 'react';
+import { useNavigate } from "react-router-dom";
+import { FaArrowLeft } from "react-icons/fa";
+import Details from '../Details/Details';
 
 function Incentiveresult({ result }) {
     console.log("Result from incentive:", result);
-
+    const navigate = useNavigate();
     // Safely parse JSON and handle errors
     let Analytics_response;
     try {
@@ -20,9 +23,19 @@ function Incentiveresult({ result }) {
         <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
             <div className="w-[95%] h-[95%] mx-auto my-5 p-5 bg-white rounded-lg shadow-md">
                 {/* Title Section */}
-                <div className="w-full p-1 h-[10%]">
-                    <h1 className="text-5xl text-center font-semibold text-gray-800">Incentives</h1>
-                </div>
+                <div className="top-header flex items-center justify-between">
+                                    <div className="title w-full p-1 h-[10%] flex-1">
+                                        <div className="text-5xl">Incentives</div>
+                                    </div>
+                                    <div className="p-1 text-center">
+                                        <button
+                                            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-2xl shadow-md hover:bg-blue-600 transition"
+                                            onClick={() => navigate("/")}
+                                        >
+                                            <FaArrowLeft /> Back to Chat
+                                        </button>
+                                    </div>
+                                </div>
                 
                 {/* Incentive Data */}
                 <div className="py-3 h-[90%] overflow-auto">
@@ -56,6 +69,7 @@ function Incentiveresult({ result }) {
                     </div>  
                 </div>
             </div>
+            <Details/>
         </div>
     );
 }

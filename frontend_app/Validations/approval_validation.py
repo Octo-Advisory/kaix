@@ -4,6 +4,7 @@ import json
 @frappe.whitelist()
 def approval_validation(param):
     allLogs=[]
+    frappe.log_error("validation error!")
     # Extract location details
     location_info = param.get("location_info", {})
     area = location_info.get("Area")

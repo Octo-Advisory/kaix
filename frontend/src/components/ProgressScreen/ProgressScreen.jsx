@@ -5,7 +5,8 @@ import check from '../../assets/check.png';
 import Confirmation from '../Confirmation/Confirmation';
 import Failure from '../Failure/Failure';
 import { FrappeContext,useFrappeEventListener,useFrappeGetDocList} from 'frappe-react-sdk';
-import { useSelector } from 'react-redux';
+import { useSelector,useDispatch } from 'react-redux';
+import { addAnalyticsResult } from '../../Redux/Store/Featuresilces/analyticsResult';
 
 function ProgressScreen() {
 
@@ -20,6 +21,7 @@ function ProgressScreen() {
   const [intervalId, setIntervalId] = useState(null);
   const validationResult = useSelector((state)=> state.validate.validation_result)
   console.log("validation Result",validationResult);
+  const dispatch = useDispatch();
 
   const fetchAnalyticsResponse = async () => {
     try {
@@ -28,6 +30,7 @@ function ProgressScreen() {
       const result = await call.get("frontend_app.Management_Class.Analytics_management.Analytics.analytics_module_call", { aiResponse: aiResponse, chatId: chatId,validationResult:validationResult });
       console.log("analytics message result", result);
       setresult(result.message)
+      dispatch(addAnalyticsResult(result.message))
       // return result.message;  // Return the result so that the calling function gets it.
     } catch (err) {
       console.log("error occurred 😂", err);
@@ -37,6 +40,8 @@ function ProgressScreen() {
 
   const fetchData = async () => {
     try {
+      console.log("chatId",chatId);
+      
       const response = await fetch(`api/resource/Session?fields=["progress.process_name","progress.process_value","progress.status","progress.modified"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
         method: 'GET',
         headers: {
@@ -44,15 +49,17 @@ function ProgressScreen() {
           'Content-Type': 'application/json'
         }
       });
-
+      console.log("response is",response);
+      
       // Check if the response is OK
       if (!response.ok) {
         throw new Error(`Error: ${response.statusText}`);
       }
+      
+        const data = await response.json();
+        console.log("data is", data);
+        setMessages(data.data)
 
-      const data = await response.json();
-      console.log("data is", data);
-      setMessages(data.data)
       // Optionally, store it in your state or handle further logic
     } catch (error) {
       console.error('Error fetching data:', error); // Handles errors
@@ -71,10 +78,10 @@ function ProgressScreen() {
   //   }
   // }, [showfailure, allsuccess, messages]);
 
-  useEffect(() => {
-    console.log("new use effect call");
-    fetchData()
-  }, [])
+  // useEffect(() => {
+  //   console.log("new use effect call");
+  //   fetchData()
+  // }, [])
 
   useEffect(() => {
     console.log("ai response is in progress", aiResponse);
