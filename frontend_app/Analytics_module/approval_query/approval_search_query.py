@@ -26,25 +26,40 @@ def fetch_query_results(query):
     except:
         return None
     
-def fetch_industry_details(given_industry_by_user):
-    # Fetching Industry details
+def fetch_industry_details(given_industry_by_user: str) -> str:
+    """
+    Fetches the industry ID from the database based on the given industry name.
+
+    Parameters:
+    given_industry_by_user (str): The industry name provided by the user.
+
+    Returns:
+    str: The industry ID if found, otherwise None.
+    """
     query = f"""
     SELECT name
     FROM `tabIndustry`
     WHERE industry_name = '{given_industry_by_user}'
     """
-    # Call the function and assign results
+    # Execute the query and fetch results
     results = fetch_query_results(query)
 
-    # Assign variables based on results
-    if results:
-        industry_id = results[0][0]
-    else:
-        industry_id = None
+    # Extract industry ID if results exist; otherwise, set to None
+    industry_id = results[0][0] if results else None
+
     return industry_id
 
-def fetch_sub_sector_details(given_sub_sector_by_user):
-    if given_sub_sector_by_user != None:
+def fetch_sub_sector_details(given_sub_sector_by_user: str) -> str:
+    """
+    Fetches the sub-sector ID from the database based on the given sub-sector name.
+
+    Parameters:
+    given_sub_sector_by_user (str): The sub-sector name provided by the user.
+
+    Returns:
+    str: The sub-sector ID if found, otherwise None.
+    """
+    if given_sub_sector_by_user is not None:
         query = f"""
         SELECT name
         FROM `tabSub Sector`
@@ -62,59 +77,92 @@ def fetch_sub_sector_details(given_sub_sector_by_user):
         sub_sector_id = None
     return sub_sector_id
 
-def fetch_area_details(given_area_by_user):
-    # Fetching Area details
+def fetch_area_details(given_area_by_user: str) -> str:
+    """
+    Fetches the area ID from the database based on the given area name.
+
+    Parameters:
+    given_area_by_user (str): The area name provided by the user.
+
+    Returns:
+    str: The area ID if found, otherwise None.
+    """
     query = f"""
     SELECT DISTINCT name
     FROM `tabArea`
     WHERE area_name = '{given_area_by_user}'
     """
 
-    # Call the function and assign results
+    # Execute the query and fetch results
     results = fetch_query_results(query)
-    # Assign variables based on results
-    if results:
-        area_id = results[0][0]
-    else:
-        area_id = None
+
+    # Extract area ID if results exist; otherwise, set to None
+    area_id = results[0][0] if results else None
+
     return area_id
 
-def fetch_city_details(given_city_by_user):
-    # Fetching City details
+def fetch_city_details(given_city_by_user: str) -> str:
+    """
+    Fetches the city ID from the database based on the given city name.
+
+    Parameters:
+    given_city_by_user (str): The city name provided by the user.
+
+    Returns:
+    str: The city ID if found, otherwise None.
+    """
     query = f"""
     SELECT DISTINCT name
     FROM `tabCity`
     WHERE city_name = '{given_city_by_user}'
     """
 
-    # Call the function and assign results
+    # Execute the query and fetch results
     results = fetch_query_results(query)
-    # Assign variables based on results
-    if results:
-        city_id = results[0][0]
-    else:
-        city_id = None
+
+    # Extract city ID if results exist; otherwise, set to None
+    city_id = results[0][0] if results else None
+
     return city_id
 
-def fetch_state_details(given_state_by_user):
-    # Fetching State details
+def fetch_state_details(given_state_by_user: str) -> str:
+    """
+    Fetches the state ID from the database based on the given state name.
+
+    Parameters:
+    given_state_by_user (str): The state name provided by the user.
+
+    Returns:
+    str: The state ID if found, otherwise None.
+    """
     query = f"""
     SELECT DISTINCT name
     FROM `tabState`
     WHERE state_name  = '{given_state_by_user}'
     """
 
-    # Call the function and assign results
+    # Execute the query and fetch results
     results = fetch_query_results(query)
-    # Assign variables based on results
-    if results:
-        state_id = results[0][0]
-    else:
-        state_id = None
+
+    # Extract state ID if results exist; otherwise, set to None
+    state_id = results[0][0] if results else None
+
     return state_id
 
 def get_property_approval_data(sub_sector_id=None, industry_id=None, area_id=None, city_id=None, state_id=None):
-    # Initialize the query string with the common parts
+    """
+    Fetches property approval details based on industry, location, and sectoral filters.
+
+    Parameters:
+    sub_sector_id (str, optional): Sub-sector identifier.
+    industry_id (str, optional): Industry identifier.
+    area_id (str, optional): Area identifier.
+    city_id (str, optional): City identifier.
+    state_id (str, optional): State identifier.
+
+    Returns:
+    pd.DataFrame or None: DataFrame containing property approval details if records exist, otherwise None.
+    """
     query = f"""
     SELECT a.name, a.license_approval,a.business_location_type as ABLT, a.land_type as ALT, a.vicinity_detail as AVD, a.cross_following_details as ACFD,a.road_cutting, a.delivery_schedule_in_working_days, a.mode_of_application, a.stage, a.is_dependent, a.depends_on, a.area, a.city, a.city_level, a.state, a.state_level, a.country_level, a.sub_sector, a.industry, a.pan_industries
     FROM `tabLicenses and Approvals Type` a
@@ -193,26 +241,67 @@ def get_property_approval_data(sub_sector_id=None, industry_id=None, area_id=Non
     else:
         return None
     
-def normalize_series(series, highest_is_worst=False):# this is to normalize
+def normalize_series(series, highest_is_worst=False):
+    """
+    Normalizes a Pandas Series to a scale of 1 to 10 using Min-Max Scaling.
+
+    Parameters:
+    series (pd.Series): The input numerical series to normalize.
+    highest_is_worst (bool, optional): If True, higher values will be considered worse (flipped scale).
+                                        Defaults to False.
+
+    Returns:
+    pd.Series: Normalized series with values between 1 and 10.
+    """
+
+    # Calculate the minimum and maximum values of the series
     min_val, max_val = series.min(), series.max()
+
+    # If all values in the series are the same, assign a default score of 5
     if min_val == max_val:
-        return pd.Series([5] * len(series), index=series.index)  # Default to 5 if all values are the same
+        return pd.Series([5] * len(series), index=series.index)
+
+    # Determine the scaling factor: -1 (default) for normal scaling, 1 for reversed scaling
     scale = 1 if highest_is_worst else -1
+
+    # Apply Min-Max Scaling and adjust the range to be between 1 and 10
     return ((series - min_val) / (max_val - min_val) * 9 + 1) * scale
 
 def get_dependent_approval_time(testing_df1, dep_approval, approval_hierarchy, current_approval_main_stage, current_approval_id, effecient_time = None, infinity_loop_lst=None):
+    """
+    Recursively calculates the total time required for an approval, considering dependencies.
+    Prevents infinite loops by tracking already visited approvals.
+    
+    Args:
+        testing_df1 (pd.DataFrame): DataFrame containing approval data.
+        dep_approval (str): The dependent approval ID.
+        approval_hierarchy (list): List defining the approval stages hierarchy.
+        current_approval_main_stage (str): The main stage of the current approval.
+        current_approval_id (str): The ID of the current approval.
+        effecient_time (dict, optional): Dictionary containing time taken per approval stage.
+        infinity_loop_lst (list, optional): Tracks visited approvals to prevent infinite loops.
+    
+    Returns:
+        list: List containing the total time required for the dependent approval.
+    """
     if not infinity_loop_lst:
         infinity_loop_lst = []
         current_approval_id_independent = current_approval_id
         infinity_loop_lst.append(current_approval_id_independent)
     infinity_loop_lst.append(dep_approval)
+
+    # Extract the dependent approval details from the DataFrame
     dep_approval_df = testing_df1[testing_df1["Approval ID"] == dep_approval]
     lst_dep_appr = []
+
+    # Case 1: If the current approval stage is not "Others"
     if current_approval_main_stage != "Others":
-        if not dep_approval_df.empty:
+        if not dep_approval_df.empty:   
+            # Skip if the dependent approval's stage is different
             if dep_approval_df["Stages"].values[0] != current_approval_main_stage:
                 pass
             else:
+                # If the dependent approval is independent, return its time taken
                 if dep_approval_df["Is Dependent"].values[0] == "No":
                     lst_dep_appr.append(dep_approval_df["Time Taken"].values[0])
                     return lst_dep_appr
@@ -224,12 +313,14 @@ def get_dependent_approval_time(testing_df1, dep_approval, approval_hierarchy, c
                         temp_lst_for_max = []
                         for dep_dep_lst in dep_approval_lst:
                             if dep_dep_lst in infinity_loop_lst:
-                                temp_lst_for_max.append(0)
+                                temp_lst_for_max.append(0)# Avoid infinite recursion
                                 continue
                             temp_placeholder = get_dependent_approval_time(testing_df1=testing_df1,dep_approval=dep_dep_lst, approval_hierarchy=approval_hierarchy, current_approval_main_stage=current_approval_main_stage, current_approval_id=current_approval_id, infinity_loop_lst=infinity_loop_lst)
                             temp_lst_for_max.append(sum(temp_placeholder))
                         lst_dep_appr.append(max(temp_lst_for_max))
         return lst_dep_appr
+
+     # Case 2: If the current approval stage is "Others"
     else:
         if not dep_approval_df.empty:
             if dep_approval_df["Stages"].values[0] == "Others":
@@ -244,7 +335,7 @@ def get_dependent_approval_time(testing_df1, dep_approval, approval_hierarchy, c
                         temp_lst_for_max = []
                         for dep_dep_lst in dep_approval_lst:
                             if dep_dep_lst in infinity_loop_lst:
-                                temp_lst_for_max.extend(0)
+                                temp_lst_for_max.extend(0)# Prevent infinite recursion
                                 continue
                             temp_placeholder = get_dependent_approval_time(testing_df1=testing_df1,dep_approval=dep_dep_lst, approval_hierarchy=approval_hierarchy, current_approval_main_stage="Others", effecient_time=effecient_time, current_approval_id=current_approval_id, infinity_loop_lst=infinity_loop_lst)
                             temp_lst_for_max.append(sum(temp_placeholder))
