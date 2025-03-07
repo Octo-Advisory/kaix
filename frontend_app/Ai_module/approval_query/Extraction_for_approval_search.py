@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple, Union, Any, Optional
 from click import prompt
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from frontend_app.Ai_module.Query_Classification_And_Analysis import refine_query_with_history, llm_70b_vers,llm_70b_vers_creative, extract_location_from_query, extract_comparison_locations, extract_main_industry_and_product_universal, extract_sub_sector_and_product_universal
+from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 from langchain.schema import HumanMessage, AIMessage
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import get_chat,save_chat,get_state,save_state
@@ -656,6 +656,10 @@ def handle_approval_query(
     chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
     save_chat(chat_history,f"QAPP_chat_{chatId}")
 
+    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to Get Approvals"], module_names_list, llm)
+    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    save_state(state,f"QAPP_state_{chatId}")
+
     if user_intention == "Approval Search for area, city, or state without industry":
         extracted_data, validated_data = extract_location_from_query(refined_user_input, available_areas, available_cities, available_states, llm)
         area_name = validated_data["Area"]
@@ -1227,6 +1231,7 @@ def call_handle_approval_query(user_input,chatId):
                 "Sub-Sector": None,
                 "Product": None,
             },
+            "KEYWORDS": None
         }
         save_state(state,f"QAPP_state_{chatId}")
     extracted_state = state.copy()

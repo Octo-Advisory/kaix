@@ -1,6 +1,7 @@
 import os
 import re
-from typing import List, Dict, Tuple
+import json 
+from typing import List, Dict, Tuple, Union
 # from dotenv import load_dotenv
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
@@ -443,6 +444,265 @@ def extract_comparison_locations(user_input: str, available_areas: List[str], av
     Extracted_Data = {"Locations": extracted_locations}
     Validated_Data = validated_classification
     return Extracted_Data, Validated_Data
+
+module_names_list = ["Query to build industry from Scratch", "Query to search Vendors", "Query to search Incentives", "Query to Get Approvals", "Query to Get Employee Search", ]
+
+field_with_description = {
+      "Query to search Vendors": {
+            "Vendor Name": "The official name of the vendor or business providing the service or goods (e.g., Bhagwati Chemicals, Agriland Biotech Limited.).",
+            "Supply Description By Vendor": "A brief explanation of the products or services offered by the vendor (e.g., 'We provide high-quality steel rods for construction projects' or 'PCB Assembly|BOM Sourcing|Turnkey Manufacturing|Electronics Manufacturing').",
+            "List of Certifications": "Certifications held by the vendor that validate compliance with industry standards (e.g., ISO 9001, BIS Certification, GMP Certification, ASME Certification, AS9100 (for aerospace, FDA Approval (US)))."
+      },
+      "Query to search Incentives": {
+            "Incentive Name": "The official title of the financial or non-financial support program available (e.g., Startup India Seed Fund, MSME Credit Guarantee Scheme).",
+            "Incentive Type": "The category of the incentive based on the type of support it provides (e.g., Equity Support, Sustenance Allowance, Tax Exemption, Interest Subsidy, Capital Investment Subsidy, Incentive in Power Tariff and Electricity Duty).",
+            "Quantum of Assistance": "The amount or percentage of financial assistance or benefit provided (e.g., 'Seed support up to Rs. 30 Lakh' or 'Capital subsidy of 25% on plant and machinery cost', 'Exemption of electicity duty')."
+      },
+      "Query to Get Approvals": {
+            "Name of License / Approval": "The specific name of the required approval for business operations (e.g., Environmental Clearance, Fire NOC, Factory License).",
+            "Government Department": "The regulatory body or authority issuing the license (e.g., Pollution Control Board, Directorate of Industrial Safety and Health).",
+            "Land Type": "The classification of land where the approval applies (e.g., Agricultural Land, Non-Agricultural Land - Urban, Industrial Land).",
+            "Business Location": "The specific area or industrial zone where the business operates (e.g., GIDC, Non GIDC, DSIRDA, MBSIRDA, GPCP SIRDA).",
+            "Stage": "The phase during which approval is required (e.g., Pre-establishment, Pre-requisite, Pre-operation).",
+            "Mode of Application": "The method by which the approval is obtained (e.g., Online, Offline).",
+            "Vicinity Detail": "Additional details on surroundings that may impact approval (e.g., Forest, Archaeological site, Mineral bearing site (for a non-mining business)).",
+            "Cross Following Details": "Checks if the industry site crosses important utilities (Notified rivers/ nalas/ canals/ drains, Pipeline of Gujarat Gas, Pipeline of Sabarmati Gas, Pipeline of GSPL, Water bodies).",
+            "Tree Cutting": "Indicates whether tree cutting is required (eg: Tree Cutting).",
+            "Road Cutting": "Indicates whether road cutting is required (eg: Road Cutting).",
+            "Require Pole Shifting": "Specifies if shifting of electricity or communication poles is needed (eg: Pole Shifting)."
+      },
+      "Query to build industry from Scratch": {
+            "Property Type": "The type of land based on usage (Non-Agricultural Land, Agricultural Land, Industrial Land, Industrial Park Plot, GIDC Plot, Warehouse, Industrial Plant, Auction Property, Industrial Park).",
+            "Business Location Type": "The classification of the business location (GIDC, Non GIDC, DSIRDA, MBSIRDA, GPCP SIRDA).",
+            "Land Type": "The specific classification of land (Agricultural Land, Non-Agricultural Land (Rural), Non-Agricultural Land (Urban)).",
+            "Location": "The specific area, city, or state where the property is located (e.g., Gujarat, Surat, Waghodia).",
+            "Vicinity of": "Environmental or geographical features nearby (Forest, Archaeological site, Mineral bearing site).",
+            "Tree Cutting Involved": "Indicates whether tree cutting is required for the project (Tree cutting).",
+            "Road Cutting Involved": "Specifies if road cutting is required to establish infrastructure (Road Cutting).",
+            "Will your industry cross the following?": "Checks whether the industry site intersects with important geographical or utility structures (Pipeline of Gujarat Gas, Pipeline of Sabarmati Gas, Pipeline of GSPL, Water bodies, Notified rivers/ nalas/ canals/ drains)."
+      },
+}
+
+def extract_json_from_llm_response(raw_output: str, json_key: str) -> Dict[str, Union[List[str], None]]:
+    """
+    Extracts a JSON object containing the specified key from an LLM response.
+
+    Supports:
+    - Direct JSON responses.
+    - JSON blocks enclosed in triple backticks.
+    - Loosely structured JSON in plain text.
+
+    Handles cases where:
+    - The key's value is explicitly `null` or `None`.
+    - The key contains a list of values.
+    
+    Parameters:
+    -----------
+    raw_output : str
+        The raw text output from the LLM.
+
+    json_key : str
+        The expected key in the JSON response (e.g., "KEYWORDS").
+
+    Returns:
+    --------
+    Dict[str, Union[List[str], None]]:
+        A dictionary with the extracted values, ensuring a structured JSON output.
+    """
+
+    # --- Case 1: Direct JSON Parsing ---
+    try:
+        data_entire = json.loads(raw_output.strip())
+        if isinstance(data_entire, dict) and json_key in data_entire:
+            extracted_value = data_entire.get(json_key, None)
+            return {json_key: extracted_value if isinstance(extracted_value, list) else None}
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass  # JSON parsing failed
+
+    # --- Case 2: Extract JSON inside triple backticks ---
+    code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', raw_output, flags=re.DOTALL)
+    for block in code_blocks:
+        try:
+            block_data = json.loads(block.strip())
+            if isinstance(block_data, dict) and json_key in block_data:
+                extracted_value = block_data.get(json_key, None)
+                return {json_key: extracted_value if isinstance(extracted_value, list) else None}
+        except (json.JSONDecodeError, ValueError, TypeError):
+            pass  # JSON parsing failed
+
+    # --- Case 3: Regex-based Extraction ---
+    
+    #    a) Pattern with curly braces (full JSON structure)
+    pattern_braces = re.compile(r'\{\s*"' + json_key + r'"\s*:\s*(\[[^]]*\]|null|None)\s*\}', flags=re.DOTALL)
+    match_braces = pattern_braces.search(raw_output)
+    if match_braces:
+        keyword_list = match_braces.group(1).strip()
+
+        # If the extracted value is explicitly "null" or "None", return None
+        if keyword_list.lower() in ["null", "none"]:
+            return {json_key: None}
+
+        extracted_values = [kw.strip('" ') for kw in keyword_list.strip("[]").split(',') if kw.strip('" ')]
+        return {json_key: extracted_values if extracted_values else None}
+
+    #    b) Loose JSON structure extraction (if above didn't work)
+    pattern_no_braces = re.compile(r'"' + json_key + r'"\s*:\s*(\[[^]]*\]|null|None)', flags=re.DOTALL)
+    match_no_braces = pattern_no_braces.search(raw_output)
+    if match_no_braces:
+        keyword_list = match_no_braces.group(1).strip()
+
+        if keyword_list.lower() in ["null", "none"]:
+            return {json_key: None}
+
+        extracted_values = [kw.strip('" ') for kw in keyword_list.strip("[]").split(',') if kw.strip('" ')]
+        return {json_key: extracted_values if extracted_values else None}
+
+    # -- If nothing worked, return a default response --
+    return {json_key: None}
+
+def extract_keywords_from_query(
+    user_input: str,
+    fields: Dict[str, str],  # Mapping of field name -> short explanation
+    module_names: List[str], # List of module names whose words must be excluded
+    llm
+) -> Dict[str, Union[List[str], None]]:
+    """
+    Extract relevant single-word keywords from the user's query based on:
+      1) A dictionary of fields (each key is the field name and the value is 
+         a short explanation of that field's meaning).
+      2) A list of module names. Any single word in these module names must never appear as a keyword.
+      3) An LLM instance to process the prompt.
+
+    Requirements:
+      - Return only the exact words from the user's query that match each field's meaning.
+      - Never include any word that is part of the module names.
+      - Break multi-word phrases into individual words. (e.g., "power incentive" → ["power", "incentive"]).
+      - If no valid keywords are found, return {"KEYWORDS": None}.
+    """
+
+    # 1) Build a text block enumerating each field with its meaning
+    field_lines = []
+    for idx, (fname, fdesc) in enumerate(fields.items(), start=1):
+        field_lines.append(f"{idx}) {fname}: {fdesc}")
+    fields_explained = "\n".join(field_lines)
+
+    # 2) We must ensure each module name is split into single words
+    #    so we can exclude them individually (e.g., "Vendor Management" => "Vendor", "Management").
+    #    We'll store them in a set to remove duplicates and allow quick membership checks.
+    module_words = set()
+    for mod_name in module_names:
+        # split on whitespace
+        for token in mod_name.split():
+            module_words.add(token.strip().lower())
+
+    # Turn the module_names into a user-facing string for the prompt
+    # (though we'll do final filtering in Python as well).
+    modules_text = ", ".join(module_names)
+
+    ####################################################################
+    # 3) Construct the Prompt (with instructions to produce single words)
+    ####################################################################
+    prompt_template_str = """
+    You are an expert at extracting single-word keywords from a user query.
+
+    1) Below is a list of fields, each with a short explanation:
+    {fields_explained}
+
+    2) We also have a list of module names, and we STRICTLY NEVER want any word from these modules (including their variations, singular/plural forms, or similar words) to be extracted as keywords:
+    {modules_text}
+
+    3) Some words should NEVER be extracted as keywords because they belong to restricted categories that disrupt the flow. Do not extract these words:
+    
+    - Capacity Units: Words related to measurement units used for capacity, power, or weight.
+      - Examples: `"MW"`, `"KW"`, `"ton"`, `"kg/day"`, `"liters"`, `"m³"`, `"barrels"`, `"cubic feet"`, `"TPA"`
+    
+    - Time Periods: Words that refer to time frames or durations.
+      - Examples: `"year"`, `"month"`, `"day"`, `"hour"`, `"weekly"`, `"annually"`, `"quarterly"`, `"biweekly"`
+    
+    If any word in the query belongs to these categories, DO NOT include them in the extracted keywords.
+
+    Important Rules:
+    - Identify each meaningful single-word from the user's query that is relevant to the field descriptions.
+    - Always split multi-word phrases into separate individual words.
+      - Example: If the user says `"power and skill development incentive"`, return `["power", "skill", "development"]` (three separate words).
+    
+    - Numbers Must Be Extracted If They Are Relevant:
+      - If a number is part of a certification or standard (e.g., `"ISO 9001"`, `"CE 22000"`), it must be included in the extracted keywords.
+      - Example: `"We need ISO 14001 certification"` → `["ISO", "14001", "certification"]`
+      - Example: `"I want information about CE 22000"` → `["CE", "22000"]`
+
+    - Correct Misspelled Words Before Extracting Them:
+      - If the user mistakenly spells a word, return the corrected version.
+      - Example: `"incentve for power"` → `["incentive", "power"]`
+      - Example: `"subsidyy information"` → `["subsidy", "information"]`
+      - Do not extract the misspelled word; only the corrected version should be included.
+
+    - Absolutely Exclude Any Word That Is Part of the Module Names:
+      - If `"Approval"` is a module, do not extract `"approval"`, `"approvals"`, or related words.
+      - If `"Incentive"` is a module, do not extract `"incentive"`, `"incentives"`, or similar terms.
+      - If `"Vendor Management"` is a module, do not extract `"vendor"`, `"vendors"`, or `"management"`.
+
+    Output Format:
+    - The response must be a JSON object in the exact format below.
+    - If no valid keywords are found, return `{{ "KEYWORDS": null }}` or `{{ "KEYWORDS": None }}`.
+    - No explanations, no extra text—only the JSON object.
+
+    User Query:
+    {user_query}
+
+    Final Output (JSON only):
+    {{
+       "KEYWORDS": ["word1", "word2"]  # or null if none
+    }}
+    """.strip()
+
+
+    # 4) Create the PromptTemplate and run the LLM
+    prompt = PromptTemplate(
+        input_variables=["fields_explained", "modules_text", "user_query"],
+        template=prompt_template_str
+    )
+    chain = prompt | llm
+    response = chain.invoke({
+        "fields_explained": fields_explained,
+        "modules_text": modules_text,
+        "user_query": user_input
+    })
+
+    raw_output = response.content.strip()
+    # print(raw_output)
+
+    data = extract_json_from_llm_response(raw_output, "KEYWORDS")
+    keywords = data.get("KEYWORDS", None)
+    ####################################################################
+    # 6) Final Cleanup in Python
+    #    - Remove empty or whitespace-only
+    #    - Convert to lowercase and compare with module_words
+    ####################################################################
+    if isinstance(keywords, list):
+        cleaned = []
+        for kw in keywords:
+            # Ensure single word
+            # (If the LLM accidentally gives us multi-word phrases, we could optionally split them here,
+            #  but ideally the LLM is already returning single words.)
+            # We do a simple split, in case the LLM gave something like "power incentive" in one item.
+            for token in kw.split():
+                token_stripped = token.strip()
+                if token_stripped:
+                    # Exclude module words
+                    if token_stripped.lower() not in module_words:
+                        cleaned.append(token_stripped)
+        # Remove duplicates (if desired) by converting to an Ordered set, or just leave them
+        cleaned = list(dict.fromkeys(cleaned))  # preserves order, removes duplicates
+
+        if cleaned:
+            keywords = cleaned
+        else:
+            keywords = None
+    else:
+        keywords = None
+
+    return {"KEYWORDS": keywords}
 
 def extract_main_industry_and_product_universal(user_query: str, main_industries: List[str], llm) -> Dict[str, str]:
     """

@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from typing import List, Dict, Tuple, Union
 from langchain.prompts import PromptTemplate
 from langchain.schema import HumanMessage, AIMessage
-from frontend_app.Ai_module.Query_Classification_And_Analysis import refine_query_with_history, classify_query, llm_70b_vers, llm_70b_vers_creative,llm_deepseek
+from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
 
@@ -928,7 +928,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
     state = get_state(f"QIND_state_{chatId}") or None
     if state is None:
         state = {'Main-Industry': 'None', 'Sub-Sector': 'None','Segment':'None', 'Capacity': 'None', 'Capacity Unit': 'None', 
-                 'Time Period': 'None', 'Product': 'None','product_attempt_count':0,'capacity_attempt_count':0}
+                 'Time Period': 'None', 'Product': 'None','product_attempt_count':0,'capacity_attempt_count':0, "KEYWORDS": None}
         save_state(state,f"QIND_state_{chatId}")
     chat_history = get_chat(f"QIND_chat_{chatId}") or []
 
@@ -938,7 +938,11 @@ def gather_industry_details(query, main_industries, llm,chatId):
     refined_query = refine_query_with_history(Chat_history_normal, query, llm)
     chat_history.append(HumanMessage(content=refined_query))
     save_chat(chat_history,f"QIND_chat_{chatId}")
-  
+    
+    keyword_dict = extract_keywords_from_query(refined_query, field_with_description["Query to build industry from Scratch"], module_names_list, llm)
+    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    save_state(state,f"QIND_state_{chatId}")
+    
     with open("log.txt", "a") as file:
             file.write(f"\nstate2 {state}")
     # Extract industry details from the refined query

@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple, Union
 from click import prompt
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from frontend_app.Ai_module.Query_Classification_And_Analysis import refine_query_with_history, llm_70b_vers,llm_70b_vers_creative,extract_location_from_query,extract_main_industry_and_product_universal,extract_comparison_locations,extract_segment_and_product_universal,extract_sub_sector_and_product_universal
+from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 from langchain.schema import HumanMessage, AIMessage
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,save_state,get_chat,get_state
@@ -330,12 +330,17 @@ def call_incentive_search(input,chatId):
     save_chat(chat_history,f"QINC_chat_{chatId}")
     state = get_state(f"QINC_state_{chatId}") or None
     if not state:
-        state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None'}
+        state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None', "KEYWORDS": None}
         save_state(state,f"QINC_state_{chatId}")
     log_to_file("state1",state)
     query_intent = classify_incentive_query(refine_user_input,llm=llm_70b_vers)
     query_intent = query_intent['classification_category']
     log_to_file("query intent",query_intent)
+
+    keyword_dict = extract_keywords_from_query(refine_user_input, field_with_description["Query to search Incentives"], module_names_list, llm_70b_vers)
+    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    save_state(state,f"QINC_state_{chatId}")
+
     if query_intent == 'Other Intent':
         static_follow_up = "Could you provide specific query?"
         message = generate_dynamic_message_for_incentive(Chat_history_normal,static_follow_up,refine_user_input,llm_70b_vers_creative,chatId)
