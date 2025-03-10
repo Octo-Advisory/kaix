@@ -4,7 +4,7 @@ import pandas as pd
 from typing import List, Dict, Tuple, Union, Any, Optional
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers,llm_70b_vers_creative, extract_main_industry_and_product_universal, extract_sub_sector_and_product_universal, extract_segment_and_product_universal
+from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 from langchain.schema import HumanMessage, AIMessage
 from rapidfuzz import process, fuzz
 import spacy
@@ -1042,6 +1042,10 @@ def handle_vendor_query(
     user_intention = result["classification_category"]
     frappe.log_error(f"user _intesnion {user_intention}")
 
+    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to search Vendors"], module_names_list, llm, "Query to search Vendors")
+    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    save_state(state,f"QVND_state_{chatId}")
+    
     if user_intention == "Vendor Search for location without industry and supply details":
         extracted_data = extract_location_from_vendor_query(refined_user_input, llm)
         given_loacation = extracted_data["Extracted_Location"]
@@ -1707,7 +1711,8 @@ def call_handle_vendor_query(input,chatId):
             },
             "Supply_info": {
                 "Supplies": []
-            }
+            },
+            "KEYWORDS": None
         }
         save_state(state,f"QVND_state_{chatId}")
 
