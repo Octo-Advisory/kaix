@@ -1,4 +1,5 @@
 import re
+import json
 from typing import List, Dict, Tuple, Union
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -77,6 +78,141 @@ def refine_query_with_history_for_employment(history, latest_query, llm):
     
     # Fallback to the entire response if no match is found
     return refined_text
+
+def extract_json_from_llm_response_employment(raw_output: str, json_key: str) -> Dict[str, Union[List[str], None]]:
+    """
+    Extracts a JSON object containing the specified key from an LLM response for Employment module.
+    Ensures valid JSON output and corrects for any parsing errors.
+
+    Parameters:
+    -----------
+    raw_output : str
+        The raw text output from the LLM.
+
+    json_key : str
+        The expected key in the JSON response (e.g., "KEYWORDS").
+
+    Returns:
+    --------
+    Dict[str, Union[List[str], None]]:
+        A dictionary with the extracted values, ensuring a structured JSON output.
+    """
+
+    # --- Case 1: Direct JSON Parsing ---
+    try:
+        data_entire = json.loads(raw_output.strip())
+        if isinstance(data_entire, dict) and json_key in data_entire:
+            extracted_value = data_entire.get(json_key, None)
+            return {json_key: extracted_value if isinstance(extracted_value, list) else None}
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass  # JSON parsing failed
+
+    # --- Case 2: Extract JSON inside triple backticks ---
+    code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', raw_output, flags=re.DOTALL)
+    for block in code_blocks:
+        try:
+            block_data = json.loads(block.strip())
+            if isinstance(block_data, dict) and json_key in block_data:
+                extracted_value = block_data.get(json_key, None)
+                return {json_key: extracted_value if isinstance(extracted_value, list) else None}
+        except (json.JSONDecodeError, ValueError, TypeError):
+            pass  # JSON parsing failed
+
+    # --- Case 3: Regex-based Extraction ---
+    pattern_braces = re.compile(r'\{\s*"' + json_key + r'"\s*:\s*(\[[^]]*\]|null|None)\s*\}', flags=re.DOTALL)
+    match_braces = pattern_braces.search(raw_output)
+    if match_braces:
+        keyword_list = match_braces.group(1).strip()
+
+        if keyword_list.lower() in ["null", "none"]:
+            return {json_key: None}
+
+        extracted_values = [kw.strip('" ') for kw in keyword_list.strip("[]").split(',') if kw.strip('" ')]
+        return {json_key: extracted_values if extracted_values else None}
+
+    pattern_no_braces = re.compile(r'"' + json_key + r'"\s*:\s*(\[[^]]*\]|null|None)', flags=re.DOTALL)
+    match_no_braces = pattern_no_braces.search(raw_output)
+    if match_no_braces:
+        keyword_list = match_no_braces.group(1).strip()
+
+        if keyword_list.lower() in ["null", "none"]:
+            return {json_key: None}
+
+        extracted_values = [kw.strip('" ') for kw in keyword_list.strip("[]").split(',') if kw.strip('" ')]
+        return {json_key: extracted_values if extracted_values else None}
+
+    return {json_key: None}
+
+
+def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Union[List[str], None]]:
+    """
+    Extracts employment-related keywords from a user query, ensuring they are classified into:
+    - "Skilled"
+    - "Semi-Skilled"
+    - "Unskilled"
+
+    If the query is a general employment search, return `None`. Otherwise, map the keyword
+    to the appropriate skill category.
+
+    Parameters:
+    -----------
+    user_input : str
+        The user-provided query string.
+
+    llm :
+        An instance of a language model (such as from LangChain) capable of processing the prompt.
+
+    Returns:
+    --------
+    Dict[str, Union[List[str], None]]:
+        A dictionary with a single key 'KEYWORDS'.
+    """
+
+    # Construct the Prompt for LLM
+    prompt_template_str = """
+    You are an expert in employment search classification.
+
+    Your task:
+    1) Determine whether the user is searching for general employment or specific employment.
+        - Example of general employment: "I want employment opportunities in Surat." (Return `null`)
+        - Example of specific employment: "I want to find an electrician and a plumber job." (Proceed to classification)
+
+    2) If the user mentions a specific skill category ("Skilled", "Semi-Skilled", "Unskilled"), return it directly.
+
+    3) If the user mentions a specific job role (e.g., "electrician", "plumber"), classify it into:
+        - Skilled: Requires formal training or judgment.
+        - Semi-Skilled: Requires experience or guidance but not full expertise.
+        - Unskilled: Requires minimal training, mainly physical labor.
+
+    4) If multiple job roles are mentioned, classify each into one of the three skill categories.
+
+    5) The response must ONLY contain:
+       - "Skilled"
+       - "Semi-Skilled"
+       - "Unskilled"
+       - OR `null` if it is a general employment search.
+
+    User Query:
+    {user_query}
+
+    Final Output (JSON only):
+    {{
+       "KEYWORDS": ["Skilled", "Semi-Skilled"]  # Example output
+    }}
+    """.strip()
+
+    prompt = PromptTemplate(
+        input_variables=["user_query"],
+        template=prompt_template_str
+    )
+    chain = prompt | llm
+    response = chain.invoke({
+        "user_query": user_input
+    })
+
+    raw_output = response.content.strip()
+
+    return extract_json_from_llm_response_employment(raw_output, "KEYWORDS")
 
 def classify_employment_query(query, llm):
     """
@@ -397,6 +533,7 @@ def handle_employment_query(
     refined_user_input = refine_query_with_history_for_employment(Chat_history_normal, user_input, llm_70b_vers)
     chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
     save_chat(chat_history,chatId=chatId)
+    keyword_dict = extract_employment_keywords_from_query(refined_user_input, llm)
     if user_intention == "Individual employment status":
         classification_data, validated_data = extract_location_from_query(refined_user_input, available_areas= available_areas, available_cities= available_cities, available_states= available_states, llm=llm_70b_vers)
        
@@ -426,7 +563,8 @@ def handle_employment_query(
                     "Is_confirmation" : None,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
             
@@ -446,7 +584,8 @@ def handle_employment_query(
                     "Is_confirmation" : True,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
@@ -456,7 +595,8 @@ def handle_employment_query(
                     "Is_confirmation" : None,
                     "Extracted Data": None,
                     "Validation Data": None,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
@@ -471,7 +611,8 @@ def handle_employment_query(
                     "Is_confirmation" : None,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
@@ -491,7 +632,8 @@ def handle_employment_query(
                     "Is_confirmation" : True,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
         
@@ -501,7 +643,8 @@ def handle_employment_query(
                     "Is_confirmation" : None,
                     "Extracted Data": None,
                     "Validation Data": None,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
@@ -514,7 +657,8 @@ def handle_employment_query(
                     "Is_confirmation" : None,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
@@ -525,7 +669,8 @@ def handle_employment_query(
                     "Is_confirmation" : None,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
@@ -539,7 +684,8 @@ def handle_employment_query(
                 "Is_confirmation" : None,
                 "Extracted Data": None,
                 "Validation Data": None,
-                "User Intention": user_intention
+                "User Intention": user_intention,
+                "KEYWORDS": keyword_dict["KEYWORDS"]
             }
             return response
         
@@ -560,7 +706,8 @@ def handle_employment_query(
                 "Is_confirmation" : None,
                 "Extracted Data": None,
                 "Validation Data": None,
-                "User Intention": user_intention
+                "User Intention": user_intention,
+                "KEYWORDS": keyword_dict["KEYWORDS"]
             }
             return response
         
@@ -578,7 +725,8 @@ def handle_employment_query(
                 "Is_confirmation" : True,
                 "Extracted Data": classification_data_to_send,
                 "Validation Data": validated_data_to_send,
-                "User Intention": user_intention
+                "User Intention": user_intention,
+                "KEYWORDS": keyword_dict["KEYWORDS"]
             }
             return response
     else:
@@ -589,7 +737,8 @@ def handle_employment_query(
                 "Is_confirmation" : None,
                 "Extracted Data": None,
                 "Validation Data": None,
-                "User Intention": user_intention
+                "User Intention": user_intention,
+                "KEYWORDS": keyword_dict["KEYWORDS"]
             }
         return response
     
