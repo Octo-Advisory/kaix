@@ -1042,7 +1042,7 @@ def handle_vendor_query(
     user_intention = result["classification_category"]
     frappe.log_error(f"user _intesnion {user_intention}")
 
-    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to Get Approvals"], module_names_list, llm)
+    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to search Vendors"], module_names_list, llm, "Query to search Vendors")
     state["KEYWORDS"] = keyword_dict["KEYWORDS"]
     save_state(state,f"QVND_state_{chatId}")
     

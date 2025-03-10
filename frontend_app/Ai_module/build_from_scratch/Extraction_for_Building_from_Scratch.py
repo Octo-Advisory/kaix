@@ -939,7 +939,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
     chat_history.append(HumanMessage(content=refined_query))
     save_chat(chat_history,f"QIND_chat_{chatId}")
     
-    keyword_dict = extract_keywords_from_query(refined_query, field_with_description["Query to build industry from Scratch"], module_names_list, llm)
+    keyword_dict = extract_keywords_from_query(refined_query, field_with_description["Query to build industry from Scratch"], module_names_list, llm, "Query to build industry from Scratch")
     state["KEYWORDS"] = keyword_dict["KEYWORDS"]
     save_state(state,f"QIND_state_{chatId}")
     

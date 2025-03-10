@@ -656,7 +656,7 @@ def handle_approval_query(
     chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
     save_chat(chat_history,f"QAPP_chat_{chatId}")
 
-    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to Get Approvals"], module_names_list, llm)
+    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to Get Approvals"], module_names_list, llm, "Query to Get Approvals")
     state["KEYWORDS"] = keyword_dict["KEYWORDS"]
     save_state(state,f"QAPP_state_{chatId}")
 

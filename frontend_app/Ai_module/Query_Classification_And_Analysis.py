@@ -562,22 +562,37 @@ def extract_json_from_llm_response(raw_output: str, json_key: str) -> Dict[str, 
 
 def extract_keywords_from_query(
     user_input: str,
-    fields: Dict[str, str],  # Mapping of field name -> short explanation
-    module_names: List[str], # List of module names whose words must be excluded
-    llm
+    fields: Dict[str, str],
+    module_names: List[str],
+    llm,
+    current_module: str
 ) -> Dict[str, Union[List[str], None]]:
     """
-    Extract relevant single-word keywords from the user's query based on:
-      1) A dictionary of fields (each key is the field name and the value is 
-         a short explanation of that field's meaning).
-      2) A list of module names. Any single word in these module names must never appear as a keyword.
-      3) An LLM instance to process the prompt.
+    Extracts relevant single-word keywords from the user's query based on the provided field descriptions, 
+    excluding words that are part of predefined module names or restricted categories.
 
-    Requirements:
-      - Return only the exact words from the user's query that match each field's meaning.
-      - Never include any word that is part of the module names.
-      - Break multi-word phrases into individual words. (e.g., "power incentive" → ["power", "incentive"]).
-      - If no valid keywords are found, return {"KEYWORDS": None}.
+    Parameters:
+    ----------
+    user_input : str
+        The user's query from which keywords are to be extracted.
+
+    fields : Dict[str, str]
+        A dictionary mapping field names to their short explanations.
+
+    module_names : List[str]
+        A list of module names, where words from these names are to be excluded from the extracted keywords.
+
+    llm : object
+        An instance of a language learning model used to process and extract keywords from the prompt.
+
+    current_module : str
+        The name of the current module which may influence the prompt structure.
+
+    Returns:
+    -------
+    Dict[str, Union[List[str], None]]
+        A dictionary with the key "KEYWORDS" mapping to a list of extracted keywords. 
+        If no valid keywords are found, returns {"KEYWORDS": None}.
     """
 
     # 1) Build a text block enumerating each field with its meaning
@@ -602,59 +617,150 @@ def extract_keywords_from_query(
     ####################################################################
     # 3) Construct the Prompt (with instructions to produce single words)
     ####################################################################
-    prompt_template_str = """
-    You are an expert at extracting single-word keywords from a user query.
+    if current_module == "Query to build industry from Scratch":
+        prompt_template_str = """
+        You are an expert at extracting single-word keywords from a user query.
 
-    1) Below is a list of fields, each with a short explanation:
-    {fields_explained}
+        1) FOCUS FIELDS (To Be Extracted as Keywords)
+        These are the fields that you must focus on while extracting keywords. If the user's query contains any word that logically matches the meaning of these fields, it must be extracted as a keyword.
 
-    2) We also have a list of module names, and we STRICTLY NEVER want any word from these modules (including their variations, singular/plural forms, or similar words) to be extracted as keywords:
-    {modules_text}
+        {fields_explained}
 
-    3) Some words should NEVER be extracted as keywords because they belong to restricted categories that disrupt the flow. Do not extract these words:
-    
-    - Capacity Units: Words related to measurement units used for capacity, power, or weight.
-      - Examples: `"MW"`, `"KW"`, `"ton"`, `"kg/day"`, `"liters"`, `"m³"`, `"barrels"`, `"cubic feet"`, `"TPA"`
-    
-    - Time Periods: Words that refer to time frames or durations.
-      - Examples: `"year"`, `"month"`, `"day"`, `"hour"`, `"weekly"`, `"annually"`, `"quarterly"`, `"biweekly"`
-    
-    If any word in the query belongs to these categories, DO NOT include them in the extracted keywords.
+        2) RESTRICTED CATEGORIES (Never to Be Extracted)
+        Words from the following restricted categories must NEVER be extracted as keywords because they disrupt the flow.
 
-    Important Rules:
-    - Identify each meaningful single-word from the user's query that is relevant to the field descriptions.
-    - Always split multi-word phrases into separate individual words.
-      - Example: If the user says `"power and skill development incentive"`, return `["power", "skill", "development"]` (three separate words).
-    
-    - Numbers Must Be Extracted If They Are Relevant:
-      - If a number is part of a certification or standard (e.g., `"ISO 9001"`, `"CE 22000"`), it must be included in the extracted keywords.
-      - Example: `"We need ISO 14001 certification"` → `["ISO", "14001", "certification"]`
-      - Example: `"I want information about CE 22000"` → `["CE", "22000"]`
+        - Capacity Units: Measurement units related to capacity, power, or weight.
+        Examples: "MW", "KW", "ton", "kg/day", "liters", "m³", "barrels", "cubic feet", "TPA"
 
-    - Correct Misspelled Words Before Extracting Them:
-      - If the user mistakenly spells a word, return the corrected version.
-      - Example: `"incentve for power"` → `["incentive", "power"]`
-      - Example: `"subsidyy information"` → `["subsidy", "information"]`
-      - Do not extract the misspelled word; only the corrected version should be included.
+        - Time Periods: Words referring to time durations or periods.
+        Examples: "year", "month", "day", "hour", "weekly", "annually", "quarterly", "biweekly"
 
-    - Absolutely Exclude Any Word That Is Part of the Module Names:
-      - If `"Approval"` is a module, do not extract `"approval"`, `"approvals"`, or related words.
-      - If `"Incentive"` is a module, do not extract `"incentive"`, `"incentives"`, or similar terms.
-      - If `"Vendor Management"` is a module, do not extract `"vendor"`, `"vendors"`, or `"management"`.
+        - Product Names: Specific products being manufactured or sold.
+        Examples: "car", "plastic", "steel", "cement", "textiles", "Aspirin", "solar panels", "fertilizers"
 
-    Output Format:
-    - The response must be a JSON object in the exact format below.
-    - If no valid keywords are found, return `{{ "KEYWORDS": null }}` or `{{ "KEYWORDS": None }}`.
-    - No explanations, no extra text—only the JSON object.
+        - Industry or Specific Sub-Sectors: Names of industries or their sectors.
+        Examples: "automobile", "chemical", "food processing", "IT sector", "agriculture", "textile industry"
 
-    User Query:
-    {user_query}
+        - Common Construction or Setup Terms: Words related to setting up a facility.
+        Examples: "factory", "industry", "building", "setup", "establish", "construct", "infrastructure"
 
-    Final Output (JSON only):
-    {{
-       "KEYWORDS": ["word1", "word2"]  # or null if none
-    }}
-    """.strip()
+        - Module Names: The following module names and their variations must be excluded from keywords:
+        {modules_text}
+
+        Important Extraction Rules
+
+        1. STRICT FOCUS ON FIELDS:
+        Extract any word from the user's query that matches the FOCUS FIELDS.
+        Even if the query is ambiguous, complex, or incomplete, if a word relates to a field meaning, it must be extracted.
+
+        2. IGNORE SENTENCE STRUCTURE COMPLETELY:
+        Keywords must be extracted regardless of how the sentence is structured.
+        Even if the user uses vague or informal language, focus only on extracting words relevant to the fields.
+        Example 1: "plastic factory in Bombay" → ["Bombay"] (Because "plastic" and "factory" are restricted)
+        Example 2: "Wanna build car industry in Vadodara" → ["Vadoadara"] (Because "car" and "industry" are restricted)
+
+        3. Numbers Must Be Extracted If They Are Relevant:
+        If a number is part of a certification or standard (like "ISO 9001", "CE 22000"), it must be included as a keyword.
+        Example: "We need ISO 14001 certification" → ["ISO", "14001", "certification"]
+        Example: "I want information about CE 22000" → ["CE", "22000"]
+
+        4. Correct Misspelled Words Before Extracting Them:
+        If a word is misspelled, return its corrected form.
+        Example: "incentve for power" → ["incentive", "power"]
+        Example: "subsidyy information" → ["subsidy", "information"]
+
+        5. Never Extract Restricted or Module Terms:
+        Words from RESTRICTED CATEGORIES or Module Names must never be included in the keywords.
+
+        Output Format
+        - The response must be a JSON object in the exact format below.
+        - If no valid keywords are found, return {{ "KEYWORDS": null }} or {{ "KEYWORDS": None }}.
+        - No explanations, no extra text—only the JSON object.
+
+        User Query:
+        {user_query}
+
+        Final Output (JSON only):
+        {{
+        "KEYWORDS": ["word1", "word2"]  # or null if none
+        }}
+        """.strip()
+
+    else:
+        prompt_template_str = """
+        You are an expert at extracting single-word keywords from a user query.
+
+        1) FOCUS FIELDS (To Be Extracted as Keywords)
+        These are the fields that you must focus on while extracting keywords. If the user's query contains any word that logically matches the meaning of these fields, it must be extracted as a keyword.
+
+        {fields_explained}
+
+        2) RESTRICTED CATEGORIES (Never to Be Extracted)
+        Words from the following restricted categories must NEVER be extracted as keywords because they disrupt the flow.
+
+        - Capacity Units: Measurement units related to capacity, power, or weight.
+        Examples: "MW", "KW", "ton", "kg/day", "liters", "m³", "barrels", "cubic feet", "TPA"
+
+        - Time Periods: Words referring to time durations or periods.
+        Examples: "year", "month", "day", "hour", "weekly", "annually", "quarterly", "biweekly"
+
+        - Product Names: Specific products being manufactured or sold.
+        Examples: "car", "plastic", "steel", "cement", "textiles", "Aspirin", "solar panels", "fertilizers"
+
+        - Industry or Specific Sub-Sectors: Names of industries or their sectors.
+        Examples: "automobile", "chemical", "food processing", "IT sector", "agriculture", "textile industry"
+
+        - Locations: Words that indicate specific areas, cities, states, or countries.
+        Examples: "Delhi", "Mumbai", "Surat", "Gujarat", "Andhra Pradesh", "USA", "industrial zone"
+
+        - Common Construction or Setup Terms: Words related to setting up, approvals, incentives, supplies, or vendor processes.
+        Examples: "factory", "industry", "building", "setup", "establish", "construct", "infrastructure", 
+        "approval", "approvals", "incentive", "incentives", "supply", "supplies", "raw material", "vendor", "vendors"
+
+        - Module Names: The following module names and their variations must be excluded from keywords:
+        {modules_text}
+
+        If any word in the query belongs to these categories, do not include them in the extracted keywords.
+
+        Important Extraction Rules
+
+        1. STRICT FOCUS ON FIELDS:
+        Extract any word from the user's query that matches the FOCUS FIELDS.
+        Even if the query is ambiguous, complex, incomplete, or vague, if a word relates to a field meaning, it must be extracted.
+
+        2. IGNORE SENTENCE STRUCTURE COMPLETELY:
+        Keywords must be extracted regardless of how the sentence is structured.
+        Even if the user uses vague, incomplete, or informal language, focus only on extracting words relevant to the fields.
+        Example 1: "I want to find ISO 9000 certified steel suppliers in Bombay" → ["ISO", "9000"]
+        Example 2: "Find subsidies power Gujarat" → ["power"]
+        Example 3: "Wanna build car industry in Vadodara" → null (Because "car", "Vadodara" and "industry" are restricted)
+
+        3. Numbers Must Be Extracted If They Are Relevant:
+        If a number is part of a certification or standard (like "ISO 9001", "CE 22000"), it must be included as a keyword.
+        Example: "We need ISO 14001 certification" → ["ISO", "14001"]
+        Example: "I want information about CE 22000" → ["CE", "22000"]
+
+        4. Correct Misspelled Words Before Extracting Them:
+        If a word is misspelled, return its corrected form.
+        Example: "incentve for powr" → ["power"]
+        Example: "want to find invesmetn subsidy related approvals" → ["investment", "subsidy"]
+
+        5. Never Extract Restricted or Module Terms:
+        Words from RESTRICTED CATEGORIES or Module Names must never be included in the keywords.
+
+        Output Format
+        - The response must be a JSON object in the exact format below.
+        - If no valid keywords are found, return {{ "KEYWORDS": null }} or {{ "KEYWORDS": None }}.
+        - No explanations, no extra text—only the JSON object.
+
+        User Query:
+        {user_query}
+
+        Final Output (JSON only):
+        {{
+        "KEYWORDS": ["word1", "word2"]  # or null if none
+        }}
+        """.strip()
 
 
     # 4) Create the PromptTemplate and run the LLM
