@@ -5,14 +5,15 @@ from typing import List, Dict, Tuple
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from rapidfuzz import fuzz, process
-import frappe  
+import frappe
+from frontend_app.Management_Class.helpers.utility import update_llm_token  
+import configparser
 # from langchain_openai import ChatOpenAI
+config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+config = configparser.ConfigParser()
+config.read(config_file)
+groq_api_key = config['Key']['groq_key']
 
-# load_dotenv()
-# We need to get this from system config
-groq_api_key = "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" 
-# openai_key = os.getenv("OPENAI_API_KEY")
- 
 # Initialize LLM    
 llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.0)
 llm_70b_vers_creative = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.7)
@@ -70,6 +71,7 @@ def refine_query_with_history(history, latest_query, llm):
     )
     chain = prompt | llm
     refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
+    update_llm_token(refined_query)
     refined_text = refined_query.content.strip()
     
     # Extract the reformulated standalone query
@@ -170,6 +172,7 @@ def classify_query(user_query):
 
     # Run the query through the chain
     category = chain.invoke({"query": user_query})
+    update_llm_token(category)
 
     return category.content.strip()
 
@@ -249,6 +252,7 @@ def extract_location_from_query(user_input: str, available_areas: List[str], ava
 
     # Run the LLM chain
     response = chain.invoke({"query": user_input})
+    update_llm_token(response)
 
     # Extract location from the model response
     location_match = re.search(r'"Location":\s*"([^"]+)"', response.content.strip())
@@ -398,6 +402,7 @@ def extract_comparison_locations(user_input: str, available_areas: List[str], av
 
     # Run the LLM chain
     response = chain.invoke({"query": user_input})
+    update_llm_token(response)
 
     # Extract locations from the model response
     locations_match = re.search(r'"Locations":\s*\[([^\]]*)\]', response.content.strip())
@@ -550,7 +555,7 @@ def extract_main_industry_and_product_universal(user_query: str, main_industries
         "query": user_query,
         "main_industries": main_industries_str,
     })
-    
+    update_llm_token(result)
     # Extract JSON response
     result_content = result.content.strip()
 
@@ -696,6 +701,7 @@ def extract_sub_sector_and_product_universal(
         "sub_sectors_str": sub_sectors_str,
         "context": context
     })
+    update_llm_token(result)
     
     # Extract JSON response
     result_content = result.content.strip()
@@ -841,6 +847,7 @@ def extract_segment_and_product_universal(
         "segments_str": segments_str,
         "context": context
     })
+    update_llm_token(result)
 
     # Extract JSON response
     result_content = result.content.strip()

@@ -7,6 +7,7 @@ from langchain.schema import HumanMessage, AIMessage
 from frontend_app.Ai_module.Query_Classification_And_Analysis import refine_query_with_history, classify_query, llm_70b_vers, llm_70b_vers_creative,llm_deepseek
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
+from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 def extract_json_main_industry_details(output: str) -> Dict[str, str]:
     """
@@ -188,6 +189,7 @@ def extract_main_industry_and_product_for_scratch(user_query: str, main_industri
         "query": user_query,
         "main_industries": main_industries_str,
     })
+    update_llm_token(result)
     
     result_text = result.content.strip()
 
@@ -406,6 +408,7 @@ def extract_sub_sector_and_product_for_scratch(
         "sub_sectors_str": sub_sectors_str,
         "context": context
     })
+    update_llm_token(result)
     
     # Extract JSON response using the new function
     extracted_details = extract_json_sub_sector_product(result.content.strip())
@@ -624,6 +627,7 @@ def extract_segment_and_product_for_scratch(
         "segments_str": segments_str,
         "context": context
     })
+    update_llm_token(result)
 
     # Extract JSON response using the robust function
     result_content = result.content.strip()
@@ -810,6 +814,7 @@ def extract_capacity_details(user_query, llm):
 
     # Invoke the query through the chain
     result = chain.invoke({"query": user_query})
+    update_llm_token(result)
     result_text = result.content.strip()
 
     # Extract JSON capacity details using the new function
@@ -910,7 +915,7 @@ def generate_ai_message(state, history, missing_fields, attempt_count, llm):
         "attempt_count": attempt_count,
         "chat_history": history,
     })
-    
+    update_llm_token(result)
     return result.content.strip()
 
 def gather_industry_details(query, main_industries, llm,chatId):
@@ -1303,6 +1308,7 @@ def time_conversion(user_quantity, user_time_period, db_standard_time_period, pr
         "db_standard_time_period": db_standard_time_period,
         "product": product
     })
+    update_llm_token(response,'Deepseek')
 
     # Extract multiplier using helper function
     multiplier_data = extract_json_time_conversion(response.content.strip())
@@ -1364,6 +1370,7 @@ def unit_conversion(user_quantity, user_unit, db_standard_unit, product, llm):
         "db_standard_unit": db_standard_unit,
         "product": product
     })
+    update_llm_token(response,'Deepseek')
 
     # Extract JSON response from model output
     multiplier_data = extract_json_unit_conversion(response.content.strip())
@@ -1469,6 +1476,7 @@ def split_unit_and_time_period(input_string, llm):
     response = chain.invoke({
         "input_string": input_string
     })
+    update_llm_token(response)
     return extract_json_unit_split(response.content.strip())
  
 def entry_build_from_scratch(input,chatId):

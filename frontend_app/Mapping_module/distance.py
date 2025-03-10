@@ -160,12 +160,8 @@ def CalculatePropSubstationDistance():
 @frappe.whitelist()
 def CalculatePropVenDistance(data):
     try:
-        
-        log_to_file("Data in input",data)
         source, destinations = data["Property"], data["Vendor"]
         profile = "mapbox/driving"
-        log_to_file("source",source)
-        log_to_file("destination",destinations)
         invalidProperty = []
         invalidVendor = []
 
@@ -218,7 +214,6 @@ def CalculatePropVenDistance(data):
         access_token = "" 
         dest=""
         batches = createBatch(destinations)
-        log_to_file("source",source)
         for sourceitem in source:
             lat, lon, *_ = sourceitem['latlong'].split(',')
             sourceitem['latlong'] = f"{lon.strip()},{lat.strip()}"
@@ -233,7 +228,6 @@ def CalculatePropVenDistance(data):
                     url = f"https://api.mapbox.com/directions-matrix/v1/{profile}/{sourceitem['latlong']};{dest}?sources=0&access_token={access_token}&annotations=distance"
                 response = requests.get(url)
                 responseJson = (response.json())  # Convert the response to JSON
-                log_to_file("responseJson",responseJson)
                 # Check if the request was successful
                 if response.status_code == 200:           
                     if len(destinations)>1:
@@ -450,20 +444,4 @@ def get_geocode(address):
             return returnResult(None,None,None,None,True, "Invalid Address")
     else:
         return returnResult(None,None,None,None,True, "Api Limit Exceed")
-
-def log_to_file(key,value):
-    """
-    Logs key-value data to a file with a timestamp.
-    
-    :param filename: Name of the log file.
-    :param data: Key-value pairs to log.
-    """
-    log_entry = {
-        "t": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        f"{key}" : value
-    }
-    
-    with open("log2.txt", "a", encoding="utf-8") as file:
-        file.write(json.dumps(log_entry) + "\n")
-
 

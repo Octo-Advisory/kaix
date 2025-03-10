@@ -4,12 +4,13 @@ import '../ProgressScreen/ProgressScreen.css';
 import check from '../../assets/check.png';
 import Confirmation from '../Confirmation/Confirmation';
 import Failure from '../Failure/Failure';
-import { FrappeContext,useFrappeEventListener,useFrappeGetDocList} from 'frappe-react-sdk';
-import { useSelector,useDispatch } from 'react-redux';
+import { FrappeContext, useFrappeEventListener, useFrappeGetDocList } from 'frappe-react-sdk';
+import { useSelector, useDispatch } from 'react-redux';
 import { addAnalyticsResult } from '../../Redux/Store/Featuresilces/analyticsResult';
+import { useNavigate } from "react-router-dom";
 
 function ProgressScreen() {
-
+  const navigate = useNavigate();
   const { call } = useContext(FrappeContext);
   const aiResponse = useSelector((state) => state.ai.aiReponse);
   const chatId = useSelector((state) => state.chat.chatID);
@@ -19,15 +20,26 @@ function ProgressScreen() {
   const [result, setresult] = useState([]);
   const [loading, setLoading] = useState(true);
   const [intervalId, setIntervalId] = useState(null);
-  const validationResult = useSelector((state)=> state.validate.validation_result)
-  console.log("validation Result",validationResult);
+  const validationResult = useSelector((state) => state.validate.validation_result)
+  console.log("validation Result", validationResult);
+  console.log("aiResponse", aiResponse);
   const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (aiResponse.length === 0) {
+      navigate("/");
+    }
+  }, [aiResponse, navigate]); // Dependencies ensure effect runs when result changes
+
+  if (aiResponse.length === 0) {
+    return null; // Prevents rendering if navigation happens
+  }
 
   const fetchAnalyticsResponse = async () => {
     try {
       console.log("chat id in progress", chatId);
 
-      const result = await call.get("frontend_app.Management_Class.Analytics_management.Analytics.analytics_module_call", { aiResponse: aiResponse, chatId: chatId,validationResult:validationResult });
+      const result = await call.get("frontend_app.Management_Class.Analytics_management.Analytics.analytics_module_call", { aiResponse: aiResponse, chatId: chatId, validationResult: validationResult });
       console.log("analytics message result", result);
       setresult(result.message)
       dispatch(addAnalyticsResult(result.message))
@@ -40,8 +52,8 @@ function ProgressScreen() {
 
   const fetchData = async () => {
     try {
-      console.log("chatId",chatId);
-      
+      console.log("chatId", chatId);
+
       const response = await fetch(`api/resource/Session?fields=["progress.process_name","progress.process_value","progress.status","progress.modified"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
         method: 'GET',
         headers: {
@@ -49,16 +61,16 @@ function ProgressScreen() {
           'Content-Type': 'application/json'
         }
       });
-      console.log("response is",response);
-      
+      console.log("response is", response);
+
       // Check if the response is OK
       if (!response.ok) {
         throw new Error(`Error: ${response.statusText}`);
       }
-      
-        const data = await response.json();
-        console.log("data is", data);
-        setMessages(data.data)
+
+      const data = await response.json();
+      console.log("data is", data);
+      setMessages(data.data)
 
       // Optionally, store it in your state or handle further logic
     } catch (error) {
@@ -110,7 +122,7 @@ function ProgressScreen() {
   }, [messages])
 
   const { data, mutate } = useFrappeGetDocList("Session", {
-    fields: ["progress.process_value", "progress.status", "progress.modified"],
+    fields: ["progress.process_value", "progress.status", "progress.modified", "progress.is_completed"],
     filters: [["name", "=", chatId]],
     orderBy: { field: "modified", order: "asc" }
   });
@@ -141,12 +153,12 @@ function ProgressScreen() {
           {messages?.map((msg, index) => (
             <div
               className={`progress-step ${msg.status === 'Complete'
+                ? 'toshow'
+                : msg.status === 'Processing'
                   ? 'toshow'
-                  : msg.status === 'Processing'
+                  : msg.status === 'Fail'
                     ? 'toshow'
-                    : msg.status === 'Fail'
-                      ? 'toshow'
-                      : ''
+                    : ''
                 }`}
               key={index}
             >
@@ -179,10 +191,10 @@ function ProgressScreen() {
                 <div className="step-text-container">
                   <span
                     className={`step-text text-base sm:text-md md:text-xl lg:text-2xl xl:text-3xl ${msg.status === 'Complete'
-                        ? 'completed-text'
-                        : msg.status === 'Processing'
-                          ? 'active-text'
-                          : ''
+                      ? 'completed-text'
+                      : msg.status === 'Processing'
+                        ? 'active-text'
+                        : ''
                       }`}
                   >
                     {msg.process_value}

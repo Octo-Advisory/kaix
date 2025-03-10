@@ -36,8 +36,8 @@ def call_vendor_query(aiResponse,chatId,validationResult):
         property_id = Location_info.get('Location')
 
         # Fetch Lat_long  from validation result
-        location_check = validationResult.get('location_check')
-        latitude_longitude = location_check.get('latitude_longitude')
+        # location_check = validationResult.get('location_check')
+        latitude_longitude = validationResult.get('latitude_longitude')
         latitude_longitude = [latitude_longitude]
         update_process(chatId,"Fetching Data","Complete")
         update_process(chatId,"Analyzing Data","Processing")

@@ -5,10 +5,23 @@ import Incentiveresult from '../ResultScreens/Incentiveresult';
 import Approvalresult from '../ResultScreens/Approvalresult';
 import Vendorresult from '../ResultScreens/Vendorresult';
 import { useSelector } from 'react-redux';
+import { useNavigate } from "react-router-dom";
 
 
 function Solutionscreen() {
+  const navigate = useNavigate();
   const result = useSelector((state) => state.analytics.analyticsResult);
+  console.log("resultr",result);
+  
+  useEffect(() => {
+    if (result.length === 0) {
+      navigate("/");
+    }
+  }, [result, navigate]); // Dependencies ensure effect runs when result changes
+
+  if (result.length === 0) {
+    return null; // Prevents rendering if navigation happens
+  }
   console.log("resultin solution scdeen", result);
   const user_intension = result[0]["user_intension"]
   return (

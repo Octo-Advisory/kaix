@@ -11,6 +11,7 @@ from  frontend_app.Management_Class.Redis_management.Redis_chat import save_chat
 from langchain.prompts import PromptTemplate
 from langchain.schema import HumanMessage, AIMessage
 from frontend_app.Log_management.createlog import log
+from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 @frappe.whitelist(allow_guest=True)
 def ai_module_call(input,chatId):
@@ -36,7 +37,7 @@ def ai_module_call(input,chatId):
                     "Is_confirmation" : None,
                     "Error":e,
                 }
-                log(chatId,'debug','response',str(response),'AI.py','ai')
+                log(chatId,'error','error',f"{str(response)} error is {str(e)}",'AI.py','ai')
                 return response
             
         elif user_intension == "Query to Get Employee Search":
@@ -50,7 +51,7 @@ def ai_module_call(input,chatId):
                     "Is_confirmation" : None,
                     "Error":e
                 }
-                log(chatId,'debug','response',str(response),'AI.py','ai')
+                log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
                 return response
             
         elif user_intension == "Query to search Vendors":
@@ -64,13 +65,13 @@ def ai_module_call(input,chatId):
                     "Is_confirmation" : None,
                     "error": e
                 }
-                log(chatId,'debug','response',str(response),'AI.py','ai')
+                log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
                 return response
             
         elif user_intension == "Query to search Incentives":
             try:
                 response = call_incentive_search(input,chatId)
-                log(chatId,'debug','response',str(response),'AI.py','ai')
+                log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
                 return response
             except Exception as e:
                 response = { 
@@ -78,7 +79,7 @@ def ai_module_call(input,chatId):
                     "Is_confirmation" : None,
                     "Error":e
                 }
-                log(chatId,'debug','response',str(response),'AI.py','ai')
+                log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
                 return response
             
         elif user_intension == "Query to Get Approvals":
@@ -92,7 +93,7 @@ def ai_module_call(input,chatId):
                     "Is_confirmation" : None,
                     "error": e
                 }
-                log(chatId,'debug','response',str(response),'AI.py','ai')
+                log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
                 return response
         else:
             message = generate_dynamic_message(input,user_intension,chatId,llm_70b_vers_creative)
@@ -113,7 +114,7 @@ def ai_module_call(input,chatId):
             "Is_confirmation" : None,
             "Error":error_details
         }
-        log(chatId,'debug','response',str(response),'AI.py','ai')
+        log(chatId,'debug','response',f"{str(response)} error is {str(error_details)}",'AI.py','ai')
         return response
 
 def check_user_intension(chatId):
@@ -224,6 +225,7 @@ def generate_dynamic_message(user_message, user_intention, chatId,llm):
 
     # Generate the response
     response = chain.invoke({"user_message": user_message, "chat_history": "\n".join(Chat_history_normal)})
+    update_llm_token(response)
     message_from_ai = response.content.strip()
     chat_history.append(AIMessage(content=message_from_ai))
     save_chat(chat_history,f"QVLQ_chat_{chatId}")

@@ -8,6 +8,7 @@ import pandas as pd
 import frappe
 import logging
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat
+from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 logging.basicConfig(
     filename='AIerror.log',  # Log file name
@@ -64,6 +65,8 @@ def refine_query_with_history_for_employment(history, latest_query, llm):
     )
     chain = prompt | llm
     refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
+    update_llm_token(refined_query)
+
     refined_text = refined_query.content.strip()
     
     # Extract the reformulated standalone query
@@ -159,6 +162,7 @@ def classify_employment_query(query, llm):
     chain = prompt_template | llm
     # Run the chain and capture the response
     response = chain.invoke({"query": query})
+    update_llm_token(response)
 
     # Use regex to extract a valid classification number
     match = re.search(r"^\s*([1-3])\s*$", response.content.strip())
@@ -291,6 +295,7 @@ def generate_dynamic_message(chat_history_for_context: List[dict], static_follow
         "recent_history": recent_history,
         "static_follow_up": static_follow_up
     })
+    update_llm_token(message)
     
     # Append AI message to chat history
     chat_history.append(AIMessage(content=f"{message.content.strip()}"))
@@ -347,6 +352,7 @@ def check_user_intent(response: str, follow_up_question: str, llm,chatId) -> str
     )
     chain = prompt_template | llm
     intent_response = chain.invoke({"response": response, "follow_up_question": follow_up_question})
+    update_llm_token(intent_response)
     intent_text = intent_response.content.strip()
 
 
