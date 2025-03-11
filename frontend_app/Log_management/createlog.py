@@ -63,7 +63,7 @@ def log(chatId, level, key, value, file_name, module: str):
             with open(f"/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/{module}.txt", "a", encoding="utf-8") as file:
                 file.write(json.dumps(log_entry) + "\n")
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def update_config(doc_log,file_log):
     config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
     config = configparser.ConfigParser()

@@ -71,7 +71,7 @@ def ai_module_call(input,chatId):
         elif user_intension == "Query to search Incentives":
             try:
                 response = call_incentive_search(input,chatId)
-                log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
+                log(chatId,'debug','response',str(response),'AI.py','ai')
                 return response
             except Exception as e:
                 response = { 

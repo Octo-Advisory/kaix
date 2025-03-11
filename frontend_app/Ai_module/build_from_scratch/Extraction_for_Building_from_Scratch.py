@@ -1054,9 +1054,13 @@ def gather_industry_details(query, main_industries, llm,chatId):
                     "Is_confirmation" : False,
                     "state":state}
             else:
+                selected_option = next(
+                    (state.get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
+                    ''
+                )
                 response = {
-                    "Ai_response" : f"We have identified that you are looking for {state.get('Product') if state.get('Product') != 'None' else state.get('Main-Industry') if state.get('Main-Industry')!= 'None' else ''} based on your query. Please confirm if this information is correct.",
-                    "Is_confirmation" : True,
+                    "Ai_response" : f"We have identified that you are looking for {selected_option},{state.get('Capacity')},{state.get('Capacity Unit')},{state.get('Time Period')} based on your query. Please confirm if this information is correct.",
+                    "Is_confirmation" : True,                                   
                     "validated_data" : segment_validated_data,
                     "state" : state
                 }
