@@ -66,10 +66,6 @@ def employment_search_algo(intention, input_data,chatId):
     Employment search algorithm based on user intention.
     """
     try:
-        with open("log.txt", "a") as file:
-            file.write(f"\nentering in the function")
-        frappe.log_error(f"use intension is{intention}")
-        frappe.log_error(f"chatid is now {chatId}")
         insert_process(chatId,"Analyzing Your Query","Analyzing Your query","Pending")
         insert_process(chatId,"Fetching Data","Fetching Data Based On Your Query","Pending")
         insert_process(chatId,"Analyzing Data","Analyzing Gathered Data","Pending")   
@@ -208,28 +204,28 @@ def employment_search_algo(intention, input_data,chatId):
         return e
 
 # def plot_pie_chart(data, title):
-    """
-    Plots a pie chart for employment data.
-    """
-    data.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
-    plt.title(title)
-    plt.ylabel("")  # Remove default ylabel
-    plt.show()
+    # """
+    # Plots a pie chart for employment data.
+    # """
+    # data.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
+    # plt.title(title)
+    # plt.ylabel("")  # Remove default ylabel
+    # plt.show()
 
 # def plot_bar_chart(data, title):
-    """
-    Plots a bar chart for comparison between cities, grouped by employment type.
-    """
-    # Transpose the data so that cities are grouped under each employment type
-    data = data.T
+    # """
+    # Plots a bar chart for comparison between cities, grouped by employment type.
+    # """
+    # # Transpose the data so that cities are grouped under each employment type
+    # data = data.T
     
-    data.plot(kind='bar', stacked=False)
-    plt.title(title)
-    plt.ylabel("Percentage (%)")
-    plt.xlabel("Employment Type")
-    plt.legend(title="City", loc='upper left', bbox_to_anchor=(1, 1))  # Place legend outside the chart
-    plt.tight_layout()  # Adjust layout to fit everything
-    plt.show()
+    # data.plot(kind='bar', stacked=False)
+    # plt.title(title)
+    # plt.ylabel("Percentage (%)")
+    # plt.xlabel("Employment Type")
+    # plt.legend(title="City", loc='upper left', bbox_to_anchor=(1, 1))  # Place legend outside the chart
+    # plt.tight_layout()  # Adjust layout to fit everything
+    # plt.show()
 
 def plot_pie_chart(data, title):
     """
@@ -252,16 +248,22 @@ def plot_bar_chart(data, title):
     """
     Plots a bar chart and returns it as a base64 string.
     """
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10, 6))  # Adjust figure size
     data.plot(kind='bar', stacked=False, ax=ax)
+
     ax.set_title(title)
     ax.set_ylabel("Percentage (%)")
-    ax.set_xlabel("Employment Type")
-    
+    # ax.set_xlabel("Employment Type")
+ 
+    # Improve layout
+    plt.xticks(rotation=0, ha="right")  # Rotate labels if needed
+    plt.tight_layout()  # Adjust layout to fit everything
+
     # Convert plot to PNG and then to base64
     img_bytes = io.BytesIO()
-    plt.savefig(img_bytes, format='png')
+    plt.savefig(img_bytes, format='png', bbox_inches='tight')  # Ensure nothing is cut off
     plt.close(fig)
     img_bytes.seek(0)
     img_base64 = base64.b64encode(img_bytes.read()).decode('utf-8')
+
     return img_base64

@@ -12,8 +12,11 @@ export const anayticsSlice = createSlice({
             console.log("state and actoin for annalytics",state,action);
             state.analyticsResult.push(action.payload)
         },
+        clearAnalyticsResult : (state) => {
+            state.analyticsResult = [];
+        }
     }
 })
 
-export const {addAnalyticsResult } = anayticsSlice.actions;
+export const {addAnalyticsResult,clearAnalyticsResult } = anayticsSlice.actions;
 export default anayticsSlice.reducer;

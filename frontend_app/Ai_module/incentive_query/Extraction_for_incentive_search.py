@@ -10,6 +10,7 @@ import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,save_state,get_chat,get_state
 from datetime import datetime
 import json
+from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 def fetch_query_results(query):
     """
@@ -65,6 +66,7 @@ def refine_query_with_history_for_incentive(history, latest_query, llm):
     )
     chain = prompt | llm
     refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
+    update_llm_token(refined_query)
     refined_text = refined_query.content.strip()
     
     # Extract the reformulated standalone query
@@ -130,6 +132,7 @@ def classify_incentive_query(query, llm):
     chain = prompt_template | llm
     # Run the chain and capture the response
     response = chain.invoke({"query": query})
+    update_llm_token(response)
 
     # Use regex to extract a valid classification number
     match = re.search(r"^\s*([1-4])\s*$", response.content.strip())
@@ -280,6 +283,7 @@ def generate_dynamic_message_for_incentive(chat_history_for_context: List[dict],
         "recent_history": recent_history,
         "static_follow_up": static_follow_up
     })
+    update_llm_token(message)
     
     # Append AI message to chat history
     chat_history = get_chat(f"QINC_chat_{chatId}") or []

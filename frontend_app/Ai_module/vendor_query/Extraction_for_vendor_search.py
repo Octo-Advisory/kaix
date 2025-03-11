@@ -10,6 +10,7 @@ from rapidfuzz import process, fuzz
 import spacy
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
+from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 warnings.filterwarnings("ignore")
 
@@ -99,6 +100,7 @@ def refine_query_with_history_for_vendor(history, latest_query, llm):
    # Invoke the LLM chain
    chain = prompt | llm
    refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
+   update_llm_token(refined_query)
    refined_text = refined_query.content.strip()
 
    # Extract the reformulated standalone query
@@ -221,6 +223,7 @@ def classify_vendor_query(query, llm):
    chain = prompt_template | llm
    # Run the chain and capture the response
    response = chain.invoke({"query": query})
+   update_llm_token(response)
 
    # Use regex to extract a valid classification number
    match = re.search(r"^\s*([1-6])\s*$", response.content.strip())
@@ -330,6 +333,7 @@ def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
 
    # Run the LLM chain
    response = chain.invoke({"query": user_input})
+   update_llm_token(response)
 
    # Extract the response content
    extracted_data = response.content.strip()
@@ -479,6 +483,7 @@ def extract_supplies_from_query(user_input: str, available_supplies: List[str], 
 
     # Run the LLM chain
     response = chain.invoke({"query": user_input})
+    update_llm_token(response)
 
     # Extract supplies from the model response
     supplies_match = re.search(r'"Supplies":\s*"([^"]*)"', response.content.strip())
@@ -637,6 +642,7 @@ def generate_dynamic_message_for_vendor(chat_history_for_context: List[dict], st
         "recent_history": recent_history,
         "static_follow_up": static_follow_up
     })
+    update_llm_token(message)
 
     # Append AI message to chat history
     chat_history_for_context.append(AIMessage(content=f"{message.content.strip()}"))

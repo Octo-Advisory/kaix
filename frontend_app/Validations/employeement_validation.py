@@ -9,30 +9,40 @@ def employment_query_validation(param):
     
     def comparison_parameter_check(Area,City,State):
         if not Area and not City and not State:
-            print("No location data provided. Skipping process.")  # Handle empty case
-        elif not Area:
+            return {'pass_to_analytics':False, 'log':f'No location information provided', 'detailed_info': None}
+
+        if City and not Area and not State:
             citycheck = city_check(City)
-            statecheck = state_check(State)
-            if citycheck[0] and statecheck[0]:
+            if citycheck[0]:
                 city_location_check = []
                 for a in City:
                     city_location_check.append(check_a_city(a))
                 pass_to_analytics_values = [entry['pass_to_analytics'] for entry in city_location_check]
                 if False in pass_to_analytics_values:
-                    return {'pass_to_analytics':False, 'log':f'One of the City didnt had the complete data', 'detailed_info': None}
+                    return {'pass_to_analytics':False, 'log':f'One of the City didnt had the complete data ', 'detailed_info': None}
                 else:
-                    state_location_check = []
-                    for b in State:
-                        state_location_check.append(check_for_state(b))
-                    pass_to_analytics = [entry['pass_to_analytics'] for entry in state_location_check]
-                    if False in pass_to_analytics:
-                        return {'pass_to_analytics':False, 'log':f'One of the State didnt had the complete data', 'detailed_info': None}
-                    else:
-                        return {'pass_to_analytics':True, 'log':f'both city and state had data', 'detailed_info': None}
-        elif not City:
-            areacheck = area_check(Area)
+                    return {'pass_to_analytics':True, 'log':f'Cities had complete data ', 'detailed_info': None}
+            else:
+                log = citycheck[1]
+                return {'pass_to_analytics':False, 'log':log, 'detailed_info': None}
+        if State and not City and not Area:
             statecheck = state_check(State)
-            if areacheck[0] and statecheck[0]:
+            if statecheck[0]:
+                state_location_check = []
+                for b in State:
+                    state_location_check.append(check_for_state(b))
+                pass_to_analytics = [entry['pass_to_analytics'] for entry in state_location_check]
+                if False in pass_to_analytics:
+                    return {'pass_to_analytics':False, 'log':f'One of the State didnt had the complete data ', 'detailed_info': None}
+                else:
+                    return {'pass_to_analytics':True, 'log':f'States had complete data ', 'detailed_info': None}
+            else:
+                log = statecheck[1]
+                return {'pass_to_analytics':False, 'log':log, 'detailed_info': None}
+
+        if Area and not City and not State:
+            areacheck = area_check(Area)
+            if areacheck[0]:
                 area_location_check = []
                 for a in Area:
                     areaquery = f"""select city_name from `tabArea` where area_name = '{Area}'"""
@@ -40,18 +50,14 @@ def employment_query_validation(param):
                     area_location_check.append(check_a_city(res[0]['city_name']))
                 pass_to_analytics_values = [entry['pass_to_analytics'] for entry in area_location_check]
                 if False in pass_to_analytics_values:
-                    return {'pass_to_analytics':False, 'log':f'One of the Area didnt had the complete data', 'detailed_info': None}
+                    return {'pass_to_analytics':False, 'log':f'One of the Area didnt had the complete data ', 'detailed_info': None}
                 else:
-                    state_location_check = []
-                    for b in State:
-                        state_location_check.append(check_for_state(b))
-                    pass_to_analytics = [entry['pass_to_analytics'] for entry in state_location_check]
-                    if False in pass_to_analytics:
-                        return {'pass_to_analytics':False, 'log':f'One of the State didnt had the complete data', 'detailed_info': None}
-                    else:
-                        return {'pass_to_analytics':True, 'log':f'both area and state had complete data', 'detailed_info': None}
-           
-        elif not State:
+                    return {'pass_to_analytics':True, 'log':f'Areas had the complete data ', 'detailed_info': None}
+            else:
+                log = areacheck[1]
+                return {'pass_to_analytics':False, 'log':log, 'detailed_info': None}
+
+        if City and Area and not State:
             areacheck = area_check(Area)
             citycheck = city_check(City)
             if areacheck[0] and citycheck[0]:
@@ -62,16 +68,66 @@ def employment_query_validation(param):
                     area_location_check.append(check_a_city(res[0]['city_name']))
                 pass_to_analytics_values = [entry['pass_to_analytics'] for entry in area_location_check]
                 if False in pass_to_analytics_values:
-                    return {'pass_to_analytics':False, 'log':f'One of the Area didnt had the complete data', 'detailed_info': None}
+                    return {'pass_to_analytics':False, 'log':f'One of the Area didnt had the complete data ', 'detailed_info': None}
                 else:
                     city_location_check = []
                     for a in City:
                         city_location_check.append(check_a_city(a))
                     pass_to_analytics_values = [entry['pass_to_analytics'] for entry in city_location_check]
                     if False in pass_to_analytics_values:
-                        return {'pass_to_analytics':False, 'log':f'One of the City didnt had the complete data', 'detailed_info': None}
+                        return {'pass_to_analytics':False, 'log':f'One of the City didnt had the complete data ', 'detailed_info': None}
                     else:
-                        return {'pass_to_analytics':True, 'log':f'Both area and city had the complete data', 'detailed_info': None}
+                        return {'pass_to_analytics':True, 'log':f'Both area and city had the complete data ', 'detailed_info': None}
+            else:
+                log = f'{areacheck[1]} and {citycheck[1]}'
+                return {'pass_to_analytics':False, 'log':log, 'detailed_info': None}
+        if City and State and not Area: 
+            citycheck = city_check(City)
+            statecheck = state_check(State)
+            if citycheck[0] and statecheck[0]:
+                city_location_check = []
+                for a in City:
+                    city_location_check.append(check_a_city(a))
+                pass_to_analytics_values = [entry['pass_to_analytics'] for entry in city_location_check]
+                if False in pass_to_analytics_values:
+                    return {'pass_to_analytics':False, 'log':f'One of the City didnt had the complete data ', 'detailed_info': None}
+                else:
+                    state_location_check = []
+                    for b in State:
+                        state_location_check.append(check_for_state(b))
+                    pass_to_analytics = [entry['pass_to_analytics'] for entry in state_location_check]
+                    if False in pass_to_analytics:
+                        return {'pass_to_analytics':False, 'log':f'One of the State didnt had the complete data ', 'detailed_info': None}
+                    else:
+                        return {'pass_to_analytics':True, 'log':f'both city and state had data ', 'detailed_info': None}
+            else:
+                log = f'{citycheck[1]} and {statecheck[1]}'
+                return {'pass_to_analytics':False, 'log':log, 'detailed_info': None}
+        if Area and State and not City:
+            areacheck = area_check(Area)
+            statecheck = state_check(State)
+            if areacheck[0] and statecheck[0]:
+                area_location_check = []
+                for a in Area:
+                    areaquery = f"""select city_name from `tabArea` where area_name = '{Area}'"""
+                    res = frappe.db.sql(areaquery,as_dict=True)
+                    area_location_check.append(check_a_city(res[0]['city_name']))
+                pass_to_analytics_values = [entry['pass_to_analytics'] for entry in area_location_check]
+                if False in pass_to_analytics_values:
+                    return {'pass_to_analytics':False, 'log':f'One of the Area didnt had the complete data ', 'detailed_info': None}
+                else:
+                    state_location_check = []
+                    for b in State:
+                        state_location_check.append(check_for_state(b))
+                    pass_to_analytics = [entry['pass_to_analytics'] for entry in state_location_check]
+                    if False in pass_to_analytics:
+                        return {'pass_to_analytics':False, 'log':f'One of the State didnt had the complete data ', 'detailed_info': None}
+                    else:
+                        return {'pass_to_analytics':True, 'log':f'both area and state had complete data ', 'detailed_info': None}
+            else:
+                log = f'{areacheck[1]} and {statecheck[1]}'
+                return {'pass_to_analytics':False, 'log':log, 'detailed_info': None}
+
         else:
             areacheck = area_check(Area)
             citycheck = city_check(City)
@@ -84,25 +140,27 @@ def employment_query_validation(param):
                     area_location_check.append(check_a_city(res[0]['city_display_name']))
                 pass_to_analytics_values = [entry['pass_to_analytics'] for entry in area_location_check]
                 if False in pass_to_analytics_values:
-                    return {'pass_to_analytics':False, 'log':f'One of the Area didnt had the complete data', 'detailed_info': None}
+                    return {'pass_to_analytics':False, 'log':f'One of the Area didnt had the complete data ', 'detailed_info': None}
                 else:
                     city_location_check = []
                     for a in City:
                         city_location_check.append(check_a_city(a))
                     pass_to_analytics_values = [entry['pass_to_analytics'] for entry in city_location_check]
                     if False in pass_to_analytics_values:
-                        return {'pass_to_analytics':False, 'log':f'One of the City didnt had the complete data', 'detailed_info': None}
+                        return {'pass_to_analytics':False, 'log':f'One of the City didnt had the complete data ', 'detailed_info': None}
                     else:
                         state_location_check = []
                         for b in State:
                             state_location_check.append(check_for_state(b))
                         pass_to_analytics = [entry['pass_to_analytics'] for entry in state_location_check]
                         if False in pass_to_analytics:
-                            return {'pass_to_analytics':False, 'log':f'One of the State didnt had the complete data', 'detailed_info': None}
+                            return {'pass_to_analytics':False, 'log':f'One of the State didnt had the complete data ', 'detailed_info': None}
                         else:
-                            return {'pass_to_analytics':True, 'log':f'all area, city and state had complete data', 'detailed_info': None}
+                            return {'pass_to_analytics':True, 'log':f'all area, city and state had complete data ', 'detailed_info': None}
             else:
-                return {'pass_to_analytics': False, 'log': 'One of the area, city , or state wasnt available in the database', 'detailed_info': None}
+                log = f'{areacheck[1]} and {citycheck[1]} and {statecheck[1]}'
+                return {'pass_to_analytics':False, 'log':log, 'detailed_info': None}
+            
     def state_check(State):
         state_length = len(State)
         State_id_list = [row for row in State]
