@@ -77,13 +77,13 @@ def insert_process(parentId, process_name, process_value, status):
         # Save the new row to the database
         child_row.insert(ignore_permissions=True)
 
-        frappe.publish_realtime(
-            event="progress_update",
-            message={"parentId": parentId, "process_name": process_name, "new_status": status},
-            doctype="Session",
-            user=frappe.session.user if frappe.session.user != "Guest" else "Guest" 
-        )
-        frappe.log_error(f"event is pulished with {parentId}{process_name}")
+        # frappe.publish_realtime(
+        #     event="progress_update",
+        #     message={"parentId": parentId, "process_name": process_name, "new_status": status},
+        #     doctype="Session",
+        #     user=frappe.session.user if frappe.session.user != "Guest" else "Guest" 
+        # )
+        # frappe.log_error(f"event is pulished with {parentId}{process_name}")
         frappe.db.commit()
 
     except Exception as e:

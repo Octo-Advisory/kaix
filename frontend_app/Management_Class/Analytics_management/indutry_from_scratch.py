@@ -24,19 +24,12 @@ def industry_from_scratch(aiResponse,chatId):
         found_employment = True
         found_incentive = True
         found_approval = True
-        found_vendor = True
-
-        # # AI Response
-        # aiResponse= {'Main-Industry': 'chemical', 'Sub-Sector': 'Pharma and Biotechnology Chemical','Segment':None, 'Capacity': 30000, 'Capacity Unit': None, 
-        # 'Time Period': None, 'Product': None,'product_attempt_count':0,'capacity_attempt_count':0}
+        # found_vendor = True
         
         main_industry = aiResponse.get("Main-Industry")
         sub_sector = aiResponse.get("Sub-Sector")
         segment = aiResponse.get("Segment")
         capacity = aiResponse.get("Capacity")
-        # capacity_unit = aiResponse.get("Capacity Unit")
-        # time_period = aiResponse.get("Time Period")
-        # product = aiResponse.get("Product")
         update_process(chatId,"Fetching Data","Complete")
 
         update_process(chatId,"Analyzing Data","Processing")
@@ -116,26 +109,11 @@ def industry_from_scratch(aiResponse,chatId):
         with open("log.txt", "a") as file:
             file.write(f"\nsupply_rules_df {supply_rules_df}")
         vendor_df = get_vendor_df(supply_rules_df)
-        # vendor_latlong_df = vendor_df[["vendor_id", "latitude_longitude"]].drop_duplicates()
-        # columns_to_convert = ["vendor_supply_capacity", "years_of_experience", "no_of_past_clients", "no_of_locations", "no_of_servieces", "no_of_employees"]
-        # vendor_df[columns_to_convert] = vendor_df[columns_to_convert].apply(pd.to_numeric, errors='coerce')
 
         property_latlong_df = property_employment_df[["property_id", "latitude_longitude"]].drop_duplicates()
         with open("log.txt", "a") as file:
             file.write(f"\nvendor_df {vendor_df}")
         test_return = get_supply_scores(property_latlong_df,supply_rules_df,vendor_df,prefered_range=(0,250), tolerable_range=(251,500))
-
-        # essential_supply_to_show = np.random.choice(list(test_return[test_return["essential"]]["supply_id"].unique()), 5)
-
-        # filtered_data = test_return[test_return["supply_id"].isin(essential_supply_to_show)]
- 
-        # # Group by property_id and aggregate supply_id and Distance into arrays
-        # supply_data_to_show_df = filtered_data.groupby("property_id").agg(
-        #     supply_ids=('supply_id', list),
-        #     distances=('Distance', list)
-        # ).reset_index()
-        
-        # supply_data_to_show_df.rename(columns= {"distances": "property_supply_distance", "supply_ids": "Supply"}, inplace=True)
             
         if len(test_return) == 2:
             property_mapped_supply_individual_score, property_mapped_supply_alternate_sug= test_return[0], test_return[1]
@@ -209,11 +187,6 @@ def industry_from_scratch(aiResponse,chatId):
         final_property_ranking_for_decision["Aggregate Property Performance Score (APPS)"] = (preference["Property-Wise Vendor Score (PWVS)"] / sum(preference.values())*final_property_ranking_for_decision["Property-Wise Vendor Score (PWVS)"]) + (preference["Property-Wise Employment Score (PWES)"] / sum(preference.values())*final_property_ranking_for_decision["Property-Wise Employment Score (PWES)"]) + (preference["Property-Wise Suitability Score (PWSS)"] / sum(preference.values())*final_property_ranking_for_decision["Property-Wise Suitability Score (PWSS)"]) + (preference["Property-Wise Approval Score (PWAS)"] / sum(preference.values())*final_property_ranking_for_decision["Property-Wise Approval Score (PWAS)"]) + (preference["Property-Wise Incentive Score (PWIS)"] / sum(preference.values())*final_property_ranking_for_decision["Property-Wise Incentive Score (PWIS)"])
         
         final_property_ranking_for_decision = final_property_ranking_for_decision.sort_values(by=["Aggregate Property Performance Score (APPS)"], ascending=False)
-
-        # final_property_ranking_for_decision_agg_score = final_property_ranking_for_decision[["Property_ID","Aggregate Property Performance Score (APPS)"]]
-        # return industry,sub_sector,zone_id,segment,min_land ,max_land,required_exact_land_by_user, required_LowerMargin_land_for_user, required_UpperMargin_land_for_user,area_list,city_list,state_list,property_list,incentive,property_incentive,df_for_property_wise_individual_score, df_for_property_wise_emp_score,df_with_property_wise_individual_score
-        # json_data = final_property_ranking_for_decision_agg_score.to_json()
-        # json_data = final_property_ranking_for_decision.to_json(orient="index")
 
         # Sorting all dataframes based on scores_df order
         Solution_screen_employment_lookup_df = sort_by_scores(Solution_screen_employment_lookup_df, final_property_ranking_for_decision)

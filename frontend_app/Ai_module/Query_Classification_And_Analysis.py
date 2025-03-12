@@ -6,13 +6,14 @@ from typing import List, Dict, Tuple, Union
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from rapidfuzz import fuzz, process
-import frappe  
+import frappe
+from frontend_app.Management_Class.helpers.utility import update_llm_token  
+import configparser
 # from langchain_openai import ChatOpenAI
-
-# load_dotenv()
-# We need to get this from system config
-groq_api_key = "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"
-# openai_key = os.getenv("OPENAI_API_KEY")
+config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+config = configparser.ConfigParser()
+config.read(config_file)
+groq_api_key = config['Key']['groq_key']
 
 # Initialize LLM    
 llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.0)
@@ -71,6 +72,7 @@ def refine_query_with_history(history, latest_query, llm):
     )
     chain = prompt | llm
     refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
+    update_llm_token(refined_query)
     refined_text = refined_query.content.strip()
     
     # Extract the reformulated standalone query
@@ -85,55 +87,81 @@ def refine_query_with_history(history, latest_query, llm):
 # Define the function
 @frappe.whitelist()
 def classify_query(user_query):
-    # Define the refined prompt template
+    # Define the refined prompt template 
     prompt_template = """
-    You are an expert in understanding business-related queries and classifying them into specific categories.
-    Based on the provided query, classify it into one of the following categories:
+    You are an expert in understanding business-related queries and classifying them into a **single most relevant category**.
+    Your task is to strictly assign the query to only one category, even if multiple classes seem applicable.  
+    Analyze the context carefully and ensure that you return only one category that best fits the query.  
 
-    Categories:
-    1. Query to build industry from Scratch:
-        - Example: I want to build 1 TPA Cement Factory.
-        - This refers to queries about establishing an industry or a business from the ground up, including any initial setup requirements and purchasing the land.
-        
-    2. Query to search Vendors:
-        - Example: I am searching for a vendor who supplies pharmaceutical-grade raw chemicals for drug manufacturing.
-        - This refers to queries related to finding suppliers, manufacturers, or vendors for products or services.
-        
-    3. Query to search Incentives:
-        - Example: What benefits are available for setting up a cement manufacturing plant in this XYZ area?
-        - This refers to queries asking about government incentives, grants, or subsidies related to starting or expanding an industry.
-        
-    4. Query to Get Approvals:
-        - Example: I want to get approval for my Cement Factory.
-        - This refers to queries related to obtaining permits, licenses, or regulatory approvals for an industry or business.
-        
-    5. Query to Get Employee Search:
-        - Example: What is the availability of employment in XYZ area for the Pharmaceutical industry?
-        - This refers to queries about recruiting or finding employees for a specific industry or area.
+    Categories & Their Definitions:
 
-    If the user's intent does not match any of these categories, classify it as:
-    - Other industry-related queries:
-        - Example: "What is the role of AI in manufacturing?"
-        - This refers to queries discussing trends, innovations, or technology related to industries but not fitting into the above categories.
-        
-    - Valueless queries:
-        - Example: "Who is Donald Trump?" or "What is the culture of India?"
-        - This refers to queries that are irrelevant to business or industry building, processes, or any business-related domain.
-        - Example: "I'm going to buy a new bike, for that which approvals do I need?"
-        - This includes queries where industry-related keywords are used, but the overall context or intent does not pertain to meaningful business processes.
+    1. Query to build industry from Scratch:  
+        - Example: *I want to build a 1 TPA Cement Factory.*  
+        - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
+        - Only assign this category if the user's query explicitly indicates an intent to build a new industry or factory.  
+        - Do NOT classify a query under this category if it only mentions approvals, incentives, vendors, or employee searches—these should be classified under their respective categories.  
+        - If the intent to build is unclear or mixed with other topics, do NOT assign this category.
 
-    Additional Notes:
-    - Do not classify a query into a category based solely on the presence of keywords like "approval," "vendor," or "incentive." Evaluate the overall context and intent to ensure it aligns with the business-related domain described in the categories.
+    2. Query to search Vendors:  
+        - Example: *I am searching for a vendor who supplies pharmaceutical-grade raw chemicals for drug manufacturing.*  
+        - This category is used for queries about finding suppliers, manufacturers, or vendors for raw materials, equipment, or services.
 
-    Query: {query}
+    3. Query to search Incentives:  
+        - Example: *What benefits are available for setting up a cement manufacturing plant in XYZ area?*  
+        - This category is used for queries asking about government incentives, grants, or subsidies related to setting up or expanding an industry.
 
-    Your output should only be the name of the category or "Other industry-related queries" or "Valueless queries." 
-    Do not provide explanations or details, just the category name.
+    4. Query to Get Approvals:  
+        - Example: *I want to get approval for my Cement Factory.*  
+        - This category is used for queries about obtaining permits, licenses, or regulatory approvals for a business or industry.
+
+    5. Query to Get Employee Search:  
+        - Example: *What is the availability of employment in XYZ area for the Pharmaceutical industry?*  
+        - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
+
+    If None of the Above Apply, Use These Two Categories:
+
+    6. Other industry-related queries:  
+        - Example: *What is the role of AI in manufacturing?*  
+        - This refers to general industry discussions, trends, or innovations that do not fit into the above categories.
+
+    7. Valueless queries:  
+        - Example: *Who is Donald Trump?*  
+        - This refers to queries that are irrelevant to business, industry setup, or supply chains.  
+        - If the query contains industry-related words but the intent is not meaningful, classify it here.  
+        - Example: *I'm going to buy a new bike, for that which approvals do I need?* (Not relevant to industry-building)
+
+    Strict Classification Rules:
+
+    1. Return Only One Class:  
+        - If the query seems to match multiple categories, analyze the overall intent and assign it to the single most appropriate category.  
+
+    2. Assign "Query to build industry from Scratch" ONLY if Confident:  
+        - Strictly assign this category only if the user clearly states they want to establish a new industry.  
+        - If the query only contains mentions of vendors, incentives, approvals, or employee searches, do NOT classify it as industry-building.  
+        - If the intent to build is unclear or mixed with other topics, do NOT assign this category.
+
+    3. Do NOT Assign "Query to build industry from Scratch" If the Query Contains Only Approvals, Incentives, Vendors, or Employee Searches:  
+        - If the user is asking about any combination of these categories (Approvals, Incentives, Vendors, or Employee Searches) but does NOT explicitly mention setting up a new industry, assign the most relevant category among them.  
+        - Example: *"I need vendors for raw materials and want to know about required approvals and incentives."* → Correct classification: Either "Query to search Vendors" or "Query to Get Approvals" based on context.  
+        - Example: *"I want to search vendors, approvals, and also check employment availability in my city."* → Correct classification: Choose the most dominant category based on intent.  
+
+    4. Prioritize Meaningful Context, Not Just Keywords:  
+        - Do NOT assign a category just because it contains words like "approval," "vendor," or "incentive."  
+        - Analyze the full context of the query before assigning a category.  
+
+    Final Output Instructions:
+    - Strictly return only the category name from the list above.  
+    - Do not include multiple categories.  
+    - Do not provide explanations, justifications, or extra details.  
+
+    Query:  
+    {query}
+
+    Output:  
+    (Return only one category name from the list)
     """
- 
 
     # Initialize the LLM
-
     # Create the prompt
     prompt = PromptTemplate(
         input_variables=["query"],
@@ -145,6 +173,7 @@ def classify_query(user_query):
 
     # Run the query through the chain
     category = chain.invoke({"query": user_query})
+    update_llm_token(category)
 
     return category.content.strip()
 
@@ -224,6 +253,7 @@ def extract_location_from_query(user_input: str, available_areas: List[str], ava
 
     # Run the LLM chain
     response = chain.invoke({"query": user_input})
+    update_llm_token(response)
 
     # Extract location from the model response
     location_match = re.search(r'"Location":\s*"([^"]+)"', response.content.strip())
@@ -373,6 +403,7 @@ def extract_comparison_locations(user_input: str, available_areas: List[str], av
 
     # Run the LLM chain
     response = chain.invoke({"query": user_input})
+    update_llm_token(response)
 
     # Extract locations from the model response
     locations_match = re.search(r'"Locations":\s*\[([^\]]*)\]', response.content.strip())
@@ -890,7 +921,7 @@ def extract_main_industry_and_product_universal(user_query: str, main_industries
         "query": user_query,
         "main_industries": main_industries_str,
     })
-    
+    update_llm_token(result)
     # Extract JSON response
     result_content = result.content.strip()
 
@@ -1036,6 +1067,7 @@ def extract_sub_sector_and_product_universal(
         "sub_sectors_str": sub_sectors_str,
         "context": context
     })
+    update_llm_token(result)
     
     # Extract JSON response
     result_content = result.content.strip()
@@ -1181,6 +1213,7 @@ def extract_segment_and_product_universal(
         "segments_str": segments_str,
         "context": context
     })
+    update_llm_token(result)
 
     # Extract JSON response
     result_content = result.content.strip()

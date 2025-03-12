@@ -1,6 +1,11 @@
 import { createSlice } from '@reduxjs/toolkit'
 
 const initialState ={
+    // messages : [{
+    //     sender: 'ai',
+    //     text: 'Hello, How can i assist today?',
+    //     timestamp: new Date().toISOString(),
+    //   }],
     messages : [],
     chatID : null
 }

@@ -36,8 +36,8 @@ def call_vendor_query(aiResponse,chatId,validationResult):
         property_id = Location_info.get('Location')
 
         # Fetch Lat_long  from validation result
-        location_check = validationResult.get('location_check')
-        latitude_longitude = location_check.get('latitude_longitude')
+        # location_check = validationResult.get('location_check')
+        latitude_longitude = validationResult.get('latitude_longitude')
         latitude_longitude = [latitude_longitude]
         update_process(chatId,"Fetching Data","Complete")
         update_process(chatId,"Analyzing Data","Processing")
@@ -62,13 +62,9 @@ def call_vendor_query(aiResponse,chatId,validationResult):
         location_latlong_data = {'property_id':property_id,"latitude_longitude":latitude_longitude}
 
         property_latlong_df = pd.DataFrame(location_latlong_data)
-        # with open("log.txt", "a") as file:
-        #     file.write(f"\nproperty_latlong_dfde {str(property_latlong_df)}")
-        #     file.write(f"\nsupply_rules_dfde {str(supply_rules_df)}")
-        #     file.write(f"\nget_vendor_dfde {str(get_vendor_df)}")
+    
         combined_data = get_supply_scores(property_latlong_df, supply_rules_df, get_vendor_df, prefered_range=(0,250), tolerable_range=(251,500))
-        # with open("log.txt", "a") as file:
-        #     file.write(f"\ncombined_data {combined_data}")
+       
         response = {
                 "Analytics_response": combined_data,
                 "Is_Error" : False

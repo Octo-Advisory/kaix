@@ -11,10 +11,13 @@ export const validateSlice = createSlice({
         addResult: (state, action) => {
             state.validation_result.push(action.payload); // Adds a new message to the array
         },
+        removeVendorResult: (state) => {
+            state.validation_result = []
+        }
     }
 })
 
 
 
-export const { addResult } = validateSlice.actions;
+export const { addResult ,removeVendorResult} = validateSlice.actions;
 export default validateSlice.reducer;

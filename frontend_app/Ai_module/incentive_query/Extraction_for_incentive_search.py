@@ -10,6 +10,7 @@ import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,save_state,get_chat,get_state
 from datetime import datetime
 import json
+from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 def fetch_query_results(query):
     """
@@ -65,6 +66,7 @@ def refine_query_with_history_for_incentive(history, latest_query, llm):
     )
     chain = prompt | llm
     refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
+    update_llm_token(refined_query)
     refined_text = refined_query.content.strip()
     
     # Extract the reformulated standalone query
@@ -79,11 +81,10 @@ def refine_query_with_history_for_incentive(history, latest_query, llm):
 def classify_incentive_query(query, llm):
     """
     Classify the user's incentive search query into the following categories:
-    1. Incentive Search for individual area, city, or state.
-    2. Comparison between cities, states, or areas.
-    3. Comparison between industries or sub-sectors.
-    4. Incentive Search for individual industry without location.
-    5. Other Intent.
+    1. Incentive Search for area, city, or state without industry
+    2. Incentive Search for industry without location
+    3. Incentive Search for area, city, or state with industry
+    4. Other Intent
 
     Args:
         query (str): The user's input query.
@@ -131,6 +132,7 @@ def classify_incentive_query(query, llm):
     chain = prompt_template | llm
     # Run the chain and capture the response
     response = chain.invoke({"query": query})
+    update_llm_token(response)
 
     # Use regex to extract a valid classification number
     match = re.search(r"^\s*([1-4])\s*$", response.content.strip())
@@ -281,6 +283,7 @@ def generate_dynamic_message_for_incentive(chat_history_for_context: List[dict],
         "recent_history": recent_history,
         "static_follow_up": static_follow_up
     })
+    update_llm_token(message)
     
     # Append AI message to chat history
     chat_history = get_chat(f"QINC_chat_{chatId}") or []
@@ -333,7 +336,7 @@ def call_incentive_search(input,chatId):
         state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None', "KEYWORDS": None}
         save_state(state,f"QINC_state_{chatId}")
     log_to_file("state1",state)
-    query_intent = classify_incentive_query(refine_user_input,llm=llm_70b_vers)
+    query_intent = classify_incentive_query(input,llm=llm_70b_vers)
     query_intent = query_intent['classification_category']
     log_to_file("query intent",query_intent)
 
@@ -347,7 +350,7 @@ def call_incentive_search(input,chatId):
         response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
-                    "State" : state
+                    "State" : state 
                 }
         return response
     else:

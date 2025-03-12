@@ -94,3 +94,14 @@ def checkApiThreshold(apiName):
         return True
     else:
         return False
+    
+def update_llm_token(result,llm='Llama'):
+    input_token = result.usage_metadata["input_tokens"]
+    output_token = result.usage_metadata["output_tokens"]
+    total_token = result.usage_metadata["total_tokens"]
+    doc = frappe.get_doc("Mars Config", llm)  # Fetch the document
+    doc.input_token = doc.input_token + input_token  # Update the value
+    doc.output_token = doc.output_token + output_token  # Update the value
+    doc.total_token = doc.total_token + total_token  # Update the value
+    doc.save()  # Save the document (triggers on_update, on_change, validate)
+    frappe.db.commit()  # Ensure changes are committed

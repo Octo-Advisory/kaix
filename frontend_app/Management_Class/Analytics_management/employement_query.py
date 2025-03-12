@@ -1,5 +1,3 @@
-# import frappe
-# import json
 from frontend_app.Analytics_module.emplyement_query.employment_search_algorith import employment_search_algo
 
 def handle_employement_query(aiResponse,chatId):

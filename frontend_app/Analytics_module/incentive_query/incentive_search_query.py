@@ -112,7 +112,7 @@ def get_incentive_data(sub_sector_id=None, industry_id=None, area_id=None, city_
             file.write(f"\nstate is {sub_sector_id, industry_id, area_id, city_id, state_id, today_date}")
     # Initialize the query string with the common parts
     sql_query = """
-    SELECT i.name, i.incentive_name, i.incentive_type, iim.sub_sector, iim.industry, iim.area, iim.city, iim.state, 
+    SELECT i.name, i.incentive_name, i.incentive_type, i.quantum_of_assistance, i.incentive_operation_start_date, i.incentive_operation_end_date, iim.sub_sector, iim.industry, iim.area, iim.city, iim.state, 
            i.incentive_rank, iim.city_level, iim.state_level, iim.country_level, iim.pan_industries
     FROM `tabIncentive Industry Mapping` iim
     JOIN `tabIncentive` i ON i.name = iim.incentive
@@ -205,10 +205,11 @@ def get_incentive_data(sub_sector_id=None, industry_id=None, area_id=None, city_
     # Process results
     if results:
         Incentive_only_df = pd.DataFrame(results, columns=[
-            'incentive_id', 'Incentive_name', 'Incentive Type', 'sub_sector_id', 'industry_id', 
+            'incentive_id', 'Incentive_name', 'Incentive Type', 'Incentive Details', 'Incentive Start Date', 'Incentive End Date', 'sub_sector_id', 'industry_id', 
             'area_id', 'city_id', 'state_id', 'incentive_rank', "city_level", "state_level", 
             "country_level", "pan_industries"
         ])
+        Incentive_only_df['incentive_rank'] = pd.to_numeric(Incentive_only_df['incentive_rank'], errors='coerce').astype('Int64')
         return (Incentive_only_df)
     else:
         return None
@@ -226,6 +227,9 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None):
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'Area'
                 })
         
@@ -238,6 +242,9 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None):
                     'Incentive Name': row['Incentive_name'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'City'
                 })
         
@@ -250,6 +257,9 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None):
                     'Incentive Name': row['Incentive_name'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'State'
                 })
     
@@ -263,6 +273,9 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None):
                     'Incentive Name': row['Incentive_name'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'City'
                 })
         
@@ -275,6 +288,9 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None):
                     'Incentive Name': row['Incentive_name'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'State'
                 })
     elif state_id:
@@ -287,6 +303,9 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None):
                     'Incentive Name': row['Incentive_name'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'State'
                 })
     # Country-level approvals
@@ -298,6 +317,9 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None):
                 'Incentive Name': row['Incentive_name'],
                 'Incentive Type': row['Incentive Type'],
                 'Incentive Rank': row['incentive_rank'],
+                'Incentive Details': row['Incentive Details'],
+                'Incentive Start Date': row['Incentive Start Date'],
+                'Incentive End Date': row['Incentive End Date'],
                 'Level': 'Country'
             })
     
