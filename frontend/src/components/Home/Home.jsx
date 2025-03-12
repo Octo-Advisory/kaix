@@ -7,6 +7,8 @@ import { useSelector } from 'react-redux';
 import { FrappeContext } from 'frappe-react-sdk';
 import Test from '../TestComponent/Test';
 import TestComponent from '../TestComponent/TestComponent';
+import MapComponent from '../MapComponent/MapComponent';
+import Industryresult from '../ResultScreens/Industryresult';
 // import { useFrappeDocumentEventListener } from 'frappe-react-sdk';
 
 function Home() {
@@ -40,7 +42,9 @@ function Home() {
         <img src={logo2} alt="" className='logo h-56 w-full relative'/>
       </div>
     </div>):(<Chatscreen />)}
+    {/* <MapComponent/> */}
       {/* <Test/> */}
+      {/* <Industryresult/> */}
     </>
   );
 }

@@ -14,8 +14,8 @@ function Model({ isOpen, onClose, title, data }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-lg w-11/12 md:w-1/2 lg:w-1/3 max-h-[80vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-5">
+      <div className="bg-white rounded-lg shadow-lg h-[95%] w-[45%] overflow-y-auto">
         {/* Modal Header */}
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
@@ -47,7 +47,7 @@ function Model({ isOpen, onClose, title, data }) {
               <div className="text-green-500">
                 {statusIcon[item.status] ? (statusIcon[item.status]):(<FaCheckCircle size={20} />) }
               </div>
-              <div className="text-gray-700">
+              <div className="text-gray-700 text-start">
                 {item.total_vendor
                   ? `${item.total_vendor} suppliers for ${item.supply} with the top choice ${item.nearest_venodor_distance} km away`
                   : item.incentive_name || item.approval_name}

@@ -1,48 +1,26 @@
 import React, { useEffect, useState } from 'react'
-import useEmblaCarousel from 'embla-carousel-react'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import markerIconPng from "leaflet/dist/images/marker-icon.png";
-import { FaCheckCircle } from 'react-icons/fa';
-import { FaTimesCircle } from 'react-icons/fa';
-import { GoAlertFill } from "react-icons/go";
 // import { result } from './data'
 import './Industryresult.css'
-import Model from './Model';
+
+import { FaMapMarkedAlt, FaBuilding } from "react-icons/fa";
+import Properties from '../Property/Properties';
+import MapComponent from '../MapComponent/MapComponent';
+import Backtochat from '../Backtochat/Backtochat';
+import Details from '../Details/Details';
 
 function Industryresult({ result }) {
-    // function Industryresult() {
+// function Industryresult() {
+
+    const [activeTab, setActiveTab] = useState("property");
     console.log("result in indeustry solution screen", result);
     const analytics_response = result["Analytics_response"]
     console.log("Analytics_response", analytics_response);
 
-    const [resultLen, setResultLen] = useState(0)
     const [solutions, setSolutions] = useState([])
-    const [emblaRef, emblaApi] = useEmblaCarousel({ dragFree: true, watchDrag: false });
-
-    // Add model states to handle modal
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalData, setModalData] = useState([]);
-    const [modalTitle, setModalTitle] = useState('');
-
-    //Toggle modal on click of button
-    const toggleModal = (data, title) => {
-        setModalData(data);
-        setModalTitle(title);
-        setIsModalOpen(!isModalOpen);
-    };
-
-    const statusIcon = {
-        good: <FaCheckCircle size={20} color="green" />,
-        bad: <FaTimesCircle size={20} color="red" />,
-        warning: <GoAlertFill size={20} color="yellow" />,
-        danger: <GoAlertFill size={20} color="red" />,
-    }
 
     const fetchData = async (property) => {
         console.log("proprtis here", property);
-
         try {
             const response = await fetch(`http://172.17.244.12/api/resource/Survey No?fields=["*"]&filters=[["name","=","${property}"]]&order_by=modified asc`, {
                 method: 'GET',
@@ -51,7 +29,6 @@ function Industryresult({ result }) {
                     'Content-Type': 'application/json'
                 }
             });
-
             // Check if the response is OK
             if (!response.ok) {
                 throw new Error(`Error: ${response.statusText}`);
@@ -101,7 +78,7 @@ function Industryresult({ result }) {
 
                 if (data) {
                     const latLong = data.latitude_longitude
-                    const latLongArray = latLong ? latLong.split(', ').map(coord => parseFloat(coord)) : []
+                    const latLongArray = latLong ? latLong.split(', ').map(coord => parseFloat(coord)) : []    
                     const area = data.area
                     const city = data.city
                     const district = data.district
@@ -115,7 +92,6 @@ function Industryresult({ result }) {
                     const distance_from_nearest_railway_station = data.distance_from_nearest_railway_station
                     const distance_from_nearest_airport = data.distance_from_nearest_airport
                     const distance_from_nearest_seaport = data.distance_from_nearest_seaport
-                    console.log("hahah😒", Essential_supply_vendor_lookup_df["supply_id"]);
 
                     const essential_supply_and_vendor = []
                     const nonessential_supply_and_vendor = []
@@ -222,145 +198,52 @@ function Industryresult({ result }) {
         }
     }
 
-    // Update the resultLen after the solutions are fetched
-    useEffect(() => {
-        setResultLen(solutions.length);
-        console.log("final solutions2", solutions);
-    }, [solutions])
-
-    const goToNext = () => {
-        if (emblaApi) {
-            emblaApi.scrollNext();
-        }
-    };
-
-    const goToPrev = () => {
-        if (emblaApi) {
-            emblaApi.scrollPrev();
-        }
-    };
-    useEffect(() => {
-        if (emblaApi) {
-            emblaApi.on('select', () => {
-                document.querySelectorAll('.embla__slide').forEach(slide => {
-                    slide.style.backgroundColor = 'rgb(135 197 235 / 41%)';
-                });
-            });
-        }
-    }, [emblaApi]);
-
-    // Define default Leaflet icon
-    const defaultIcon = L.icon({
-        iconUrl: markerIconPng,
-        iconSize: [25, 41],
-        iconAnchor: [12, 41]
-    });
-
     return (
-        <div className="reuslt-container flex flex-col w-full h-full">
-            <div className="result-title w-full h-[5%] flex items-center justify-center p-5 text-2xl">
-                We Found <p className='font-bold text-red-600 px-1'>{resultLen}</p> Results For Your Query
-            </div>
-            <div className="solutions px-16 h-[95%] pb-6">
-                <div className="embla h-full" ref={emblaRef}>
-                    <div className="embla__container border-black h-full" >
-                        {solutions.map((solution, index) => (
-                            <div key={index} className="embla__slide rounded-md">
-                                <div className="slide-content flex flex-col h-full">
-                                    <div className="addres w-full h-[6%] p-2 flex items-center text-start text-2xl">{solution.address}</div>
-                                    <div className="first-row flex w-full h-[33%]">
-                                        <div className="location-image w-[25%] h-full">
-                                            <MapContainer center={solution.lat_long} zoom={13} style={{ height: '100%', width: '100%' }} className='rounded-xl' attributionControl={false} zoomControl={false}>
-                                                <TileLayer
-                                                    attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
-                                                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                                                />
-                                                <Marker position={solution.lat_long} icon={defaultIcon}>
-                                                    <Popup>
-                                                        Location: <br />
-                                                        Latitude: {solution.lat_long[0]} <br />
-                                                        Longitude: {solution.lat_long[1]}
-                                                    </Popup>
-                                                </Marker>
-                                            </MapContainer>
-                                        </div>
-                                        <div className="details w-[75%] flex flex-col">
-                                            <div className="title px-5 text-start text-xl text-dodgerblue">Land Maping</div>
-                                            <div className="Content flex px-5 py-5 gap-2">
-                                                <div className="left flex flex-1 text-start flex-col gap-3 border-r border-black">
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon.good}</div><div className="text">{solution.property_type}</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon.good}</div><div className="text">{solution.total_area} Acre</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon[solution.seaport.status]}</div><div className="text">{solution.seaport['distance']} Kms From Seaport</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon[solution.railway.status]}</div><div className="text">{solution.railway['distance']} Kms From Railway Line</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon[solution.power.status]}</div><div className="text">{solution.power['distance']} Kms From Power Plant</div></div>
-                                                </div>
-                                                <div className="right flex-1 text-start flex flex-col gap-3">
-                                                    <div className="items flex gap-3"><div className="icon"><FaCheckCircle size={20} color="green" /></div><div className="text">{solution.business_location_type}</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon[solution.availability_of_local_transportation]}</div><div className="text">Avaibility Of Local Transportaion</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon[solution.road_connectivity.status]}</div><div className="text">{solution.road_connectivity['distance']} Kms From Road Connectivity</div></div>
-                                                    <div className="items flex gap-3"><div className="icon"><FaCheckCircle size={20} color="green" /></div><div className="text">Available {solution.employement['count']} {solution.employement['type']} Manpower</div></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="second-row flex flex-col py-5 gap-1">
-                                        <div className="section-title text-start text-xl text-dodgerblue">Vendors & Suppliers Mapping</div>
-                                        <div className="Content flex px-2 py-2 gap-2">
-                                            <div className="left flex flex-1 text-start flex-col gap-3 border-r border-black">
-                                                {solution.essential_vendors.length > 0 ? (
-                                                    solution.essential_vendors.slice(0, 5).map((item, ind) => {
-                                                        const roundedDistance = parseFloat(item.nearest_vendor_distance.toFixed(2));
-                                                        return (
-                                                            <div key={ind} className="items flex gap-3">
-                                                                <div className="icon">{statusIcon[item.status]}</div>
-                                                                <div className="text">
-                                                                    {item.total_vendor} suppliers for {item.supply} with the top choice {roundedDistance} km away
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })
-                                                ) : (
-                                                    <div>No supplier available</div>
-                                                )}
-                                                {solution.essential_vendors.length > 5 && <button className='text-sm' onClick={() => toggleModal(solution.essential_vendors, 'Vendors')}>Show More...</button>}
-                                            </div>
-                                            <div className="right flex-1 text-start flex flex-col gap-3">
-                                                {solution.nonessential_vendors.slice(0, 5).map((item, index) => {
-                                                    const roundedDistance = parseFloat(item.nearest_venodor_distance.toFixed(2));
-                                                    return (<div key={index} className="items flex gap-3"><div className="icon">{statusIcon[item.status]}</div><div className="text">{item.total_vendor} suppliers for {item.supply} with the top choice {roundedDistance} km away</div></div>)
-                                                })}
-                                                {solution.nonessential_vendors.length > 5 && <button className='text-sm' onClick={() => toggleModal(solution.nonessential_vendors, 'Vendors')}>Show More...</button>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="third-row flex flex-col pt-5">
-                                        <div className="section-title text-start text-xl text-dodgerblue">Incentive & Approvals
-                                        </div>
-                                        <div className="Content flex px-2 py-2 gap-2">
-                                            <div className="left flex flex-1 text-start flex-col gap-3 border-r border-black">
-                                                {solution.incentives.slice(0, 5).map((item, index) => {
-                                                    return (<div key={index} className="items flex gap-3"><div className="icon"><FaCheckCircle size={20} color="green" /></div><div className="text">{item.incentive_name}</div></div>)
-                                                })}
-                                                {solution.incentives.length && <button className='text-sm' onClick={() => toggleModal(solution.incentives, 'Incentives')}>Show More...</button>}
-                                            </div>
-                                            <div className="right flex-1 text-start flex flex-col gap-3">
-                                                {solution.approvals.slice(0, 5).map((item, index) => {
-                                                    return (<div key={index} className="items flex gap-3"><div className="icon"><FaCheckCircle size={20} color="green" /></div><div className="text">{item.approval_name}</div></div>)
-                                                })}
-                                                {solution.approvals.length > 5 && <button className='text-sm' onClick={() => toggleModal(solution.approvals, 'Approvals')}>Show More...</button>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-                <button className="embla__prev" onClick={goToPrev}>Prev</button>
-                <button className="embla__next" onClick={goToNext}>Next</button>
-                <Model isOpen={isModalOpen} onClose={() => (setIsModalOpen(false))} title={modalTitle} data={modalData} />
-            </div>
+        <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
+        <div className="w-[98%] h-[98%] mx-auto p-4 bg-white rounded-lg shadow-md">
+          <div className="border-b border-gray-200 dark:border-gray-700 flex justify-between">
+            <ul className="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500 dark:text-gray-400">
+              <li className="me-2">
+                <button
+                  onClick={() => setActiveTab("property")}
+                  className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group transition-all ${
+                    activeTab === "property"
+                      ? "text-blue-600 border-blue-600 dark:text-blue-500 dark:border-blue-500"
+                      : "border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+                  }`}
+                >
+                  <FaBuilding
+                    className={`w-5 h-5 me-2 ${
+                      activeTab === "property" ? "text-blue-600 dark:text-blue-500" : "text-gray-400 group-hover:text-gray-500 dark:text-gray-500 dark:group-hover:text-gray-300"
+                    }`}
+                  />
+                  Property
+                </button>
+              </li>
+              <li className="me-2">
+                <button
+                  onClick={() => setActiveTab("map")}
+                  className={`inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group transition-all ${
+                    activeTab === "map"
+                      ? "text-blue-600 border-blue-600 dark:text-blue-500 dark:border-blue-500"
+                      : "border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+                  }`}
+                >
+                  <FaMapMarkedAlt
+                    className={`w-5 h-5 me-2 ${
+                      activeTab === "map" ? "text-blue-600 dark:text-blue-500" : "text-gray-400 group-hover:text-gray-500 dark:text-gray-500 dark:group-hover:text-gray-300"
+                    }`}
+                  />
+                  Map
+                </button>
+              </li>
+            </ul>
+            <Backtochat/>
+          </div>
+          <div className="mt-1 w-full h-full">{activeTab === "property" ? <Properties solutions = {solutions}/> : <MapComponent solutions= {solutions}/>}</div>
         </div>
+        <Details/>
+      </div>
     )
 }
 

@@ -935,13 +935,13 @@ def gather_industry_details(query, main_industries, llm,chatId):
         state = {'Main-Industry': 'None', 'Sub-Sector': 'None','Segment':'None', 'Capacity': 'None', 'Capacity Unit': 'None', 
                  'Time Period': 'None', 'Product': 'None','product_attempt_count':0,'capacity_attempt_count':0, "KEYWORDS": None}
         save_state(state,f"QIND_state_{chatId}")
-    chat_history = get_chat(f"QIND_chat_{chatId}") or []
+    chat_history = get_chat(f"chat_{chatId}") or []
 
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     
     refined_query = refine_query_with_history(Chat_history_normal, query, llm)
     chat_history.append(HumanMessage(content=refined_query))
-    save_chat(chat_history,f"QIND_chat_{chatId}")
+    save_chat(chat_history,f"chat_{chatId}")
     
     keyword_dict = extract_keywords_from_query(refined_query, field_with_description["Query to build industry from Scratch"], module_names_list, llm, "Query to build industry from Scratch")
     state["KEYWORDS"] = keyword_dict["KEYWORDS"]
@@ -975,12 +975,12 @@ def gather_industry_details(query, main_industries, llm,chatId):
                     state[key] = value
             save_state(state,f"QIND_state_{chatId}")
 
-        chat_history = get_chat(f"QIND_chat_{chatId}")
+        chat_history = get_chat(f"chat_{chatId}")
         state['product_attempt_count'] = state['product_attempt_count'] + 1
         save_state(state,f"QIND_state_{chatId}")
         message = generate_ai_message(state,Chat_history_normal,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
         chat_history.append(AIMessage(content=f"{message}"))
-        save_chat(chat_history,f"QIND_chat_{chatId}")
+        save_chat(chat_history,f"chat_{chatId}")
         return {"Ai_response": message,
                 "Is_confirmation" : False,
                 "state":state}
@@ -1001,12 +1001,12 @@ def gather_industry_details(query, main_industries, llm,chatId):
                 "Is_confirmation" : False,
                 "state":state}
         else:
-            chat_history = get_chat(f"QIND_chat_{chatId}")
+            chat_history = get_chat(f"chat_{chatId}")
             state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
             save_state(state,f"QIND_state_{chatId}")
             message = generate_ai_message(state,Chat_history_normal,missing_fields,state['capacity_attempt_count'],llm_70b_vers_creative)
             chat_history.append(AIMessage(content=f"{message}"))
-            save_chat(chat_history,f"QIND_chat_{chatId}")
+            save_chat(chat_history,f"chat_{chatId}")
             return {"Ai_response": message,
                 "Is_confirmation" : False,
                 "state":state}
@@ -1044,12 +1044,12 @@ def gather_industry_details(query, main_industries, llm,chatId):
             save_state(state,f"QIND_state_{chatId}")
             capicity_pending_list = get_keys_for_capicity(chatId)
             if len(capicity_pending_list) > 0:
-                chat_history = get_chat(f"QIND_chat_{chatId}")
+                chat_history = get_chat(f"chat_{chatId}")
                 state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
                 save_state(state,f"QIND_state_{chatId}")
                 message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=f"{message}"))
-                save_chat(chat_history,f"QIND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 return {"Ai_response": message,
                     "Is_confirmation" : False,
                     "state":state}
@@ -1069,12 +1069,12 @@ def gather_industry_details(query, main_industries, llm,chatId):
         elif state['Sub-Sector'] == 'Not Available in list':
             capicity_pending_list = get_keys_for_capicity(chatId)
             if len(capicity_pending_list) > 0:
-                chat_history = get_chat(f"QIND_chat_{chatId}")
+                chat_history = get_chat(f"chat_{chatId}")
                 state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
                 save_state(state,f"QIND_state_{chatId}")
                 message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=f"{message}"))
-                save_chat(chat_history,f"QIND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 return {"Ai_response": message,
                     "Is_confirmation" : False,
                     "state": state}
@@ -1085,12 +1085,12 @@ def gather_industry_details(query, main_industries, llm,chatId):
                 "state":state}
 
         else:
-            chat_history = get_chat(f"QIND_chat_{chatId}")
+            chat_history = get_chat(f"chat_{chatId}")
             state['product_attempt_count'] = state['product_attempt_count'] + 1
             save_state(state,f"QIND_state_{chatId}")
             message = generate_ai_message(state,Chat_history_normal,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
             chat_history.append(AIMessage(content=f"{message}"))
-            save_chat(chat_history,f"QIND_chat_{chatId}")
+            save_chat(chat_history,f"chat_{chatId}")
             return {"Ai_response": message,
                 "Is_confirmation" : False,
                 "state":state}

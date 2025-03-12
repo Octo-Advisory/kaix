@@ -1,52 +1,41 @@
 .embla {
-    position: relative;
-    width: 100%;
-    overflow: hidden;
-  }
-  
-  .embla__container {
-    display: flex;
-  }
-  .embla__slide {
-    min-width: 100%;
-    text-align: center;
-    padding: 20px;
-    height: 100%;
-    /* box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.2); */
-    /* backdrop-filter: blur(10px); */
-    border-radius: 10px; /* Slightly rounded corners */
-}
-
-/* Add background blur effect to the parent container */
-.embla__viewport {
-    position: relative;
-    overflow: hidden;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
 }
 
 .embla__container {
-    /* backdrop-filter: blur(15px); */
-    background: rgb(135 197 235 / 41%); /* Dark transparent background */
-    border-radius: 10px;
+  display: flex;
+  background: rgb(135 197 235 / 41%);
+  border-radius: 10px;
 }
 
-  .embla__prev, .embla__next {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    background-color: rgba(0, 0, 0, 0.5);
-    color: white;
-    padding: 10px;
-    border: none;
-    cursor: pointer;
-    z-index: 10;
+.embla__slide {
+  min-width: 100%;
+  text-align: center;
+  padding: 20px;
+  height: 100%;
+  border-radius: 10px;
 }
 
-.embla__prev {
-    left: 10px;
+.embla__controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
 }
 
-.embla__next {
-    right: 10px;
+.embla__btn {
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.embla__btn:hover {
+  background-color: rgba(0, 0, 0, 0.8);
 }
 
 /* Width & Background */

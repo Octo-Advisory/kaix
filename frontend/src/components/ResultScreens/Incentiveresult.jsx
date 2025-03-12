@@ -40,7 +40,7 @@ function Incentiveresult({ result }) {
         <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
             <div className="w-[95%] h-[95%] mx-auto my-5 p-5 bg-white rounded-lg shadow-md">
                 {/* Title Section */}
-                <div className="top-header flex items-center justify-between">
+                <div className="top-header flex items-center justify-between pb-1">
                     <div className="title w-full p-1 h-[10%] flex-1">
                         <div className="text-5xl">Incentives</div>
                     </div>
