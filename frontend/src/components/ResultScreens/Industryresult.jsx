@@ -22,7 +22,7 @@ function Industryresult({ result }) {
     const fetchData = async (property) => {
         console.log("proprtis here", property);
         try {
-            const response = await fetch(`http://172.17.244.12/api/resource/Survey No?fields=["*"]&filters=[["name","=","${property}"]]&order_by=modified asc`, {
+            const response = await fetch(`api/resource/Survey No?fields=["*"]&filters=[["name","=","${property}"]]&order_by=modified asc`, {
                 method: 'GET',
                 headers: {
                     'Authorization': 'token d3de1e0e4e25846:3d3be60aaa3b67c',
@@ -77,6 +77,7 @@ function Industryresult({ result }) {
                 console.log("actual result data", data);
 
                 if (data) {
+                    const boundary_coordinates = data.boundary_coordinates // Add by ushan 
                     const latLong = data.latitude_longitude
                     const latLongArray = latLong ? latLong.split(', ').map(coord => parseFloat(coord)) : []    
                     const area = data.area
@@ -166,7 +167,9 @@ function Industryresult({ result }) {
                         employement: { type: emp_skill_type, count: count },
                         incentives: incenetives,
                         approvals: approvals,
-                        road_connectivity: { distance: road_connectivity, status: get_status_for_distance(road_connectivity) }
+                        road_connectivity: { distance: road_connectivity, status: get_status_for_distance(road_connectivity) },
+                        boundary_coordinates: boundary_coordinates, // Add by ushan 
+                        result_type:"Industry_Result" // Add by ushan 
                     }
                     console.log("solution json", solution);
                     preaparedSolutions.push(solution)

@@ -53,8 +53,80 @@ function MapComponent({ solutions }) {
       duration: 1000 // Animation duration in milliseconds
     });
 
-    laodbindDataOnMap(elements, "Property")
+    // Add a LineString feature to connect these points
+    map.addSource('straight-line', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: coordinates  // Use your existing coordinates
+        }
+      }
+    });
+ 
+    // Add a layer to display the line
+    map.addLayer({
+      id: 'straight-line-layer',
+      type: 'line',
+      source: 'straight-line',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#ff0000', // Red color
+        'line-width': 3
+      }
+    });
 
+    
+    solutions.forEach(item=>{
+      debugger
+      if(item.result_type === "Industry_Result"){
+        let parsedCoord = JSON.parse(item.boundary_coordinates);
+        // Add polygon source
+        map.addSource("polygon", {
+          type: "geojson",
+          data: {
+              type: "Feature",
+              properties: {},
+              geometry: {
+                  type: "Polygon",
+                  coordinates: [parsedCoord],
+              },
+          },
+      });
+
+      // Add fill layer for polygon
+      map.addLayer({
+          id: "polygon-fill",
+          type: "fill",
+          source: "polygon",
+          layout: {},
+          paint: {
+              "fill-color": "#ff0000", // Red color
+              "fill-opacity": 0.5, // 50% transparent
+          },
+      });
+
+      // Add border for polygon
+      map.addLayer({
+          id: "polygon-border",
+          type: "line",
+          source: "polygon",
+          layout: {},
+          paint: {
+              "line-color": "#000000", // Black border
+              "line-width": 2,
+          },
+      });
+      }
+
+    })
+    laodbindDataOnMap(elements, "Property")
+    
+ 
   }
   const laodbindDataOnMap = async (elements, layerType) => {
     let featureCollectionArray = []

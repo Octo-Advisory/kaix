@@ -706,9 +706,14 @@ def handle_approval_query(
             
             if perfect_industry_data and perfect_location_data:
                 if state["Industry_info"]["Main-Industry"] != "Not Available in list" and state["Industry_info"]["Sub-Sector"] != "Not Available in list":
-                    message = f"We have identified location {(state['Location_info']['Area'] or state['Location_info']['City'])} for category {state['Industry_info']['Main-Industry']} based on your query. Please confirm if this information is correct"
-
-                    chat_history.append(AIMessage(content=message))  # Log user query
+                    
+                    selected_option = next(
+                    (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                    ''
+                    )
+                    message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
                     response = {
                         "Ai_response": message,
@@ -810,9 +815,14 @@ def handle_approval_query(
                     
                     if perfect_industry_data and perfect_location_data:
                         if state["Location_info"]["Area"] != "Not Available in List" or state["Location_info"]["City"] != "Not Available in List":
-                            message = f"We have identified location {(state['Location_info']['Area'] or state['Location_info']['City'])} for category {state['Industry_info']['Main-Industry']} based on your query. Please confirm if this information is correct"
-
-                            chat_history.append(AIMessage(content=message))  # Log user query
+                            
+                            selected_option = next(
+                            (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                            ''
+                            )
+                            message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                            dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                            chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                             save_chat(chat_history,f"chat_{chatId}")
                             response = {
                                 "Ai_response": message,
@@ -1014,9 +1024,14 @@ def handle_approval_query(
                 perfect_location_data = False
             
             if perfect_industry_data and perfect_location_data:
-                message = f"We have identified location {(state['Location_info']['Area'] or state['Location_info']['City'])} for category {state['Industry_info']['Main-Industry']} based on your query. Please confirm if this information is correct"
 
-                chat_history.append(AIMessage(content=message))  # Log user query
+                selected_option = next(
+                (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                ''
+                )
+                message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                 save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,

@@ -526,13 +526,13 @@ def handle_employment_query(
     Returns:
         Dict[str, Union[str, List[str]]]: A dictionary containing responses or follow-up questions.
     """
-    result = classify_employment_query(user_input, llm_70b_vers)
-    user_intention = result["classification_category"]
-    chat_history = get_chat(f"chat_{chatId}") if get_chat(f"chat_{chatId}") else []
+    chat_history = get_chat(chatId) if get_chat(chatId) else []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     refined_user_input = refine_query_with_history_for_employment(Chat_history_normal, user_input, llm_70b_vers)
     chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
     save_chat(chat_history,f"chat_{chatId}")
+    result = classify_employment_query(refined_user_input, llm_70b_vers)
+    user_intention = result["classification_category"]
     keyword_dict = extract_employment_keywords_from_query(refined_user_input, llm)
     if user_intention == "Individual employment status":
         classification_data, validated_data = extract_location_from_query(refined_user_input, available_areas= available_areas, available_cities= available_cities, available_states= available_states, llm=llm_70b_vers)
