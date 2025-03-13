@@ -1249,3 +1249,57 @@ def extract_segment_and_product_universal(
         validated_data["Segment"] = "Not Available in list"
 
     return extracted_data, validated_data
+
+def generate_dynamic_confirmation_message(static_confirmation: str, llm) -> str:
+    """
+    Generate a dynamic confirmation message using LLM based on the provided static confirmation requirement for various modules.
+
+    Parameters:
+        static_confirmation (str): The static confirmation message to send to the user.
+        llm: The language model instance.
+
+    Returns:
+        str: The dynamically generated confirmation message.
+    """
+
+    # Define the prompt
+    prompt = """
+    You are a professional assistant specializing in crafting formal, engaging, and accurate confirmation messages.
+    Your goal is to create a polished confirmation message that clearly summarizes the provided static confirmation details in a concise, professional manner.
+
+    Key Instructions:
+    - The static confirmation message is a reference, not to be copied verbatim.
+    - Use it as guidance to formulate a clear and formal confirmation question.
+    - Avoid adding assumptions or additional details not present in the static confirmation message.
+    - Do not introduce words like 'acquiring' or 'seeking' unless explicitly stated in the static confirmation message.
+    - Retain context details such as 'based on your query' if present in the static message.
+    - The message should allow the user to provide a simple 'Yes' or 'No' response.
+    - Ensure all essential details from the static message are included.
+    - Do NOT include any placeholders like "None" or "Not Available in List."
+    - Avoid redundant confirmation phrasing—conclude with only one clear confirmation question.
+    - Keep the response concise and free of unnecessary elaboration.
+
+    Inputs
+    1. Static Confirmation Message: "{static_confirmation}"
+
+    Final Response Guidelines:
+    - Summarize the static message in a professional, clear, and concise manner.
+    - Craft the message as a yes/no confirmation question without adding assumptions.
+    - Retain context phrases like 'based on your query' if present.
+    - Do NOT copy the static message verbatim but ensure all key details are included.
+    - Maintain a formal and engaging tone.
+    - Prefer phrasing such as 'Please confirm if this information is correct.' for consistency.
+    - Ensure that the message concludes with only one clear confirmation question.
+    """
+
+    # Prepare input to the model
+    prompt_template = PromptTemplate(
+        input_variables=["static_confirmation"],
+        template=prompt
+    )
+    chain = prompt_template | llm
+    message = chain.invoke({
+        "static_confirmation": static_confirmation
+    })
+
+    return message.content.strip()

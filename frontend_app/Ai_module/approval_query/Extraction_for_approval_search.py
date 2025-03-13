@@ -160,7 +160,7 @@ def generate_dynamic_message_for_approval(chat_history_for_context: List[dict], 
     # Prepare the conversation history context
     recent_history = "\n".join(chat_history_for_context)  
 
-    # Define the prompt
+        # Define the prompt
     prompt = """
     You are a highly skilled assistant specializing in creating professional, engaging, and contextually relevant messages.
     Your goal is to craft a polished follow-up message that seamlessly incorporates the provided static follow-up message while aligning with the tone and context of the recent conversation.
@@ -278,7 +278,6 @@ def generate_dynamic_message_for_approval(chat_history_for_context: List[dict], 
         "recent_history": recent_history,
         "static_follow_up": static_follow_up
     })
-    update_llm_token(message)
 
     return message.content.strip()
 
@@ -328,10 +327,12 @@ def get_static_follow_up_for_approval(approval_state: Dict[str, Dict[str, Option
                 provided_details.append(f"You're looking for approvals in {location_info['Area']}, {location_info['City']}.")
             elif location_info["City"] is not None and location_info["State"] is not None:
                 provided_details.append(f"You're looking for approvals in {location_info['City']}, {location_info['State']}.")
-            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None:
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] < 2:
                 return (
                     f"""{location_info["State"]} has many cities and areas, and approval details can vary based on location. Could you please share the specific city or area within {location_info["State"]}? This will help us provide you with the most accurate information."""
                 )
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] >= 2:
+                provided_details.append(f"You're looking for approvals in {location_info['State']}.")
 
         # Industry handling logic
         if not all_industry_missing:
@@ -410,10 +411,12 @@ def get_static_follow_up_for_approval(approval_state: Dict[str, Dict[str, Option
                 provided_details.append(f"You're looking for approvals in {location_info['Area']}, {location_info['City']}.")
             elif location_info["City"] is not None and location_info["State"] is not None:
                 provided_details.append(f"You're looking for approvals in {location_info['City']}, {location_info['State']}.")
-            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None:
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] < 2:
                 return (
                     f"""{location_info["State"]} has many cities and areas, and approval details can vary based on location. Could you please share the specific city or area within {location_info["State"]}? This will help us provide you with the most accurate information."""
                 )
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] >= 2:
+                provided_details.append(f"You're looking for approvals in {location_info['State']}.")
 
 
         # Identifying missing details
@@ -460,10 +463,12 @@ def get_static_follow_up_for_approval(approval_state: Dict[str, Dict[str, Option
                 provided_details.append(f"You're looking for approvals in {location_info['Area']}, {location_info['City']}.")
             elif location_info["City"] is not None and location_info["State"] is not None:
                 provided_details.append(f"You're looking for approvals in {location_info['City']}, {location_info['State']}.")
-            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None:
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] < 2:
                 return (
                     f"""{location_info["State"]} has many cities and areas, and approval details can vary based on location. Could you please share the specific city or area within {location_info["State"]}? This will help us provide you with the most accurate information."""
                 )
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] >= 2:
+                provided_details.append(f"You're looking for approvals in {location_info['State']}.")
 
         # Industry handling logic
         if not all_industry_missing:
@@ -526,10 +531,12 @@ def get_static_follow_up_for_approval(approval_state: Dict[str, Dict[str, Option
                 provided_details.append(f"You're looking for approvals in {location_info['Area']}, {location_info['City']}.")
             elif location_info["City"] is not None and location_info["State"] is not None:
                 provided_details.append(f"You're looking for approvals in {location_info['City']}, {location_info['State']}.")
-            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None:
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] < 2:
                 return (
                     f"""{location_info["State"]} has many cities and areas, and approval details can vary based on location. Could you please share the specific city or area within {location_info["State"]}? This will help us provide you with the most accurate information."""
                 )
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] >= 2:
+                provided_details.append(f"You're looking for approvals in {location_info['State']}.")
 
         # Industry handling logic
         if not all_industry_missing:
@@ -641,7 +648,7 @@ def handle_approval_query(
 
     chat_history = get_chat(f"QAPP_chat_{chatId}") or []
     
-    if state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None:
+    if (state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None) or (state["Only_State_Attempt_Count"] >= 2):
         perfect_location_data = True
     else:
         perfect_location_data = False
@@ -650,15 +657,14 @@ def handle_approval_query(
     else:
         perfect_industry_data = False
     
-    result = classify_approval_query(user_input, llm)
-    user_intention = result["classification_category"]
-
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     
     refined_user_input = refine_query_with_history_for_approval(Chat_history_normal, user_input, llm)
     chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
     save_chat(chat_history,f"QAPP_chat_{chatId}")
 
+    result = classify_approval_query(refined_user_input, llm)
+    user_intention = result["classification_category"]
     keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to Get Approvals"], module_names_list, llm, "Query to Get Approvals")
     state["KEYWORDS"] = keyword_dict["KEYWORDS"]
     save_state(state,f"QAPP_state_{chatId}")
@@ -691,6 +697,7 @@ def handle_approval_query(
                 state["Location_info"]["Area"] = None
                 state["Location_info"]["City"] = None
                 state["Location_info"]["State"] = state_name
+                state["Only_State_Attempt_Count"] += 1
                 save_state(state,f"QAPP_state_{chatId}")
 
             else:
@@ -699,16 +706,20 @@ def handle_approval_query(
                 state["Location_info"]["State"] = None
                 save_state(state,f"QAPP_state_{chatId}")
             
-            if state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None:
+            if (state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None) or (state["Only_State_Attempt_Count"] >= 2):
                 perfect_location_data = True
             else:
                 perfect_location_data = False
             
             if perfect_industry_data and perfect_location_data:
                 if state["Industry_info"]["Main-Industry"] != "Not Available in list" and state["Industry_info"]["Sub-Sector"] != "Not Available in list":
-                    message = f"We have identified location {(state['Location_info']['Area'] or state['Location_info']['City'])} for category {state['Industry_info']['Main-Industry']} based on your query. Please confirm if this information is correct"
-
-                    chat_history.append(AIMessage(content=message))  # Log user query
+                    selected_option = next(
+                    (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                    ''
+                    )
+                    message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                     save_chat(chat_history,f"QAPP_chat_{chatId}")
                     response = {
                         "Ai_response": message,
@@ -810,12 +821,16 @@ def handle_approval_query(
                     
                     if perfect_industry_data and perfect_location_data:
                         if state["Location_info"]["Area"] != "Not Available in List" or state["Location_info"]["City"] != "Not Available in List":
-                            message = f"We have identified location {(state['Location_info']['Area'] or state['Location_info']['City'])} for category {state['Industry_info']['Main-Industry']} based on your query. Please confirm if this information is correct"
-
-                            chat_history.append(AIMessage(content=message))  # Log user query
+                            selected_option = next(
+                            (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                            ''
+                            )
+                            message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                            dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                            chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                             save_chat(chat_history,f"QAPP_chat_{chatId}")
                             response = {
-                                "Ai_response": message,
+                                "Ai_response": dynamic_confirmation_message,
                                 "Is_confirmation" : True,
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
@@ -957,6 +972,7 @@ def handle_approval_query(
                 state["Location_info"]["Area"] = None
                 state["Location_info"]["City"] = None
                 state["Location_info"]["State"] = state_name
+                state["Only_State_Attempt_Count"] += 1
                 save_state(state,f"QAPP_state_{chatId}")
             else:
                 state["Location_info"]["Area"] = None
@@ -1008,18 +1024,22 @@ def handle_approval_query(
                 perfect_industry_data = True
             else:
                 perfect_industry_data = False
-            if state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None:
+            if (state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None) or (state["Only_State_Attempt_Count"] >= 2):
                 perfect_location_data = True
             else:
                 perfect_location_data = False
             
             if perfect_industry_data and perfect_location_data:
-                message = f"We have identified location {(state['Location_info']['Area'] or state['Location_info']['City'])} for category {state['Industry_info']['Main-Industry']} based on your query. Please confirm if this information is correct"
-
-                chat_history.append(AIMessage(content=message))  # Log user query
+                selected_option = next(
+                (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                ''
+                )
+                message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                 save_chat(chat_history,f"QAPP_chat_{chatId}")
                 response = {
-                    "Ai_response": message,
+                    "Ai_response": dynamic_confirmation_message,
                     "Is_confirmation" : True,
                     "Extracted Data": extracted_state,
                     "Validation Data": state,
@@ -1103,6 +1123,7 @@ def handle_approval_query(
                     state["Location_info"]["Area"] = None
                     state["Location_info"]["City"] = None
                     state["Location_info"]["State"] = state_name
+                    state["Only_State_Attempt_Count"] += 1
                     save_state(state,f"QAPP_state_{chatId}")
 
                 else:
@@ -1234,7 +1255,8 @@ def call_handle_approval_query(user_input,chatId):
                 "Sub-Sector": None,
                 "Product": None,
             },
-            "KEYWORDS": None
+            "KEYWORDS": None,
+            "Only_State_Attempt_Count": 0
         }
         save_state(state,f"QAPP_state_{chatId}")
     extracted_state = state.copy()
