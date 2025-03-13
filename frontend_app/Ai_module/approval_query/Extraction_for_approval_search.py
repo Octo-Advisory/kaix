@@ -706,7 +706,6 @@ def handle_approval_query(
             
             if perfect_industry_data and perfect_location_data:
                 if state["Industry_info"]["Main-Industry"] != "Not Available in list" and state["Industry_info"]["Sub-Sector"] != "Not Available in list":
-                    
                     selected_option = next(
                     (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
                     ''
@@ -949,7 +948,6 @@ def handle_approval_query(
         extracted_state["Industry_info"]["Product"] = ind_extracted_data["Product"] if ind_extracted_data["Product"] != "None" else None
 
         if area_name != "Not Available in List" and main_industry_name != "Not Available in list":
-
             if area_name != "None":
                 parent_city = next((key for key, value in city_to_area_mapping.items() if area_name in value), None)
                 parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)
@@ -1024,7 +1022,6 @@ def handle_approval_query(
                 perfect_location_data = False
             
             if perfect_industry_data and perfect_location_data:
-
                 selected_option = next(
                 (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
                 ''
