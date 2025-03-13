@@ -28,6 +28,7 @@ def call_vendor_query(aiResponse,chatId,validationResult):
         Industry_info = Validation_Data.get('Industry_info')
         Location_info = Validation_Data.get('Location_info')
         Supply_info = Validation_Data.get('Supply_info')
+        keyword_given_by_user = Validation_Data.get('KEYWORDS')
 
         main_industry = Industry_info.get('Main-Industry')
         Supplies = Supply_info.get('Supplies')
@@ -56,6 +57,20 @@ def call_vendor_query(aiResponse,chatId,validationResult):
 
         get_vendor_df = vendor_df(supply_id_str)
 
+        columns_to_drop = [
+            'supply_id', 'vendor_supply_capacity',
+            'years_of_experience', 'no_of_locations', 'no_of_past_clients',
+            'no_of_servieces', 'no_of_employees', 'latitude_longitude'
+        ]
+
+        vendor_keyword_df =  get_vendor_df.drop(columns=columns_to_drop)
+
+        vendor_keyword_df["vendor_name"] = vendor_keyword_df["vendor_name"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        vendor_keyword_df["Certifications"] = vendor_keyword_df["Certifications"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        vendor_keyword_df["Description"] = vendor_keyword_df["Description"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+
+        vendor_keyword_df = vendor_keyword_df.rename(columns= {'vendor_id':'ID'})
+
         columns_to_convert = ["vendor_supply_capacity", "years_of_experience", "no_of_past_clients", "no_of_locations", "no_of_servieces", "no_of_employees"]
         get_vendor_df[columns_to_convert] = get_vendor_df[columns_to_convert].apply(pd.to_numeric, errors='coerce')
 
@@ -63,7 +78,7 @@ def call_vendor_query(aiResponse,chatId,validationResult):
 
         property_latlong_df = pd.DataFrame(location_latlong_data)
     
-        combined_data = get_supply_scores(property_latlong_df, supply_rules_df, get_vendor_df, prefered_range=(0,250), tolerable_range=(251,500))
+        combined_data = get_supply_scores(property_latlong_df, supply_rules_df, get_vendor_df, prefered_range=(0,250), tolerable_range=(251,500),keyword_given_by_user=keyword_given_by_user,vendor_keyword_df=vendor_keyword_df)
        
         response = {
                 "Analytics_response": combined_data,

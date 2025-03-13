@@ -61,7 +61,7 @@ def get_employment_status():
 warnings.filterwarnings("ignore")
 
 
-def employment_search_algo(intention, input_data,chatId):
+def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
     """
     Employment search algorithm based on user intention.
     """
@@ -114,7 +114,7 @@ def employment_search_algo(intention, input_data,chatId):
 
                 if not keyword_given_by_user:
                     response = {
-                        "Analytics_response": {"total_state_summary" : total_state_summary.to_json()},
+                        "Analytics_response": {"total_state_summary" : total_state_summary.to_json() if not total_state_summary.empty else None},
                         "Is_Error" : False,
                         "chart_base64": img_base64,
                         "intention" : intention
@@ -129,7 +129,10 @@ def employment_search_algo(intention, input_data,chatId):
                     other_summary = other_data.groupby("employment_type")["availability"].sum()
 
                     response = {
-                            "Analytics_response": {"selected_data":selected_summary.to_json(), "other_summary" :other_summary.to_json()},
+                            "Analytics_response": {
+                                "selected_data": selected_summary.to_json() if not selected_summary.empty else None,
+                                "other_summary": other_summary.to_json() if not other_summary.empty else None
+                            },
                             "Is_Error" : False,
                             "chart_base64": img_base64,
                             "intention" : intention
@@ -160,11 +163,11 @@ def employment_search_algo(intention, input_data,chatId):
                  # Always generate the pie chart with all employment types
                 city_summary = city_data.groupby("employment_type")["availability"].sum()
                 img_base64 = plot_pie_chart(city_summary, f"City-wise Employment Status: {city}, {state}")
-                
                 if not keyword_given_by_user:
                     # If no keyword is provided, return the full summary as usual
+                    city_summary_json = city_summary.to_json() if not city_summary.empty else None
                     response = {
-                        "Analytics_response": {"city_summary":city_summary.to_json()},
+                        "Analytics_response": {"city_summary":str(city_summary_json)},
                         "Is_Error" : False,
                         "chart_base64": img_base64,
                         "intention" : intention
@@ -178,16 +181,19 @@ def employment_search_algo(intention, input_data,chatId):
                     remaining_summary = remaining_data.groupby("employment_type")["availability"].sum()
 
                     response = {
-                        "Analytics_response": {"selected_data":selected_summary.to_json(),"remaining_summary":remaining_summary.to_json()},
+                        "Analytics_response": {
+                            "selected_data": selected_summary.to_json() if not selected_summary.empty else None,
+                            "remaining_summary": remaining_summary.to_json() if not remaining_summary.empty else None
+                        },
                         "Is_Error" : False,
                         "chart_base64": img_base64,
                         "intention" : intention
                     }
-                    update_process(chatId,"Analyzing Data","Complete")
-                    update_process(chatId,"Preparing Result","Processing")
-                    time.sleep(5)
-                    update_process(chatId,"Preparing Result","Complete")
-                    return response
+                update_process(chatId,"Analyzing Data","Complete")
+                update_process(chatId,"Preparing Result","Processing")
+                time.sleep(5)
+                update_process(chatId,"Preparing Result","Complete")
+                return response
             
         elif intention == "Comparison between cities, states, or areas":
             cities = input_data.get("cities")
@@ -222,7 +228,10 @@ def employment_search_algo(intention, input_data,chatId):
                 comparison_data_percentage = comparison_data.div(comparison_data.sum(axis=1), axis=0) * 100
                 img_base64 = plot_bar_chart(comparison_data_percentage, f"Comparison Between Cities: {', '.join(cities)}")
                 response = {
-                        "Analytics_response": {"comparison_data":comparison_data.to_json(),"comparison_data_percentage":comparison_data_percentage.to_json()},
+                         "Analytics_response": {
+                            "comparison_data": comparison_data.to_json() if not comparison_data.empty else None,
+                            "comparison_data_percentage": comparison_data_percentage.to_json() if not comparison_data_percentage.empty else None
+                        },
                         "Is_Error" : False,
                         "chart_base64": img_base64,
                         "intention" : intention
@@ -248,7 +257,10 @@ def employment_search_algo(intention, input_data,chatId):
                 full_comparison_percentage = full_comparison.div(full_comparison.sum(axis=1), axis=0) * 100
                 img_base64 = plot_bar_chart(full_comparison_percentage, f"Comparison Between Cities: {', '.join(cities)}")
                 response = {
-                    "Analytics_response": {"selected_comparison":selected_comparison.to_json(),"other_comparison":other_comparison.to_json()},
+                    "Analytics_response": {
+                        "selected_comparison": selected_comparison.to_json() if not selected_comparison.empty else None,
+                        "other_comparison": other_comparison.to_json() if not other_comparison.empty else None
+                    },
                     "Is_Error" : False,
                     "chart_base64": img_base64,
                     "intention" : intention
@@ -317,21 +329,32 @@ def plot_pie_chart(data, title):
 def plot_bar_chart(data, title):
     """
     Plots a bar chart and returns it as a base64 string.
+    Adds percentage labels on top of the bars for clarity.
     """
-    fig, ax = plt.subplots(figsize=(10, 6))  # Adjust figure size
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Transpose if needed to group by employment type
+    data = data.T  
     data.plot(kind='bar', stacked=False, ax=ax)
 
     ax.set_title(title)
     ax.set_ylabel("Percentage (%)")
-    # ax.set_xlabel("Employment Type")
- 
-    # Improve layout
-    plt.xticks(rotation=0, ha="right")  # Rotate labels if needed
-    plt.tight_layout()  # Adjust layout to fit everything
+    ax.set_xlabel("Employment Type")
 
-    # Convert plot to PNG and then to base64
+    # Improve legend placement
+    ax.legend(title="City", loc='upper left', bbox_to_anchor=(1, 1))
+
+    # Add percentage labels on top of bars
+    for container in ax.containers:
+        ax.bar_label(container, fmt='%.1f%%', label_type='edge', fontsize=10, padding=3)
+
+    # Adjust layout
+    plt.xticks(rotation=45, ha="right")  
+    plt.tight_layout()
+
+    # Convert to base64
     img_bytes = io.BytesIO()
-    plt.savefig(img_bytes, format='png', bbox_inches='tight')  # Ensure nothing is cut off
+    plt.savefig(img_bytes, format='png', bbox_inches='tight')
     plt.close(fig)
     img_bytes.seek(0)
     img_base64 = base64.b64encode(img_bytes.read()).decode('utf-8')

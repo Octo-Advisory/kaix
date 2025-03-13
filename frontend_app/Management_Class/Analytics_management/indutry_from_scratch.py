@@ -1,4 +1,4 @@
-from frontend_app.Analytics_module.Industry_form_scratch.query_to_build_industry_from_scratch import get_industry,get_subsector,get_segment,integrate_land_calculation,get_list_of_area_id,get_list_of_city_list,get_state_list,get_property_and_employement,get_property_incentive_mapped,transform_dataframes,calculate_property_suitability,calculate_employment_availability_score,get_property_wise_incentive_score,get_property_approval_mapped,get_property_wise_approval_score,get_supply_rule,get_vendor_df,get_supply_scores,calculate_final_supply_mapped_property_scores_with_condition,process_incentive_df_to_send_solution_screen,process_approval_df_to_send_solution_screen,process_supply_vendor_df_to_send_solution_screen,sort_by_scores
+from frontend_app.Analytics_module.Industry_form_scratch.query_to_build_industry_from_scratch import *
 import frappe
 import pandas as pd
 from frontend_app.Management_Class.helpers.progress import insert_process,update_process
@@ -30,6 +30,8 @@ def industry_from_scratch(aiResponse,chatId):
         sub_sector = aiResponse.get("Sub-Sector")
         segment = aiResponse.get("Segment")
         capacity = aiResponse.get("Capacity")
+        keyword_given_by_user = aiResponse.get("KEYWORDS")
+        log_to_file("keyword_given_by_user",keyword_given_by_user)
         update_process(chatId,"Fetching Data","Complete")
 
         update_process(chatId,"Analyzing Data","Processing")
@@ -43,12 +45,30 @@ def industry_from_scratch(aiResponse,chatId):
         city_list = get_list_of_city_list(area_list)
         state_list = get_state_list(city_list)
         property_employment_df,property_list = get_property_and_employement(zone_id,area_list,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user,found_property,found_employment)
+        columns_to_drop = [
+            'distance_from_nearest_railway_station',
+            'distance_from_nearest_seaport', 'distance_from_power_source',
+            'latitude_longitude', 'road_connectivity',
+            'distance_from_nearest_airport', 'employment_area_id',
+            'employmenttype_id', 'availability'
+        ]
+        propert_keyword_df =  property_employment_df.drop(columns=columns_to_drop)
+        propert_keyword_df["tree_cutting_involved"] = propert_keyword_df["tree_cutting_involved"].apply(lambda x: "Tree Cutting" if x == "Yes" else "None")
+        propert_keyword_df["road_cutting_involved"] = propert_keyword_df["road_cutting_involved"].apply(lambda x: "Road Cutting" if x == "Yes" else "None")
+        propert_keyword_df["pole_shifting"] = propert_keyword_df["pole_shifting"].apply(lambda x: "Pole Shifting" if x == "Yes" else "None")
+        propert_keyword_df["business_location_type"] = propert_keyword_df["business_location_type"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        propert_keyword_df["land_type"] = propert_keyword_df["land_type"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        propert_keyword_df["vicinity_of"] = propert_keyword_df["vicinity_of"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        propert_keyword_df["Cross_the_following"] = propert_keyword_df["Cross_the_following"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+
+        propert_keyword_df = propert_keyword_df.rename(columns= {'property_id':'ID'})
+
         # Incentive_only_df = get_incentive(sub_sector,main_industry,area_list,city_list,state_list)
         property_incentive_mapped_df,found_incentive = get_property_incentive_mapped(industry,sub_sector,area_list,city_list,state_list,property_list,found_incentive)
         Solution_screen_incentive_lookup_df = process_incentive_df_to_send_solution_screen(property_incentive_mapped_df)
 
         df_for_property_wise_individual_score, df_for_property_wise_emp_score = transform_dataframes(property_employment_df)
-        df_with_property_wise_individual_score = calculate_property_suitability(df_for_property_wise_individual_score)
+        df_with_property_wise_individual_score = calculate_property_suitability(df_for_property_wise_individual_score,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user)
         df_with_property_wise_individual_score.sort_values(by=["property_suitability_score"], ascending=False)
         final_property_ranking_for_decision = pd.DataFrame({"Property_ID": list(property_employment_df["property_id"].unique())})
         final_property_ranking_for_decision = pd.merge(final_property_ranking_for_decision, df_with_property_wise_individual_score[["property_id","property_suitability_score"]], left_on="Property_ID", right_on="property_id", how='left').drop(columns=["property_id"])
@@ -195,23 +215,96 @@ def industry_from_scratch(aiResponse,chatId):
         Solution_screen_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_vendor_lookup_df, final_property_ranking_for_decision)
         Solution_screen_non_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_vendor_lookup_df, final_property_ranking_for_decision)
 
-        Final_analytics_results_query_to_build_industry_from_scratch = {
-            "final_scoring_df": final_property_ranking_for_decision.to_json(),
-            "Employment_lookup_df": Solution_screen_employment_lookup_df.to_json(),
-            "Solution_lookup_df": Solution_screen_incentive_lookup_df.to_json(),
-            "Approval_lookup_df": Solution_screen_approval_lookup_df.to_json(),
-            "Essential_supply_vendor_lookup_df": Solution_screen_essential_supply_vendor_lookup_df.to_json(),
-            "Non_essential_supply_vendor_lookup_df": Solution_screen_non_essential_supply_vendor_lookup_df.to_json()
-        }
-        time.sleep(2)
-        update_process(chatId,"Analyzing Data","Complete")
-        update_process(chatId,"Preparing Result","Processing")
-        time.sleep(5)
-        update_process(chatId,"Preparing Result","Complete")
+        if not keyword_given_by_user:
+            Final_analytics_results_query_to_build_industry_from_scratch = {
+                "Filtered_final_property_ranking_for_decision" : None,
+                "Filtererd_Solution_screen_employment_lookup_df" : None,
+                "Filtererd_Solution_screen_incentive_lookup_df" : None,
+                "Filtererd_Solution_screen_approval_lookup_df" : None,
+                "Filtererd_Solution_screen_essential_supply_vendor_lookup_df" : None,
+                "Filtererd_Solution_screen_non_essential_supply_vendor_lookup_df" : None,
+
+                "Unfiltered_final_property_ranking_for_decision" : final_property_ranking_for_decision.to_json() if not final_property_ranking_for_decision.empty else None,
+                "Unfiltered_Solution_screen_employment_lookup_df" : Solution_screen_employment_lookup_df.to_json() if not  Solution_screen_employment_lookup_df.empty else None,
+                "Unfiltered_Solution_screen_incentive_lookup_df" : Solution_screen_incentive_lookup_df.to_json() if not Solution_screen_incentive_lookup_df.empty else None ,
+                "Unfiltered_Solution_screen_approval_lookup_df" : Solution_screen_approval_lookup_df.to_json() if not Solution_screen_approval_lookup_df.empty else None,
+                "Unfiltered_Solution_screen_essential_supply_vendor_lookup_df" : Solution_screen_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_essential_supply_vendor_lookup_df.empty else None,
+                "Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df" : Solution_screen_non_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_non_essential_supply_vendor_lookup_df.empty else None,
+            }
+        else:
+            
+            keyword_result = filter_df_by_keywords(keyword_given_by_user, propert_keyword_df)
+            log_to_file("keyword_result",keyword_result)
+            filtered_keyword_df, unfiltered_keyword_df = keyword_result[0], keyword_result[1]
+            log_to_file("filtered_keyword_df",filtered_keyword_df)
+            log_to_file("unfiltered_keyword_df",unfiltered_keyword_df)
+            # print(type(filtered_keyword_df), type(unfiltered_keyword_df))
+            if len(filtered_keyword_df) != 0:
+
+                Filtered_final_property_ranking_for_decision = pd.merge(final_property_ranking_for_decision, filtered_keyword_df, left_on="Property_ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
+                Filtererd_Solution_screen_employment_lookup_df = sort_by_scores(Solution_screen_employment_lookup_df, Filtered_final_property_ranking_for_decision, for_final_return=True)
+                Filtererd_Solution_screen_incentive_lookup_df = sort_by_scores(Solution_screen_incentive_lookup_df, Filtered_final_property_ranking_for_decision, for_final_return=True)
+                Filtererd_Solution_screen_approval_lookup_df = sort_by_scores(Solution_screen_approval_lookup_df, Filtered_final_property_ranking_for_decision, for_final_return=True)
+                Filtererd_Solution_screen_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_vendor_lookup_df, Filtered_final_property_ranking_for_decision, for_final_return=True)
+                Filtererd_Solution_screen_non_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_vendor_lookup_df, Filtered_final_property_ranking_for_decision, for_final_return=True)
+                
+                Unfiltered_final_property_ranking_for_decision = pd.merge(final_property_ranking_for_decision, unfiltered_keyword_df, left_on="Property_ID", right_on="ID").drop("ID", axis=1).sort_values(by=["Aggregate Property Performance Score (APPS)"], ascending=False) 
+                Unfiltered_Solution_screen_employment_lookup_df = sort_by_scores(Solution_screen_employment_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
+                Unfiltered_Solution_screen_incentive_lookup_df = sort_by_scores(Solution_screen_incentive_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
+                Unfiltered_Solution_screen_approval_lookup_df = sort_by_scores(Solution_screen_approval_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
+                Unfiltered_Solution_screen_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_vendor_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
+                Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_vendor_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
+                # print(type(Filtererd_Solution_screen_employment_lookup_df))
+                Final_analytics_results_query_to_build_industry_from_scratch = {
+
+                    "Filtered_final_property_ranking_for_decision" : Filtered_final_property_ranking_for_decision.to_json() if not Filtered_final_property_ranking_for_decision.empty else None,
+                    "Filtererd_Solution_screen_employment_lookup_df" : Filtererd_Solution_screen_employment_lookup_df.to_json() if not Filtererd_Solution_screen_employment_lookup_df.empty else None,
+                    "Filtererd_Solution_screen_incentive_lookup_df" : Filtererd_Solution_screen_incentive_lookup_df.to_json() if not Filtererd_Solution_screen_incentive_lookup_df.empty else None,
+                    "Filtererd_Solution_screen_approval_lookup_df" : Filtererd_Solution_screen_approval_lookup_df.to_json() if not Filtererd_Solution_screen_approval_lookup_df.empty else None,
+                    "Filtererd_Solution_screen_essential_supply_vendor_lookup_df" : Filtererd_Solution_screen_essential_supply_vendor_lookup_df.to_json() if not Filtererd_Solution_screen_essential_supply_vendor_lookup_df.empty else None,
+                    "Filtererd_Solution_screen_non_essential_supply_vendor_lookup_df" : Filtererd_Solution_screen_non_essential_supply_vendor_lookup_df.to_json() if not Filtererd_Solution_screen_non_essential_supply_vendor_lookup_df.empty else None,
+
+                    "Unfiltered_final_property_ranking_for_decision" : Unfiltered_final_property_ranking_for_decision.to_json() if not Unfiltered_final_property_ranking_for_decision.empty else None,
+                    "Unfiltered_Solution_screen_employment_lookup_df" : Unfiltered_Solution_screen_employment_lookup_df.to_json() if not Unfiltered_Solution_screen_employment_lookup_df.empty else None,
+                    "Unfiltered_Solution_screen_incentive_lookup_df" : Unfiltered_Solution_screen_incentive_lookup_df.to_json() if not Unfiltered_Solution_screen_incentive_lookup_df.empty else None,
+                    "Unfiltered_Solution_screen_approval_lookup_df" : Unfiltered_Solution_screen_approval_lookup_df.to_json() if not Unfiltered_Solution_screen_approval_lookup_df.empty else None,
+                    "Unfiltered_Solution_screen_essential_supply_vendor_lookup_df" : Unfiltered_Solution_screen_essential_supply_vendor_lookup_df.to_json() if not Unfiltered_Solution_screen_essential_supply_vendor_lookup_df.empty else None,
+                    "Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df" : Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df.to_json() if not Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df.empty else None
+                }
+            else:
+
+                Unfiltered_final_property_ranking_for_decision = pd.merge(Solution_screen_employment_lookup_df, unfiltered_keyword_df, left_on="Property_ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False) 
+                Unfiltered_Solution_screen_employment_lookup_df = pd.merge(Solution_screen_employment_lookup_df, unfiltered_keyword_df, left_on="Property_ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False) 
+                Unfiltered_Solution_screen_incentive_lookup_df = pd.merge(Solution_screen_incentive_lookup_df, unfiltered_keyword_df, left_on="Property_ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)  
+                Unfiltered_Solution_screen_approval_lookup_df = pd.merge(Solution_screen_approval_lookup_df, unfiltered_keyword_df, left_on="Property_ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False) 
+                Unfiltered_Solution_screen_essential_supply_vendor_lookup_df = pd.merge(Solution_screen_essential_supply_vendor_lookup_df, unfiltered_keyword_df, left_on="Property_ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False) 
+                Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df = pd.merge(Solution_screen_non_essential_supply_vendor_lookup_df, unfiltered_keyword_df, left_on="Property_ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
+                
+                Final_analytics_results_query_to_build_industry_from_scratch ={
+                   "Filtered_final_property_ranking_for_decision" : None,
+                "Filtererd_Solution_screen_employment_lookup_df" : None,
+                "Filtererd_Solution_screen_incentive_lookup_df" : None,
+                "Filtererd_Solution_screen_approval_lookup_df" : None,
+                "Filtererd_Solution_screen_essential_supply_vendor_lookup_df" : None,
+                "Filtererd_Solution_screen_non_essential_supply_vendor_lookup_df" : None,
+
+                "Unfiltered_final_property_ranking_for_decision" : Unfiltered_final_property_ranking_for_decision.to_json() if not Unfiltered_final_property_ranking_for_decision.empty else None,
+                "Unfiltered_Solution_screen_employment_lookup_df" : Unfiltered_Solution_screen_employment_lookup_df.to_json() if not Unfiltered_Solution_screen_employment_lookup_df.empty else None,
+                "Unfiltered_Solution_screen_incentive_lookup_df" : Unfiltered_Solution_screen_incentive_lookup_df.to_json() if not Unfiltered_Solution_screen_incentive_lookup_df.empty else None,
+                "Unfiltered_Solution_screen_approval_lookup_df" : Unfiltered_Solution_screen_approval_lookup_df.to_json() if not Unfiltered_Solution_screen_approval_lookup_df.empty else None,
+                "Unfiltered_Solution_screen_essential_supply_vendor_lookup_df" : Unfiltered_Solution_screen_essential_supply_vendor_lookup_df.to_json() if not Unfiltered_Solution_screen_essential_supply_vendor_lookup_df.empty else None,
+                "Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df" : Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df.to_json() if not Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df.empty else None
+                }
+
         response = {
                 "Analytics_response": Final_analytics_results_query_to_build_industry_from_scratch,
                 "Is_Error" : False
             }
+        log_to_file("response",response)
+        update_process(chatId,"Analyzing Data","Complete")
+        update_process(chatId,"Preparing Result","Processing")
+        time.sleep(5)
+        update_process(chatId,"Preparing Result","Complete")
         return response
     
     except Exception as e:
@@ -236,5 +329,5 @@ def log_to_file(key,value):
         f"{key}" : value
     }
     
-    with open("log.txt", "a", encoding="utf-8") as file:
+    with open("log2.txt", "a", encoding="utf-8") as file:
         file.write(json.dumps(log_entry) + "\n")
