@@ -4,11 +4,11 @@ from typing import List, Dict, Tuple, Union, Any, Optional
 from click import prompt
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from frontend_app.Ai_module.Query_Classification_And_Analysis import refine_query_with_history, llm_70b_vers,llm_70b_vers_creative, extract_location_from_query, extract_comparison_locations, extract_main_industry_and_product_universal, extract_sub_sector_and_product_universal
+from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 from langchain.schema import HumanMessage, AIMessage
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import get_chat,save_chat,get_state,save_state
-
+from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 def fetch_query_results(query):
     """
@@ -64,6 +64,7 @@ def refine_query_with_history_for_approval(history, latest_query, llm):
     )
     chain = prompt | llm
     refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
+    update_llm_token(refined_query)
     refined_text = refined_query.content.strip()
     
     # Extract the reformulated standalone query
@@ -129,6 +130,7 @@ def classify_approval_query(query, llm):
     chain = prompt_template | llm
     # Run the chain and capture the response
     response = chain.invoke({"query": query})
+    update_llm_token(response)
 
     # Use regex to extract a valid classification number
     match = re.search(r"^\s*([1-4])\s*$", response.content.strip())
@@ -158,21 +160,85 @@ def generate_dynamic_message_for_approval(chat_history_for_context: List[dict], 
     # Prepare the conversation history context
     recent_history = "\n".join(chat_history_for_context)  
 
-    # Define the prompt
+        # Define the prompt
     prompt = """
     You are a highly skilled assistant specializing in creating professional, engaging, and contextually relevant messages.
     Your goal is to craft a polished follow-up message that seamlessly incorporates the provided static follow-up message while aligning with the tone and context of the recent conversation.
 
+    ---
+
     Key Instructions
-    - The static follow-up message is only a reference.  
-    - Do NOT copy it word-for-word—instead, use it as guidance to create a well-crafted, natural response that follows all instructions.  
-    - Ignore placeholders like "None" or "Not Available in List"—they should NEVER be included in the final response.  
-    - Do NOT reference any industry (Industry, Sub-Sector, Product) or location (Area, City, State) details from chat history or user messages unless explicitly mentioned in the static follow-up message.  
-    - In no circumstances should the model respond to off-topic queries. If a query is unrelated, handle it according to the specified instructions.  
+
+    1. Strict Focus on Approval-Related Queries  
+    - Only include approval-related details in the follow-up message, even if the user query mentions multiple topics.  
+    - If the user mentions incentives, employment, vendors, or any other unrelated terms, completely exclude them from the response.  
+    - Regardless of any other mentioned topics, approval-related words must always appear in the response.  
+
+    Example Correction:  
+    - User Query: "I want to search for approvals and incentives."  
+    - Wrong Response: "I can assist with approvals and incentive-related searches."  
+    - Correct Response: "Could you specify the industry or location for which you're looking for approvals?"  
+
+    2. Strict Industry & Location Handling  
+    - Do NOT infer, assume, or use any Industry (Industry, Sub-Sector, Product) or location (Area, City, State) from the user’s message or conversation history.  
+    - Only include these details if they are explicitly mentioned in the static follow-up message.  
+    - If no industry or location is provided in the static follow-up, do NOT include one in the generated response.  
+
+    3. Handling Placeholders Like "None" or "Not Available in List"  
+    - If the static message contains placeholders such as "None" or "Not Available in List", ignore these terms completely.  
+    - NEVER include them in the response.  
+
+    4. Handling Off-Topic Queries  
+    - If the user’s query is completely unrelated to approvals, politely inform them:  
+    - "I specialize in assisting with approval-related queries for industries and locations."  
+    - However, DO NOT include this statement if the user query is partially relevant to approvals or if approvals are mentioned alongside other topics.  
+    - Instead, generate a relevant response by only focusing on the approval-related part of the query while ignoring unrelated topics.  
+    - DO NOT attempt to answer fully off-topic queries. Instead, smoothly transition to the static follow-up message.
+
+    Example Correction:  
+    - User Query: "Tell me about tourism in Paris."  
+    - Correct Response: "I specialize in assisting with approval-related queries for industries and locations."  
+    - User Query: "I want to search for approvals and employment."  
+    - Correct Response: "Could you specify the industry or location for which you're looking for approvals?" (Employment mention ignored)  
+
+    5. Handling Missing Information  
+    - If only industry-related details (Industry, Sub-Sector, or Product) are missing, politely ask the user to provide them.  
+    - If only location details (Area, City, or State) are missing, politely ask the user for the location.  
+    - If both industry and location details are missing, request both in a natural and concise manner.  
+    - Ensure the request for missing details is seamlessly connected to the static follow-up message.  
+
+    6. Ensuring Smooth Transitions with Proper Conjunctions  
+    - Analyze the static follow-up message before adding conjunctions.  
+    - If the message already has a natural transition, do not add unnecessary conjunctions.  
+    - If the static message consists of two distinct parts (acknowledgment + request for details), use a conjunction where appropriate, such as:  
+    - "Additionally, Furthermore, To proceed further, To assist you better, On another note, As a next step, In addition, Also"  
+
+    7. Natural and Engaging Tone  
+    - The response should feel like a smooth continuation of the conversation without sounding mechanical or scripted.  
+    - Avoid robotic acknowledgments or unnecessary phrases such as:  
+    - "I wanted to follow up on..."  
+    - "I am here to assist with..."  
+    - "It seems you are asking about..."  
+
+    8. Handling Greetings  
+    - If the user greets (e.g., "Hi", "Hello", "Good morning"), respond with an appropriate greeting.  
+    - Ensure the transition to the follow-up message is smooth and natural using proper conjunctions.  
+
+    9. Handling Special Events  
+    - If the user mentions a special occasion (e.g., birthday, anniversary), acknowledge and celebrate it first.  
+    - Then, transition smoothly into the static follow-up message using proper conjunctions.  
+
+    10. Handling Negative Emotions  
+    - If the user expresses sadness, frustration, or anger, address their emotions with empathy first.  
+    - Then, transition seamlessly into the static follow-up message using a natural, logical flow.  
+
+    11. Ensuring Conciseness (Maximum 3 Lines)  
+    - The response must be concise—a maximum of 3 lines while fully incorporating the static follow-up message.  
+    - Ensure the message is professional, user-friendly, and free of unnecessary elaboration or additional context.  
 
     ---
 
-    Inputs
+    Inputs  
     1. User’s Latest Message  
     - This is the most recent message from the user. Use this to determine the appropriate tone, greetings, or redirection.  
     - {user_message}  
@@ -189,72 +255,17 @@ def generate_dynamic_message_for_approval(chat_history_for_context: List[dict], 
 
     ---
 
-    Response Guidelines
-
-    1. Do NOT Copy the Static Message As-Is
-    - Instead, use it as a reference to create a well-structured, smooth, and conversational response.
-    - The final response must not sound robotic or overly formal.
-    - Ensure the message is clear, natural, and engaging.
-
-    2. Do NOT Use "None" or "Not Available in List"
-    - If the static message contains placeholders like `"None"` or `"Not Available in List"`, ignore these terms completely.
-    - NEVER include them in the response.
-
-    3. Do NOT Address Off-Topic Queries
-    - If the user’s query is unrelated to industry or approvals, politely inform them:
-        - *"I specialize in assisting with approval-related queries for industries and locations."*
-    - DO NOT attempt to answer off-topic queries—instead, redirect to the static follow-up message with a smooth transition.
-
-    4. Do NOT Infer or Carry Forward Past Details
-    - DO NOT infer industry (Industry, Sub-Sector, Product) or location (Area, City, State) details from past conversation history or user messages.  
-    - Only use the details explicitly mentioned in the static follow-up message.
-
-    5. Intelligent Use of Conjunctions
-    - Analyze the static follow-up message before adding conjunctions.
-    - If the message already has a natural transition, do not add an unnecessary conjunction.
-    - If the static message consists of two distinct parts (acknowledgment + request for missing details), place a proper conjunction between them where appropriate.
-    - The conjunction should not be at the very beginning of the message unless it naturally requires it.
-
-    6. Natural and Engaging Tone
-    - The response should feel like a smooth continuation of the conversation without sounding mechanical or scripted.
-    - Avoid robotic acknowledgments or unnecessary phrases such as:
-        - "I wanted to follow up on..."
-        - "I am here to assist with..."
-        - "It seems you are asking about..."
-    - Ensure the response sounds professional yet friendly, direct yet engaging.
-
-    7. Handling Greetings
-    - If the user greets (e.g., "Hi", "Hello", "Good morning"), respond with an appropriate greeting.
-    - Ensure the transition to the follow-up message is smooth and natural using proper conjunctions.
-
-    8. Handling Missing Information
-    - If only industry-related details (Industry, Sub-Sector, or Product) are missing, politely ask the user to provide them.
-    - If only location details (Area, City, or State) are missing, politely ask the user for the location.
-    - If both industry and location details are missing, request both in a natural and concise manner.
-    - Ensure the request for missing details is seamlessly connected to the static follow-up message.
-
-    9. Handling Special Events
-    - If the user mentions a special occasion (e.g., birthday, anniversary), acknowledge and celebrate it first.
-    - Then transition smoothly into the static follow-up message using proper conjunctions.
-
-    10. Handling Negative Emotions
-    - If the user expresses sadness, frustration, or anger, address their emotions with empathy first.
-    - Then transition seamlessly into the static follow-up message using a natural, logical flow.
-
-    ---
-
-    Final Output Requirements
-    - Do NOT copy the static follow-up message word-for-word.
-    - Craft a clear, polished response that aligns with the user’s latest message.
-    - Ensure a smooth and engaging conversational flow.
-    - NEVER include placeholders like "None" or "Not Available in List" in the response.
-    - NEVER infer or use industry/location details unless they appear in the static follow-up message.
-    - NEVER address off-topic queries—redirect them properly.
-    - Keep the response concise (maximum 3 lines) while fully incorporating the static follow-up message.
-    - Ensure the message is professional, user-friendly, and free of unnecessary elaboration or additional context.
-
+    Final Output Requirements  
+    - Do NOT copy the static follow-up message word-for-word.  
+    - Do NOT include placeholders like "None" or "Not Available in List".  
+    - Do NOT infer or use industry/location details unless explicitly mentioned in the static follow-up message.  
+    - Do NOT answer off-topic queries—redirect them properly.  
+    - Only use "I specialize in assisting with approval-related queries" if the query is truly off-topic.  
+    - If the query mentions approvals but also includes unrelated topics, ignore the unrelated topics and only focus on approvals in the response.  
+    - Craft a clear, polished response that aligns with the user’s latest message.  
+    - Ensure a smooth and engaging conversational flow with proper conjunctions.  
+    - Keep the response concise (maximum 3 lines).  
     """
-
 
     # Prepare input to the model
     prompt_template = PromptTemplate(
@@ -316,10 +327,12 @@ def get_static_follow_up_for_approval(approval_state: Dict[str, Dict[str, Option
                 provided_details.append(f"You're looking for approvals in {location_info['Area']}, {location_info['City']}.")
             elif location_info["City"] is not None and location_info["State"] is not None:
                 provided_details.append(f"You're looking for approvals in {location_info['City']}, {location_info['State']}.")
-            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None:
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] < 2:
                 return (
                     f"""{location_info["State"]} has many cities and areas, and approval details can vary based on location. Could you please share the specific city or area within {location_info["State"]}? This will help us provide you with the most accurate information."""
                 )
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] >= 2:
+                provided_details.append(f"You're looking for approvals in {location_info['State']}.")
 
         # Industry handling logic
         if not all_industry_missing:
@@ -398,10 +411,12 @@ def get_static_follow_up_for_approval(approval_state: Dict[str, Dict[str, Option
                 provided_details.append(f"You're looking for approvals in {location_info['Area']}, {location_info['City']}.")
             elif location_info["City"] is not None and location_info["State"] is not None:
                 provided_details.append(f"You're looking for approvals in {location_info['City']}, {location_info['State']}.")
-            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None:
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] < 2:
                 return (
                     f"""{location_info["State"]} has many cities and areas, and approval details can vary based on location. Could you please share the specific city or area within {location_info["State"]}? This will help us provide you with the most accurate information."""
                 )
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] >= 2:
+                provided_details.append(f"You're looking for approvals in {location_info['State']}.")
 
 
         # Identifying missing details
@@ -448,10 +463,12 @@ def get_static_follow_up_for_approval(approval_state: Dict[str, Dict[str, Option
                 provided_details.append(f"You're looking for approvals in {location_info['Area']}, {location_info['City']}.")
             elif location_info["City"] is not None and location_info["State"] is not None:
                 provided_details.append(f"You're looking for approvals in {location_info['City']}, {location_info['State']}.")
-            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None:
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] < 2:
                 return (
                     f"""{location_info["State"]} has many cities and areas, and approval details can vary based on location. Could you please share the specific city or area within {location_info["State"]}? This will help us provide you with the most accurate information."""
                 )
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] >= 2:
+                provided_details.append(f"You're looking for approvals in {location_info['State']}.")
 
         # Industry handling logic
         if not all_industry_missing:
@@ -514,10 +531,12 @@ def get_static_follow_up_for_approval(approval_state: Dict[str, Dict[str, Option
                 provided_details.append(f"You're looking for approvals in {location_info['Area']}, {location_info['City']}.")
             elif location_info["City"] is not None and location_info["State"] is not None:
                 provided_details.append(f"You're looking for approvals in {location_info['City']}, {location_info['State']}.")
-            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None:
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] < 2:
                 return (
                     f"""{location_info["State"]} has many cities and areas, and approval details can vary based on location. Could you please share the specific city or area within {location_info["State"]}? This will help us provide you with the most accurate information."""
                 )
+            elif location_info["State"] is not None and location_info["Area"] is None and location_info["City"] is None and approval_state["Only_State_Attempt_Count"] >= 2:
+                provided_details.append(f"You're looking for approvals in {location_info['State']}.")
 
         # Industry handling logic
         if not all_industry_missing:
@@ -627,9 +646,9 @@ def handle_approval_query(
           prompting the user for more details.
     """
 
-    chat_history = get_chat(f"QAPP_chat_{chatId}") or []
+    chat_history = get_chat(f"chat_{chatId}") or []
     
-    if state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None:
+    if (state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None) or (state["Only_State_Attempt_Count"] >= 2):
         perfect_location_data = True
     else:
         perfect_location_data = False
@@ -638,14 +657,17 @@ def handle_approval_query(
     else:
         perfect_industry_data = False
     
-    result = classify_approval_query(user_input, llm)
-    user_intention = result["classification_category"]
-
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     
     refined_user_input = refine_query_with_history_for_approval(Chat_history_normal, user_input, llm)
     chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
-    save_chat(chat_history,f"QAPP_chat_{chatId}")
+    save_chat(chat_history,f"chat_{chatId}")
+
+    result = classify_approval_query(refined_user_input, llm)
+    user_intention = result["classification_category"]
+    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to Get Approvals"], module_names_list, llm, "Query to Get Approvals")
+    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    save_state(state,f"QAPP_state_{chatId}")
 
     if user_intention == "Approval Search for area, city, or state without industry":
         extracted_data, validated_data = extract_location_from_query(refined_user_input, available_areas, available_cities, available_states, llm)
@@ -675,6 +697,7 @@ def handle_approval_query(
                 state["Location_info"]["Area"] = None
                 state["Location_info"]["City"] = None
                 state["Location_info"]["State"] = state_name
+                state["Only_State_Attempt_Count"] += 1
                 save_state(state,f"QAPP_state_{chatId}")
 
             else:
@@ -683,17 +706,21 @@ def handle_approval_query(
                 state["Location_info"]["State"] = None
                 save_state(state,f"QAPP_state_{chatId}")
             
-            if state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None:
+            if (state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None) or (state["Only_State_Attempt_Count"] >= 2):
                 perfect_location_data = True
             else:
                 perfect_location_data = False
             
             if perfect_industry_data and perfect_location_data:
                 if state["Industry_info"]["Main-Industry"] != "Not Available in list" and state["Industry_info"]["Sub-Sector"] != "Not Available in list":
-                    message = f"We have identified location {(state['Location_info']['Area'] or state['Location_info']['City'])} for category {state['Industry_info']['Main-Industry']} based on your query. Please confirm if this information is correct"
-
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"QAPP_chat_{chatId}")
+                    selected_option = next(
+                    (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                    ''
+                    )
+                    message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : True,
@@ -705,7 +732,7 @@ def handle_approval_query(
                 else:
                     message = "Not Available In List"
                     chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"QAPP_chat_{chatId}")
+                    save_chat(chat_history,f"chat_{chatId}")
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -718,7 +745,7 @@ def handle_approval_query(
                 response_static_message = get_static_follow_up_for_approval(state, user_intention)
                 message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QAPP_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -736,7 +763,7 @@ def handle_approval_query(
             if perfect_industry_data:
                 message = "Not Available In List"
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QAPP_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": "Not Available In List",
                     "Is_confirmation" : None,
@@ -749,7 +776,7 @@ def handle_approval_query(
                 response_static_message = get_static_follow_up_for_approval(state, user_intention)
                 message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QAPP_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -794,12 +821,16 @@ def handle_approval_query(
                     
                     if perfect_industry_data and perfect_location_data:
                         if state["Location_info"]["Area"] != "Not Available in List" or state["Location_info"]["City"] != "Not Available in List":
-                            message = f"We have identified location {(state['Location_info']['Area'] or state['Location_info']['City'])} for category {state['Industry_info']['Main-Industry']} based on your query. Please confirm if this information is correct"
-
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"QAPP_chat_{chatId}")
+                            selected_option = next(
+                            (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                            ''
+                            )
+                            message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                            dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                            chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
+                            save_chat(chat_history,f"chat_{chatId}")
                             response = {
-                                "Ai_response": message,
+                                "Ai_response": dynamic_confirmation_message,
                                 "Is_confirmation" : True,
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
@@ -809,7 +840,7 @@ def handle_approval_query(
                         else:
                             message = "Not Available In List"
                             chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"QAPP_chat_{chatId}")
+                            save_chat(chat_history,f"chat_{chatId}")
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -822,7 +853,7 @@ def handle_approval_query(
                         response_static_message = get_static_follow_up_for_approval(state, user_intention)
                         message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                         chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"QAPP_chat_{chatId}")
+                        save_chat(chat_history,f"chat_{chatId}")
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -839,7 +870,7 @@ def handle_approval_query(
                     if perfect_location_data:
                         message = "Not Available In List"
                         chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"QAPP_chat_{chatId}")
+                        save_chat(chat_history,f"chat_{chatId}")
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -852,7 +883,7 @@ def handle_approval_query(
                         response_static_message = get_static_follow_up_for_approval(state, user_intention)
                         message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                         chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"QAPP_chat_{chatId}")
+                        save_chat(chat_history,f"chat_{chatId}")
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -869,7 +900,7 @@ def handle_approval_query(
                 response_static_message = get_static_follow_up_for_approval(state, user_intention)
                 message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QAPP_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -886,7 +917,7 @@ def handle_approval_query(
             if perfect_location_data:
                 message = "Not Available In List"
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QAPP_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -899,7 +930,7 @@ def handle_approval_query(
                 response_static_message = get_static_follow_up_for_approval(state, user_intention)
                 message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QAPP_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -923,7 +954,6 @@ def handle_approval_query(
         extracted_state["Industry_info"]["Product"] = ind_extracted_data["Product"] if ind_extracted_data["Product"] != "None" else None
 
         if area_name != "Not Available in List" and main_industry_name != "Not Available in list":
-
             if area_name != "None":
                 parent_city = next((key for key, value in city_to_area_mapping.items() if area_name in value), None)
                 parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)
@@ -941,6 +971,7 @@ def handle_approval_query(
                 state["Location_info"]["Area"] = None
                 state["Location_info"]["City"] = None
                 state["Location_info"]["State"] = state_name
+                state["Only_State_Attempt_Count"] += 1
                 save_state(state,f"QAPP_state_{chatId}")
             else:
                 state["Location_info"]["Area"] = None
@@ -972,7 +1003,7 @@ def handle_approval_query(
                     save_state(state,f"QAPP_state_{chatId}")
                     message = "Not Available In List"
                     chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"QAPP_chat_{chatId}")
+                    save_chat(chat_history,f"chat_{chatId}")
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -992,18 +1023,22 @@ def handle_approval_query(
                 perfect_industry_data = True
             else:
                 perfect_industry_data = False
-            if state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None:
+            if (state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None) or (state["Only_State_Attempt_Count"] >= 2):
                 perfect_location_data = True
             else:
                 perfect_location_data = False
             
             if perfect_industry_data and perfect_location_data:
-                message = f"We have identified location {(state['Location_info']['Area'] or state['Location_info']['City'])} for category {state['Industry_info']['Main-Industry']} based on your query. Please confirm if this information is correct"
-
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QAPP_chat_{chatId}")
+                selected_option = next(
+                (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                ''
+                )
+                message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
-                    "Ai_response": message,
+                    "Ai_response": dynamic_confirmation_message,
                     "Is_confirmation" : True,
                     "Extracted Data": extracted_state,
                     "Validation Data": state,
@@ -1014,7 +1049,7 @@ def handle_approval_query(
                 response_static_message = get_static_follow_up_for_approval(state, user_intention)
                 message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QAPP_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1054,7 +1089,7 @@ def handle_approval_query(
                         save_state(state,f"QAPP_state_{chatId}")
                 message = "Not Available In List"
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QAPP_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1087,6 +1122,7 @@ def handle_approval_query(
                     state["Location_info"]["Area"] = None
                     state["Location_info"]["City"] = None
                     state["Location_info"]["State"] = state_name
+                    state["Only_State_Attempt_Count"] += 1
                     save_state(state,f"QAPP_state_{chatId}")
 
                 else:
@@ -1097,7 +1133,7 @@ def handle_approval_query(
                 
                 message = "Not Available In List"
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QAPP_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1116,7 +1152,7 @@ def handle_approval_query(
                 save_state(state,f"QAPP_state_{chatId}")
                 message = "Not Available In List"
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QAPP_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1130,7 +1166,7 @@ def handle_approval_query(
         response_static_message = get_static_follow_up_for_approval(state, user_intention)
         message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
         chat_history.append(AIMessage(content=message))  # Log user query
-        save_chat(chat_history,f"QAPP_chat_{chatId}")
+        save_chat(chat_history,f"chat_{chatId}")
         response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1218,6 +1254,8 @@ def call_handle_approval_query(user_input,chatId):
                 "Sub-Sector": None,
                 "Product": None,
             },
+            "KEYWORDS": None,
+            "Only_State_Attempt_Count": 0
         }
         save_state(state,f"QAPP_state_{chatId}")
     extracted_state = state.copy()

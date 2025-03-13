@@ -16,6 +16,7 @@ const getSiteName = () => {
   return import.meta.env.VITE_SITE_NAME
 
 }
+// console.log("socket port",import.meta.env.VITE_SOCKET_PORT,getSiteName());
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

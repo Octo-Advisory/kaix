@@ -10,10 +10,13 @@ import '../Chatscreen/Chatscreen.css';
 import userIcon from '../../assets/user.png'
 import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
-import { FrappeContext, useFrappeCreateDoc } from 'frappe-react-sdk'
+import { FrappeContext, useFrappeCreateDoc, useFrappeUpdateDoc } from 'frappe-react-sdk'
 import ProgressScreen from '../ProgressScreen/ProgressScreen'
 import { addAIresponse, clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
 import { addResult } from '../../Redux/Store/Featuresilces/validation'
+import { useTypewriter } from "react-simple-typewriter";
+import { useNavigate } from "react-router-dom";
+import Details from '../Details/Details';
 
 function Chatscreen() {
   const [message, setMessage] = useState('');
@@ -30,9 +33,21 @@ function Chatscreen() {
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const [isProgressVisible, setIsProgressVisible] = useState(false);
   const responseAi = useSelector((state) => state.ai.aiReponse)
-  
+  const [placeholder, setPlaceholder] = useState("");
+  const [charIndex, setCharIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const navigate = useNavigate();
   //Create frappe context to call apis
   const { call } = useContext(FrappeContext)
+
+  const suggestions = [
+    "I want to build industry....",
+    "I want to see incetives for cement factory....",
+    "I want to get approvals to setup industry....",
+    "I want to see employement....",
+    "I want suppliers for industry...."
+  ]
 
   const createSessionid = () => {
     const nowTime = new Date();
@@ -197,6 +212,8 @@ function Chatscreen() {
     }
   }
 
+  const { updateDoc } = useFrappeUpdateDoc()
+
   const handleConfirmation = async (response) => {
     setConfirmationPending(false);
     const confirmationMessage = {
@@ -216,22 +233,23 @@ function Chatscreen() {
 
     if (response == 'yes') {
       const validationResult = await hanldeValidation()
-      console.log("validation result", validationResult);
+      console.log("validation result from chatscreen", validationResult);
       // console.log("validation result1", validationResult[0]);
       const aiResp = validationResult && validationResult.length > 0
-    ? (validationResult[0] ? "Thank you for your response" : "We have your query, we will get back to you soon.")
-    : "We have your query, we will get back to you soon.";
-        const newAIMessage = {
-          sender: 'ai',
-          text: aiResp,
-          timestamp: new Date().toISOString(),
-        };
+        ? (validationResult[0] ? "Thank you for your response" : "We have your query, we will get back to you soon.")
+        : "We have your query, we will get back to you soon.";
+      const newAIMessage = {
+        sender: 'ai',
+        text: aiResp,
+        timestamp: new Date().toISOString(),
+      };
       dispatch(addMessage(newAIMessage));
       // if (validationResult[0]) {
-        setIsProgressVisible(true);
-        // setTimeout(() => {
-        //   setIsProgressVisible(true);
-        // }, 0); // Ensure setTimeout executes properly
+      setIsProgressVisible(true);
+      navigate("/progress");
+      // setTimeout(() => {
+      //   setIsProgressVisible(true);
+      // }, 0); // Ensure setTimeout executes properly
       // }
     } else {
       const newAIMessage = {
@@ -241,6 +259,14 @@ function Chatscreen() {
       };
       dispatch(addMessage(newAIMessage));
       dispatch(clearAiresponse())
+      try {
+        await updateDoc("Session", chatId, {
+          user_intension: "",
+        });
+        console.log("Updated Successfully");
+      } catch (err) {
+        console.error("Error Updating:", err);
+      }
     }
   };
 
@@ -254,6 +280,29 @@ function Chatscreen() {
       // return;    
     }
   }, [])
+
+  useEffect(() => {
+    const suggestion = suggestions[suggestionIndex];
+
+    if (!isDeleting && charIndex < suggestion.length) {
+      const timeout = setTimeout(() => {
+        setPlaceholder(suggestion.substring(0, charIndex + 1));
+        setCharIndex(charIndex + 1);
+      }, 50);
+      return () => clearTimeout(timeout);
+    } else if (isDeleting && charIndex > 0) {
+      const timeout = setTimeout(() => {
+        setPlaceholder(suggestion.substring(0, charIndex - 1));
+        setCharIndex(charIndex - 1);
+      }, 30);
+      return () => clearTimeout(timeout);
+    } else if (!isDeleting && charIndex === suggestion.length) {
+      setTimeout(() => setIsDeleting(true), 1000);
+    } else if (isDeleting && charIndex === 0) {
+      setIsDeleting(false);
+      setSuggestionIndex((prev) => (prev + 1) % suggestions.length);
+    }
+  }, [charIndex, suggestionIndex, isDeleting]);
 
   const ref = useChatScroll(messages);
 
@@ -327,37 +376,40 @@ function Chatscreen() {
         </div>
       )}
 
-      {isProgressVisible && (
+      {/* {isProgressVisible && (
         <div className="absolute top-0 left-0 right-0 bottom-0 bg-opacity-50 bg-black z-50 flex justify-center items-center">
           <ProgressScreen />
         </div>
-      )}
-      <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#19a282] rounded-full p-2 bg-white shadow-lg">
+      )} */}
+      <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#19a282] rounded-3xl p-2 bg-white shadow-lg">
         <div className="flex-grow">
-          <input
-            type="text-area"
-            placeholder="Message Mars 2.0"
-            className="w-full border-none outline-none bg-transparent text-[#242f6a] placeholder-[#242f6a] opacity-70 px-4 py-2"
+          <textarea
+            placeholder={messages.length > 0 ? "Message Mars 2.0" : placeholder}
+            className="w-full border-none outline-none bg-transparent text-black placeholder-[#242f6a] opacity-70 px-4 py-2 resize-none overflow-y-auto max-h-20 placeholder-opacity-75" // Adjusted classes
             value={message}
+            maxLength={250}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
                 if (!disabled) {
                   handleSendbtn();
                 }
               }
             }}
+            style={{ lineHeight: '1.5' }} //added line height to make it more readable.
           />
         </div>
 
         {message && (
-          <div className="cursor-pointer p-2" onClick={() => setMessage('')}>
+          <div className="cursor-pointer p-2" onClick={() => setMessage("")}>
             <AiOutlineClear size={24} className="text-[#242f6a]" />
           </div>
         )}
 
         <div
-          className={`cursor-pointer p-3 rounded-full transition ${disabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#19a282] hover:bg-[#217964]'}`}
+          className={`cursor-pointer p-3 rounded-full transition ${disabled ? "bg-gray-400 cursor-not-allowed" : "bg-[#19a282] hover:bg-[#217964]"
+            }`}
           onClick={!disabled ? handleSendbtn : null}
         >
           <FiSend size={28} className="text-white" />
@@ -367,6 +419,7 @@ function Chatscreen() {
       <div className="alert-msg mb-5">
         <p className='text-xs text-[#242f6a]'>Mars 2.0 can make mistakes. Check important info.</p>
       </div>
+      <Details />
     </div>
   );
 }

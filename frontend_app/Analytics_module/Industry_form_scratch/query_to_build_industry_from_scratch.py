@@ -926,7 +926,7 @@ def fetch_supply_data(industry_id, sub_sector_id=None, segment_id=None):
         supply_rules_query = f"""
         SELECT supply, minimum_supply_requirement, essential_items
         FROM `tabSupply Rules`
-        WHERE (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}')
+        WHERE (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment IS NULL)
         """
         results = fetch_query_results(supply_rules_query)
 

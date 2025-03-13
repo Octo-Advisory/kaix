@@ -1,6 +1,7 @@
 import frappe
 import requests
 import traceback
+from frontend_app.Mapping_module.distance import *
 
 @frappe.whitelist()
 def vendor_validation(param):
@@ -103,11 +104,14 @@ def vendor_validation(param):
             supply_check = verify_supply()
 
             if location_check != True:
-                return [False, location_check]
+                return  {'pass_to_analytics_module': False, 'log': location_check, 'latitude_longitude': 'None',"location_name":'None', 'from_gujarat': 'None'}
             elif location_check == True and industry_check != True and supply_check != True:
-                return [False,industry_check]
+                return  {'pass_to_analytics_module': False, 'log': industry_check, 'latitude_longitude': 'None',"location_name":'None', 'from_gujarat': 'None'}
             elif location_check == True and industry_check == True and supply_check != True:
-                return location_and_industry()
+                location_industry = location_and_industry()
+                location_details = location_industry.get('location_check')
+                industry_details = location_industry.get('industry_check')
+                # return {'pass_to_analytics_module'}
             elif location_check == True and industry_check != True and supply_check == True:
                 return location_and_supply()
             elif location_check == True and industry_check == True and supply_check == True:
@@ -116,32 +120,54 @@ def vendor_validation(param):
         def location_and_industry():
             # checking for industry first 
             industry_check = industry_info_check()
-            pass_to_analytics = industry_check.get('pass_to_analytics_module')
-            if pass_to_analytics:
+            pass_to_analytics_industry = industry_check.get('pass_to_analytics_module')
+            industry_log = industry_check.get('log')
+            supplies_with_no_vendors = industry_check.get('supplies_with_no_vendors')
+            if pass_to_analytics_industry:
                 location_check =  location_info_check()
-                return {"location_check":location_check,"industry_check": industry_check}
+                pass_to_analytics_location = location_check.get('pass_to_analytics')
+                latitude_longitude = location_check.get('latitude_longitude')
+                from_gujarat = location_check.get('from_gujarat')
+                location_name = location_check.get('location_name')
+                location_log = location_check.get('log')
+                if pass_to_analytics_location:
+                    return {'pass_to_analytics': True, 'log': f'location_log: {location_log}, industry_log: {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat }
+                else:
+                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, industry_log: {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': False }
             else:
-                return {"location_check":'Didnt executed the location check as industry check returned False', "industry_check": industry_check}
+                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': 'Didnt got any location', 'location_name':'Didnt got any location', 'from_gujarat': False }
 
         def location_and_supply():
             supply_check = supply_info_check()
-            pass_to_analytics = supply_check.get('pass_to_analytics_module')
-            if pass_to_analytics:
+            pass_to_analytics_supply = supply_check.get('pass_to_analytics_module')
+            supply_log = supply_check.get('log')
+            supplies_with_no_vendors = supply_check.get('supplies_with_no_vendors')
+            if pass_to_analytics_supply:
                 location_check = location_info_check()
-                return {'location_check':location_check, 'supply_check':supply_check}
+                pass_to_analytics_location = location_check.get('pass_to_analytics')
+                latitude_longitude = location_check.get('latitude_longitude')
+                from_gujarat = location_check.get('from_gujarat')
+                location_name = location_check.get('location_name')
+                location_log = location_check.get('log')
+                if pass_to_analytics_location:
+                    return {'pass_to_analytics': True, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat }
+                else:
+                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': False }
             else:
-                return {'location_check':'Didnt executed the location check as supply check returned False', 'supply_check':supply_check}
+                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': 'Didnt got any latitude longitudes', 'location_name':'Didnt got any location', 'from_gujarat': False }
+
         def geocode_check():
             geocode = get_geocode(location)
             latitude_longitude = geocode['location_info']['latitude_longitude']
             from_gujarat = geocode['location_info']['from_gujarat']
             from_india = geocode['location_info']['from_india']
+            location_name = geocode['location_info']['location_name']
 
             if latitude_longitude:
                 if from_india == False:
                     return [False,'Location was outside of India', 'didnt got from_gujarat']
                 else:
-                    return [True, latitude_longitude, from_gujarat]
+                    return [True, latitude_longitude, from_gujarat,location_name]
             else:
                 return [False,'Location function didnt returned any data', 'didnt got from_gujarat']
             
@@ -157,23 +183,24 @@ def vendor_validation(param):
                     else:
                         from_gujarat = False
                     if (latitude_longitude is not None) and (latitude_longitude != ''):
-                        return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude for the state', 'latitude_longitude': latitude_longitude, 'from_gujarat': from_gujarat}
+                        return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude for the state', 'latitude_longitude': latitude_longitude, "location_name":location, 'from_gujarat': from_gujarat}
                     else:
                         geocode = geocode_check()
                         if geocode[0] == False:
                             log = geocode[1]
-                            return {'pass_to_analytics_module': False, 'log': log, latitude_longitude: 'didnt got any latitude longitude', 'from_gujarat': False}
+                            return {'pass_to_analytics_module': False, 'log': log, latitude_longitude: 'didnt got any latitude longitude',"location_name":'Didnt got any location',  'from_gujarat': False}
                         else:
                             if len(state_check) == 1:
                                 lat_long = geocode[1]
                                 from_gujarat = geocode[2]
+                                location_name = geocode[3]
                                 updatequery = f"""UPDATE `tabState` SET latitude_longitude = '{lat_long}' where state_name = '{location}'"""
                                 frappe.db.sql(updatequery)
                                 #the above query needs to be executed
                                 frappe.db.commit() 
-                                return {"pass_to_analytics_module": True, 'log':f'State Table updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                return {"pass_to_analytics_module": True, 'log':f'State Table updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name, "from_gujarat": from_gujarat}
                             else:
-                                return {"pass_to_analytics_module": True, 'log':f'State Table not updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                return {"pass_to_analytics_module": True, 'log':f'State Table not updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
 
                 else:
                     query1 = f"""select state,city_name,name,latitude_longitude from `tabCity` where city_name = '{location}'"""
@@ -187,23 +214,24 @@ def vendor_validation(param):
                         else:
                             from_gujarat = False
                         if (latitude_longitude is not None) and (latitude_longitude != ''):
-                            return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude in City table instead of State', 'latitude_longitude': latitude_longitude, 'from_gujarat': from_gujarat}
+                            return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude in City table instead of State', 'latitude_longitude': latitude_longitude,"location_name":location, 'from_gujarat': from_gujarat}
                         else:
                             geocode = geocode_check()
                             if geocode[0] == False:
                                 log = geocode[1]
-                                return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude', 'from_gujarat': False}
+                                return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude',"location_name":'Didnt got any location', 'from_gujarat': False}
                             else:
                                 if len(city_check) == 1:
                                     lat_long = geocode[1]
                                     from_gujarat = geocode[2]
+                                    location_name = geocode[3]
                                     updatequery = f"""UPDATE `tabCity` SET latitude_longitude = '{lat_long}' where city_name = '{location}'"""
                                     frappe.db.sql(updatequery)
                                     #the above query needs to be executed
                                     frappe.db.commit() 
-                                    return {"pass_to_analytics_module": True, 'log':f'City Table updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                    return {"pass_to_analytics_module": True, 'log':f'City Table updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
                                 else:
-                                    return {"pass_to_analytics_module": True, 'log':f'City Table not updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                    return {"pass_to_analytics_module": True, 'log':f'City Table not updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
                     else:
                         query2 = f"""select state,name,latitude_longitude from `tabArea` where area_name = '{location}'"""
                         area_check = frappe.db.sql(query2, as_dict=True)
@@ -215,28 +243,34 @@ def vendor_validation(param):
                             else:
                                 from_gujarat = False
                             if (latitude_longitude is not None) and (latitude_longitude != ''):
-                                return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude in Area table instead of State', 'latitude_longitude': latitude_longitude, 'from_gujarat': from_gujarat}
+                                return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude in Area table instead of State', 'latitude_longitude': latitude_longitude,"location_name":location, 'from_gujarat': from_gujarat}
                             else:
                                 geocode = geocode_check()
                                 if geocode[0] == False:
                                     log = geocode[1]
-                                    return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude', 'from_gujarat': False}
+                                    return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude',"location_name":'Didnt got any location', 'from_gujarat': False}
                                 else:
                                     if len(area_check) == 1:
                                         lat_long = geocode[1]
                                         from_gujarat = geocode[2]
+                                        location_name = geocode[3]
                                         updatequery = f"""UPDATE `tabArea` SET latitude_longitude = '{lat_long}' where area_name = '{location}'"""
                                         frappe.db.sql(updatequery)
                                         #the above query needs to be executed
                                         frappe.db.commit() 
-                                        return {"pass_to_analytics_module": True, 'log':f'Area Table updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                        return {"pass_to_analytics_module": True, 'log':f'Area Table updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
                                     else:
-                                        return {"pass_to_analytics_module": True, 'log':f'Area Table not updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                        return {"pass_to_analytics_module": True, 'log':f'Area Table not updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
                         else: 
-                            geocode = geocode_check()
+                             geocode = geocode_check()
+                        if geocode[0] == False:
+                            log = geocode[1]
+                            return {"pass_to_analytics_module":False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude', "location_name":'Didnt got any location', 'from_gujarat': False}
+                        else:
                             lat_long = geocode[1]
                             from_gujarat = geocode[2]
-                            return {"pass_to_analytics_module": True, 'log':f'Didnt found the location in the databasee.. getting coordinates directly from map function', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                            location_name = geocode[3]
+                            return {"pass_to_analytics_module": True, 'log':f'Didnt found the location in the database.. getting coordinates directly from map function', 'latitude_longitude': lat_long, "location_name":location_name,"from_gujarat": from_gujarat}
                             
             elif location_category == 'City':
                 query1 = f"""select state,name,latitude_longitude from `tabCity` where city_name = '{location}'"""
@@ -249,23 +283,24 @@ def vendor_validation(param):
                     else:
                         from_gujarat = False
                     if (latitude_longitude is not None) and (latitude_longitude != ''):
-                        return {'pass_to_analytics_module': True, 'log': 'got the location in City table', 'latitude_longitude': latitude_longitude, 'from_gujarat': from_gujarat}
+                        return {'pass_to_analytics_module': True, 'log': 'got the location in City table', 'latitude_longitude': latitude_longitude,"location_name":location, 'from_gujarat': from_gujarat}
                     else:
                         geocode = geocode_check()
                         if geocode[0] == False:
                             log = geocode[1]
-                            return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude', 'from_gujarat': False}
+                            return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude',"location_name":'Didnt got any location', 'from_gujarat': False}
                         else:
                             if len(city_check) == 1:
                                 lat_long = geocode[1]
                                 from_gujarat = geocode[2]
+                                location_name = geocode[3]
                                 updatequery = f"""UPDATE `tabCity` SET latitude_longitude = '{lat_long}' where city_name = '{location}'"""
                                 frappe.db.sql(updatequery)
                                 #the above query needs to be executed
                                 frappe.db.commit() 
-                                return {"pass_to_analytics_module": True, 'log':f'City Table updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                return {"pass_to_analytics_module": True, 'log':f'City Table updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
                             else:
-                                return {"pass_to_analytics_module": True, 'log':f'City Table not updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                return {"pass_to_analytics_module": True, 'log':f'City Table not updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
 
                 else:
                     query2 = f"""select state,name,latitude_longitude from `tabArea` where area_name = '{location}'"""
@@ -278,22 +313,24 @@ def vendor_validation(param):
                         else:
                             from_gujarat = False
                         if (latitude_longitude is not None) and (latitude_longitude != ''):
-                            return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude in Area table instead of City', 'latitude_longitude': latitude_longitude, 'from_gujarat': from_gujarat}
+                            return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude in Area table instead of City', 'latitude_longitude': latitude_longitude,"location_name":location, 'from_gujarat': from_gujarat}
                         else:
                             geocode = geocode_check()
                             if geocode[0] == False:
                                 log = geocode[1]
-                                return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude', 'from_gujarat': False}
+                                return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude',"location_name":'Didnt got any location', 'from_gujarat': False}
                             else:
                                 if len(area_check) == 1:
                                     lat_long = geocode[1]
+                                    from_gujarat = geocode[2]
+                                    location_name = geocode[3]
                                     updatequery = f"""UPDATE `tabArea` SET latitude_longitude = '{lat_long}' where area_name = '{location}'"""
                                     frappe.db.sql(updatequery)
                                     #the above query needs to be executed
                                     frappe.db.commit() 
-                                    return {"pass_to_analytics_module": True, 'log':f'Area Table updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                    return {"pass_to_analytics_module": True, 'log':f'Area Table updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
                                 else:
-                                    return {"pass_to_analytics_module": True, 'log':f'Area Table not updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                    return {"pass_to_analytics_module": True, 'log':f'Area Table not updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
 
                     else: 
                         query3 = f"""select state_name,name, latitude_longitude from  `tabState` where state_name = '{location}'"""
@@ -306,28 +343,34 @@ def vendor_validation(param):
                             else:
                                 from_gujarat = False
                             if (latitude_longitude is not None) and (latitude_longitude != ''):
-                                return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude for the state instead of City', 'latitude_longitude': latitude_longitude, 'from_gujarat': from_gujarat}
+                                return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude for the state instead of City', 'latitude_longitude': latitude_longitude,"location_name":location, 'from_gujarat': from_gujarat}
                             else:
                                 geocode = geocode_check()
                                 if geocode[0] == False:
                                     log = geocode[1]
-                                    return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude', 'from_gujarat': False}
+                                    return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude',"location_name":'Didnt got any location', 'from_gujarat': False}
                                 else:
                                     if len(state_check) == 1:
                                         lat_long = geocode[1]
                                         from_gujarat = geocode[2]
+                                        location_name = geocode[3]
                                         updatequery = f"""UPDATE `tabState` SET latitude_longitude = '{lat_long}' where state_name = '{location}'"""
                                         frappe.db.sql(updatequery)
                                         #the above query needs to be executed
                                         frappe.db.commit() 
-                                        return {"pass_to_analytics_module": True, 'log':f'State Table updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                        return {"pass_to_analytics_module": True, 'log':f'State Table updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
                                     else:
-                                        return {"pass_to_analytics_module": True, 'log':f'State Table not updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                        return {"pass_to_analytics_module": True, 'log':f'State Table not updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
                         else:
-                            geocode = geocode_check()
+                             geocode = geocode_check()
+                        if geocode[0] == False:
+                            log = geocode[1]
+                            return {"pass_to_analytics_module":False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude', "location_name":'Didnt got any location', 'from_gujarat': False}
+                        else:
                             lat_long = geocode[1]
                             from_gujarat = geocode[2]
-                            return {"pass_to_analytics_module": True, 'log':f'Didnt found the location in the databasee.. getting coordinates directly from map function', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                            location_name = geocode[3]
+                            return {"pass_to_analytics_module": True, 'log':f'Didnt found the location in the database.. getting coordinates directly from map function', 'latitude_longitude': lat_long, "location_name":location_name,"from_gujarat": from_gujarat}
             elif location_category == 'Area':
                 query = f"""select state,name,latitude_longitude from `tabArea` where area_name = '{location}'"""
                 area_check = frappe.db.sql(query, as_dict=True)
@@ -339,23 +382,24 @@ def vendor_validation(param):
                     else:
                         from_gujarat = False
                     if (latitude_longitude is not None) and (latitude_longitude != ''):
-                        return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude for Area', 'latitude_longitude': latitude_longitude, 'from_gujarat': from_gujarat}
+                        return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude for Area', 'latitude_longitude': latitude_longitude,"location_name":location, 'from_gujarat': from_gujarat}
                     else:
                         geocode = geocode_check()
                         if geocode[0] == False:
                             log = geocode[1]
-                            return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude', 'from_gujarat': False}
+                            return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude',"location_name":'Didnt got any location', 'from_gujarat': False}
                         else:
                             if len(area_check) == 1:
                                 lat_long = geocode[1]
                                 from_gujarat = geocode[2]
+                                location_name = geocode[3]
                                 updatequery = f"""UPDATE `tabArea` SET latitude_longitude = '{lat_long}' where area_name = '{location}'"""
                                 frappe.db.sql(updatequery)
                                 #the above query needs to be executed
                                 frappe.db.commit() 
-                                return {"pass_to_analytics_module": True, 'log':f'Area Table updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                return {"pass_to_analytics_module": True, 'log':f'Area Table updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
                             else:
-                                return {"pass_to_analytics_module": True, 'log':f'Area Table not updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                return {"pass_to_analytics_module": True, 'log':f'Area Table not updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
 
                 else:
                     query1 = f"""select state,name,latitude_longitude from `tabCity` where city_name = '{location}'"""
@@ -368,12 +412,12 @@ def vendor_validation(param):
                         else:
                             from_gujarat = False
                         if (latitude_longitude is not None) and (latitude_longitude != ''):
-                            return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude for City instead of Area', 'latitude_longitude': latitude_longitude, 'from_gujarat': from_gujarat}
+                            return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude for City instead of Area', 'latitude_longitude': latitude_longitude,"location_name":location, 'from_gujarat': from_gujarat}
                         else:
                             geocode = geocode_check()
                             if geocode[0] == False:
                                 log = geocode[1]
-                                return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude', 'from_gujarat': False}
+                                return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude',"location_name":'Didnt got any location', 'from_gujarat': False}
                             else:
                                 if len(city_check) == 1:
                                     lat_long = geocode[1]
@@ -382,9 +426,9 @@ def vendor_validation(param):
                                     frappe.db.sql(updatequery)
                                     #the above query needs to be executed
                                     frappe.db.commit() 
-                                    return {"pass_to_analytics_module": True, 'log':f'City Table updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                    return {"pass_to_analytics_module": True, 'log':f'City Table updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
                                 else:
-                                    return {"pass_to_analytics_module": True, 'log':f'City Table not updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                    return {"pass_to_analytics_module": True, 'log':f'City Table not updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
 
                     else:
                         query2 = f"""select state_name,name,latitude_longitude from `tabState` where state_name = '{location}'"""
@@ -397,12 +441,12 @@ def vendor_validation(param):
                             else:
                                 from_gujarat = False
                             if (latitude_longitude is not None) and (latitude_longitude != ''):
-                                return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude for State instead of Area', 'latitude_longitude': latitude_longitude, 'from_gujarat': from_gujarat}
+                                return {'pass_to_analytics_module': True, 'log': 'got the latitude and longitude for State instead of Area', 'latitude_longitude': latitude_longitude,"location_name":location, 'from_gujarat': from_gujarat}
                             else:
                                 geocode = geocode_check()
                                 if geocode[0] == False:
                                     log = geocode[1]
-                                    return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude', 'from_gujarat': False}
+                                    return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude',"location_name":'Didnt got any location', 'from_gujarat': False}
                                 else:
                                     if len(state_check) == 1:
                                         lat_long = geocode[1]
@@ -410,15 +454,20 @@ def vendor_validation(param):
                                         frappe.db.sql(updatequery)
                                         #the above query needs to be executed
                                         frappe.db.commit() 
-                                        return {"pass_to_analytics_module": True, 'log':f'State Table updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                        return {"pass_to_analytics_module": True, 'log':f'State Table updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
                                     else:
-                                        return {"pass_to_analytics_module": True, 'log':f'State Table not updated for {location}', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                                        return {"pass_to_analytics_module": True, 'log':f'State Table not updated for {location}', 'latitude_longitude': lat_long,"location_name":location_name,"from_gujarat": from_gujarat}
 
                         else:
                             geocode = geocode_check()
+                        if geocode[0] == False:
+                            log = geocode[1]
+                            return {"pass_to_analytics_module":False, 'log': log, 'latitude_longitude': 'didnt got any latitude longitude', "location_name":'Didnt got any location', 'from_gujarat': False}
+                        else:
                             lat_long = geocode[1]
                             from_gujarat = geocode[2]
-                            return {"pass_to_analytics_module": True, 'log':f'Didnt found the location in the databasee.. getting coordinates directly from map function', 'latitude_longitude': lat_long,"from_gujarat": from_gujarat}
+                            location_name = geocode[3]
+                            return {"pass_to_analytics_module": True, 'log':f'Didnt found the location in the database.. getting coordinates directly from map function', 'latitude_longitude': lat_long, "location_name":location_name,"from_gujarat": from_gujarat}
                             
             else:
                 return 'Invalid Location Category'
@@ -609,69 +658,7 @@ def vendor_validation(param):
                 return {'pass_to_analytics_module':True, 'log': 'Found the vendors for the given supplies', 'supplies_with_no_vendors': supplies_with_no_vendors}
             else: 
                 return {'pass_to_analytics_module':False, 'log': 'There wasnt even a single vendor for any of the supplies in the database', 'supplies_with_no_vendors': 'Not a single vendor found'}
-                
-        def get_geocode(address):
-            if address  != None and address != "" and address != " ":
-                try:
-                    address = str(address)
-                    #API request
-                    url = f"https://maps.googleapis.com/maps/api/geocode/json?address={address}&key=AIzaSyCgESPN3REByWpiQYiRKGpDWwBZLwQEnVA"
-                    response = requests.get(url)
-                    data = response.json()  #parse the JSON data
-                
-                    if data['status'] == 'OK' and len(data['results']) > 0:
-                        formatted_address = data['results'][0]['formatted_address']
-                        location = data['results'][0]['geometry']['location']
-                        latitude_longitude = f"{location['lat']},{location['lng']}"
-                        location_name = data['results'][0]['address_components'][0]['long_name']
-                    
-                        from_gujarat = "Gujarat" in formatted_address
-                        from_india = "India" in formatted_address
-                    
-                        return {
-                            'location_info': {
-                                'location_name': location_name,
-                                'latitude_longitude': latitude_longitude,
-                                'from_gujarat': from_gujarat,
-                                'from_india': from_india,
-                            },
-                            'isError': False
-                        }
-                    else:
-                        #no valid result found, return False
-                        return {
-                            'location_info': {
-                                'location_name': None,
-                                'latitude_longitude': None,
-                                'from_gujarat': None,
-                                'from_india': None,
-                            },
-                            'isError': False
-                        }
-        
-                except Exception as e:
-                    # If any error occurs,
-                    return {
-                        'location_info': {
-                            'location_name': None,
-                            'latitude_longitude': None,
-                            'from_gujarat': None,
-                            'from_india': None,
-                        },
-                        'isError': True,
-                        'error_message': str(e)  
-                    }
-            else:
-                return {
-                        'location_info': {
-                            'location_name': None,
-                            'latitude_longitude': None,
-                            'from_gujarat': None,
-                            'from_india': None,
-                        },
-                        'isError': False
-                }
-            
+                        
         return parameter_check()
     except Exception as e:
         error_message = traceback.format_exc()

@@ -4,12 +4,13 @@ from typing import List, Dict, Tuple, Union
 from click import prompt
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from frontend_app.Ai_module.Query_Classification_And_Analysis import refine_query_with_history, llm_70b_vers,llm_70b_vers_creative,extract_location_from_query,extract_main_industry_and_product_universal,extract_comparison_locations,extract_segment_and_product_universal,extract_sub_sector_and_product_universal
+from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 from langchain.schema import HumanMessage, AIMessage
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,save_state,get_chat,get_state
 from datetime import datetime
 import json
+from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 def fetch_query_results(query):
     """
@@ -65,6 +66,7 @@ def refine_query_with_history_for_incentive(history, latest_query, llm):
     )
     chain = prompt | llm
     refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
+    update_llm_token(refined_query)
     refined_text = refined_query.content.strip()
     
     # Extract the reformulated standalone query
@@ -79,11 +81,10 @@ def refine_query_with_history_for_incentive(history, latest_query, llm):
 def classify_incentive_query(query, llm):
     """
     Classify the user's incentive search query into the following categories:
-    1. Incentive Search for individual area, city, or state.
-    2. Comparison between cities, states, or areas.
-    3. Comparison between industries or sub-sectors.
-    4. Incentive Search for individual industry without location.
-    5. Other Intent.
+    1. Incentive Search for area, city, or state without industry
+    2. Incentive Search for industry without location
+    3. Incentive Search for area, city, or state with industry
+    4. Other Intent
 
     Args:
         query (str): The user's input query.
@@ -131,6 +132,7 @@ def classify_incentive_query(query, llm):
     chain = prompt_template | llm
     # Run the chain and capture the response
     response = chain.invoke({"query": query})
+    update_llm_token(response)
 
     # Use regex to extract a valid classification number
     match = re.search(r"^\s*([1-4])\s*$", response.content.strip())
@@ -167,74 +169,106 @@ def generate_dynamic_message_for_incentive(chat_history_for_context: List[dict],
     You are a highly skilled assistant specializing in creating professional, engaging, and contextually relevant messages.
     Your goal is to craft a polished follow-up message that seamlessly incorporates the provided static follow-up message while aligning with the tone and context of the recent conversation.
 
-    Inputs:
-    1. User’s Latest Message:
-    - This is the most recent message from the user. Use this to determine the appropriate tone, greetings, or redirection.
-    - {user_message}
+    ---
 
-    2. Recent Conversation History:
-    - This contains past exchanges between the user and the assistant.
-    - Use this context only to understand the flow of the conversation.
-    - Do NOT infer, assume, or include any industry details (Industry, Sub-Sector, Product) or location details (Area, City, State) from the history or the user’s latest message unless explicitly mentioned in the static follow-up message.
-    - {recent_history}
+    Key Instructions
 
-    3. Static Follow-Up Message:
-    - This is the core message that must be delivered to the user.
-    - Your task is to naturally incorporate this message into the final response.
-    - Static Message: "{static_follow_up}"
+    1. Strict Focus on Incentive-Related Queries  
+    - Only include incentive-related details in the follow-up message, even if the user query mentions multiple topics.  
+    - If the user mentions employment, approvals, vendors, or any other unrelated terms, completely exclude them from the response.  
+    - Regardless of any other mentioned topics, incentive-related words should always appear in the response.  
 
-    Response Guidelines:
+    Example Correction:  
+    - User Query: "I want to search for incentives and employment."  
+    - Wrong Response: "I can assist with incentives and employment-related searches."  
+    - Correct Response: "Could you specify the industry or location for which you're looking for incentives?"  
 
-    - Strict Industry & Location Handling:
-    - Do NOT infer or assume any Industry (Industry, Sub-Sector, Product) or location (Area, City, State) from the user’s latest message or the conversation history.
-    - Only include these details if they are explicitly mentioned in the static follow-up message.
-    - If no industry or location is provided in the static follow-up, do NOT include one in the generated response.
+    2. Strict Industry & Location Handling  
+    - Do NOT infer, assume, or use any Industry (Industry, Sub-Sector, Product) or location (Area, City, State) from the user’s message or conversation history.  
+    - Only include these details if they are explicitly mentioned in the static follow-up message.  
+    - If no industry or location is provided in the static follow-up, do NOT include one in the generated response.  
 
-    - Handling Missing Information:
-    - If only industry-related details (Industry, Sub-Sector, or Product) are missing, politely ask the user to provide them.
-    - If only location details (Area, City, or State) are missing, politely ask the user for the location.
-    - If both industry and location details are missing, request both details in a natural and concise manner.
-    - Ensure the request for missing details is smooth and seamlessly transitions from the static follow-up message.
+    3. Handling Placeholders Like "None" or "Not Available in List"  
+    - If the static message contains placeholders such as `"None"` or `"Not Available in List"`, ignore these terms completely.  
+    - NEVER include them in the response.  
 
-    - Ensuring Smooth Transitions with Proper Conjunctions:
-    - Always use proper conjunctions (e.g., *Additionally, Furthermore, To proceed further, To assist you better, On another note, As a next step, In addition, Also*) to ensure the transition from the user’s message to the follow-up message feels natural and fluid.
-    - The transition should not feel abrupt or disconnected but should logically connect the user’s message with the static follow-up message.
+    4. Handling Off-Topic Queries  
+    - If the user’s query is **completely unrelated to incentives**, politely inform them:  
+    - "I specialize in assisting with incentive-related queries for industries and locations."  
+    - However, **DO NOT include this statement if the user query is partially relevant to incentives** or if incentives are mentioned alongside other topics.  
+    - Instead, generate a relevant response by **only focusing on the incentive-related part of the query** while ignoring unrelated topics.  
+    - DO NOT attempt to answer fully off-topic queries. Instead, smoothly transition to the static follow-up message.
 
-    - Natural and Engaging Tone:
-    - The response should feel like a smooth continuation of the conversation without sounding mechanical or scripted.
-    - Avoid robotic acknowledgments or unnecessary phrases such as:
-        - "I wanted to follow up on..."
-        - "I am here to assist with..."
-        - "It seems you are asking about..."
+    Example Correction:  
+    - User Query: "Tell me about tourism in Paris."  
+    - Correct Response: "I specialize in assisting with incentive-related queries for industries and locations."  
+    - User Query: "I want to search for incentives and vendors."  
+    - Correct Response: "Could you specify the industry or location for which you're looking for incentives?" (Vendor mention ignored)  
 
-    - Handling Greetings:
-    - If the user greets (e.g., "Hi", "Hello", "Good morning"), respond with an appropriate greeting.
-    - Ensure the transition to the follow-up message is smooth and natural using proper conjunctions.
+    5. Handling Missing Information  
+    - If only industry-related details (Industry, Sub-Sector, or Product) are missing, politely ask the user to provide them.  
+    - If only location details (Area, City, or State) are missing, politely ask the user for the location.  
+    - If both industry and location details are missing, request both in a natural and concise manner.  
+    - Ensure the request for missing details is seamlessly connected to the static follow-up message.  
 
-    - Handling Off-Topic Queries:
-    - If the user’s query is unrelated to industry or incentives, politely inform them:
-        - "I specialize in assisting with incentive-related queries for industries and locations."
-    - Do NOT engage with the off-topic query but redirect to the static follow-up message with a smooth transition.
+    6. Ensuring Smooth Transitions with Proper Conjunctions  
+    - Analyze the static follow-up message before adding conjunctions.  
+    - If the message already has a natural transition, do not add unnecessary conjunctions.  
+    - If the static message consists of two distinct parts (acknowledgment + request for details), use a conjunction where appropriate, such as:  
+    - "Additionally, Furthermore, To proceed further, To assist you better, On another note, As a next step, In addition, Also"  
 
-    - Handling Special Events:
-    - If the user mentions a special occasion (e.g., birthday, anniversary), acknowledge and celebrate it first.
-    - Then transition smoothly into the static follow-up message using proper conjunctions.
+    7. Natural and Engaging Tone  
+    - The response should feel like a smooth continuation of the conversation without sounding mechanical or scripted.  
+    - Avoid robotic acknowledgments or unnecessary phrases such as:  
+    - "I wanted to follow up on..."  
+    - "I am here to assist with..."  
+    - "It seems you are asking about..."  
 
-    - Handling Negative Emotions:
-    - If the user expresses sadness, frustration, or anger, address their emotions with empathy first.
-    - Then transition seamlessly into the static follow-up message using a natural, logical flow.
+    8. Handling Greetings  
+    - If the user greets (e.g., "Hi", "Hello", "Good morning"), respond with an appropriate greeting.  
+    - Ensure the transition to the follow-up message is smooth and natural using proper conjunctions.  
 
-    Additional Instructions:
-    1. Do NOT include any reasons, explanations, or assumptions about the static follow-up or user query (e.g., "I’ve reviewed our conversation" or "It seems you are asking about...").
-    2. Ensure transitions between the user’s input and the static follow-up message are smooth and cohesive, avoiding abrupt changes or unrelated statements.
-    3. Use proper conjunctions to make the response feel fluid and natural.
-    4. Keep the response concise, limiting it to two or three short sentences, while fully incorporating the static follow-up message.
-    5. Ensure the message is professional, user-friendly, and free of unnecessary elaboration or additional context.
+    9. Handling Special Events  
+    - If the user mentions a special occasion (e.g., birthday, anniversary), acknowledge and celebrate it first.  
+    - Then, transition smoothly into the static follow-up message using proper conjunctions.  
 
-    Output:
-    - Generate a concise, polished response that aligns with the tone of the user’s latest message.
-    - Seamlessly integrate the static follow-up message while adhering to all guidelines.
-    - Do NOT include any industry details (Industry, Sub-Sector, Product) or location details (Area, City, State) in the response unless explicitly mentioned in the static follow-up message.
+    10. Handling Negative Emotions  
+    - If the user expresses sadness, frustration, or anger, address their emotions with empathy first.  
+    - Then, transition seamlessly into the static follow-up message using a natural, logical flow.  
+
+    11. Ensuring Conciseness (Maximum 3 Lines)  
+    - The response must be concise—a maximum of 3 lines while fully incorporating the static follow-up message.  
+    - Ensure the message is professional, user-friendly, and free of unnecessary elaboration or additional context.  
+
+    ---
+
+    Inputs  
+    1. User’s Latest Message  
+    - This is the most recent message from the user. Use this to determine the appropriate tone, greetings, or redirection.  
+    - {user_message}  
+
+    2. Recent Conversation History  
+    - This contains past exchanges between the user and the assistant.  
+    - Chat history is only for reference. Do NOT infer, assume, or use any details about industry or location unless explicitly mentioned in the static follow-up message.  
+    - {recent_history}  
+
+    3. Static Follow-Up Message  
+    - This is the reference message containing the key details to be included in the final response.  
+    - Your task is to reword and refine this message into a polished, professional, and conversational follow-up.  
+    - Static Message: "{static_follow_up}"  
+
+    ---
+
+    Final Output Requirements  
+    - Do NOT copy the static follow-up message word-for-word.  
+    - Do NOT include placeholders like `"None"` or `"Not Available in List"`.  
+    - Do NOT infer or use industry/location details unless explicitly mentioned in the static follow-up message.  
+    - Do NOT answer off-topic queries—redirect them properly.  
+    - Only use "I specialize in assisting with incentive-related queries" if the query is truly off-topic.  
+    - If the query mentions incentives but also includes unrelated topics, ignore the unrelated topics and **only focus on incentives** in the response.  
+    - Craft a clear, polished response that aligns with the user’s latest message.  
+    - Ensure a smooth and engaging conversational flow with proper conjunctions.  
+    - Keep the response concise (maximum 3 lines).  
     """
 
 
@@ -249,11 +283,12 @@ def generate_dynamic_message_for_incentive(chat_history_for_context: List[dict],
         "recent_history": recent_history,
         "static_follow_up": static_follow_up
     })
+    update_llm_token(message)
     
     # Append AI message to chat history
-    chat_history = get_chat(f"QINC_chat_{chatId}") or []
+    chat_history = get_chat(f"chat_{chatId}") or []
     chat_history.append(AIMessage(content=f"{message.content.strip()}"))
-    save_chat(chat_history,f"QINC_chat_{chatId}")
+    save_chat(chat_history,f"chat_{chatId}")
     return message.content.strip()
 
 # Get available area, city, state
@@ -274,7 +309,7 @@ def get_available_area_city_state():
 
     # Create a DataFrame from the result
     columns = ["area_name", "city_name", "state_name"]
-    df_area_for_incentive_extraction = pd.DataFrame(result_of_query, columns=columns)
+    df_area_for_incentive_extraction = pd.DataFrame(result_of_query, columns=columns) 
     df_area_for_incentive_extraction = df_area_for_incentive_extraction.drop_duplicates()
 
     city_area_mapped_dict =  df_area_for_incentive_extraction.groupby("city_name")["area_name"].apply(list).to_dict()
@@ -291,26 +326,31 @@ def get_available_area_city_state():
 # Entry point of Incentive search
 def call_incentive_search(input,chatId):
     log_to_file("----","--------------")
-    chat_history = get_chat(f"QINC_chat_{chatId}") or []
+    chat_history = get_chat(f"chat_{chatId}") or []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     refine_user_input = refine_query_with_history_for_incentive(Chat_history_normal,input,llm_70b_vers)
     chat_history.append(HumanMessage(content=refine_user_input))
-    save_chat(chat_history,f"QINC_chat_{chatId}")
+    save_chat(chat_history,f"chat_{chatId}")
     state = get_state(f"QINC_state_{chatId}") or None
     if not state:
-        state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None'}
+        state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None', "KEYWORDS": None, "Only_State_Attempt_Count": 1}
         save_state(state,f"QINC_state_{chatId}")
     log_to_file("state1",state)
-    query_intent = classify_incentive_query(refine_user_input,llm=llm_70b_vers)
+    query_intent = classify_incentive_query(input,llm=llm_70b_vers)
     query_intent = query_intent['classification_category']
     log_to_file("query intent",query_intent)
+
+    keyword_dict = extract_keywords_from_query(refine_user_input, field_with_description["Query to search Incentives"], module_names_list, llm_70b_vers, "Query to search Incentives")
+    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    save_state(state,f"QINC_state_{chatId}")
+
     if query_intent == 'Other Intent':
         static_follow_up = "Could you provide specific query?"
         message = generate_dynamic_message_for_incentive(Chat_history_normal,static_follow_up,refine_user_input,llm_70b_vers_creative,chatId)
         response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
-                    "State" : state
+                    "State" : state 
                 }
         return response
     else:
@@ -345,9 +385,16 @@ def call_incentive_search(input,chatId):
                 return response
             else:
                 if location_follow_up == 'None':
-                    message = "we have found something for you"
+                    selected_option = next(
+                    (state.get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
+                    ''
+                    )
+                    message = f"We have identified, you are looking for incentives related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=f"{dynamic_confirmation_message}"))
+                    save_chat(chat_history,chatId=chatId)
                     response = {
-                        "Ai_response": message,
+                        "Ai_response": dynamic_confirmation_message,
                         "Is_confirmation" : True,
                         "State" : state
                     }
@@ -431,8 +478,11 @@ def get_location_from_query(user_query,area_list,city_list,state_list,city_area_
         if state['Area'] == state['City'] == state['State'] == "Not Available in List":
             return "Could you provide the area, city, or state? This will help me give you better details."
         if state['Area'] == 'None' and state['City'] == 'None':
-            if state['State'] != 'None':
+            if state['State'] != 'None' and state["Only_State_Attempt_Count"] <2:
+                state["Only_State_Attempt_Count"] += 1
                 return "Got the state! Could you specify the city or area for more details?"
+            elif state['State'] != 'None' and state["Only_State_Attempt_Count"] >=2:
+                return 'None'
             else:
                 return "Could you provide the area, city, or state? This will help me give you better details."
         else:

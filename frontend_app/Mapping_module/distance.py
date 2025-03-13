@@ -160,12 +160,8 @@ def CalculatePropSubstationDistance():
 @frappe.whitelist()
 def CalculatePropVenDistance(data):
     try:
-        
-        log_to_file("Data in input",data)
         source, destinations = data["Property"], data["Vendor"]
         profile = "mapbox/driving"
-        log_to_file("source",source)
-        log_to_file("destination",destinations)
         invalidProperty = []
         invalidVendor = []
 
@@ -218,7 +214,6 @@ def CalculatePropVenDistance(data):
         access_token = "" 
         dest=""
         batches = createBatch(destinations)
-        log_to_file("source",source)
         for sourceitem in source:
             lat, lon, *_ = sourceitem['latlong'].split(',')
             sourceitem['latlong'] = f"{lon.strip()},{lat.strip()}"
@@ -233,7 +228,6 @@ def CalculatePropVenDistance(data):
                     url = f"https://api.mapbox.com/directions-matrix/v1/{profile}/{sourceitem['latlong']};{dest}?sources=0&access_token={access_token}&annotations=distance"
                 response = requests.get(url)
                 responseJson = (response.json())  # Convert the response to JSON
-                log_to_file("responseJson",responseJson)
                 # Check if the request was successful
                 if response.status_code == 200:           
                     if len(destinations)>1:
@@ -281,123 +275,173 @@ def CalculatePropVenDistance(data):
                 file.write(f"\nException from here {e}")
         return {"IsError":True,"result":{},"InvalidProperty":invalidProperty,"InvalidVendor":invalidVendor,"error_message":str(e)}
 
+
+# def get_geocode(address):
+#     isProcessFurther = checkApiThreshold("Goolge Geocoding Api")
+#     if(isProcessFurther):
+#         if address  != None and address != "" and address != " ":
+#                     try:
+#                         actualAddress = copy.deepcopy(address)
+#                         address = str(address).upper()
+#                         updatedAddress = address+",Gujarat"
+#                         #API request
+#                         url = f"https://maps.googleapis.com/maps/api/geocode/json?address={updatedAddress}&key=AIzaSyCgESPN3REByWpiQYiRKGpDWwBZLwQEnVA"
+#                         response = requests.get(url)
+#                         data = response.json()  #parse the JSON data
+                        
+#                         if data['status'] == 'OK' and len(data['results']) > 0:
+#                             for item in data['results']:
+#                                 formatted_address = item['formatted_address']
+#                                 formatted_address = formatted_address.upper()
+#                                 frappe.log_error(formatted_address)
+#                                 isAddressPresent = address in formatted_address
+#                                 frappe.log_error(isAddressPresent)
+#                                 if isAddressPresent:
+                                    
+#                                     location = item['geometry']['location']
+#                                     latitude_longitude = f"{location['lat']},{location['lng']}"
+#                                     # location_name = item['address_components'][0]['long_name']
+#                                     isAddressPresent = address in formatted_address
+#                                     from_gujarat = "Gujarat" in formatted_address
+#                                     from_india = "India" in formatted_address
+#                                     return {
+#                                         'location_info': {
+#                                             'location_name': actualAddress,
+#                                             'latitude_longitude': latitude_longitude,
+#                                             'from_gujarat': from_gujarat,
+#                                             'from_india': from_india,
+#                                         },
+#                                         'isError': False
+#                                     }
+#                             # formatted_address = data['results'][0]['formatted_address']
+#                             # location = data['results'][0]['geometry']['location']
+#                             # latitude_longitude = f"{location['lat']},{location['lng']}"
+#                             # location_name = data['results'][0]['address_components'][0]['long_name']
+                            
+#                             # from_gujarat = "Gujarat" in formatted_address
+#                             # from_india = "India" in formatted_address
+                            
+#                             return {
+#                                 'location_info': {
+#                                     'location_name': None,
+#                                     'latitude_longitude': None,
+#                                     'from_gujarat': None,
+#                                     'from_india': None,
+#                                 },
+#                                 'isError': False
+#                             }
+#                         else:
+#                             #no valid result found, return False
+#                             return {
+#                                 'location_info': {
+#                                     'location_name': None,
+#                                     'latitude_longitude': None,
+#                                     'from_gujarat': None,
+#                                     'from_india': None,
+#                                 },
+#                                 'isError': True,
+#                                 'error_message':data['status']
+#                             }
+
+#                     except Exception as e:
+#                         # If any error occurs,
+#                         return {
+#                             'location_info': {
+#                                 'location_name': None,
+#                                 'latitude_longitude': None,
+#                                 'from_gujarat': None,
+#                                 'from_india': None,
+#                             },
+#                             'isError': True,
+#                             'error_message': str(e)  
+#                         }
+#         else:
+#             return {
+#                     'location_info': {
+#                         'location_name': None,
+#                         'latitude_longitude': None,
+#                         'from_gujarat': None,
+#                         'from_india': None,
+#                     },
+#                     'isError': True,
+#                     'error_message': "Invalid Address" 
+#             }
+#     else:
+#         return {
+#             'location_info': {
+#                 'location_name': None,
+#                 'latitude_longitude': None,
+#                 'from_gujarat': None,
+#                 'from_india': None,
+#             },
+#             'isError': True,
+#             'error_message': "Api Limit Exceed"  
+#         }
 @frappe.whitelist()
 def get_geocode(address):
+    def callApi(url):
+        response = requests.get(url)
+        data = response.json()  #parse the JSON data
+        return data
+    def returnResult(location_name=None,latitude_longitude=None,from_gujarat=None,from_india=None,isError=False,error_message=None):
+        return {
+            'location_info': {
+                'location_name': location_name,
+                'latitude_longitude': latitude_longitude,
+                'from_gujarat': from_gujarat,
+                'from_india': from_india,
+            },
+            'isError': isError,
+            'error_message':error_message
+        }
     isProcessFurther = checkApiThreshold("Goolge Geocoding Api")
     if(isProcessFurther):
         if address  != None and address != "" and address != " ":
                     try:
                         actualAddress = copy.deepcopy(address)
                         address = str(address).upper()
-                        updatedAddress = address+",Gujarat"
                         #API request
-                        url = f"https://maps.googleapis.com/maps/api/geocode/json?address={updatedAddress}&key=AIzaSyCgESPN3REByWpiQYiRKGpDWwBZLwQEnVA"
-                        response = requests.get(url)
-                        data = response.json()  #parse the JSON data
+                        url = f"https://maps.googleapis.com/maps/api/geocode/json?address={address}&key=AIzaSyCgESPN3REByWpiQYiRKGpDWwBZLwQEnVA"
+                        data = callApi(url)
                         
                         if data['status'] == 'OK' and len(data['results']) > 0:
-                            for item in data['results']:
-                                formatted_address = item['formatted_address']
+                                formatted_address = data['results'][0]['formatted_address']
                                 formatted_address = formatted_address.upper()
-                                frappe.log_error(formatted_address)
-                                isAddressPresent = address in formatted_address
-                                frappe.log_error(isAddressPresent)
-                                if isAddressPresent:
-                                    
-                                    location = item['geometry']['location']
-                                    latitude_longitude = f"{location['lat']},{location['lng']}"
-                                    # location_name = item['address_components'][0]['long_name']
+                                location = data['results'][0]['geometry']['location']
+                                latitude_longitude = f"{location['lat']},{location['lng']}"
+                                from_gujarat = "GUJARAT" in formatted_address
+                                from_india = "INDIA" in formatted_address
+                                return returnResult(actualAddress,latitude_longitude,from_gujarat,from_india,False,None)
+
+                        elif data['status'] == 'ZERO_RESULTS' or len(data['results']) <= 0:
+                            updatedAddress = address+",Gujarat"
+                            url = f"https://maps.googleapis.com/maps/api/geocode/json?address={updatedAddress}&key=AIzaSyCgESPN3REByWpiQYiRKGpDWwBZLwQEnVA"
+                            data = callApi(url)
+                            if data['status'] == 'OK' and len(data['results']) > 0:
+                                for item in data['results']:
+                                    formatted_address = item['formatted_address']
+                                    formatted_address = formatted_address.upper()                                    
                                     isAddressPresent = address in formatted_address
-                                    from_gujarat = "Gujarat" in formatted_address
-                                    from_india = "India" in formatted_address
-                                    return {
-                                        'location_info': {
-                                            'location_name': actualAddress,
-                                            'latitude_longitude': latitude_longitude,
-                                            'from_gujarat': from_gujarat,
-                                            'from_india': from_india,
-                                        },
-                                        'isError': False
-                                    }
-                            # formatted_address = data['results'][0]['formatted_address']
-                            # location = data['results'][0]['geometry']['location']
-                            # latitude_longitude = f"{location['lat']},{location['lng']}"
-                            # location_name = data['results'][0]['address_components'][0]['long_name']
-                            
-                            # from_gujarat = "Gujarat" in formatted_address
-                            # from_india = "India" in formatted_address
-                            
-                            return {
-                                'location_info': {
-                                    'location_name': None,
-                                    'latitude_longitude': None,
-                                    'from_gujarat': None,
-                                    'from_india': None,
-                                },
-                                'isError': False
-                            }
+                                
+                                    if isAddressPresent:                                    
+                                        location = item['geometry']['location']
+                                        latitude_longitude = f"{location['lat']},{location['lng']}"                                    
+                                        
+                                        from_gujarat = "GUJARAT" in formatted_address
+                                        from_india = "INDIA" in formatted_address
+                                        return returnResult(actualAddress,latitude_longitude,from_gujarat,from_india,False,None)
+
+                                return returnResult(None,None,None,None,False,None)
                         else:
                             #no valid result found, return False
-                            return {
-                                'location_info': {
-                                    'location_name': None,
-                                    'latitude_longitude': None,
-                                    'from_gujarat': None,
-                                    'from_india': None,
-                                },
-                                'isError': True,
-                                'error_message':data['status']
-                            }
+                            return returnResult(None,None,None,None,False,None)
 
                     except Exception as e:
                         # If any error occurs,
-                        return {
-                            'location_info': {
-                                'location_name': None,
-                                'latitude_longitude': None,
-                                'from_gujarat': None,
-                                'from_india': None,
-                            },
-                            'isError': True,
-                            'error_message': str(e)  
-                        }
+                        return returnResult(None,None,None,None,True,str(e))                        
+ 
         else:
-            return {
-                    'location_info': {
-                        'location_name': None,
-                        'latitude_longitude': None,
-                        'from_gujarat': None,
-                        'from_india': None,
-                    },
-                    'isError': True,
-                    'error_message': "Invalid Address" 
-            }
+            return returnResult(None,None,None,None,True, "Invalid Address")
     else:
-        return {
-            'location_info': {
-                'location_name': None,
-                'latitude_longitude': None,
-                'from_gujarat': None,
-                'from_india': None,
-            },
-            'isError': True,
-            'error_message': "Api Limit Exceed"  
-        }
-
-
-def log_to_file(key,value):
-    """
-    Logs key-value data to a file with a timestamp.
-    
-    :param filename: Name of the log file.
-    :param data: Key-value pairs to log.
-    """
-    log_entry = {
-        "t": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        f"{key}" : value
-    }
-    
-    with open("log2.txt", "a", encoding="utf-8") as file:
-        file.write(json.dumps(log_entry) + "\n")
-
+        return returnResult(None,None,None,None,True, "Api Limit Exceed")
 

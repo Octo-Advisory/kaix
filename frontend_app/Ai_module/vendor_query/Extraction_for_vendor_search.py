@@ -4,12 +4,13 @@ import pandas as pd
 from typing import List, Dict, Tuple, Union, Any, Optional
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers,llm_70b_vers_creative, extract_main_industry_and_product_universal, extract_sub_sector_and_product_universal, extract_segment_and_product_universal
+from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 from langchain.schema import HumanMessage, AIMessage
 from rapidfuzz import process, fuzz
 import spacy
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
+from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 warnings.filterwarnings("ignore")
 
@@ -99,6 +100,7 @@ def refine_query_with_history_for_vendor(history, latest_query, llm):
    # Invoke the LLM chain
    chain = prompt | llm
    refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
+   update_llm_token(refined_query)
    refined_text = refined_query.content.strip()
 
    # Extract the reformulated standalone query
@@ -221,6 +223,7 @@ def classify_vendor_query(query, llm):
    chain = prompt_template | llm
    # Run the chain and capture the response
    response = chain.invoke({"query": query})
+   update_llm_token(response)
 
    # Use regex to extract a valid classification number
    match = re.search(r"^\s*([1-6])\s*$", response.content.strip())
@@ -290,12 +293,16 @@ def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
    - If the location is outside India, set `"From_India": "No"`.
    - Assume that most locations mentioned will be from India.
 
-   6. Ensure the Official Location Name is Used (Without Unnecessary Changes):
-   - If a location has multiple variants, use the official name, but ONLY if it is widely accepted.
-   - Examples:
-      - "Bombay" → "Mumbai"
-      - "Calcutta" → "Kolkata"
-      - "Madras" → "Chennai"
+   6. Ensure the Official Location Name is Used:
+   - If the location has multiple variants, always return the official name of the location instead of alternative or outdated names.
+   - Some common examples:
+       - "Bombay" → "Mumbai"
+       - "Baroda" → "Vadodara"
+       - "Kashi" → "Varanasi"
+       - "Calcutta" → "Kolkata"
+       - "Bangalore" → "Bengaluru"
+       - "Pondicherry" → "Puducherry"
+   - Ensure all locations are recognized and standardized to their official designation.
    - Do NOT change names that are already valid and contextually correct.
 
    7. Only Return a Location if One is Mentioned:
@@ -326,6 +333,7 @@ def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
 
    # Run the LLM chain
    response = chain.invoke({"query": user_input})
+   update_llm_token(response)
 
    # Extract the response content
    extracted_data = response.content.strip()
@@ -475,6 +483,7 @@ def extract_supplies_from_query(user_input: str, available_supplies: List[str], 
 
     # Run the LLM chain
     response = chain.invoke({"query": user_input})
+    update_llm_token(response)
 
     # Extract supplies from the model response
     supplies_match = re.search(r'"Supplies":\s*"([^"]*)"', response.content.strip())
@@ -499,134 +508,145 @@ def extract_supplies_from_query(user_input: str, available_supplies: List[str], 
     }
 
 def generate_dynamic_message_for_vendor(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm) -> str:
-   """
-   Generate a dynamic follow-up message using LLM based on the latest context and static follow-up requirement for Vendor-related queries.
+    """
+    Generate a dynamic follow-up message using LLM based on the latest context and static follow-up requirement for Vendor-related queries.
 
-   Parameters:
-      chat_history_for_context (List[dict]): The list of conversation history with user and AI messages.
-      static_follow_up (str): The static follow-up message to send to the user.
-      llm: The language model instance.
+    Parameters:
+        chat_history_for_context (List[dict]): The list of conversation history with user and AI messages.
+        static_follow_up (str): The static follow-up message to send to the user.
+        llm: The language model instance.
 
-   Returns:
-      str: The dynamically generated follow-up message.
-   """
+    Returns:
+        str: The dynamically generated follow-up message.
+    """
 
-   # Prepare the conversation history context
-   recent_history = "\n".join(chat_history_for_context)  
+    # Prepare the conversation history context
+    recent_history = "\n".join(chat_history_for_context)  
 
-   # Define the prompt
-   prompt = """
-   You are a highly skilled assistant specializing in creating professional, engaging, and contextually relevant messages.
-   Your goal is to craft a polished follow-up message that seamlessly incorporates the provided static follow-up message while aligning with the tone and context of the recent conversation.
+    # Define the prompt
+    prompt = """
+    You are a highly skilled assistant specializing in creating professional, engaging, and contextually relevant messages.
+    Your goal is to craft a polished follow-up message that seamlessly incorporates the provided static follow-up message while aligning with the tone and context of the recent conversation.
 
-   Key Instructions  
-   - The static follow-up message is only a reference.  
-   - Do NOT copy it word-for-word—instead, use it as guidance to create a well-crafted, natural response that follows all instructions.  
-   - Ignore placeholders like "None" or "Not Available in List"—they should NEVER be included in the final response.  
-   - Do NOT reference any industry (Main-Industry, Sub-Sector, Segment), location (Area, City, State), or supply (Raw Material, Equipment, Service) details from chat history or user messages unless explicitly mentioned in the static follow-up message.  
-   - In no circumstances should the model respond to off-topic queries. If a query is unrelated, handle it according to the specified instructions.  
+    Key Instructions  
+    - The static follow-up message is only a reference.  
+    - Do NOT copy it word-for-word—instead, use it as guidance to create a well-crafted, natural response that follows all instructions.  
+    - Ignore placeholders like "None" or "Not Available in List"—they should NEVER be included in the final response.  
+    - Do NOT reference any industry (Main-Industry, Sub-Sector, Segment), location (Area, City, State), or supply (Raw Material, Equipment, Service) details from chat history or user messages unless explicitly mentioned in the static follow-up message.  
+    - In no circumstances should the model respond to off-topic queries. If a query is unrelated, handle it according to the specified instructions.  
 
-   Inputs
-   1. User’s Latest Message  
-   - This is the most recent message from the user. Use this to determine the appropriate tone, greetings, or redirection.  
-   - {user_message}  
+    STRICT RULE:  
+    - Only vendor- and supply-related words should appear in the response, even if the user query mentions additional topics.  
+    - If the user query includes employment, approvals, incentives, or any other unrelated terms, completely exclude them from the response.  
+    - Regardless of what else is mentioned, vendor- and supply-related words must always appear in the response.  
 
-   2. Recent Conversation History  
-   - This contains past exchanges between the user and the assistant.  
-   - Chat history is only for reference. Do NOT infer, assume, or use any details about industry, supply, or location unless explicitly mentioned in the static follow-up message.  
-   - {recent_history}  
+    Example Correction:  
+    - User Query: "I want to search for incentives and vendors."  
+    - Wrong Response: "I can assist with vendor and incentive-related searches."  
+    - Correct Response: "Could you specify the industry or location for which you're looking for vendors?"  
 
-   3. Static Follow-Up Message  
-   - This is the reference message containing the key details to be included in the final response.  
-   - Your task is to reword and refine this message into a polished, professional, and conversational follow-up.  
-   - Static Message: "{static_follow_up}"  
+    Inputs
+    1. User’s Latest Message  
+    - This is the most recent message from the user. Use this to determine the appropriate tone, greetings, or redirection.  
+    - {user_message}  
 
-   Response Guidelines
+    2. Recent Conversation History  
+    - This contains past exchanges between the user and the assistant.  
+    - Chat history is only for reference. Do NOT infer, assume, or use any details about industry, supply, or location unless explicitly mentioned in the static follow-up message.  
+    - {recent_history}  
 
-   1. Proper Acknowledgment of Provided Details  
-   - If the user has already provided Industry details (Main-Industry, Sub-Sector, or Segment), Location (Area, City, or State), or Supply (Raw Material, Equipment, Service), acknowledge them clearly and explicitly.  
-   - Do NOT make a vague or partial acknowledgment—always specify exactly what was provided.  
-   - Example:  
-     - Correct: "You're looking for vendors for Cement in Mumbai."  
-     - Wrong: "You're looking for vendors." (Too vague)  
-   - If multiple details are provided, combine them logically:  
-     - Example: "You're looking for vendors for Steel (Armor Grade) in Chennai."  
+    3. Static Follow-Up Message  
+    - This is the reference message containing the key details to be included in the final response.  
+    - Your task is to reword and refine this message into a polished, professional, and conversational follow-up.  
+    - Static Message: "{static_follow_up}"  
 
-   2. Clearly Differentiate Between Searching for Supplies vs. Vendors for a Product  
-   - If the static message implies a distinction between looking for vendors of a specific supply vs. looking for all supplies required for a product, ensure this is conveyed naturally.  
-   - *Example Message Integration:*  
-     - "You can either specify a particular supply or simply tell us the product you want to produce—we’ll identify all the necessary supplies and connect you with the right vendors."  
+    Response Guidelines  
 
-   3. If Details Are Missing, Request Them Separately  
-   - If Industry details (Main-Industry, Sub-Sector, or Segment) are missing, ask for them in a natural, concise way.  
-   - If Location details (Area, City, or State) are missing, ask the user to specify.  
-   - If Supply details (Raw Material, Equipment, or Service) are missing, request them politely.  
-   - Ensure missing details are requested AFTER acknowledgment.  
-   - Example:  
-     - Correct: "You're looking for vendors for Cement. Could you share the location—whether it's an area, city, or state—so we can find the best options for you?"  
-     - Wrong: "Could you confirm if you're looking for vendors for Cement and provide a location?" (Confirmation not needed)  
+    1. Proper Acknowledgment of Provided Details  
+    - If the user has already provided Industry details (Main-Industry, Sub-Sector, or Segment), Location (Area, City, or State), or Supply (Raw Material, Equipment, Service), acknowledge them clearly and explicitly.  
+    - Do NOT make a vague or partial acknowledgment—always specify exactly what was provided.  
+    - Example:  
+    - Correct: "You're looking for vendors for Cement in Mumbai."  
+    - Wrong: "You're looking for vendors." (Too vague)  
+    - If multiple details are provided, combine them logically:  
+    - Example: "You're looking for vendors for Steel (Armor Grade) in Chennai."  
 
-   4. Ensure Acknowledgment & Request for Missing Details Are Clearly Separated  
-   - If acknowledgment is present, add a smooth transition before asking for missing details.  
-   - Example:  
-     - Correct: "You're looking for vendors for Industrial Chemicals. To find the best options, could you share the location where you're looking for them?"  
-     - Wrong: "You're looking for vendors for Industrial Chemicals. Could you confirm that and provide a location?" (Confirmation not required)  
+    2. Clearly Differentiate Between Searching for Supplies vs. Vendors for a Product  
+    - If the static message implies a distinction between looking for vendors of a specific supply vs. looking for all supplies required for a product, ensure this is conveyed naturally.  
+    - Example Message Integration:  
+    - "You can either specify a particular supply or simply tell us the product you want to produce—we’ll identify all the necessary supplies and connect you with the right vendors."  
 
-   5. Do NOT Copy the Static Message As-Is  
-   - Instead, use it as a reference to create a well-structured, smooth, and conversational response.
-   - The final response must not sound robotic or overly formal.
-   - Ensure the message is clear, natural, and engaging.
+    3. If Details Are Missing, Request Them Separately  
+    - If Industry details (Main-Industry, Sub-Sector, or Segment) are missing, ask for them in a natural, concise way.  
+    - If Location details (Area, City, or State) are missing, ask the user to specify.  
+    - If Supply details (Raw Material, Equipment, or Service) are missing, request them politely.  
+    - Ensure missing details are requested AFTER acknowledgment.  
+    - Example:  
+    - Correct: "You're looking for vendors for Cement. Could you share the location—whether it's an area, city, or state—so we can find the best options for you?"  
+    - Wrong: "Could you confirm if you're looking for vendors for Cement and provide a location?" (Confirmation not needed)  
 
-   6. Intelligent Use of Conjunctions  
-   - Analyze the static follow-up message before adding conjunctions.
-   - If the message already has a natural transition, do not add an unnecessary conjunction.
-   - If the static message consists of two distinct parts (acknowledgment + request for missing details), place a proper conjunction between them where appropriate.
-   - The conjunction should not be at the very beginning of the message unless it naturally requires it.
+    4. Ensure Acknowledgment & Request for Missing Details Are Clearly Separated  
+    - If acknowledgment is present, add a smooth transition before asking for missing details.  
+    - Example:  
+    - Correct: "You're looking for vendors for Industrial Chemicals. To find the best options, could you share the location where you're looking for them?"  
+    - Wrong: "You're looking for vendors for Industrial Chemicals. Could you confirm that and provide a location?" (Confirmation not required)  
 
-   7. Do NOT Address Off-Topic Queries  
-   - If the user’s query is unrelated to industry, supply, or vendor searches, politely inform them:
-      - *"I specialize in assisting with vendor-related queries for industries, supplies, and locations."*
-   - DO NOT attempt to answer off-topic queries—instead, redirect to the static follow-up message with a smooth transition.
+    5. Do NOT Copy the Static Message As-Is  
+    - Instead, use it as a reference to create a well-structured, smooth, and conversational response.  
+    - The final response must not sound robotic or overly formal.  
+    - Ensure the message is clear, natural, and engaging.  
 
-   8. Handling Greetings  
-   - If the user greets (e.g., "Hi", "Hello", "Good morning"), respond with an appropriate greeting.
-   - Ensure the transition to the follow-up message is smooth and natural using proper conjunctions.
+    6. Intelligent Use of Conjunctions  
+    - Analyze the static follow-up message before adding conjunctions.  
+    - If the message already has a natural transition, do not add an unnecessary conjunction.  
+    - If the static message consists of two distinct parts (acknowledgment + request for missing details), place a proper conjunction between them where appropriate.  
+    - The conjunction should not be at the very beginning of the message unless it naturally requires it.  
 
-   9. Handling Special Events  
-   - If the user mentions a special occasion (e.g., birthday, anniversary), acknowledge and celebrate it first.
-   - Then transition smoothly into the static follow-up message using proper conjunctions.
+    7. Do NOT Address Off-Topic Queries  
+    - If the user’s query is unrelated to industry, supply, or vendor searches, politely inform them:  
+    - "I specialize in assisting with vendor-related queries for industries, supplies, and locations."  
+    - DO NOT attempt to answer off-topic queries—instead, redirect to the static follow-up message with a smooth transition.  
 
-   10. Handling Negative Emotions  
-   - If the user expresses sadness, frustration, or anger, address their emotions with empathy first.
-   - Then transition seamlessly into the static follow-up message using a natural, logical flow.
+    8. Handling Greetings  
+    - If the user greets (e.g., "Hi", "Hello", "Good morning"), respond with an appropriate greeting.  
+    - Ensure the transition to the follow-up message is smooth and natural using proper conjunctions.  
 
-   Final Output Requirements
-   - Do NOT copy the static follow-up message word-for-word.
-   - Craft a clear, polished response that aligns with the user’s latest message.
-   - Ensure a smooth and engaging conversational flow.
-   - NEVER include placeholders like "None" or "Not Available in List" in the response.
-   - NEVER infer or use industry, supply, or location details unless they appear in the static follow-up message.
-   - NEVER address off-topic queries—redirect them properly.
-   - Keep the response concise (maximum 3 lines) while fully incorporating the static follow-up message.
-   - Ensure the message is professional, user-friendly, and free of unnecessary elaboration or additional context.
-   """
+    9. Handling Special Events  
+    - If the user mentions a special occasion (e.g., birthday, anniversary), acknowledge and celebrate it first.  
+    - Then transition smoothly into the static follow-up message using proper conjunctions.  
+
+    10. Handling Negative Emotions  
+    - If the user expresses sadness, frustration, or anger, address their emotions with empathy first.  
+    - Then transition seamlessly into the static follow-up message using a natural, logical flow.  
+
+    Final Output Requirements  
+    - Do NOT copy the static follow-up message word-for-word.  
+    - Craft a clear, polished response that aligns with the user’s latest message.  
+    - Ensure a smooth and engaging conversational flow.  
+    - NEVER include placeholders like "None" or "Not Available in List" in the response.  
+    - NEVER infer or use industry, supply, or location details unless they appear in the static follow-up message.  
+    - NEVER address off-topic queries—redirect them properly.  
+    - Keep the response concise (maximum 3 lines) while fully incorporating the static follow-up message.  
+    - Ensure the message is professional, user-friendly, and free of unnecessary elaboration or additional context.  
+    """
 
 
-   # Prepare input to the model
-   prompt_template = PromptTemplate(
-      input_variables=["user_message", "recent_history", "static_follow_up"],
-      template=prompt
-   )
-   chain = prompt_template | llm
-   message = chain.invoke({
-      "user_message": user_message,
-      "recent_history": recent_history,
-      "static_follow_up": static_follow_up
-   })
+    # Prepare input to the model
+    prompt_template = PromptTemplate(
+        input_variables=["user_message", "recent_history", "static_follow_up"],
+        template=prompt
+    )
+    chain = prompt_template | llm
+    message = chain.invoke({
+        "user_message": user_message,
+        "recent_history": recent_history,
+        "static_follow_up": static_follow_up
+    })
+    update_llm_token(message)
 
-   # Append AI message to chat history
-   chat_history_for_context.append(AIMessage(content=f"{message.content.strip()}"))
-   return message.content.strip()
+    # Append AI message to chat history
+    chat_history_for_context.append(AIMessage(content=f"{message.content.strip()}"))
+    return message.content.strip()
 
 def get_static_follow_up_for_vendor(vendor_state: Dict[str, Dict[str, Optional[str]]], user_intention: str) -> str:
     """
@@ -1017,17 +1037,21 @@ def handle_vendor_query(
     else:
         perfect_supply_data = True
     
-    chat_history = get_chat(f"QVND_chat_{chatId}") or []
+    chat_history = get_chat(f"chat_{chatId}") or []
 
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
 
     refined_user_input = refine_query_with_history_for_vendor(Chat_history_normal, user_input, llm)
     chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
-    save_chat(chat_history,f"QVND_chat_{chatId}")
+    save_chat(chat_history,f"chat_{chatId}")
     result = classify_vendor_query(refined_user_input, llm)
     user_intention = result["classification_category"]
     frappe.log_error(f"user _intesnion {user_intention}")
 
+    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to search Vendors"], module_names_list, llm, "Query to search Vendors")
+    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    save_state(state,f"QVND_state_{chatId}")
+    
     if user_intention == "Vendor Search for location without industry and supply details":
         extracted_data = extract_location_from_vendor_query(refined_user_input, llm)
         given_loacation = extracted_data["Extracted_Location"]
@@ -1047,9 +1071,19 @@ def handle_vendor_query(
         
         if (perfect_industry_data or perfect_supply_data) and perfect_location_data:
             if (state["Industry_info"]["Main-Industry"] != "Not Available in list" and state["Industry_info"]["Sub-Sector"] != "Not Available in list") or (not all(item == "Not Available in List" for item in state["Supply_info"]["Supplies"])):
-                message = "We found something for you"
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                if not state["Supply_info"]["Supplies"]:
+                    selected_option = next(
+                    (state.get("Industry_info").get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                    ''
+                    )
+                    message = f"We have identified that you are searching for all suppliers needed for your {selected_option} production in {state.get("Location_info").get('Location')}. Is this information correct?"
+                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)          
+                else:
+                    message = f"We have identified, you are looking for {" and ".join(state["Supply_info"]["Supplies"])} suppliers in {state.get("Location_info").get('Location')}. Is this information correct?"
+                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
+
+                chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : True,
@@ -1061,7 +1095,7 @@ def handle_vendor_query(
             else:
                 message = "Not Available In List"
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1074,7 +1108,7 @@ def handle_vendor_query(
             response_static_message = get_static_follow_up_for_vendor(state, user_intention)
             message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
             chat_history.append(AIMessage(content=message))  # Log user query
-            save_chat(chat_history,f"QVND_chat_{chatId}")
+            save_chat(chat_history,f"chat_{chatId}")
             response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1139,11 +1173,16 @@ def handle_vendor_query(
                         perfect_industry_data = False
                     
                     if perfect_industry_data and perfect_location_data:
-                        message = "We found something for you"
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        selected_option = next(
+                        (state.get("Industry_info").get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                        ''
+                        )
+                        message = f"We have identified that you are searching for all suppliers needed for your {selected_option} production in {state.get("Location_info").get('Location')}. Is this information correct?"
+                        dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                        chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
+                        save_chat(chat_history,f"chat_{chatId}")
                         response = {
-                            "Ai_response": "We found something for you",
+                            "Ai_response": dynamic_confirmation_message,
                             "Is_confirmation" : True,
                             "Extracted Data": extracted_state,
                             "Validation Data": state,
@@ -1155,7 +1194,7 @@ def handle_vendor_query(
                         response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                         message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                         chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        save_chat(chat_history,f"chat_{chatId}")
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1185,7 +1224,7 @@ def handle_vendor_query(
                         response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                         message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                         chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        save_chat(chat_history,f"chat_{chatId}")
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1203,7 +1242,7 @@ def handle_vendor_query(
                 response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                 message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1221,7 +1260,7 @@ def handle_vendor_query(
             if perfect_location_data:
                 message = "Not Available In List"
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1234,7 +1273,7 @@ def handle_vendor_query(
                 response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                 message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1265,11 +1304,12 @@ def handle_vendor_query(
         if not all(supply == "Not Available in List" for supply in state["Supply_info"]["Supplies"]):
             if state["Supply_info"]["Supplies"]:
                 if perfect_location_data:
-                    message = "We found something for you"
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"QVND_chat_{chatId}")
+                    message = f"We have identified, you are looking for {" and ".join(state["Supply_info"]["Supplies"])} suppliers in {state.get("Location_info").get('Location')}. Is this information correct?"
+                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
+                    chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
                     response = {
-                        "Ai_response": "We found something for you",
+                        "Ai_response": dynamic_confirmation_message,
                         "Is_confirmation" : True,
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
@@ -1281,7 +1321,7 @@ def handle_vendor_query(
                     
                     message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                     chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"QVND_chat_{chatId}")
+                    save_chat(chat_history,f"chat_{chatId}")
                     response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1295,7 +1335,7 @@ def handle_vendor_query(
                 
                 message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1308,7 +1348,7 @@ def handle_vendor_query(
             if perfect_location_data: 
                 message = "Not Available In List"
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1322,7 +1362,7 @@ def handle_vendor_query(
                 
                 message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1403,11 +1443,16 @@ def handle_vendor_query(
                         perfect_industry_data = False
                     
                     if perfect_industry_data and perfect_location_data:
-                        message = "We found something for you"
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        selected_option = next(
+                        (state.get("Industry_info").get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                        ''
+                        )
+                        message = f"We have identified that you are searching for all suppliers needed for your {selected_option} production in {state.get("Location_info").get('Location')}. Is this information correct?"
+                        dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                        chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
+                        save_chat(chat_history,f"chat_{chatId}")
                         response = {
-                            "Ai_response": message,
+                            "Ai_response": dynamic_confirmation_message,
                             "Is_confirmation" : True,
                             "Extracted Data": extracted_state,
                             "Validation Data": state,
@@ -1419,7 +1464,7 @@ def handle_vendor_query(
                         response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                         message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                         chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        save_chat(chat_history,f"chat_{chatId}")
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1436,7 +1481,7 @@ def handle_vendor_query(
                     if perfect_location_data:
                         message = "Not Available In List"
                         chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        save_chat(chat_history,f"chat_{chatId}")
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1449,7 +1494,7 @@ def handle_vendor_query(
                         response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                         message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                         chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"QVND_chat_{chatId}")
+                        save_chat(chat_history,f"chat_{chatId}")
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1467,7 +1512,7 @@ def handle_vendor_query(
                 response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                 message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1486,7 +1531,7 @@ def handle_vendor_query(
             if perfect_location_data: 
                 message = "Not Available In List"
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1500,7 +1545,7 @@ def handle_vendor_query(
                 
                 message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1551,12 +1596,12 @@ def handle_vendor_query(
         if not all(supply == "Not Available in List" for supply in state["Supply_info"]["Supplies"]):
             if state["Supply_info"]["Supplies"]:
                 if perfect_location_data and perfect_supply_data:
-                    
-                    message = "We found something for you"
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"QVND_chat_{chatId}")
+                    message = f"We have identified, you are looking for {" and ".join(state["Supply_info"]["Supplies"])} suppliers in {state.get("Location_info").get('Location')}. Is this information correct?"
+                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
+                    chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
                     response = {
-                        "Ai_response": "We found something for you",
+                        "Ai_response": dynamic_confirmation_message,
                         "Is_confirmation" : True,
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
@@ -1568,7 +1613,7 @@ def handle_vendor_query(
                    
                     message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                     chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"QVND_chat_{chatId}")
+                    save_chat(chat_history,f"chat_{chatId}")
                     response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1582,7 +1627,7 @@ def handle_vendor_query(
                 
                 message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1595,7 +1640,7 @@ def handle_vendor_query(
             if perfect_location_data and perfect_supply_data: 
                 message = "Not Available In List"
                 chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"QVND_chat_{chatId}")
+                save_chat(chat_history,f"chat_{chatId}")
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1623,7 +1668,7 @@ def handle_vendor_query(
         
         message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
         chat_history.append(AIMessage(content=message))  # Log user query
-        save_chat(chat_history,f"QVND_chat_{chatId}")
+        save_chat(chat_history,f"chat_{chatId}")
         response = {
                     "Ai_response": message,
                     "Is_confirmation" : None,
@@ -1693,7 +1738,8 @@ def call_handle_vendor_query(input,chatId):
             },
             "Supply_info": {
                 "Supplies": []
-            }
+            },
+            "KEYWORDS": None
         }
         save_state(state,f"QVND_state_{chatId}")
 

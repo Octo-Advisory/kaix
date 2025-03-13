@@ -1,13 +1,15 @@
 import re
+import json
 from typing import List, Dict, Tuple, Union
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers, llm_70b_vers_creative
+from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers, llm_70b_vers_creative,extract_location_from_query,extract_comparison_locations
 from langchain.schema import HumanMessage, AIMessage
 import pandas as pd
 import frappe
 import logging
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat
+from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 logging.basicConfig(
     filename='AIerror.log',  # Log file name
@@ -64,6 +66,8 @@ def refine_query_with_history_for_employment(history, latest_query, llm):
     )
     chain = prompt | llm
     refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
+    update_llm_token(refined_query)
+
     refined_text = refined_query.content.strip()
     
     # Extract the reformulated standalone query
@@ -74,6 +78,141 @@ def refine_query_with_history_for_employment(history, latest_query, llm):
     
     # Fallback to the entire response if no match is found
     return refined_text
+
+def extract_json_from_llm_response_employment(raw_output: str, json_key: str) -> Dict[str, Union[List[str], None]]:
+    """
+    Extracts a JSON object containing the specified key from an LLM response for Employment module.
+    Ensures valid JSON output and corrects for any parsing errors.
+
+    Parameters:
+    -----------
+    raw_output : str
+        The raw text output from the LLM.
+
+    json_key : str
+        The expected key in the JSON response (e.g., "KEYWORDS").
+
+    Returns:
+    --------
+    Dict[str, Union[List[str], None]]:
+        A dictionary with the extracted values, ensuring a structured JSON output.
+    """
+
+    # --- Case 1: Direct JSON Parsing ---
+    try:
+        data_entire = json.loads(raw_output.strip())
+        if isinstance(data_entire, dict) and json_key in data_entire:
+            extracted_value = data_entire.get(json_key, None)
+            return {json_key: extracted_value if isinstance(extracted_value, list) else None}
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass  # JSON parsing failed
+
+    # --- Case 2: Extract JSON inside triple backticks ---
+    code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', raw_output, flags=re.DOTALL)
+    for block in code_blocks:
+        try:
+            block_data = json.loads(block.strip())
+            if isinstance(block_data, dict) and json_key in block_data:
+                extracted_value = block_data.get(json_key, None)
+                return {json_key: extracted_value if isinstance(extracted_value, list) else None}
+        except (json.JSONDecodeError, ValueError, TypeError):
+            pass  # JSON parsing failed
+
+    # --- Case 3: Regex-based Extraction ---
+    pattern_braces = re.compile(r'\{\s*"' + json_key + r'"\s*:\s*(\[[^]]*\]|null|None)\s*\}', flags=re.DOTALL)
+    match_braces = pattern_braces.search(raw_output)
+    if match_braces:
+        keyword_list = match_braces.group(1).strip()
+
+        if keyword_list.lower() in ["null", "none"]:
+            return {json_key: None}
+
+        extracted_values = [kw.strip('" ') for kw in keyword_list.strip("[]").split(',') if kw.strip('" ')]
+        return {json_key: extracted_values if extracted_values else None}
+
+    pattern_no_braces = re.compile(r'"' + json_key + r'"\s*:\s*(\[[^]]*\]|null|None)', flags=re.DOTALL)
+    match_no_braces = pattern_no_braces.search(raw_output)
+    if match_no_braces:
+        keyword_list = match_no_braces.group(1).strip()
+
+        if keyword_list.lower() in ["null", "none"]:
+            return {json_key: None}
+
+        extracted_values = [kw.strip('" ') for kw in keyword_list.strip("[]").split(',') if kw.strip('" ')]
+        return {json_key: extracted_values if extracted_values else None}
+
+    return {json_key: None}
+
+
+def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Union[List[str], None]]:
+    """
+    Extracts employment-related keywords from a user query, ensuring they are classified into:
+    - "Skilled"
+    - "Semi-Skilled"
+    - "Unskilled"
+
+    If the query is a general employment search, return `None`. Otherwise, map the keyword
+    to the appropriate skill category.
+
+    Parameters:
+    -----------
+    user_input : str
+        The user-provided query string.
+
+    llm :
+        An instance of a language model (such as from LangChain) capable of processing the prompt.
+
+    Returns:
+    --------
+    Dict[str, Union[List[str], None]]:
+        A dictionary with a single key 'KEYWORDS'.
+    """
+
+    # Construct the Prompt for LLM
+    prompt_template_str = """
+    You are an expert in employment search classification.
+
+    Your task:
+    1) Determine whether the user is searching for general employment or specific employment.
+        - Example of general employment: "I want employment opportunities in Surat." (Return `null`)
+        - Example of specific employment: "I want to find an electrician and a plumber job." (Proceed to classification)
+
+    2) If the user mentions a specific skill category ("Skilled", "Semi-Skilled", "Unskilled"), return it directly.
+
+    3) If the user mentions a specific job role (e.g., "electrician", "plumber"), classify it into:
+        - Skilled: Requires formal training or judgment.
+        - Semi-Skilled: Requires experience or guidance but not full expertise.
+        - Unskilled: Requires minimal training, mainly physical labor.
+
+    4) If multiple job roles are mentioned, classify each into one of the three skill categories.
+
+    5) The response must ONLY contain:
+       - "Skilled"
+       - "Semi-Skilled"
+       - "Unskilled"
+       - OR `null` if it is a general employment search.
+
+    User Query:
+    {user_query}
+
+    Final Output (JSON only):
+    {{
+       "KEYWORDS": ["Skilled", "Semi-Skilled"]  # Example output
+    }}
+    """.strip()
+
+    prompt = PromptTemplate(
+        input_variables=["user_query"],
+        template=prompt_template_str
+    )
+    chain = prompt | llm
+    response = chain.invoke({
+        "user_query": user_input
+    })
+
+    raw_output = response.content.strip()
+
+    return extract_json_from_llm_response_employment(raw_output, "KEYWORDS")
 
 def classify_employment_query(query, llm):
     """
@@ -99,26 +238,53 @@ def classify_employment_query(query, llm):
     refined_prompt = """
     You are an expert in analyzing user queries related to employment searches. Your task is to classify the user's intention into one of the following categories:
 
-    1. Individual Employment Status:
-    - Queries focusing on employment statistics, job availability, or unemployment rates in a specific location (e.g., "employment status in Ahmedabad" or "job statistics for Gujarat").
-    - Includes queries targeting districts, towns, or cities (considered as equivalent to cities) or states individually.
+    1 Individual Employment Status:
+    - The query is about employment statistics, job availability, or unemployment rates in a single location.  
+    - Example: *"What is the employment status in Ahmedabad?"* or *"Job statistics for Gujarat."*  
+    - Even if employment-related words are NOT present, assume it is an employment search if a location is mentioned alone.  
+    - If the user mentions multiple locations, but one of them is only for reference (e.g., *"I live in X but want to search about Y"*), classify under this category.  
+    - DO NOT assume a comparison unless employment search is for multiple locations in the query’s main intent.  
 
-    2. Comparison Between Locations:
-    - Queries involving a comparison of employment-related metrics between multiple locations (e.g., "compare Ahmedabad and Baroda" or "employment status in Gujarat vs Maharashtra").
-    - Multiple locations must be explicitly mentioned in the query for it to fall into this category.
+    2 Comparison Between Locations:
+    - The query asks about employment status across multiple locations, either explicitly or implicitly.  
+    - Explicit Comparison: *"Compare employment in Ahmedabad vs Baroda."*  
+    - Implicit Comparison: *"What is the employment situation in Gujarat and Maharashtra?"*  
+    - Even if "compare" is not explicitly mentioned, classify here if employment search involves multiple locations.  
+    - If multiple locations are mentioned AND they are both part of the employment search, classify under this category.  
+    - DO NOT require explicit words like "compare"—use contextual understanding.  
 
-    3. Other Intentions:
-    - Any query that does not pertain to employment searches or falls outside the scope of categories 1 and 2.
+    3 Other Intentions:
+    - Only classify here if the query is entirely unrelated to employment.  
+    - Example: *"Best places to live in Ahmedabad."* or *"How is the weather in Gujarat?"*  
+    - DO NOT classify as Other Intent just because employment is not explicitly mentioned.  
+    - If a query has no employment, no approvals, no incentives, and no vendor search, assume it is employment-related and classify under Class 1 or 2.  
 
-    Additional Classification Guidelines:
-    - Treat districts, towns, and cities as equivalent to cities when interpreting queries.
-    - If the query mentions multiple locations explicitly and seeks comparison, classify it as category 2, regardless of the phrasing.
-    - For vague or unclear queries, classify into category 3 (Other Intentions).
+    Special Classification Rules:
+    1 Implicit Employment Queries:  
+    - If a location is mentioned alone, classify as Class 1 or 2 (NOT Class 3).  
+    - Example: *"Ahmedabad?"* → Class 1.  
+    - Example: *"Vadodara vs Surat?"* → Class 2.  
 
-    Query: {query}
+    2 Employment + Other Topics = Still Employment (Class 1 or 2):  
+    - If the query includes employment + another topic, keep it in Class 1 or 2.  
+    - Example: *"Employment status in Ahmedabad and real estate?"* → Class 1.  
+    - Example: *"Jobs in Delhi and tourism industry?"* → Class 1.  
 
-    Output:
-    Classify the query into one of the categories (1, 2, or 3). Provide the classification number only, with no explanations or additional text.
+    3 Only Classify as "Other Intent" (Class 3) if a Completely Different Topic is Asked:  
+    - Approvals, incentives, vendor searches, or unrelated topics → Class 3.  
+    - Example: *"What incentives are available in Mumbai?"* → Class 3.  
+    - Example: *"Approvals needed for setting up a factory in Gujarat?"* → Class 3.  
+
+    Final Output Instructions:
+    - Strictly return only the classification number (1, 2, or 3).  
+    - Do NOT return multiple classifications.  
+    - Do NOT provide explanations or additional text.  
+
+    Query:  
+    {query}  
+
+    Output:  
+    (Return only one classification number: 1, 2, or 3)
     """
 
 
@@ -132,6 +298,7 @@ def classify_employment_query(query, llm):
     chain = prompt_template | llm
     # Run the chain and capture the response
     response = chain.invoke({"query": query})
+    update_llm_token(response)
 
     # Use regex to extract a valid classification number
     match = re.search(r"^\s*([1-3])\s*$", response.content.strip())
@@ -146,231 +313,6 @@ def classify_employment_query(query, llm):
     else:
         raise ValueError(f"Unexpected or invalid response from LLM: {response}")
 
-
-def extract_location_for_employment_query(user_input: str, available_areas: List[str], available_cities: List[str], available_states: List[str], llm) -> Dict[str, str]:
-    """
-    Extract the area, city, or state mentioned in the user query and validate against the available lists.
-
-    Parameters:
-        user_input (str): The user-provided query.
-        available_areas (List[str]): List of all available areas.
-        available_cities (List[str]): List of all available cities.
-        available_states (List[str]): List of all available states.
-        llm: The language model instance to use for processing.
-
-    Returns:
-        Dict[str, str]: A dictionary containing the extracted area, city, and state. Validation for presence
-        in the available lists happens outside the model's logic.
-    """
-    # Convert lists to strings
-    areas_string = ", ".join(available_areas)
-    cities_string = ", ".join(available_cities)
-    states_string = ", ".join(available_states)
-
-    # Define the prompt
-    prompt_template = """
-    You are an assistant designed to extract location information from user input with precision.
-    Your primary goal is to identify and accurately classify the area, city, or state mentioned in the user's query.
-
-    Instructions:
-    - Available Location Data:
-        - Areas: {areas_string}
-        - Cities: {cities_string}
-        - States: {states_string}
-    - Use these lists as references to classify and validate the user's query. Match the input with the closest location name from these lists whenever possible, accounting for typos or phonetic variations.
-
-    Guidelines:
-    1. India-Focused Context:
-        - Assume the majority of areas, cities, or states referenced in the user's query are located in India.
-        - If the identified location is outside India or does not logically belong to India, return `"None"` for the respective field(s).
-
-    2. Handling Explicit Location Mentions:
-        - If the user explicitly mentions a location in their query:
-            - Accurately extract and classify it as "Area," "City," or "State."
-            - If the location is not in India, return `"None"` for that field.
-
-    3. Vague or Incomplete Queries:
-        - Extract location information even when the query is vague, incomplete, or unstructured.
-        - Use similarity-based logic to identify the closest match from the provided lists while ensuring accuracy.
-
-    4. Precise Classification Rules:
-        - If the location is an area, put the name in the `"Area"` field and set `"City"` and `"State"` fields to `"None"`.
-        - If the location is a city, put the name in the `"City"` field and set `"Area"` and `"State"` fields to `"None"`.
-        - If the location is a state, put the name in the `"State"` field and set `"Area"` and `"City"` fields to `"None"`.
-        - If no identifiable area, city, or state is mentioned, set all fields to `"None"`.
-
-    5. Unmatched Locations:
-        - If a location cannot be matched to any entry in the provided lists but logically belongs to India, classify it under the most appropriate field.
-        - If it cannot be classified and does not belong to India, return `"None"`.
-
-    User Query:
-    {query}
-
-    Output Format:
-    Provide the output strictly as a JSON object in the following format:
-    {{
-        "Area": <Extracted Area or 'None'>,
-        "City": <Extracted City or 'None'>,
-        "State": <Extracted State or 'None'>
-    }}
-    """
-    
-    # Create a PromptTemplate and LLM chain
-    prompt = PromptTemplate(
-        input_variables=["query", "areas_string", "cities_string", "states_string"],
-        template=prompt_template
-    )
-    chain = prompt | llm
-    
-    # Run the LLM chain
-    response = chain.invoke({
-        "query": user_input,
-        "areas_string": areas_string,
-        "cities_string": cities_string,
-        "states_string": states_string
-    })
-
-    # Use regex to extract Area, City, and State values
-    area_match = re.search(r'"Area":\s*"([^"]+)"', response.content.strip())
-    city_match = re.search(r'"City":\s*"([^"]+)"', response.content.strip())
-    state_match = re.search(r'"State":\s*"([^"]+)"', response.content.strip())
-    
-    # Extract the matched values or default to "None"
-    area = area_match.group(1) if area_match else "None"
-    city = city_match.group(1) if city_match else "None"
-    state = state_match.group(1) if state_match else "None"
-    
-    # Create initial classification dictionary
-    classification = {
-        "Area": area,
-        "City": city,
-        "State": state
-    }
-
-    # Validate against the available lists
-    validated_classification = {
-        key: (value if value in available_areas + available_cities + available_states else "Not Available in List")
-        if value != "None" else "None"
-        for key, value in classification.items()
-    }
-
-    return classification,validated_classification
-
-def extract_comparison_locations(
-    user_input: str,
-    available_areas: List[str],
-    available_cities: List[str],
-    available_states: List[str],
-    llm
-) -> Tuple[Dict[str, str], Dict[str, str]]:
-    """
-    Extract multiple areas, cities, and states from the user's query for comparison purposes.
-    """
-    # Convert lists to strings
-    areas_string = ", ".join(available_areas)
-    cities_string = ", ".join(available_cities)
-    states_string = ", ".join(available_states)
-
-    # Define the prompt
-    prompt_template = """
-    You are an assistant designed to extract and classify multiple locations mentioned in a query for comparison purposes.
-    Your primary goal is to identify and accurately classify all areas, cities, or states mentioned in the user's query.
-
-    Instructions:
-    - Available Location Data:
-        - Areas: {areas_string}
-        - Cities: {cities_string}
-        - States: {states_string}
-    - Use these lists as references to classify and validate the user's query. Match the input with the closest location names from these lists whenever possible, accounting for typos or phonetic variations.
-
-    Guidelines:
-    1. India-Focused Context:
-        - Assume the majority of areas, cities, or states referenced in the user's query are located in India.
-        - If the identified location is outside India or does not logically belong to India, return `"None"` for the respective field(s).
-
-    2. Handling Explicit Location Mentions:
-        - If the user explicitly mentions locations in their query:
-            - Extract and classify them accurately as "Area," "City," or "State."
-            - If a location is not in India, return `"None"` for that field.
-
-    3. Vague or Incomplete Queries:
-        - Extract location information even when the query is vague, incomplete, or unstructured.
-        - Use similarity-based logic to identify the closest matches from the provided lists while ensuring accuracy.
-
-    4. Precise Classification Rules for Multiple Locations:
-        - If multiple areas are mentioned, list them all in the `"Area"` field, separated by commas, and enclosed in double quotes as a single string.
-        - If multiple cities are mentioned, list them all in the `"City"` field, separated by commas, and enclosed in double quotes as a single string.
-        - If multiple states are mentioned, list them all in the `"State"` field, separated by commas, and enclosed in double quotes as a single string.
-        - If no identifiable area, city, or state is mentioned, set all fields to `"None"`.
-
-    5. Unmatched Locations:
-        - If a location cannot be matched to any entry in the provided lists but logically belongs to India, classify it under the most appropriate field.
-        - If it cannot be classified and does not belong to India, return `"None"`.
-
-    Strict Formatting Rules:
-    - Ensure the output is deterministic, producing identical results for the same input every time.
-    - Output the final result strictly in the JSON format described below, ensuring all values are strings enclosed in double quotes:
-    {{
-        "Area": "<Extracted Areas (comma-separated) or 'None'>",
-        "City": "<Extracted Cities (comma-separated) or 'None'>",
-        "State": "<Extracted States (comma-separated) or 'None'>"
-    }}
-
-    - Do not provide intermediate results, notes, alternative outputs, or any other text. Only provide the final JSON object as described.
-
-    User Query:
-    {query}
-
-    Provide the final result strictly as a JSON object in the required format.
-    """
-
-    # Create a PromptTemplate and LLM chain
-    prompt = PromptTemplate(
-        input_variables=["query", "areas_string", "cities_string", "states_string"],
-        template=prompt_template
-    )
-    chain = prompt | llm
-
-    # Run the LLM chain
-    response = chain.invoke({
-        "query": user_input,
-        "areas_string": areas_string,
-        "cities_string": cities_string,
-        "states_string": states_string
-    })
-    # Use regex to extract Area, City, and State values
-    area_match = re.search(r'"Area":\s*"([^"]*)"', response.content.strip())
-    city_match = re.search(r'"City":\s*"([^"]*)"', response.content.strip())
-    state_match = re.search(r'"State":\s*"([^"]*)"', response.content.strip())
-
-    # Extract the matched values or default to "None"
-    area = area_match.group(1).strip() if area_match else "None"
-    city = city_match.group(1).strip() if city_match else "None"
-    state = state_match.group(1).strip() if state_match else "None"
-
-    # Create initial classification dictionary
-    classification = {
-        "Area": area,
-        "City": city,
-        "State": state
-    }
-
-    # Validate against the available lists
-    validated_classification = {
-        key: ", ".join(
-            [
-                loc.strip() if loc.strip() in available_areas + available_cities + available_states else "Not Available in List"
-                for loc in value.split(",") if value != "None"
-            ]
-        ) if value != "None" else "None"
-        for key, value in classification.items()
-    }
-
-    return classification, validated_classification
-
-# Chat history to maintain context
-# chat_history = get_chat(chatId) if get_chat("chat_history") else []
-
 def generate_dynamic_message(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm,chatId) -> str:
     """
     Generate a dynamic follow-up message using LLM based on the latest context and static follow-up requirement.
@@ -383,12 +325,13 @@ def generate_dynamic_message(chat_history_for_context: List[dict], static_follow
     Returns:
         str: The dynamically generated follow-up message.
     """
-    chat_history = get_chat(chatId) if get_chat(chatId) else []
+    chat_history = get_chat(f"chat_{chatId}") if get_chat(f"chat_{chatId}") else []
     # Prepare the conversation history context
     recent_history = "\n".join(
         chat_history_for_context
     )  # Limit history to the last 6 messages for brevity
     
+    # Define the refined prompt
     prompt = """
     You are a highly skilled assistant specializing in creating professional, engaging, and contextually relevant messages.
     Your goal is to craft a polished follow-up message that seamlessly incorporates the provided static follow-up message while aligning with the tone and context of the recent conversation.
@@ -401,7 +344,7 @@ def generate_dynamic_message(chat_history_for_context: List[dict], static_follow
     2. Recent Conversation History:
     - This contains past exchanges between the user and the assistant.
     - Use this context only to understand the flow of the conversation.
-    - Do NOT infer, assume, or include any location (area, city, or state) from the history or the user’s latest message unless explicitly mentioned in the static follow-up message.
+    - Do not infer, assume, or include any location (area, city, or state) from the history or the user’s latest message unless explicitly mentioned in the static follow-up message.
     - {recent_history}
 
     3. Static Follow-Up Message:
@@ -410,38 +353,71 @@ def generate_dynamic_message(chat_history_for_context: List[dict], static_follow
     - Static Message: "{static_follow_up}"
 
     Response Guidelines:
-    - Strict Location Handling:
-    - Under no circumstances should you infer or assume any location (area, city, or state) from the user’s message or the conversation history unless the location is explicitly mentioned in the static follow-up message.
-    - If no location is provided in the static follow-up, do NOT include one in the generated response.
+    Strict Focus on Employment-Related Queries
+    - Only include employment-related details in the follow-up message, even if the user query mentions multiple topics.
+    - If the user mentions incentives, approvals, vendors, or any other unrelated terms, completely exclude them from the response.
+    - Regardless of any other mentioned topics, employment-related words should appear in the response.
 
-    - Natural and Engaging Tone:
+    Example Correction:
+    - User Query: "I want to search for incentives and employment."
+    - Wrong Response: "I can assist with employment-related searches."
+    - Correct Response: "Could you specify the industry or location you're looking for employment opportunities in?"
+
+    Strict Location Handling:
+    - Under no circumstances should you infer or assume any location (area, city, or state) from the user’s message or the conversation history unless the location is explicitly mentioned in the static follow-up message.
+    - If no location is provided in the static follow-up, do not include one in the generated response.
+
+    Correct Usage of Conjunctions:
+    - Do not use conjunctions at the beginning of a sentence unless absolutely necessary.
+    - Only use conjunctions like "To find employment" or "To better assist you" when transitioning from an answer to a missing information request.
+    - If the response is a direct question, do not add unnecessary conjunctions.
+
+    Example Correction:
+    - User Query: "I want employment details in Ankleshwar."
+    - Wrong Response: "To find employment in Ankleshwar, employment status details are available for Bharuch, which encompasses the area of Ankleshwar. Would you like to view the information for Bharuch?"
+    - Correct Response: "Employment status details are available for Bharuch, which includes Ankleshwar. Would you like to view the information for Bharuch?"
+
+    - User Query: "Where is employment highest in Gujarat?"
+    - Wrong Response: "To provide this information, Gujarat has high employment in Ahmedabad and Surat."
+    - Correct Response: "Ahmedabad and Surat have the highest employment in Gujarat. Are you looking for details on a specific sector?"
+
+    Natural and Engaging Tone:
     - The response should feel like a smooth continuation of the conversation without sounding mechanical or scripted.
     - Avoid robotic acknowledgments or unnecessary phrases such as "I wanted to follow up on..." or "I am here to assist with..."
 
-    - Handling Greetings:
+    Handling Greetings:
     - If the user greets (e.g., "Hi", "Hello", "Good morning"), respond with an appropriate greeting and then transition seamlessly into the static follow-up message.
 
-    - Handling Off-Topic Queries:
-    - If the user’s query is unrelated to industry or employment topics, politely inform them:  
-    "I specialize in assisting with employment queries related to various industries."
-    - Do NOT engage with the off-topic query but redirect to the static follow-up message.
+    Handling Off-Topic Queries:
+    - Only use the phrase "I can assist with employment-related searches." when the user’s query is truly off-topic.
+    - If the user query is already employment-related, generate a relevant response without using this phrase.
+    - For truly irrelevant queries (not related to employment at all), politely inform the user that employment assistance is the focus.
 
-    - Handling Special Events:
+    Example Correction:
+    - User Query: "Can you tell me about tourism in Paris?"
+    - Correct Response: "I specialize in employment-related searches. Let me know if you have any employment-related questions."
+    - User Query: "What are the job opportunities in Bangalore?"
+    - Correct Response: "Could you specify the industry or job category you're looking for in Bangalore?"
+
+    Handling Special Events:
     - If the user mentions a special occasion (e.g., birthday, anniversary), acknowledge and celebrate it first before transitioning into the static follow-up message.
 
-    - Handling Negative Emotions:
+    Handling Negative Emotions:
     - If the user expresses sadness, frustration, or anger, address their emotions with empathy first before seamlessly transitioning into the static follow-up message.
 
     Additional Instructions:
-    1. Do NOT include any reasons, explanations, or assumptions about the static follow-up or user query (e.g., "I’ve reviewed our conversation" or "It seems you are asking about...").
+    1. Do not include any reasons, explanations, or assumptions about the static follow-up or user query (e.g., "I’ve reviewed our conversation" or "It seems you are asking about...").
     2. Ensure transitions between the user’s input and the static follow-up message are smooth and cohesive, avoiding abrupt changes or unrelated statements.
-    3. Keep the response concise, limiting it to two or three short sentences, while fully incorporating the static follow-up message.
+    3. Keep the response concise, limiting it to two or three short sentences while fully incorporating the static follow-up message.
     4. Ensure the message is professional, user-friendly, and free of unnecessary elaboration or additional context.
 
     Output:
     - Generate a concise, polished response that aligns with the tone of the user’s latest message.
     - Seamlessly integrate the static follow-up message while adhering to all guidelines.
-    - Do NOT include any locations (area, city, or state) in the response unless explicitly mentioned in the static follow-up message.
+    - Strictly ensure that only employment-related terms appear in the response.
+    - Do not mention incentives, approvals, vendors, or any non-employment-related terms, even if they were part of the user query.
+    - Only use "I can assist with employment-related searches." when the user query is completely off-topic.
+    - Ensure that conjunctions are only used where appropriate—avoid unnecessary conjunctions at the beginning of sentences.
     """
     
     # Prepare input to the model
@@ -455,11 +431,12 @@ def generate_dynamic_message(chat_history_for_context: List[dict], static_follow
         "recent_history": recent_history,
         "static_follow_up": static_follow_up
     })
+    update_llm_token(message)
     
     # Append AI message to chat history
     chat_history.append(AIMessage(content=f"{message.content.strip()}"))
     # logging.info(f"actual aarray3 {chat_history}")
-    save_chat(chat_history,chatId=chatId)
+    save_chat(chat_history,f"chat_{chatId}")
     return message.content.strip()
 
 def check_user_intent(response: str, follow_up_question: str, llm,chatId) -> str:
@@ -504,13 +481,14 @@ def check_user_intent(response: str, follow_up_question: str, llm,chatId) -> str
     User's Response: {response}
     """
 
-    chat_history = get_chat(chatId) if get_chat(chatId) else []
+    chat_history = get_chat(f"chat_{chatId}") if get_chat(f"chat_{chatId}") else []
     prompt_template = PromptTemplate(
         input_variables=["response", "follow_up_question"],
         template=prompt
     )
     chain = prompt_template | llm
     intent_response = chain.invoke({"response": response, "follow_up_question": follow_up_question})
+    update_llm_token(intent_response)
     intent_text = intent_response.content.strip()
 
 
@@ -522,7 +500,7 @@ def check_user_intent(response: str, follow_up_question: str, llm,chatId) -> str
     chat_history.append(HumanMessage(content=f"User's Response: {response}"))
     chat_history.append(AIMessage(content=f"Classified Intent: {classified_intent}"))
     # logging.info(f"actual aarray2 {chat_history}")
-    save_chat(chat_history,chatId=chatId)
+    save_chat(chat_history,f"chat_{chatId}")
 
     return classified_intent
 
@@ -548,15 +526,16 @@ def handle_employment_query(
     Returns:
         Dict[str, Union[str, List[str]]]: A dictionary containing responses or follow-up questions.
     """
-    result = classify_employment_query(user_input, llm_70b_vers)
-    user_intention = result["classification_category"]
     chat_history = get_chat(chatId) if get_chat(chatId) else []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     refined_user_input = refine_query_with_history_for_employment(Chat_history_normal, user_input, llm_70b_vers)
     chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
-    save_chat(chat_history,chatId=chatId)
+    save_chat(chat_history,f"chat_{chatId}")
+    result = classify_employment_query(refined_user_input, llm_70b_vers)
+    user_intention = result["classification_category"]
+    keyword_dict = extract_employment_keywords_from_query(refined_user_input, llm)
     if user_intention == "Individual employment status":
-        classification_data, validated_data = extract_location_for_employment_query(refined_user_input, available_areas= available_areas, available_cities= available_cities, available_states= available_states, llm=llm_70b_vers)
+        classification_data, validated_data = extract_location_from_query(refined_user_input, available_areas= available_areas, available_cities= available_cities, available_states= available_states, llm=llm_70b_vers)
        
         # Extract validated details
         area = validated_data["Area"]
@@ -584,7 +563,8 @@ def handle_employment_query(
                     "Is_confirmation" : None,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
             
@@ -604,7 +584,8 @@ def handle_employment_query(
                     "Is_confirmation" : True,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
@@ -614,7 +595,8 @@ def handle_employment_query(
                     "Is_confirmation" : None,
                     "Extracted Data": None,
                     "Validation Data": None,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
@@ -629,7 +611,8 @@ def handle_employment_query(
                     "Is_confirmation" : None,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
@@ -649,7 +632,8 @@ def handle_employment_query(
                     "Is_confirmation" : True,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
         
@@ -659,7 +643,8 @@ def handle_employment_query(
                     "Is_confirmation" : None,
                     "Extracted Data": None,
                     "Validation Data": None,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
@@ -672,18 +657,21 @@ def handle_employment_query(
                     "Is_confirmation" : None,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
             elif city == "None":
-
+                context = f"We have identified the state as {state} based on your query. Please confirm if this information is correct"
+                message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
                 response = {
-                    "Ai_response": "Not Available in List",
-                    "Is_confirmation" : None,
+                    "Ai_response": message,
+                    "Is_confirmation" : True,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
                 }
                 return response
 
@@ -697,7 +685,8 @@ def handle_employment_query(
                 "Is_confirmation" : None,
                 "Extracted Data": None,
                 "Validation Data": None,
-                "User Intention": user_intention
+                "User Intention": user_intention,
+                "KEYWORDS": keyword_dict["KEYWORDS"]
             }
             return response
         
@@ -718,25 +707,39 @@ def handle_employment_query(
                 "Is_confirmation" : None,
                 "Extracted Data": None,
                 "Validation Data": None,
-                "User Intention": user_intention
+                "User Intention": user_intention,
+                "KEYWORDS": keyword_dict["KEYWORDS"]
             }
             return response
         
         else:
             classification_data_to_send =  {
-                key: [] if value == "None" else [i_value.strip() for i_value in value.split(",")]
+                key: [] if value == "None" else [i_value.strip() for i_value in value]
                 for key, value in classification_data.items()
             }
             validated_data_to_send = {
                 key: [] if value == "None" else [i_value.strip() for i_value in value.split(",")]
                 for key, value in validated_data.items()
             }
+            # Extract and combine all unique locations from the JSON fields
+            locations = set(validated_data_to_send.get('Area', []) + validated_data_to_send.get('City', []) + validated_data_to_send.get('State', []))
+            # Join locations with commas and 'and' for the last item
+            locations_list = list(locations)
+            if len(locations_list) == 1:
+                locations_str = locations_list[0]
+            else:
+                locations_str = ', '.join(locations_list[:-1]) + f", and {locations_list[-1]}"
+            
+            # Construct the confirmation message
+            message = f"Kindly confirm if you are seeking to compare the employment status between {locations_str}."
+            confirmation_message = generate_dynamic_message(Chat_history_normal, message,refined_user_input, llm_70b_vers_creative)
             response = {
-                "Ai_response": "We Found Something For your Query",
+                "Ai_response": confirmation_message,
                 "Is_confirmation" : True,
                 "Extracted Data": classification_data_to_send,
                 "Validation Data": validated_data_to_send,
-                "User Intention": user_intention
+                "User Intention": user_intention,
+                "KEYWORDS": keyword_dict["KEYWORDS"]
             }
             return response
     else:
@@ -747,7 +750,8 @@ def handle_employment_query(
                 "Is_confirmation" : None,
                 "Extracted Data": None,
                 "Validation Data": None,
-                "User Intention": user_intention
+                "User Intention": user_intention,
+                "KEYWORDS": keyword_dict["KEYWORDS"]
             }
         return response
     

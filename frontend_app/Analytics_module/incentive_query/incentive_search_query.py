@@ -212,6 +212,7 @@ def get_incentive_data(sub_sector_id=None, industry_id=None, area_id=None, city_
             'area_id', 'city_id', 'state_id', 'incentive_rank', "city_level", "state_level", 
             "country_level", "pan_industries"
         ])
+        Incentive_only_df['incentive_rank'] = pd.to_numeric(Incentive_only_df['incentive_rank'], errors='coerce').astype('Int64')
         return (Incentive_only_df)
     else:
         return None
