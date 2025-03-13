@@ -333,7 +333,7 @@ def call_incentive_search(input,chatId):
     save_chat(chat_history,f"chat_{chatId}")
     state = get_state(f"QINC_state_{chatId}") or None
     if not state:
-        state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None', "KEYWORDS": None}
+        state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None', "KEYWORDS": None, "Only_State_Attempt_Count": 1}
         save_state(state,f"QINC_state_{chatId}")
     log_to_file("state1",state)
     query_intent = classify_incentive_query(input,llm=llm_70b_vers)
@@ -385,9 +385,16 @@ def call_incentive_search(input,chatId):
                 return response
             else:
                 if location_follow_up == 'None':
-                    message = "we have found something for you"
+                    selected_option = next(
+                    (state.get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
+                    ''
+                    )
+                    message = f"We have identified, you are looking for incentives related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
+                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=f"{dynamic_confirmation_message}"))
+                    save_chat(chat_history,chatId=chatId)
                     response = {
-                        "Ai_response": message,
+                        "Ai_response": dynamic_confirmation_message,
                         "Is_confirmation" : True,
                         "State" : state
                     }
@@ -471,8 +478,11 @@ def get_location_from_query(user_query,area_list,city_list,state_list,city_area_
         if state['Area'] == state['City'] == state['State'] == "Not Available in List":
             return "Could you provide the area, city, or state? This will help me give you better details."
         if state['Area'] == 'None' and state['City'] == 'None':
-            if state['State'] != 'None':
+            if state['State'] != 'None' and state["Only_State_Attempt_Count"] <2:
+                state["Only_State_Attempt_Count"] += 1
                 return "Got the state! Could you specify the city or area for more details?"
+            elif state['State'] != 'None' and state["Only_State_Attempt_Count"] >=2:
+                return 'None'
             else:
                 return "Could you provide the area, city, or state? This will help me give you better details."
         else:

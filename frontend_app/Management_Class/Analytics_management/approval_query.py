@@ -1,6 +1,6 @@
 import frappe
 import time
-from frontend_app.Analytics_module.approval_query.approval_search_query import calculate_efficiency,fetch_area_details,fetch_city_details,fetch_industry_details,fetch_state_details,fetch_sub_sector_details,get_property_approval_data
+from frontend_app.Analytics_module.approval_query.approval_search_query import *
 from frontend_app.Management_Class.helpers.progress import insert_process,update_process
 
 @frappe.whitelist()
@@ -21,6 +21,7 @@ def call_approval_query(aiResponse,chatId):
         Validation_Data = aiResponse.get('Validation Data')
         location_info = Validation_Data.get('Location_info')
         Industry_info = Validation_Data.get('Industry_info')
+        Keywords = Validation_Data.get('KEYWORDS')
         given_area = location_info.get('Area')
         given_city = location_info.get('City')
         given_state = location_info.get('State')
@@ -45,12 +46,30 @@ def call_approval_query(aiResponse,chatId):
             file.write(f"\nresults {main_industry,sub_sector_id,area_id,state_id}")
         
         app_df = get_property_approval_data(sub_sector_id, main_industry, area_id, city_id, state_id)
+        columns_to_drop = [
+            'Time_taken', 'is_dependent', 'dependent_approval_ids',
+            'area_id', 'city_id', 'city_level', 'state', 'state_level',
+            'country_level', 'sub_sector', 'industry', 'pan_industries'
+        ]
+
+        approval_keyword_df =  app_df.drop(columns=columns_to_drop) 
+        approval_keyword_df.rename(columns = {"approval_id": "ID"}, inplace=True)
+        approval_keyword_df["Tree Cutting"] = approval_keyword_df["Tree Cutting"].apply(lambda x: "Tree Cutting" if x == "Yes" else "None")
+        approval_keyword_df["Road Cutting"] = approval_keyword_df["Road Cutting"].apply(lambda x: "Road Cutting" if x == "Yes" else "None")
+        approval_keyword_df["Pole Shifting"] = approval_keyword_df["Pole Shifting"].apply(lambda x: "Pole Shifting" if x == "Yes" else "None")
+        approval_keyword_df["Government Department"] = approval_keyword_df["Government Department"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        approval_keyword_df["Business_location"] = approval_keyword_df["Business_location"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        approval_keyword_df["Land_type"] = approval_keyword_df["Land_type"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        approval_keyword_df["Vicinity_detail"] = approval_keyword_df["Vicinity_detail"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        approval_keyword_df["Cross_following"] = approval_keyword_df["Cross_following"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        approval_keyword_df["online_or_offline"] = approval_keyword_df["online_or_offline"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        approval_keyword_df["stages"] = approval_keyword_df["stages"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
         update_process(chatId,"Analyzing Data","Complete")
         update_process(chatId,"Preparing Result","Processing")
         time.sleep(5)
         update_process(chatId,"Preparing Result","Complete")
 
-        final_result = calculate_efficiency(app_df,area_id,city_id,state_id)
+        final_result = calculate_efficiency(app_df,area_id,city_id,state_id, keyword_given_by_user= Keywords, approval_keyword_df = approval_keyword_df)
         response = {
                 "Analytics_response": final_result,
                 "Is_Error" : False

@@ -1058,8 +1058,12 @@ def gather_industry_details(query, main_industries, llm,chatId):
                     (state.get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
                     ''
                 )
+                confirmation_message_static = f"We have identified that you are looking property for your {selected_option} production with the capacity of {state.get('Capacity')},{state.get('Capacity Unit')},{state.get('Time Period')} based on your query. Please confirm if this information is correct."
+                dynamic_confirmation_message = generate_dynamic_confirmation_message(confirmation_message_static, llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=f"{dynamic_confirmation_message}"))
+                save_chat(chat_history,f"QIND_chat_{chatId}")
                 response = {
-                    "Ai_response" : f"We have identified that you are looking for {selected_option},{state.get('Capacity')},{state.get('Capacity Unit')},{state.get('Time Period')} based on your query. Please confirm if this information is correct.",
+                    "Ai_response" : dynamic_confirmation_message,
                     "Is_confirmation" : True,                                   
                     "validated_data" : segment_validated_data,
                     "state" : state
