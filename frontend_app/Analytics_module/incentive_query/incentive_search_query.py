@@ -1,6 +1,9 @@
 import pandas as pd
 from datetime import datetime
 import frappe
+import spacy
+from typing import List, Tuple
+nlp = spacy.load("en_core_web_lg")
 
 def fetch_query_results(query):
     """
@@ -214,7 +217,7 @@ def get_incentive_data(sub_sector_id=None, industry_id=None, area_id=None, city_
     else:
         return None
 
-def incentive_details(df, area_id=None, city_id=None, state_id=None):
+def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_given_by_user= None, incentive_keyword_df = None):
     results = []
     if area_id:
         # Area-level approvals
@@ -325,4 +328,100 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None):
     
     # Convert to DataFrame
     result_df = pd.DataFrame(results).sort_values(by='Incentive Rank',ascending=False)
-    return result_df.to_json()
+    if not keyword_given_by_user:
+        return {
+            "Filtered Incentive Data":None,
+            "Unfiltered Incentive Data":result_df.to_json(),
+            }
+    
+    else:
+        keyword_result = filter_df_by_keywords(keyword_given_by_user, incentive_keyword_df)
+        filtered_keyword_df, unfiltered_keyword_df = keyword_result[0], keyword_result[1]
+
+        if len(filtered_keyword_df) != 0:
+            filtered_result_df = pd.merge(result_df, filtered_keyword_df, left_on="Incentive ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score", "Incentive Rank"], ascending=[False, False])
+            unfiltered_result_df = pd.merge(result_df, unfiltered_keyword_df, left_on="Incentive ID", right_on="ID").drop("ID", axis=1).sort_values(by=["Incentive Rank", "aggregated_score"], ascending=[False, False])
+            return {            
+                "Filtered Incentive Data":filtered_result_df.to_json(),
+                "Unfiltered Incentive Data":unfiltered_result_df.to_json(),
+                }
+        else:
+            unfiltered_result_df = pd.merge(result_df, unfiltered_keyword_df, left_on="Approval ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score", "Incentive Rank"], ascending=[False, False])
+            return {
+                "Filtered Incentive Data":None,
+                "Unfiltered Incentive Data":unfiltered_result_df.to_json()
+                }
+
+def filter_df_by_keywords(
+    extracted_keywords: List[str],
+    df: pd.DataFrame,
+    spacy_threshold: float = 0.65
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    1) Compute SpaCy similarity for EACH column separately.
+    2) Store the similarity scores as new columns (e.g., "spacy_score_<column_name>").
+    3) Compute an aggregated similarity score per row.
+    4) Sort both DataFrames by the aggregated score.
+    5) Return TWO DataFrames:
+       - `filtered_df`: Rows where at least one column has similarity >= spacy_threshold.
+       - `remaining_df`: Rows where no columns met the threshold.
+
+    Parameters:
+    -----------
+    extracted_keywords : List[str]
+        The list of keywords extracted from the user query (e.g., ["power", "incentive"]).
+
+    df : pd.DataFrame
+        The DataFrame containing textual columns to filter.
+        Non-string columns will be converted to string before similarity computation.
+
+    spacy_threshold : float
+        The minimum SpaCy similarity (0.0-1.0) to consider a row a match.
+
+    Returns:
+    --------
+    Tuple[pd.DataFrame, pd.DataFrame]:
+        - `filtered_df`: Rows where at least one column met the threshold, sorted by relevance.
+        - `remaining_df`: Rows where no columns met the threshold, sorted by relevance.
+    """
+
+    # 1) Concatenate the extracted keywords into a single user text string
+    user_text = " ".join(kw.strip() for kw in extracted_keywords if kw.strip()).lower()
+
+    # If no user_text is available, return empty DataFrames with the same structure
+    if not user_text:
+        return df.iloc[0:0], df.iloc[0:0]  # Return two empty DataFrames
+
+    # Convert user text to a SpaCy Doc object
+    user_doc = nlp(user_text)
+
+    # Copy the DataFrame to avoid modifying the original
+    df = df.copy()
+
+    # Store similarity scores for each column
+    similarity_columns = []
+    # 2) Compute SpaCy similarity for each column separately
+    for col in df.columns:
+        if col == "ID":
+            continue
+        col_name = f"spacy_score_{col}"  # Create column name for similarity score
+        similarity_columns.append(col_name)
+
+        # Convert column to string and lowercase (handle NaN safely)
+        df[col] = df[col].astype(str).str.lower()
+
+        # Compute similarity for each row in the column
+        df[col_name] = df[col].apply(lambda text: user_doc.similarity(nlp(text)) if text.strip() else 0)
+
+    # 3) Compute an aggregated similarity score per row
+    df["aggregated_score"] = (df[similarity_columns].max(axis=1) + df[similarity_columns].mean(axis=1)) / 2
+
+    # 4) Filter rows where at least ONE column has similarity >= threshold
+    mask = df[similarity_columns] >= spacy_threshold  # Check each column individually
+    row_match = mask.any(axis=1)  # If at least one column meets threshold, keep the row
+
+    # 5) Create the two DataFrames:
+    filtered_df = df.loc[row_match].sort_values(by="aggregated_score", ascending=False)  # Sort by relevance
+    remaining_df = df.loc[~row_match].sort_values(by="aggregated_score", ascending=False)  # Sort by relevance
+
+    return filtered_df[["ID", "aggregated_score"]], remaining_df[["ID", "aggregated_score"]]
