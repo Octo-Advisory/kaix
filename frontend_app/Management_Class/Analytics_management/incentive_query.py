@@ -25,6 +25,7 @@ def call_incentive_query(aiResponse,chatId):
         given_area = state.get('Area')
         given_city = state.get('City')
         given_state = state.get('State')
+        keywords = state.get('KEYWORDS')
         given_main_industry = state.get('Main-Industry')
         given_sub_sector = state.get('Sub-Sector')
         update_process(chatId,"Fetching Data","Complete")
@@ -38,12 +39,22 @@ def call_incentive_query(aiResponse,chatId):
         today_date = datetime.now().strftime('%Y-%m-%d 00:00:00')
  
         Incentive_only_df = get_incentive_data(sub_sector,main_industry,area,city,State,today_date)
-        incentive_detail = incentive_details(Incentive_only_df,area,city,State)
+        incentive_detail = incentive_details(Incentive_only_df,area,city,State,keyword_given_by_user= keywords, incentive_keyword_df = incentive_keyword_df)
+        columns_to_drop = [
+       'Incentive Start Date', 'Incentive End Date', 'sub_sector_id',
+       'city_level', 'state_level', 'country_level', 'pan_industries'
+        ]
+        incentive_keyword_df =  Incentive_only_df.drop(columns=columns_to_drop)
+        incentive_keyword_df.rename(columns={"incentive_id":"ID"}, inplace=True)
+        incentive_keyword_df["Incentive_name"] = incentive_keyword_df["Incentive_name"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        incentive_keyword_df["Incentive Type"] = incentive_keyword_df["Incentive Type"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
+        incentive_keyword_df["Incentive Details"] = incentive_keyword_df["Incentive Details"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)    
         update_process(chatId,"Analyzing Data","Complete")
         update_process(chatId,"Preparing Result","Processing")
         time.sleep(5)
         update_process(chatId,"Preparing Result","Complete")
         response = {
+       'industry_id', 'area_id', 'city_id', 'state_id', 'incentive_rank',
                 "Analytics_response": incentive_detail,
                 "Is_Error" : False
             }
