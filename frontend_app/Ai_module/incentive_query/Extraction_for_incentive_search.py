@@ -286,9 +286,9 @@ def generate_dynamic_message_for_incentive(chat_history_for_context: List[dict],
     update_llm_token(message)
     
     # Append AI message to chat history
-    chat_history = get_chat(f"QINC_chat_{chatId}") or []
+    chat_history = get_chat(f"chat_{chatId}") or []
     chat_history.append(AIMessage(content=f"{message.content.strip()}"))
-    save_chat(chat_history,f"QINC_chat_{chatId}")
+    save_chat(chat_history,f"chat_{chatId}")
     return message.content.strip()
 
 # Get available area, city, state
@@ -309,7 +309,7 @@ def get_available_area_city_state():
 
     # Create a DataFrame from the result
     columns = ["area_name", "city_name", "state_name"]
-    df_area_for_incentive_extraction = pd.DataFrame(result_of_query, columns=columns)
+    df_area_for_incentive_extraction = pd.DataFrame(result_of_query, columns=columns) 
     df_area_for_incentive_extraction = df_area_for_incentive_extraction.drop_duplicates()
 
     city_area_mapped_dict =  df_area_for_incentive_extraction.groupby("city_name")["area_name"].apply(list).to_dict()
@@ -326,11 +326,11 @@ def get_available_area_city_state():
 # Entry point of Incentive search
 def call_incentive_search(input,chatId):
     log_to_file("----","--------------")
-    chat_history = get_chat(f"QINC_chat_{chatId}") or []
+    chat_history = get_chat(f"chat_{chatId}") or []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     refine_user_input = refine_query_with_history_for_incentive(Chat_history_normal,input,llm_70b_vers)
     chat_history.append(HumanMessage(content=refine_user_input))
-    save_chat(chat_history,f"QINC_chat_{chatId}")
+    save_chat(chat_history,f"chat_{chatId}")
     state = get_state(f"QINC_state_{chatId}") or None
     if not state:
         state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None', "KEYWORDS": None, "Only_State_Attempt_Count": 1}

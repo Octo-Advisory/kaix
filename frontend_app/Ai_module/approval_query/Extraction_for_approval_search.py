@@ -954,7 +954,6 @@ def handle_approval_query(
         extracted_state["Industry_info"]["Product"] = ind_extracted_data["Product"] if ind_extracted_data["Product"] != "None" else None
 
         if area_name != "Not Available in List" and main_industry_name != "Not Available in list":
-
             if area_name != "None":
                 parent_city = next((key for key, value in city_to_area_mapping.items() if area_name in value), None)
                 parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)

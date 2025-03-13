@@ -325,7 +325,7 @@ def generate_dynamic_message(chat_history_for_context: List[dict], static_follow
     Returns:
         str: The dynamically generated follow-up message.
     """
-    chat_history = get_chat(chatId) if get_chat(chatId) else []
+    chat_history = get_chat(f"chat_{chatId}") if get_chat(f"chat_{chatId}") else []
     # Prepare the conversation history context
     recent_history = "\n".join(
         chat_history_for_context
@@ -436,7 +436,7 @@ def generate_dynamic_message(chat_history_for_context: List[dict], static_follow
     # Append AI message to chat history
     chat_history.append(AIMessage(content=f"{message.content.strip()}"))
     # logging.info(f"actual aarray3 {chat_history}")
-    save_chat(chat_history,chatId=chatId)
+    save_chat(chat_history,f"chat_{chatId}")
     return message.content.strip()
 
 def check_user_intent(response: str, follow_up_question: str, llm,chatId) -> str:
@@ -481,7 +481,7 @@ def check_user_intent(response: str, follow_up_question: str, llm,chatId) -> str
     User's Response: {response}
     """
 
-    chat_history = get_chat(chatId) if get_chat(chatId) else []
+    chat_history = get_chat(f"chat_{chatId}") if get_chat(f"chat_{chatId}") else []
     prompt_template = PromptTemplate(
         input_variables=["response", "follow_up_question"],
         template=prompt
@@ -500,7 +500,7 @@ def check_user_intent(response: str, follow_up_question: str, llm,chatId) -> str
     chat_history.append(HumanMessage(content=f"User's Response: {response}"))
     chat_history.append(AIMessage(content=f"Classified Intent: {classified_intent}"))
     # logging.info(f"actual aarray2 {chat_history}")
-    save_chat(chat_history,chatId=chatId)
+    save_chat(chat_history,f"chat_{chatId}")
 
     return classified_intent
 
