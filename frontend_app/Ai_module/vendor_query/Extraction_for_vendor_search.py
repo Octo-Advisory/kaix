@@ -1084,6 +1084,7 @@ def handle_vendor_query(
 
                 chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                 save_chat(chat_history,f"chat_{chatId}")
+                
                 response = {
                     "Ai_response": message,
                     "Is_confirmation" : True,
