@@ -8,6 +8,7 @@ def handle_employement_query(aiResponse,chatId):
             city = aiResponse['Validation Data']['City'][0]
             state = aiResponse['Validation Data']['State'][0]
             result = {"user_intention": user_intention, "city": city, "state": state}
+            given_keyword_by_user = []
             return employment_search_algo(user_intention,{"state":state , "city_name":city },chatId)
         elif user_intention == "Comparison between cities, states, or areas":
             city = aiResponse['Validation Data']['City']

@@ -389,7 +389,7 @@ def call_incentive_search(input,chatId):
                     (state.get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
                     ''
                     )
-                    message = f"We have identified, you are looking for incentives related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                    message = f"We have identified, you are looking for incentives related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
                     dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                     chat_history.append(AIMessage(content=f"{dynamic_confirmation_message}"))
                     save_chat(chat_history,chatId=chatId)
