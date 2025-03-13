@@ -1076,10 +1076,10 @@ def handle_vendor_query(
                     (state.get("Industry_info").get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
                     ''
                     )
-                    message = f"We have identified that you are searching for all suppliers needed for your {selected_option} production in {state.get("Location_info").get('Location')}. Is this information correct?"
+                    message = f"We have identified that you are searching for all suppliers needed for your {selected_option} production in {state.get('Location_info').get('Location')}. Is this information correct?"
                     dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)          
                 else:
-                    message = f"We have identified, you are looking for {" and ".join(state["Supply_info"]["Supplies"])} suppliers in {state.get("Location_info").get('Location')}. Is this information correct?"
+                    message = f"We have identified, you are looking for {' and '.join(state['Supply_info']['Supplies'])} suppliers in {state.get('Location_info').get('Location')}. Is this information correct?"
                     dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
 
                 chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
@@ -1177,7 +1177,7 @@ def handle_vendor_query(
                         (state.get("Industry_info").get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
                         ''
                         )
-                        message = f"We have identified that you are searching for all suppliers needed for your {selected_option} production in {state.get("Location_info").get('Location')}. Is this information correct?"
+                        message = f"We have identified that you are searching for all suppliers needed for your {selected_option} production in {state.get('Location_info').get('Location')}. Is this information correct?"
                         dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                         chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                         save_chat(chat_history,f"chat_{chatId}")
@@ -1304,7 +1304,7 @@ def handle_vendor_query(
         if not all(supply == "Not Available in List" for supply in state["Supply_info"]["Supplies"]):
             if state["Supply_info"]["Supplies"]:
                 if perfect_location_data:
-                    message = f"We have identified, you are looking for {" and ".join(state["Supply_info"]["Supplies"])} suppliers in {state.get("Location_info").get('Location')}. Is this information correct?"
+                    message = f"We have identified, you are looking for {' and '.join(state['Supply_info']['Supplies'])} suppliers in {state.get('Location_info').get('Location')}. Is this information correct?"
                     dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
                     chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
@@ -1447,7 +1447,7 @@ def handle_vendor_query(
                         (state.get("Industry_info").get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
                         ''
                         )
-                        message = f"We have identified that you are searching for all suppliers needed for your {selected_option} production in {state.get("Location_info").get('Location')}. Is this information correct?"
+                        message = f"We have identified that you are searching for all suppliers needed for your {selected_option} production in {state.get('Location_info').get('Location')}. Is this information correct?"
                         dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                         chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                         save_chat(chat_history,f"chat_{chatId}")
@@ -1596,7 +1596,7 @@ def handle_vendor_query(
         if not all(supply == "Not Available in List" for supply in state["Supply_info"]["Supplies"]):
             if state["Supply_info"]["Supplies"]:
                 if perfect_location_data and perfect_supply_data:
-                    message = f"We have identified, you are looking for {" and ".join(state["Supply_info"]["Supplies"])} suppliers in {state.get("Location_info").get('Location')}. Is this information correct?"
+                    message = f"We have identified, you are looking for {' and '.join(state['Supply_info']['Supplies'])} suppliers in {state.get('Location_info').get('Location')}. Is this information correct?"
                     dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
                     chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
