@@ -54,7 +54,6 @@ def call_incentive_query(aiResponse,chatId):
         time.sleep(5)
         update_process(chatId,"Preparing Result","Complete")
         response = {
-       'industry_id', 'area_id', 'city_id', 'state_id', 'incentive_rank',
                 "Analytics_response": incentive_detail,
                 "Is_Error" : False
             }
