@@ -1308,3 +1308,71 @@ def generate_dynamic_confirmation_message(static_confirmation: str, llm) -> str:
     })
 
     return message.content.strip()
+
+def generate_fallback_message(chat_history_for_context: List[dict], confirmation_message: str, llm) -> str:
+    """
+    Generate a dynamic fallback message using LLM when the user responds 'no' to a confirmation message.
+
+    Parameters:
+        chat_history_for_context (List[dict]): The list of conversation history with user and AI messages.
+        confirmation_message (str): The confirmation message the user responded 'no' to.
+        llm: The language model instance.
+
+    Returns:
+        str: The dynamically generated fallback message.
+    """
+
+    # Prepare the conversation history context
+    recent_history = "\n".join(chat_history_for_context)
+
+    # Define the prompt
+    prompt = """
+    You are a professional assistant specializing in creating formal, engaging, and contextually relevant fallback messages.
+    Your goal is to craft a polite and professional response when the user indicates that the confirmation message was incorrect.
+
+    ---
+
+    Key Instructions
+    1. The message should naturally convey that the provided details may not fully align with the user's needs. 
+       - Use phrasing like "It seems the provided details may not fully align with your needs" or a similar, contextually natural variation.
+       - Avoid copying the exact phrasing from the prompt unless it fits naturally in the response.
+    2. Politely ask the user to specify the correct or missing details without using direct apologies.
+    3. Avoid language that implies fault, such as 'I apologize.' Instead, use neutral and professional phrasing.
+    4. Do NOT assume or infer details that were not explicitly provided.
+    5. Ensure the tone is empathetic, professional, and user-friendly.
+    6. The response must be concise (no more than 3 lines) and encourage the user to provide the correct details.
+
+    ---
+
+    Inputs
+    1. Recent Conversation History:
+    - {recent_history}
+
+    2. Previous Confirmation Message:
+    - "{confirmation_message}"
+
+    ---
+
+    Final Response Guidelines:
+    - Begin with a sentence that naturally conveys that the provided details may not fully align with the user's needs.
+    - Use variations like "It seems..." or "It appears..." to keep the tone conversational and engaging.
+    - Politely ask the user to specify the correct or missing details.
+    - Maintain a professional, engaging, and empathetic tone.
+    - Do NOT infer or assume details not mentioned in the chat history or confirmation message.
+    - Keep the response concise (within 3 lines).
+    - Do NOT use phrases like 'I apologize.'
+
+    """
+
+    # Prepare input to the model
+    prompt_template = PromptTemplate(
+        input_variables=["recent_history", "confirmation_message"],
+        template=prompt
+    )
+    chain = prompt_template | llm
+    message = chain.invoke({
+        "recent_history": recent_history,
+        "confirmation_message": confirmation_message
+    })
+
+    return message.content.strip()
