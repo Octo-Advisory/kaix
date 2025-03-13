@@ -530,7 +530,7 @@ def handle_employment_query(
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     refined_user_input = refine_query_with_history_for_employment(Chat_history_normal, user_input, llm_70b_vers)
     chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
-    save_chat(chat_history,chatId=chatId)
+    save_chat(chat_history,f"chat_{chatId}")
     result = classify_employment_query(refined_user_input, llm_70b_vers)
     user_intention = result["classification_category"]
     keyword_dict = extract_employment_keywords_from_query(refined_user_input, llm)
