@@ -663,10 +663,11 @@ def handle_employment_query(
                 return response
 
             elif city == "None":
-
+                context = f"We have identified the state as {state} based on your query. Please confirm if this information is correct"
+                message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
                 response = {
-                    "Ai_response": "Not Available in List",
-                    "Is_confirmation" : None,
+                    "Ai_response": message,
+                    "Is_confirmation" : True,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
                     "User Intention": user_intention,
