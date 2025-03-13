@@ -89,46 +89,49 @@ def refine_query_with_history(history, latest_query, llm):
 def classify_query(user_query):
     # Define the refined prompt template 
     prompt_template = """
-    You are an expert in understanding business-related queries and classifying them into a **single most relevant category**.
+    You are an expert in understanding business-related queries and classifying them into a single most relevant category.
     Your task is to strictly assign the query to only one category, even if multiple classes seem applicable.  
     Analyze the context carefully and ensure that you return only one category that best fits the query.  
 
     Categories & Their Definitions:
 
     1. Query to build industry from Scratch:  
-        - Example: *I want to build a 1 TPA Cement Factory.*  
+        - Example: I want to build a 1 TPA Cement Factory.  
         - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
-        - Only assign this category if the user's query explicitly indicates an intent to build a new industry or factory.  
-        - Do NOT classify a query under this category if it only mentions approvals, incentives, vendors, or employee searches—these should be classified under their respective categories.  
-        - If the intent to build is unclear or mixed with other topics, do NOT assign this category.
+        - Assign this category if the user's query indicates any intent to establish, set up, construct, initiate, develop, or start a new industry or factory, regardless of the exact words used.  
+        - The classification must be based on understanding the overall intent and context rather than focusing on specific words like "build" or "establish."  
+        - Queries about buying property for building an industry may fall under this category only if the intent to use that property for setting up an industry is clearly indicated.  
+        - Queries about selling property, renting land, or general property transactions that do not involve setting up an industry should not be classified under this category.  
+        - If the intent to build is unclear, vague, or mixed with other topics, classify it under "Other industry-related queries."
 
     2. Query to search Vendors:  
-        - Example: *I am searching for a vendor who supplies pharmaceutical-grade raw chemicals for drug manufacturing.*  
+        - Example: I am searching for a vendor who supplies pharmaceutical-grade raw chemicals for drug manufacturing.  
         - This category is used for queries about finding suppliers, manufacturers, or vendors for raw materials, equipment, or services.
 
     3. Query to search Incentives:  
-        - Example: *What benefits are available for setting up a cement manufacturing plant in XYZ area?*  
+        - Example: What benefits are available for setting up a cement manufacturing plant in XYZ area?  
         - This category is used for queries asking about government incentives, grants, or subsidies related to setting up or expanding an industry.
 
     4. Query to Get Approvals:  
-        - Example: *I want to get approval for my Cement Factory.*  
+        - Example: I want to get approval for my Cement Factory.  
         - This category is used for queries about obtaining permits, licenses, or regulatory approvals for a business or industry.
 
     5. Query to Get Employee Search:  
-        - Example: *What is the availability of employment in XYZ area for the Pharmaceutical industry?*  
+        - Example: What is the availability of employment in XYZ area for the Pharmaceutical industry?  
         - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
 
     If None of the Above Apply, Use These Two Categories:
 
     6. Other industry-related queries:  
-        - Example: *What is the role of AI in manufacturing?*  
+        - Example: What is the role of AI in manufacturing?  
         - This refers to general industry discussions, trends, or innovations that do not fit into the above categories.
+        - Queries about selling property, renting facilities, or unrelated infrastructure transactions should be classified here.
 
     7. Valueless queries:  
-        - Example: *Who is Donald Trump?*  
+        - Example: Who is Donald Trump?  
         - This refers to queries that are irrelevant to business, industry setup, or supply chains.  
         - If the query contains industry-related words but the intent is not meaningful, classify it here.  
-        - Example: *I'm going to buy a new bike, for that which approvals do I need?* (Not relevant to industry-building)
+        - Example: I'm going to buy a new bike, for that which approvals do I need? (Not relevant to industry-building)
 
     Strict Classification Rules:
 
@@ -136,17 +139,18 @@ def classify_query(user_query):
         - If the query seems to match multiple categories, analyze the overall intent and assign it to the single most appropriate category.  
 
     2. Assign "Query to build industry from Scratch" ONLY if Confident:  
-        - Strictly assign this category only if the user clearly states they want to establish a new industry.  
-        - If the query only contains mentions of vendors, incentives, approvals, or employee searches, do NOT classify it as industry-building.  
-        - If the intent to build is unclear or mixed with other topics, do NOT assign this category.
+        - Assign this category only if the query's overall context and intent clearly suggest setting up or establishing an industry, using any terminology (like initiate, develop, set up, start, construct, etc.).  
+        - Do not classify queries about selling, renting, or unrelated property dealings under this category.  
+        - Queries that simply mention "property for an industry" but do not clearly indicate an intent to build should be classified under "Other industry-related queries."  
+        - The classification should be based on a thorough understanding of the full query, not on the presence of single words.
 
-    3. Do NOT Assign "Query to build industry from Scratch" If the Query Contains Only Approvals, Incentives, Vendors, or Employee Searches:  
-        - If the user is asking about any combination of these categories (Approvals, Incentives, Vendors, or Employee Searches) but does NOT explicitly mention setting up a new industry, assign the most relevant category among them.  
-        - Example: *"I need vendors for raw materials and want to know about required approvals and incentives."* → Correct classification: Either "Query to search Vendors" or "Query to Get Approvals" based on context.  
-        - Example: *"I want to search vendors, approvals, and also check employment availability in my city."* → Correct classification: Choose the most dominant category based on intent.  
+    3. Do Not Assign "Query to build industry from Scratch" If the Query Contains Only Approvals, Incentives, Vendors, or Employee Searches:  
+        - If the user is asking about any combination of these categories (Approvals, Incentives, Vendors, or Employee Searches) but does not explicitly or contextually mention setting up a new industry, assign the most relevant category among them.  
+        - Example: "I need vendors for raw materials and want to know about required approvals and incentives." → Correct classification: Either "Query to search Vendors" or "Query to Get Approvals" based on context.  
+        - Example: "I want to search vendors, approvals, and also check employment availability in my city." → Correct classification: Choose the most dominant category based on intent.  
 
     4. Prioritize Meaningful Context, Not Just Keywords:  
-        - Do NOT assign a category just because it contains words like "approval," "vendor," or "incentive."  
+        - Do not assign a category just because it contains words like "approval," "vendor," or "incentive."  
         - Analyze the full context of the query before assigning a category.  
 
     Final Output Instructions:
@@ -160,6 +164,7 @@ def classify_query(user_query):
     Output:  
     (Return only one category name from the list)
     """
+ 
 
     # Initialize the LLM
     # Create the prompt

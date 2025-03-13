@@ -1,6 +1,6 @@
 import frappe
 from langchain.prompts import PromptTemplate
-from frontend_app.Ai_module.Query_Classification_And_Analysis import classify_query,llm_70b_vers_creative
+from frontend_app.Ai_module.Query_Classification_And_Analysis import classify_query,llm_70b_vers_creative,refine_query_with_history,llm_70b_vers
 from frontend_app.Ai_module.employement_query.Extraction_for_employement_search import call_handle_employment_query
 from frontend_app.Ai_module.build_from_scratch.Extraction_for_Building_from_Scratch import entry_build_from_scratch
 from frontend_app.Ai_module.incentive_query.Extraction_for_incentive_search import call_incentive_search
@@ -20,7 +20,10 @@ def ai_module_call(input,chatId):
         user_intension = check_user_intension(chatId)
 
         if user_intension in ["Valueless queries","Other industry-related queries",None]:
-            user_intension = classify_query(input)
+            chat_history = get_chat(f"chat_{chatId}") or []
+            Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+            refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_70b_vers)
+            user_intension = classify_query(refine_user_input)
             with open("testlog.txt", "a") as file:
                 file.write(f"\nuser_intension found {user_intension} for chatId {chatId}")
             update_user_intension(user_intension,chatId)  # Store the classified intention for future use
@@ -71,7 +74,7 @@ def ai_module_call(input,chatId):
         elif user_intension == "Query to search Incentives":
             try:
                 response = call_incentive_search(input,chatId)
-                log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
+                log(chatId,'debug','response',str(response),'AI.py','ai')
                 return response
             except Exception as e:
                 response = { 
@@ -144,7 +147,7 @@ def generate_dynamic_message(user_message, user_intention, chatId,llm):
     Returns:
         str: A concise, professional, and context-aware response guiding the user appropriately.
     """
-    chat_history = get_chat(f"QVLQ_chat_{chatId}") or []
+    chat_history = get_chat(f"chat_{chatId}") or []
 
 
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-4:]]
@@ -228,6 +231,6 @@ def generate_dynamic_message(user_message, user_intention, chatId,llm):
     update_llm_token(response)
     message_from_ai = response.content.strip()
     chat_history.append(AIMessage(content=message_from_ai))
-    save_chat(chat_history,f"QVLQ_chat_{chatId}")
+    save_chat(chat_history,f"chat_{chatId}")
     
     return message_from_ai

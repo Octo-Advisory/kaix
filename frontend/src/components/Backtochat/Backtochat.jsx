@@ -21,11 +21,19 @@ function Backtochat() {
         }
     };
 
-    const handleClick = () => {
+    const handleClick = async () => {
         dispatch(clearAiresponse())
         dispatch(clearAnalyticsResult())
         dispatch(removeVendorResult()) 
         deleteAllProgressRecords(chatId)
+        try {
+            await updateDoc("Session", chatId, {
+                user_intension: "",
+            });
+            console.log("Updated Successfully");
+        } catch (err) {
+            console.error("Error Updating:", err);
+        }
         navigate("/")
     }
     return (

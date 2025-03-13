@@ -126,13 +126,13 @@ function Details() {
               required>
                 <option value="" disabled>--- Select Category ---</option>
                 <option value="Incentive">Incentive</option>
-                <option value="Technical Support">Approvals</option>
-                <option value="General Inquiry">Land</option>
-                <option value="General Inquiry">Employment</option>
-                <option value="General Inquiry">Suppliers</option>
-                <option value="Billing">IT</option>
-                <option value="General Inquiry">Website</option>
-                <option value="Other">Others</option>
+                <option value="Approvals">Approvals</option>
+                <option value="Land">Land</option>
+                <option value="Employment">Employment</option>
+                <option value="Suppliers">Suppliers</option>
+                <option value="IT">IT</option>
+                <option value="Website">Website</option>
+                <option value="Others">Others</option>
               </select>
             </div>
             <div>
