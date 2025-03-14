@@ -372,6 +372,7 @@ def call_incentive_search(input,chatId):
             state['Sub-Sector'] = sub_sector_validated_Data['Sub-Sector']
             state['Product'] = sub_sector_validated_Data["Product"]
             save_state(state,f"QINC_state_{chatId}")
+            log_to_file("state['Sub-Sector']",state['Sub-Sector'])
             if state['Sub-Sector'] == 'None':
                 static_follow_up = "Could you share more specific details about the product you're interested in?"
                 if location_follow_up != 'None':
@@ -384,15 +385,16 @@ def call_incentive_search(input,chatId):
                     }
                 return response
             else:
+                log_to_file("location_follow_up",location_follow_up)
                 if location_follow_up == 'None':
                     selected_option = next(
                     (state.get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
                     ''
                     )
-                    message = f"We have identified, you are looking for incentives related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
+                    message = f"We have identified, you are looking for incentives related to {selected_option} production in {state.get('Area')} under the city {state.get('City')} in {state.get('State')}. Is this information correct?"
                     dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                     chat_history.append(AIMessage(content=f"{dynamic_confirmation_message}"))
-                    save_chat(chat_history,chatId=chatId)
+                    save_chat(chat_history,f"chat_{chatId}")
                     response = {
                         "Ai_response": dynamic_confirmation_message,
                         "Is_confirmation" : True,

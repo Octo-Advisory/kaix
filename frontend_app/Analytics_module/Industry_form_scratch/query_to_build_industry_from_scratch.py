@@ -6,6 +6,9 @@ import sys
 from numpy import average
 import numpy as np
 import traceback
+import spacy
+from typing import List, Tuple
+nlp = spacy.load("en_core_web_lg")
 
 def fetch_query_results(query):
     """
@@ -121,64 +124,6 @@ def get_segment(segment):
         return segment_id
     else:
        return None
-
-# def get_land_requirements(industry_id,sub_sector_id,segment_id,required_capacity_by_user):
-#     if industry_id != None and sub_sector_id != None and segment_id != None:
-#         query = f"""
-#         SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
-#             `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
-#         FROM `tabIndustry Capacity Rule`
-#         WHERE (
-#             ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
-#             OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
-#         )
-#         AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment = '{segment_id}');
-#     """
-
-#     elif industry_id != None and sub_sector_id != None and segment_id == None:
-#         query = f"""
-#         SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
-#             `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
-#         FROM `tabIndustry Capacity Rule`
-#         WHERE (
-#             ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
-#             OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
-#         )
-#         AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment IS NULL);
-#         """
-
-#     elif industry_id != None and sub_sector_id == None and segment_id == None:
-#         # Show all `sub_sector_id` related to `industry_id`
-#         query = f"""
-#         SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
-#             `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
-#         FROM `tabIndustry Capacity Rule`
-#         WHERE (
-#             ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
-#             OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
-#         )
-#         AND (industry = '{industry_id}');
-#         """  
-
-#     else:
-#         query = None
-#     # Ensure query execution happens only when query is not None
-#     # log_to_file("query",query)
-#     if query != None:
-#         results = fetch_query_results(query)
-#         # log_to_file("result",result)
-#         # results = pd.DataFrame(result)
-#     else:
-#         results = None
-#     # log_to_file("result",results)
-#     # Assign variables based on results
-#     if results != None:
-#         for row in results:
-#             minimum_land_requirement = row[3]  # 4th column
-#             maximum_land_requirement = row[4]  # 5th column
-#             return minimum_land_requirement,maximum_land_requirement
-#     else:
-#         return 'No Result Found For Land'
 
 
 def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=None, segment_id=None):
@@ -442,23 +387,23 @@ def get_property_and_employement(zone_id,area_id_list,required_LowerMargin_land_
     # convert list to string to use in query
     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
 
-    sql_query_for_property_and_employment = f"""
-    SELECT p.name, p.area, p.city, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability
+    sql_query_for_property_and_employment_and_employment = f"""
+    SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability
     FROM `tabSurvey No` p
     JOIN `tabEmployment City Mapping` e ON p.area = e.area
     WHERE (p.zone = '{zone_id}') 
-    AND (p.area IN ({area_id_str}))
-    AND (p.area_acre BETWEEN {required_LowerMargin_land_for_user} AND {required_UpperMargin_land_for_user});
+    AND (p.area IN ({area_id_str}));
     """
 
     # Call the function and assign results
-    results = fetch_query_results(sql_query_for_property_and_employment)
+    results = fetch_query_results(sql_query_for_property_and_employment_and_employment)
+
+    # Convert results to a pandas DataFrame
+    import pandas as pd
 
     if results:
         # Convert the fetched results into a pandas DataFrame
-        property_employment_df = pd.DataFrame(results, columns=['property_id', 'area', 'city', 'state', 'distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source', 'latitude_longitude',"business_location_type", "land_type","pole_shifting", "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following_?", "road_connectivity", "distance_from_nearest_airport" ,'employment_area_id', 'employmenttype_id', 'availability'])
-        # log_to_file("propert_emp",property_employment_df)
-        # log_to_file("propert_emp unique",property_employment_df.property_id.unique())
+        property_employment_df = pd.DataFrame(results, columns=['property_id', "land_size",'area', 'city', 'village', 'taluka', 'district', 'state', 'distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source', 'latitude_longitude', 'Property Type', "business_location_type", "land_type","pole_shifting", "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following", "road_connectivity", "distance_from_nearest_airport" ,'employment_area_id', 'employmenttype_id', 'availability'])
         return property_employment_df,property_employment_df.property_id.unique()
     else:
         found_property = False
@@ -511,10 +456,9 @@ WHERE
         return None,found_incentive
 
 def transform_dataframes(df):
-    
     # First DataFrame: Select unique property_id with distances
     df1 = df.groupby("property_id")[
-        ["distance_from_nearest_railway_station", "distance_from_nearest_seaport", "distance_from_power_source","distance_from_nearest_airport","road_connectivity"]
+        ["land_size", "distance_from_nearest_railway_station", "distance_from_nearest_seaport", "distance_from_power_source","distance_from_nearest_airport","road_connectivity"]
     ].first().reset_index()
 
     # Second DataFrame: Pivot for employmenttype_id as columns and level_of_availability as values
@@ -524,36 +468,64 @@ def transform_dataframes(df):
     df2.columns.name = ""  # Remove the name of the index
     return df1, df2
 
-def calculate_property_suitability(df, preference_power_plant=5, preference_road=5, preference_railway=4, preference_seaport=3, preference_airport=2):
+def calculate_land_size_score(size, lower_limit, upper_limit, k1=0.028125):
+    if size >= lower_limit:
+        return 10
+    else:
+        score = 10 * np.exp(-k1 * (lower_limit - size))
+        return max(score, 1)
+
+def calculate_property_suitability(
+    df, 
+    lower_limit, 
+    upper_limit, 
+    preference_power_plant=5, 
+    preference_road=5, 
+    preference_railway=4, 
+    preference_seaport=3, 
+    preference_airport=2,
+    k1=0.028125
+):
     # Ensure the distance columns are numeric
-    distance_columns = ['distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source',"distance_from_nearest_airport","road_connectivity"]
+    distance_columns = ['distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source', "distance_from_nearest_airport", "road_connectivity", "land_size"]
     for col in distance_columns:
-        df[col] = pd.to_numeric(df[col], errors='coerce')  # Convert to numeric, coercing errors to NaN
+        df[col] = pd.to_numeric(df[col], errors='coerce')
     df.fillna(0, inplace=True)
-    total_preference_score = (preference_power_plant + preference_road + preference_railway + preference_seaport + preference_airport)
+
+    total_preference_score = (
+        preference_power_plant + preference_road + preference_railway + preference_seaport + preference_airport
+    )
 
     # Define weightages
-    weight_railway = preference_railway/total_preference_score
-    weight_seaport = preference_seaport/total_preference_score
-    weight_power_plant = preference_power_plant/total_preference_score
-    weight_airport = preference_airport/total_preference_score
-    weight_road = preference_road/total_preference_score
+    weight_railway = preference_railway / total_preference_score
+    weight_seaport = preference_seaport / total_preference_score
+    weight_power_plant = preference_power_plant / total_preference_score
+    weight_airport = preference_airport / total_preference_score
+    weight_road = preference_road / total_preference_score
 
-    # Compute normalized scores for each mode
-    df['railway_score'] = normalize_series(df['distance_from_nearest_railway_station'],highest_is_worst=True)
-    df['seaport_score'] = normalize_series(df['distance_from_nearest_seaport'],highest_is_worst=True)
-    df['airport_score'] = normalize_series(df['distance_from_nearest_airport'],highest_is_worst=True)
-    df['road_score'] = normalize_series(df['road_connectivity'],highest_is_worst=True)
-    df['power_plant_score'] = normalize_series(df['distance_from_power_source'],highest_is_worst=True)
+    # Compute normalized scores for each proximity mode
+    df['railway_score'] = normalize_series(df['distance_from_nearest_railway_station'], highest_is_worst=True)
+    df['seaport_score'] = normalize_series(df['distance_from_nearest_seaport'], highest_is_worst=True)
+    df['airport_score'] = normalize_series(df['distance_from_nearest_airport'], highest_is_worst=True)
+    df['road_score'] = normalize_series(df['road_connectivity'], highest_is_worst=True)
+    df['power_plant_score'] = normalize_series(df['distance_from_power_source'], highest_is_worst=True)
 
-    # Compute property suitability score
-    df['property_suitability_score'] = (
+    # Compute overall proximity-based suitability score
+    df['prximity_suitability_score'] = (
         (weight_railway * df['railway_score']) +
         (weight_seaport * df['seaport_score']) +
         (weight_airport * df['airport_score']) +
         (weight_road * df['road_score']) +
         (weight_power_plant * df['power_plant_score'])
     )
+
+    # Compute land size score
+    df['land_size_score'] = df['land_size'].apply(
+        lambda size: calculate_land_size_score(size, lower_limit, upper_limit, k1)
+    )
+
+    # Final score with 50-50 weightage between proximity and land size score
+    df['property_suitability_score'] = 0.5 * df['prximity_suitability_score'] + 0.5 * (df['land_size_score'] / 10)
 
     return df
 
@@ -1416,9 +1388,13 @@ def process_supply_vendor_df_to_send_solution_screen(df):
     else:
         return pd.DataFrame(), pd.DataFrame()
 
-def sort_by_scores(df, scores_df):
-    df_sorted = df.set_index('property_id').reindex(scores_df['Property_ID']).reset_index()
-    return df_sorted
+def sort_by_scores(df, scores_df, for_final_return = False):
+    if not for_final_return:
+        df_sorted = df.set_index('property_id').reindex(scores_df['Property_ID']).reset_index()
+        return df_sorted
+    else:
+        df_sorted = df.set_index('Property_ID').reindex(scores_df['Property_ID']).reset_index()
+        return df_sorted
 
 from math import radians, sin, cos, sqrt, atan2
 #Temp. Distance Calculations
@@ -1493,3 +1469,77 @@ def is_valid_latlong(latlong: str) -> bool:
             return False
     except ValueError:
         return False  # In case conversion to float fails
+
+def filter_df_by_keywords(
+    extracted_keywords: List[str],
+    df: pd.DataFrame,
+    spacy_threshold: float = 0.65
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    1) Compute SpaCy similarity for EACH column separately.
+    2) Store the similarity scores as new columns (e.g., "spacy_score_<column_name>").
+    3) Compute an aggregated similarity score per row.
+    4) Sort both DataFrames by the aggregated score.
+    5) Return TWO DataFrames:
+       - `filtered_df`: Rows where at least one column has similarity >= spacy_threshold.
+       - `remaining_df`: Rows where no columns met the threshold.
+
+    Parameters:
+    -----------
+    extracted_keywords : List[str]
+        The list of keywords extracted from the user query (e.g., ["power", "incentive"]).
+
+    df : pd.DataFrame
+        The DataFrame containing textual columns to filter.
+        Non-string columns will be converted to string before similarity computation.
+
+    spacy_threshold : float
+        The minimum SpaCy similarity (0.0-1.0) to consider a row a match.
+
+    Returns:
+    --------
+    Tuple[pd.DataFrame, pd.DataFrame]:
+        - `filtered_df`: Rows where at least one column met the threshold, sorted by relevance.
+        - `remaining_df`: Rows where no columns met the threshold, sorted by relevance.
+    """
+
+    # 1) Concatenate the extracted keywords into a single user text string
+    user_text = " ".join(kw.strip() for kw in extracted_keywords if kw.strip()).lower()
+
+    # If no user_text is available, return empty DataFrames with the same structure
+    if not user_text:
+        return df.iloc[0:0], df.iloc[0:0]  # Return two empty DataFrames
+
+    # Convert user text to a SpaCy Doc object
+    user_doc = nlp(user_text)
+
+    # Copy the DataFrame to avoid modifying the original
+    df = df.copy()
+
+    # Store similarity scores for each column
+    similarity_columns = []
+    # 2) Compute SpaCy similarity for each column separately
+    for col in df.columns:
+        if col == "ID":
+            continue
+        col_name = f"spacy_score_{col}"  # Create column name for similarity score
+        similarity_columns.append(col_name)
+
+        # Convert column to string and lowercase (handle NaN safely)
+        df[col] = df[col].astype(str).str.lower()
+
+        # Compute similarity for each row in the column
+        df[col_name] = df[col].apply(lambda text: user_doc.similarity(nlp(text)) if text.strip() else 0)
+
+    # 3) Compute an aggregated similarity score per row
+    df["aggregated_score"] = (df[similarity_columns].max(axis=1) + df[similarity_columns].mean(axis=1)) / 2
+
+    # 4) Filter rows where at least ONE column has similarity >= threshold
+    mask = df[similarity_columns] >= spacy_threshold  # Check each column individually
+    row_match = mask.any(axis=1)  # If at least one column meets threshold, keep the row
+
+    # 5) Create the two DataFrames:
+    filtered_df = df.loc[row_match].sort_values(by="aggregated_score", ascending=False)  # Sort by relevance
+    remaining_df = df.loc[~row_match].sort_values(by="aggregated_score", ascending=False)  # Sort by relevance
+
+    return filtered_df[["ID", "aggregated_score"]], remaining_df[["ID", "aggregated_score"]]

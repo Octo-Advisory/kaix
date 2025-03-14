@@ -732,7 +732,7 @@ def handle_employment_query(
             
             # Construct the confirmation message
             message = f"Kindly confirm if you are seeking to compare the employment status between {locations_str}."
-            confirmation_message = generate_dynamic_message(Chat_history_normal, message,refined_user_input, llm_70b_vers_creative)
+            confirmation_message = generate_dynamic_message(Chat_history_normal, message,refined_user_input, llm_70b_vers_creative,chatId=chatId)
             response = {
                 "Ai_response": confirmation_message,
                 "Is_confirmation" : True,
