@@ -126,13 +126,9 @@ def industry_from_scratch(aiResponse,chatId):
         final_property_ranking_for_decision.rename(columns={'Final Score': 'Property_wise_approval_score'}, inplace=True)
 
         supply_rules_df = get_supply_rule(main_industry,sub_sector,segment,capacity)
-        with open("log.txt", "a") as file:
-            file.write(f"\nsupply_rules_df {supply_rules_df}")
         vendor_df = get_vendor_df(supply_rules_df)
 
         property_latlong_df = property_employment_df[["property_id", "latitude_longitude"]].drop_duplicates()
-        with open("log.txt", "a") as file:
-            file.write(f"\nvendor_df {vendor_df}")
         test_return = get_supply_scores(property_latlong_df,supply_rules_df,vendor_df,prefered_range=(0,250), tolerable_range=(251,500))
             
         if len(test_return) == 2:

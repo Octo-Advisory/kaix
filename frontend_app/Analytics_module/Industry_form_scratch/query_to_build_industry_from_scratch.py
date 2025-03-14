@@ -398,9 +398,6 @@ def get_property_and_employement(zone_id,area_id_list,required_LowerMargin_land_
     # Call the function and assign results
     results = fetch_query_results(sql_query_for_property_and_employment_and_employment)
 
-    # Convert results to a pandas DataFrame
-    import pandas as pd
-
     if results:
         # Convert the fetched results into a pandas DataFrame
         property_employment_df = pd.DataFrame(results, columns=['property_id', "land_size",'area', 'city', 'village', 'taluka', 'district', 'state', 'distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source', 'latitude_longitude', 'Property Type', "business_location_type", "land_type","pole_shifting", "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following", "road_connectivity", "distance_from_nearest_airport" ,'employment_area_id', 'employmenttype_id', 'availability'])

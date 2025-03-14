@@ -1,85 +1,141 @@
-import React, { useState } from 'react';
-import Details from '../Details/Details';
-import Backtochat from '../Backtochat/Backtochat';
-import * as Accordion from "@radix-ui/react-accordion";
-import { ChevronDown, Info } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import Details from "../Details/Details";
+import Backtochat from "../Backtochat/Backtochat";
+import { FaSearch } from "react-icons/fa";
 
 function Incentiveresult({ result }) {
-    console.log("Result from incentive:", result);
-    const [openItem, setOpenItem] = useState(null);
-    // Safely parse JSON and handle errors
-    let Analytics_response;
-    try {
-        Analytics_response = JSON.parse(result?.Analytics_response || '{}');
-    } catch (error) {
-        console.error("Error parsing Analytics_response:", error);
-        Analytics_response = {};
-    }
+  const [selectedIncentive, setSelectedIncentive] = useState(null);
+  const [filtered, setFiltered] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
-    // Convert data object into an array of incentive objects
-    let incentivesArray = Object.keys(Analytics_response["Incentive Rank"]).map(key => ({
-        id: Analytics_response["Incentive ID"][key],
-        name: Analytics_response["Incentive Name"][key],
-        type: Analytics_response["Incentive Type"][key],
-        rank: Analytics_response["Incentive Rank"][key],
-        details: Analytics_response["Incentive Details"][key],
-        startDate: new Date(Analytics_response["Incentive Start Date"][key])
-            .toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }),
+  let Analytics_response = {};
+  try {
+    Analytics_response = result?.Analytics_response || "{}";
+  } catch (error) {
+    console.error("Error parsing Analytics_response:", error);
+  }
 
-        endDate: new Date(Analytics_response["Incentive End Date"][key])
-            .toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
-    }));
+  const hasFilteredData = !!Analytics_response["Filtered Incentive Data"];
+  const dataKey = hasFilteredData && filtered ? "Filtered Incentive Data" : "Unfiltered Incentive Data";
 
-    // Ensure sorting by rank
-    incentivesArray.sort((a, b) => b.rank - a.rank);
+  let parsedData = {};
+  try {
+    parsedData = JSON.parse(Analytics_response[dataKey] || "{}");
+  } catch (error) {
+    console.error(`Error parsing ${dataKey}:`, error);
+  }
 
-    console.log("incenitve array", incentivesArray);
+  const incentives = parsedData["Incentive ID"]
+    ? Object.keys(parsedData["Incentive ID"]).map((id) => ({
+        id,
+        name: parsedData["Incentive ID"]?.[id] || "Unnamed Incentive",
+        type: parsedData["Incentive Type"]?.[id] || "N/A",
+        rank: parsedData["Incentive Rank"]?.[id] || "N/A",
+        details: parsedData["Incentive Details"]?.[id] || "N/A",
+        startDate: parsedData["Incentive Start Date"]?.[id]
+          ? new Date(parsedData["Incentive Start Date"][id]).toLocaleDateString()
+          : "N/A",
+        endDate: parsedData["Incentive End Date"]?.[id]
+          ? new Date(parsedData["Incentive End Date"][id]).toLocaleDateString()
+          : "N/A",
+        level: parsedData["Incentive Level"]?.[id]
+          ? JSON.parse(parsedData["Incentive Level"][id])
+          : "N/A",
+      })).sort((a, b) => b.rank - a.rank)
+    : [];
 
+  const filteredIncentives = incentives.filter((incentive) =>
+    incentive.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-    return (
-        <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
-            <div className="w-[95%] h-[95%] mx-auto my-5 p-5 bg-white rounded-lg shadow-md">
-                {/* Title Section */}
-                <div className="top-header flex items-center justify-between pb-1">
-                    <div className="title w-full p-1 h-[10%] flex-1">
-                        <div className="text-5xl">Incentives</div>
-                    </div>
-                    <Backtochat />
-                </div>
+  useEffect(() => {
+    setSelectedIncentive(null);
+  }, [filtered]);
 
-                {/* Incentive Data */}
-                <div className="p-3 h-[90%] overflow-auto">
-                    <Accordion.Root type="single" collapsible className="space-y-2" value={openItem} onValueChange={setOpenItem}>
-                        {incentivesArray.map((incentive, index) => (
-                            <Accordion.Item key={index} value={`item-${index}`} className="border border-gray-300 rounded-lg overflow-hidden">
-                                <Accordion.Header>
-                                    <Accordion.Trigger className="w-full text-left px-4 py-3 bg-[#19a282] text-white font-semibold hover:bg-[#167d66] transition flex justify-between items-center">
-                                        <span>{incentive.name} - {incentive.type}</span>
-                                        <ChevronDown
-                                            className={`transform transition-transform ${openItem === `item-${index}` ? 'rotate-180' : ''}`}
-                                        />
-                                    </Accordion.Trigger>
-                                </Accordion.Header>
-                                <Accordion.Content className="p-4 bg-white border-t border-gray-300">
-                                    <div className="flex items-center gap-2 text-lg font-semibold text-gray-700 mb-2">
-                                        <Info className="text-blue-500" />
-                                        Incentive Details
-                                    </div>
-                                    <div className="bg-[#f8f9fa] p-3 rounded-md border border-gray-300 space-y-2">
-                                        <p><span className="font-semibold">Type:</span> {incentive.type}</p>
-                                        <p><span className="font-semibold">Description:</span> {incentive.details}</p>
-                                        <p><span className="font-semibold">Effective Date:</span> {incentive.startDate} - {incentive.endDate}</p>
-                                        {/* <p><span className="font-semibold">Rank:</span> {incentive.rank}</p> */}
-                                    </div>
-                                </Accordion.Content>
-                            </Accordion.Item>
-                        ))}
-                    </Accordion.Root>
-                </div>
-            </div>
-            <Details />
+  return (
+    <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
+      <div className="w-[95%] h-[95%] mx-auto my-5 p-5 bg-white rounded-lg shadow-md">
+        <div className="top-header flex items-center justify-between pb-1">
+          <div className="title w-full p-1 h-[10%] flex-1">
+            <div className="text-5xl">Incentives</div>
+          </div>
+          <Backtochat />
         </div>
-    );
+
+        <div className="p-3 h-[90%] overflow-auto">
+          <div className="bg-white shadow p-4 flex justify-between items-center my-4 rounded-lg">
+            <div className="flex space-x-2">
+              {hasFilteredData && (
+                <button
+                  className={`px-4 py-2 rounded ${
+                    filtered ? "bg-blue-500 text-white" : "bg-gray-300 text-gray-700"
+                  }`}
+                  onClick={() => setFiltered(true)}
+                >
+                  Show Filtered Data
+                </button>
+              )}
+              <button
+                className={`px-4 py-2 rounded ${
+                  filtered ? "bg-gray-300 text-gray-700" : "bg-blue-500 text-white"
+                }`}
+                onClick={() => setFiltered(false)}
+              >
+                Show Unfiltered Data
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search incentives..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="px-3 py-2 border rounded-lg pl-10"
+              />
+              <FaSearch className="absolute left-3 top-3 text-gray-500" />
+            </div>
+          </div>
+
+          <div className="flex h-[80%] overflow-y-auto bg-white shadow rounded-lg p-4">
+            <div className="w-2/3">
+              {filteredIncentives.length > 0 ? (
+                filteredIncentives.map((incentive) => (
+                  <div
+                    key={incentive.id}
+                    className={`p-4 border cursor-pointer shadow-sm ${
+                      selectedIncentive?.id === incentive.id
+                        ? "bg-[#242f6a] border-gray-400 text-white"
+                        : "bg-white border-gray-300"
+                    }`}
+                    onClick={() => setSelectedIncentive(incentive)}
+                  >
+                    <span className="font-semibold">{incentive.name}</span>
+                  </div>
+                ))
+              ) : hasFilteredData ? (
+                <p className="text-gray-500">No incentives found.</p>
+              ) : (
+                incentives.length === 0 && <p className="text-gray-500">No incentives found.</p>
+              )}
+            </div>
+
+            {selectedIncentive && (
+              <div className="w-1/3 bg-[#242f6a] shadow p-4 text-white sticky top-0">
+                <h2 className="text-xl font-bold">{selectedIncentive.name}</h2>
+                <p className="mt-2 text-sm"><strong>Type:</strong> {selectedIncentive.type}</p>
+                <p className="mt-2 text-sm"><strong>Rank:</strong> {selectedIncentive.rank}</p>
+                <p className="mt-2 text-sm"><strong>Details:</strong> {selectedIncentive.details}</p>
+                <p className="mt-2 text-sm"><strong>Start Date:</strong> {selectedIncentive.startDate}</p>
+                <p className="mt-2 text-sm"><strong>End Date:</strong> {selectedIncentive.endDate}</p>
+                <p className="mt-2 text-sm"><strong>Level:</strong> {selectedIncentive.level}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <Details />
+    </div>
+  );
 }
 
 export default Incentiveresult;

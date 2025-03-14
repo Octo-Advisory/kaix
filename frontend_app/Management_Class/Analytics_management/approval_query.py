@@ -2,6 +2,8 @@ import frappe
 import time
 from frontend_app.Analytics_module.approval_query.approval_search_query import *
 from frontend_app.Management_Class.helpers.progress import insert_process,update_process
+import traceback
+import json
 
 @frappe.whitelist()
 def call_approval_query(aiResponse,chatId):
@@ -47,7 +49,7 @@ def call_approval_query(aiResponse,chatId):
         
         app_df = get_property_approval_data(sub_sector_id, main_industry, area_id, city_id, state_id)
         columns_to_drop = [
-            'Time_taken', 'is_dependent', 'dependent_approval_ids',
+            'Time Taken', 'is_dependent', 'dependent_approval_ids',
             'area_id', 'city_id', 'city_level', 'state', 'state_level',
             'country_level', 'sub_sector', 'industry', 'pan_industries'
         ]
@@ -76,9 +78,26 @@ def call_approval_query(aiResponse,chatId):
             }
         return response
     except Exception as e:
+        error_details = traceback.format_exc()
+        log_to_file("error details",error_details)
         update_process(chatId,"Analyzing Data","Fail")
         response = {
                 "Analytics_response": f"Error From Analytics :- {e}",
                 "Is_Error" : True
             }
         return response
+
+def log_to_file(key,value):
+    """
+    Logs key-value data to a file with a timestamp.
+    
+    :param filename: Name of the log file.
+    :param data: Key-value pairs to log.
+    """
+    log_entry = {
+        "t": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        f"{key}" : value
+    }
+    
+    with open("log2.txt", "a", encoding="utf-8") as file:
+        file.write(json.dumps(log_entry) + "\n")
