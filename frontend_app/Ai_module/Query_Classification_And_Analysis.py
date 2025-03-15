@@ -484,71 +484,43 @@ def extract_comparison_locations(user_input: str, available_areas: List[str], av
 module_names_list = ["Query to build industry from Scratch", "Query to search Vendors", "Query to search Incentives", "Query to Get Approvals", "Query to Get Employee Search", ]
 
 field_with_description = {
-      "Query to search Vendors": {
-            "Vendor Name": "The official name of the vendor or business providing the service or goods (e.g., Bhagwati Chemicals, Agriland Biotech Limited.).",
-            "Supply Description By Vendor": "A brief explanation of the products or services offered by the vendor (e.g., 'We provide high-quality steel rods for construction projects' or 'PCB Assembly|BOM Sourcing|Turnkey Manufacturing|Electronics Manufacturing').",
-            "List of Certifications": "Certifications held by the vendor that validate compliance with industry standards (e.g., ISO 9001, BIS Certification, GMP Certification, ASME Certification, AS9100 (for aerospace, FDA Approval (US)))."
-      },
-      "Query to search Incentives": {
-            "Incentive Name": "The official title of the financial or non-financial support program available (e.g., Startup India Seed Fund, MSME Credit Guarantee Scheme). This includes any official name mentioned for incentives or subsidies, such as 'Power Tariff Subsidy Scheme'.",
-            
-            "Incentive Type": "The category of the incentive based on the type of support it provides. This includes financial and non-financial forms of assistance. For example, 'Equity Support', 'Sustenance Allowance', 'Tax Exemption', 'Interest Subsidy', 'Capital Investment Subsidy', 'Incentive in Power Tariff', 'Electricity Duty Waiver'. If the user mentions 'power' in relation to tariff reductions, electricity duty exemptions, or subsidies related to electricity consumption, it must be extracted as a keyword. Even general mentions of 'power' in the context of incentives should be extracted to avoid missing relevant details.",
-            
-            "Quantum of Assistance": "The exact amount, percentage, or type of financial assistance or benefit provided. Examples include 'Seed support up to Rs. 30 Lakh', 'Capital subsidy of 25% on plant and machinery cost', 'Exemption of electricity duty'. If the user mentions numeric figures in relation to incentives, including specific rates (e.g., '5% reduction on power tariff') or benefits (like 'up to 50% exemption on electricity duty'), these numbers must be extracted as keywords."
-            },
-      "Query to Get Approvals": {
-            "Name of License / Approval": 
-            "Clearly specify the exact name of the required license, approval, clearance, or permission for business operations. "
-            "This includes specific approval types such as 'Environmental Clearance', 'Fire NOC', 'Factory License', or any regulatory certificate required for setting up or operating a business. "
-            "Do not include generic terms like 'approval' or 'license' without context.",
-
-            "Government Department": 
-            "The official name of the specific government authority or department responsible for issuing licenses or approvals. "
-            "This includes departments like 'Revenue Department', 'Pollution Control Board', 'Fire Department', 'Urban Development Authority', 'Municipal Corporation', or similar regulatory bodies. "
-            "If the query mentions a department's name (e.g., 'Revenue', 'Fire', 'Environment'), it should always be extracted as a keyword. "
-            "Do not exclude common department names even if they seem generic. For example, 'Revenue Department' must be included as 'revenue', 'department'.",
-
-            "Land Type": 
-            "The specific classification of land where business operations or approvals apply. "
-            "This could be terms like 'Agricultural Land', 'Non-Agricultural Land - Urban', or 'Industrial Land'.",
-
-            "Business Location": 
-            "Details about the specific area or industrial zone related to the business, such as 'GIDC', 'Non GIDC', 'DSIRDA', 'MBSIRDA', 'GPCP SIRDA'. "
-            "Do not include general city or state names.",
-
-            "Stage": 
-            "The specific phase during which the approval is required, like 'Pre-establishment', 'Pre-requisite', or 'Pre-operation'.",
-
-            "Mode of Application": 
-            "Specifies whether the approval process is 'Online' or 'Offline'. Extract only these specific terms.",
-
-            "Vicinity Detail": 
-            "Details about the proximity to critical or sensitive areas affecting the approval process. "
-            "This includes terms like 'Forest', 'Archaeological site', or 'Mineral bearing site' relevant to the business operation.",
-
-            "Cross Following Details": 
-            "Indicates whether the business site crosses important utilities such as 'Notified rivers', 'nalas', 'canals', 'drains', or specific pipelines (e.g., 'Gujarat Gas', 'Sabarmati Gas', 'GSPL'). Also includes proximity to 'Water bodies'.",
-
-            "Tree Cutting": 
-            "Mentions whether tree cutting is required for the business setup or operations. Keywords include 'tree cutting'.",
-
-            "Road Cutting": 
-            "Indicates whether road cutting is necessary. Keywords include 'road cutting'.",
-
-            "Require Pole Shifting": 
-            "Specifies if shifting of electricity or communication poles is needed. Keywords include 'pole shifting'."
-            },
-      "Query to build industry from Scratch": {
-            "Property Type": "The type of land based on usage (Non-Agricultural Land, Agricultural Land, Industrial Land, Industrial Park Plot, GIDC Plot, Warehouse, Industrial Plant, Auction Property, Industrial Park).",
-            "Business Location Type": "The classification of the business location (GIDC, Non GIDC, DSIRDA, MBSIRDA, GPCP SIRDA).",
-            "Land Type": "The specific classification of land (Agricultural Land, Non-Agricultural Land (Rural), Non-Agricultural Land (Urban)).",
-            "Location": "The specific area, city, or state where the property is located (e.g., Gujarat, Surat, Waghodia).",
-            "Vicinity of": "Environmental or geographical features nearby (Forest, Archaeological site, Mineral bearing site).",
-            "Tree Cutting Involved": "Indicates whether tree cutting is required for the project (Tree cutting).",
-            "Road Cutting Involved": "Specifies if road cutting is required to establish infrastructure (Road Cutting).",
-            "Will your industry cross the following?": "Checks whether the industry site intersects with important geographical or utility structures (Pipeline of Gujarat Gas, Pipeline of Sabarmati Gas, Pipeline of GSPL, Water bodies, Notified rivers/ nalas/ canals/ drains)."
-      },
+    "Query to search Vendors": {
+        "Vendor Name": "The official name of the vendor or business providing the service or goods (e.g., Bhagwati Chemicals, Agriland Biotech Limited.).",
+        "Supply Description By Vendor": "A brief explanation of the products or services offered by the vendor (e.g., 'We provide high-quality steel rods for construction projects' or 'PCB Assembly|BOM Sourcing|Turnkey Manufacturing|Electronics Manufacturing').",
+        "List of Certifications": "Certifications held by the vendor that validate compliance with industry standards (e.g., ISO 9001, BIS Certification, GMP Certification, ASME Certification, AS9100 (for aerospace), FDA Approval (US))."
+    },
+    "Query to search Incentives": {
+        "Incentive Name": "The official title of the financial or non-financial support program available (e.g., Startup India Seed Fund, MSME Credit Guarantee Scheme, Water Infrastructure Development Program, Industrial Water Subsidy Program, Rehabilitation Support Program).",
+        
+        "Incentive Type": "The category of the incentive based on the type of support it provides. This includes financial and non-financial assistance that improves industrial or business growth. Examples include Equity Support, Sustenance Allowance, Tax Exemption, Interest Subsidy, Capital Investment Subsidy, Incentive in Power Tariff and Electricity Duty, Incentive in Water Duty, Subsidies for Water Infrastructure, Assistance in Water Conservation Initiatives, and Rehabilitation Assistance (for disaster recovery, employee support, or facility restoration).",
+        
+        "Quantum of Assistance": "The amount or percentage of financial assistance or benefit provided. This may include direct financial grants, subsidies, duty exemptions, or infrastructural support. Example statements include 'Seed support up to Rs. 30 Lakh', 'Capital subsidy of 25% on plant and machinery cost', 'Exemption of electricity duty', 'Subsidy of 15% on water infrastructure development', 'Exemption on water duty for industrial processes', or 'Financial assistance of 10 lakh for rehabilitation of industrial facilities post-natural disaster.'"
+    },
+    "Query to Get Approvals": {
+        "Name of License / Approval": "Clearly specify the exact name of the required license, approval, clearance, or permission for business operations. This includes specific approval types such as 'Environmental Clearance', 'Fire NOC', 'Factory License', or any regulatory certificate required for setting up or operating a business. Do not include generic terms like 'approval' or 'license' without context.",
+        "Government Department": "The official name of the specific government authority or department responsible for issuing licenses or approvals. This includes departments like 'Revenue Department', 'Pollution Control Board', 'Fire Department', 'Urban Development Authority', 'Municipal Corporation', or similar regulatory bodies. If the query mentions a department's name (e.g., 'Revenue', 'Fire', 'Environment'), it should always be extracted as a keyword. Do not exclude common department names even if they seem generic. For example, 'Revenue Department' must be included as 'revenue', 'department'.",
+        "Land Type": "The specific classification of land where business operations or approvals apply. This could be terms like 'Agricultural Land', 'Non-Agricultural Land - Urban', or 'Industrial Land'.",
+        "Business Location": "Details about the specific area or industrial zone related to the business, such as 'GIDC', 'Non GIDC', 'DSIRDA', 'MBSIRDA', 'GPCP SIRDA'. Do not include general city or state names.",
+        "Stage": "The specific phase during which the approval is required, like 'Pre-establishment', 'Pre-requisite', or 'Pre-operation'.",
+        "Mode of Application": "Specifies whether the approval process is 'Online' or 'Offline'. Extract only these specific terms.",
+        "Vicinity Detail": "Details about the proximity to critical or sensitive areas affecting the approval process. This includes terms like 'Forest', 'Archaeological site', or 'Mineral bearing site' relevant to the business operation.",
+        "Cross Following Details": "Indicates whether the business site crosses important utilities such as 'Notified rivers', 'nalas', 'canals', 'drains', or specific pipelines (e.g., 'Gujarat Gas', 'Sabarmati Gas', 'GSPL'). Also includes proximity to 'Water bodies'.",
+        "Tree Cutting": "Mentions whether tree cutting is required for the business setup or operations. Keywords include 'tree cutting'.",
+        "Road Cutting": "Indicates whether road cutting is necessary. Keywords include 'road cutting'.",
+        "Require Pole Shifting": "Specifies if shifting of electricity or communication poles is needed. Keywords include 'pole shifting'."
+    },
+    "Query to build industry from Scratch": {
+        "Property Type": "The type of land based on usage (Non-Agricultural Land, Agricultural Land, Industrial Land, Industrial Park Plot, GIDC Plot, Warehouse, Industrial Plant, Auction Property, Industrial Park).",
+        "Business Location Type": "The classification of the business location (GIDC, Non GIDC, DSIRDA, MBSIRDA, GPCP SIRDA).",
+        "Land Type": "The specific classification of land (Agricultural Land, Non-Agricultural Land (Rural), Non-Agricultural Land (Urban)).",
+        "Location": "The specific area, city, or state where the property is located (e.g., Gujarat, Surat, Waghodia).",
+        "Vicinity of": "Environmental or geographical features nearby (Forest, Archaeological site, Mineral bearing site).",
+        "Tree Cutting Involved": "Indicates whether tree cutting is required for the project (Tree cutting).",
+        "Road Cutting Involved": "Specifies if road cutting is required to establish infrastructure (Road Cutting).",
+        "Will your industry cross the following?": "Checks whether the industry site intersects with important geographical or utility structures (Pipeline of Gujarat Gas, Pipeline of Sabarmati Gas, Pipeline of GSPL, Water bodies, Notified rivers/ nalas/ canals/ drains)."
+    }
 }
+
 
 def extract_json_from_llm_response(raw_output: str, json_key: str) -> Dict[str, Union[List[str], None]]:
     """
@@ -855,49 +827,52 @@ def extract_keywords_from_query(
         - Locations: Specific areas, cities, states, or countries.
         Examples: "Delhi", "Mumbai", "Surat", "Gujarat", "Andhra Pradesh", "USA", "industrial zone"
 
-        - Incentive-Related Terms: Common general terms that refer to incentives.
-        Examples: "incentive", "incentives", "subsidy", "subsidies", "benefit", "benefits", "scheme", "schemes"
-
         - Module Names: The following module names and their variations must be excluded from keywords:
         {modules_text}
 
-        If any word in the query belongs to these categories, do not include them in the extracted keywords.
+        3) Supreme Extraction Rule (Overrides All Other Restrictions)
 
-        3) Important Rules for Extraction
+        - If a word is mentioned with context descriptors such as "regarding," "related to," "about," or "in context of," it must always be extracted, even if it falls under restricted categories.
+        - This ensures that key incentive-related terms are never missed, even if they belong to restricted categories.
 
-        - STRICT FOCUS ON FIELDS:
+        Examples:
+        - "Incentives regarding rehabilitation scheme for factories" → ["rehabilitation"]
+        - "I need incentives related to water usage in industries" → ["water"]
+        - "I am searching for schemes about power conservation" → ["power", "conservation"]
+        - "Incentives regarding support for disaster recovery" → ["recovery"]
+        - "Looking for incentives regarding product development" → ["development"]
+
+        4) POWER, WATER, AND REHABILITATION-SPECIFIC RULES:
+        1. If "power," "water," or "rehabilitation" are mentioned in any incentive-related context, they must always be extracted.
+        2. If context is unclear, always extract these terms.
+        3. If they clearly relate to restricted industries, they should be excluded.
+
+        5) STRICT FOCUS ON FIELDS:
         Extract any word from the user's query that matches the FOCUS FIELDS.
         Even if the query is ambiguous, complex, incomplete, or vague, if a word relates to a field meaning, it must be extracted.
 
-        - IF IN DOUBT, ALWAYS EXTRACT:
-        If there's any uncertainty about whether a term is a focus field or a restricted field, always prioritize extracting the term.
-
-        - POWER-SPECIFIC RULE (Refined):
-        - If the term "power" is mentioned in relation to incentives (like "power incentive", "power-related assistance", or "power tariff incentive"), it must always be extracted.
-        - If the context is unclear or doubtful, "power" must still be extracted.
-        - However, if "power" is clearly related to an industry (like "power plant"), it must be excluded.
-
-        - IGNORE SENTENCE STRUCTURE COMPLETELY:
+        6) IGNORE SENTENCE STRUCTURE COMPLETELY:
         Keywords must be extracted regardless of how the sentence is structured.
-        
-        Example 1: "I want to find power-related incentives for the cement industry in Gujarat" → ["power"]  
-        Example 2: "Subsidies related to power production" → null (because "power production" is an industry term)  
-        Example 3: "Need assistance related to power tariff and electricity duty" → ["power", "tariff", "electricity", "duty"]  
-        Example 4: "Electricity duty exemption for industrial setups" → ["electricity", "duty"]  
-        Example 5: "Need power-related assistance for factory" → ["power"] (if context is unclear, always extract)  
 
-        - NUMBERS MUST BE EXTRACTED IF THEY ARE RELEVANT:
-        - If a number is part of a certification or standard, it must be included as a keyword.
-        - Example: "We need ISO 14001 certification for subsidy eligibility" → ["ISO", "14001"]  
-        - Example: "I want information about CE 22000" → ["CE", "22000"]  
+        Examples:
+        - "I am looking for water-related incentives for milk processing." → ["water"]
+        - "Incentives regarding rehabilitation scheme for industries." → ["rehabilitation"]
+        - "Subsidies for water infrastructure." → ["water", "infrastructure"]
+        - "Rehabilitation support in disaster-affected areas." → ["rehabilitation"]
+        - "Development incentives for rural areas." → ["development"]
+        - "ISO 9001 certification subsidies." → ["ISO", "9001"]
 
-        - CORRECT MISSPELLED WORDS BEFORE EXTRACTING THEM:
-        - Example: "invesmetn incentive related info" → ["investment"]  
-        - Example: "benfits for establishing industries" → null (because "benefits" and "industries" are restricted)  
+        7) NUMBERS MUST BE EXTRACTED IF THEY ARE RELEVANT:
+        If a number is part of a certification or standard, it must be included as a keyword.
+        - Example: "We need ISO 14001 certification for subsidy eligibility." → ["ISO", "14001"]  
+        - Example: "I want information about CE 22000." → ["CE", "22000"]
 
-        - NEVER EXTRACT RESTRICTED OR MODULE TERMS.
+        8) CORRECT MISSPELLED WORDS BEFORE EXTRACTING THEM:
+        Example: "rehabilitaton subsidy related info" → ["rehabilitation"]
 
-        4) Output Format:
+        9) NEVER EXTRACT RESTRICTED OR MODULE TERMS UNLESS THE SUPREME RULE APPLIES.
+
+        Output Format:
         - The response must be a JSON object in the exact format below.
         - If no valid keywords are found, return {{ "KEYWORDS": null }} or {{ "KEYWORDS": None }}.
         - No explanations, no extra text—only the JSON object.
@@ -910,6 +885,8 @@ def extract_keywords_from_query(
         "KEYWORDS": ["word1", "word2"]  # or null if none
         }}
         """.strip()
+
+
 
 
     elif current_module == "Query to Get Approvals":
@@ -992,6 +969,7 @@ def extract_keywords_from_query(
         "KEYWORDS": ["word1", "word2"]  # or null if none
         }}
         """.strip()
+
 
     else:
         prompt_template_str = """
