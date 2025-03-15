@@ -665,7 +665,7 @@ def handle_approval_query(
 
     result = classify_approval_query(refined_user_input, llm)
     user_intention = result["classification_category"]
-    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to Get Approvals"], module_names_list, llm, "Query to Get Approvals")
+    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to Get Approvals"], module_names_list, llm, "Query to Get Approvals", existing_keywords=state["KEYWORDS"])
     state["KEYWORDS"] = keyword_dict["KEYWORDS"]
     save_state(state,f"QAPP_state_{chatId}")
 

@@ -143,6 +143,106 @@ def extract_json_from_llm_response_employment(raw_output: str, json_key: str) ->
 
     return {json_key: None}
 
+def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Union[List[str], None]]:
+    """
+    Extracts employment-related keywords from a user query, ensuring they are classified into:
+    - "Skilled"
+    - "Semi-Skilled"
+    - "Unskilled"
+
+    If the query is a general employment search, return `None`. Otherwise, map the keyword
+    to the appropriate skill category.
+
+    Parameters:
+    -----------
+    user_input : str
+        The user-provided query string.
+
+    llm :
+        An instance of a language model (such as from LangChain) capable of processing the prompt.
+
+    Returns:
+    --------
+    Dict[str, Union[List[str], None]]:
+        A dictionary with a single key 'KEYWORDS'.
+    """
+
+    prompt_template_str = """
+    You are an expert in employment search classification.
+
+    Your task:
+
+    1) DETERMINE THE TYPE OF EMPLOYMENT SEARCH:
+    - If the query is for general employment without specifying a job role or skill type, return `null`.
+    - Example (General Employment): "I want employment opportunities in Surat." → null
+    - Example (General Employment): "Looking for jobs in Gujarat." → null
+
+    2) IDENTIFY DIRECT MENTIONS OF SKILL CATEGORIES:
+    - If the query explicitly mentions "Skilled", "Semi-Skilled", or "Unskilled", return these directly.
+    - Example: "I want to hire skilled and unskilled workers." → ["Skilled", "Unskilled"]
+
+    3) CLASSIFY SPECIFIC JOB ROLES OR BROAD TERMS:
+    - If the query mentions a specific job role, classify it into:
+        - Skilled: Requires formal training, technical knowledge, or expertise (e.g., electricians, engineers, mechanics).
+        - Semi-Skilled: Requires experience or on-the-job guidance (e.g., machine operators, crane operators, construction assistants).
+        - Unskilled: Requires minimal training, involves basic physical labor (e.g., loaders, helpers).
+
+    - Extract ONLY the most relevant category based on the job role. Do not include unrelated categories.
+
+    4) HANDLE BROAD TERMS INTELLIGENTLY:
+    - If the user mentions broad or ambiguous terms, classify based on logical context.
+    - "Technical" Terms Handling:
+        - If the context clearly indicates advanced expertise or formal training, classify as "Skilled".
+        - If it refers to operators, assistants, or general on-the-job experience, classify as "Semi-Skilled".
+        - If context is unclear, classify with the most probable category based on the job description.
+        - Do NOT extract multiple categories unless clearly mentioned.
+
+    Examples:
+    - "Looking for technical workers." → ["Semi-Skilled"] (as it's likely general)
+    - "Looking for technical engineers." → ["Skilled"]
+    - "Need technical operators for machines." → ["Semi-Skilled"]
+    - "Hiring experienced technical staff." → ["Skilled"]
+    - "Hiring crane operators for the construction site." → ["Semi-Skilled"]
+    - "Need helpers for packaging work." → ["Unskilled"]
+    - "Looking for electricians and plumbers." → ["Skilled"]
+    - "I need laborers for shifting work." → ["Unskilled"]
+    - "Searching for skilled operators for heavy machinery." → ["Skilled"]
+    - "Looking for workers in Surat." → null
+
+    5) MULTIPLE CLASSIFICATIONS:
+    - If the query mentions multiple job roles, classify each and return them together.
+    - Example: "I need electricians and machine operators." → ["Skilled", "Semi-Skilled"]
+
+    6) FINAL OUTPUT RULES:
+    - Only include the following values in the response: "Skilled", "Semi-Skilled", "Unskilled".
+    - If no valid classification is possible, return `null`.
+
+    Output Format:
+    - The response must be a JSON object in the exact format below.
+    - If no valid keywords are found, return {{ "KEYWORDS": null }} or {{ "KEYWORDS": None }}.
+    - No explanations, no extra text—only the JSON object.
+
+    User Query:
+    {user_query}
+
+    Final Output (JSON only):
+    {{
+        "KEYWORDS": ["word1", "word2"]  # or null if none
+    }}
+    """.strip()
+
+    prompt = PromptTemplate(
+        input_variables=["user_query"],
+        template=prompt_template_str
+    )
+    chain = prompt | llm
+    response = chain.invoke({
+        "user_query": user_input
+    })
+
+    raw_output = response.content.strip()
+
+    return extract_json_from_llm_response_employment(raw_output, "KEYWORDS")
 
 def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Union[List[str], None]]:
     """
@@ -168,36 +268,67 @@ def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Un
         A dictionary with a single key 'KEYWORDS'.
     """
 
-    # Construct the Prompt for LLM
     prompt_template_str = """
     You are an expert in employment search classification.
 
     Your task:
-    1) Determine whether the user is searching for general employment or specific employment.
-        - Example of general employment: "I want employment opportunities in Surat." (Return `null`)
-        - Example of specific employment: "I want to find an electrician and a plumber job." (Proceed to classification)
 
-    2) If the user mentions a specific skill category ("Skilled", "Semi-Skilled", "Unskilled"), return it directly.
+    1) DETERMINE THE TYPE OF EMPLOYMENT SEARCH:
+    - If the query is for general employment without specifying a job role or skill type, return `null`.
+    - Example (General Employment): "I want employment opportunities in Surat." → null
+    - Example (General Employment): "Looking for jobs in Gujarat." → null
 
-    3) If the user mentions a specific job role (e.g., "electrician", "plumber"), classify it into:
-        - Skilled: Requires formal training or judgment.
-        - Semi-Skilled: Requires experience or guidance but not full expertise.
-        - Unskilled: Requires minimal training, mainly physical labor.
+    2) IDENTIFY DIRECT MENTIONS OF SKILL CATEGORIES:
+    - If the query explicitly mentions "Skilled", "Semi-Skilled", or "Unskilled", return these directly.
+    - Example: "I want to hire skilled and unskilled workers." → ["Skilled", "Unskilled"]
 
-    4) If multiple job roles are mentioned, classify each into one of the three skill categories.
+    3) CLASSIFY SPECIFIC JOB ROLES OR BROAD TERMS:
+    - If the query mentions a specific job role, classify it into:
+        - Skilled: Requires formal training, technical knowledge, or expertise (e.g., electricians, engineers, mechanics).
+        - Semi-Skilled: Requires experience or on-the-job guidance (e.g., machine operators, crane operators, construction assistants).
+        - Unskilled: Requires minimal training, involves basic physical labor (e.g., loaders, helpers).
 
-    5) The response must ONLY contain:
-       - "Skilled"
-       - "Semi-Skilled"
-       - "Unskilled"
-       - OR `null` if it is a general employment search.
+    - Extract ONLY the most relevant category based on the job role. Do not include unrelated categories.
+
+    4) HANDLE BROAD TERMS INTELLIGENTLY:
+    - If the user mentions broad or ambiguous terms, classify based on logical context.
+    - "Technical" Terms Handling:
+        - If the context clearly indicates advanced expertise or formal training, classify as "Skilled".
+        - If it refers to operators, assistants, or general on-the-job experience, classify as "Semi-Skilled".
+        - If context is unclear, classify with the most probable category based on the job description.
+        - Do NOT extract multiple categories unless clearly mentioned.
+
+    Examples:
+    - "Looking for technical workers." → ["Semi-Skilled"] (as it's likely general)
+    - "Looking for technical engineers." → ["Skilled"]
+    - "Need technical operators for machines." → ["Semi-Skilled"]
+    - "Hiring experienced technical staff." → ["Skilled"]
+    - "Hiring crane operators for the construction site." → ["Semi-Skilled"]
+    - "Need helpers for packaging work." → ["Unskilled"]
+    - "Looking for electricians and plumbers." → ["Skilled"]
+    - "I need laborers for shifting work." → ["Unskilled"]
+    - "Searching for skilled operators for heavy machinery." → ["Skilled"]
+    - "Looking for workers in Surat." → null
+
+    5) MULTIPLE CLASSIFICATIONS:
+    - If the query mentions multiple job roles, classify each and return them together.
+    - Example: "I need electricians and machine operators." → ["Skilled", "Semi-Skilled"]
+
+    6) FINAL OUTPUT RULES:
+    - Only include the following values in the response: "Skilled", "Semi-Skilled", "Unskilled".
+    - If no valid classification is possible, return `null`.
+
+    Output Format:
+    - The response must be a JSON object in the exact format below.
+    - If no valid keywords are found, return {{ "KEYWORDS": null }} or {{ "KEYWORDS": None }}.
+    - No explanations, no extra text—only the JSON object.
 
     User Query:
     {user_query}
 
     Final Output (JSON only):
     {{
-       "KEYWORDS": ["Skilled", "Semi-Skilled"]  # Example output
+        "KEYWORDS": ["word1", "word2"]  # or null if none
     }}
     """.strip()
 
@@ -213,105 +344,6 @@ def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Un
     raw_output = response.content.strip()
 
     return extract_json_from_llm_response_employment(raw_output, "KEYWORDS")
-
-def classify_employment_query(query, llm):
-    """
-    Classify the user's employment search query into two categories:
-    1. Individual employment status.
-    2. Comparison between cities, states, or areas.
-
-    Args:
-        query (str): The user's input query.
-        llm: The language model object.
-
-    Returns:
-        dict: A dictionary with the raw prompt, classification category, and explanation if needed.
-    """
-    # Define the category mapping
-    category_mapping = {
-        1: "Individual employment status",
-        2: "Comparison between cities, states, or areas",
-        3: "Other Intention"
-    }
-
-    # Define the refined prompt string
-    refined_prompt = """
-    You are an expert in analyzing user queries related to employment searches. Your task is to classify the user's intention into one of the following categories:
-
-    1 Individual Employment Status:
-    - The query is about employment statistics, job availability, or unemployment rates in a single location.  
-    - Example: *"What is the employment status in Ahmedabad?"* or *"Job statistics for Gujarat."*  
-    - Even if employment-related words are NOT present, assume it is an employment search if a location is mentioned alone.  
-    - If the user mentions multiple locations, but one of them is only for reference (e.g., *"I live in X but want to search about Y"*), classify under this category.  
-    - DO NOT assume a comparison unless employment search is for multiple locations in the query’s main intent.  
-
-    2 Comparison Between Locations:
-    - The query asks about employment status across multiple locations, either explicitly or implicitly.  
-    - Explicit Comparison: *"Compare employment in Ahmedabad vs Baroda."*  
-    - Implicit Comparison: *"What is the employment situation in Gujarat and Maharashtra?"*  
-    - Even if "compare" is not explicitly mentioned, classify here if employment search involves multiple locations.  
-    - If multiple locations are mentioned AND they are both part of the employment search, classify under this category.  
-    - DO NOT require explicit words like "compare"—use contextual understanding.  
-
-    3 Other Intentions:
-    - Only classify here if the query is entirely unrelated to employment.  
-    - Example: *"Best places to live in Ahmedabad."* or *"How is the weather in Gujarat?"*  
-    - DO NOT classify as Other Intent just because employment is not explicitly mentioned.  
-    - If a query has no employment, no approvals, no incentives, and no vendor search, assume it is employment-related and classify under Class 1 or 2.  
-
-    Special Classification Rules:
-    1 Implicit Employment Queries:  
-    - If a location is mentioned alone, classify as Class 1 or 2 (NOT Class 3).  
-    - Example: *"Ahmedabad?"* → Class 1.  
-    - Example: *"Vadodara vs Surat?"* → Class 2.  
-
-    2 Employment + Other Topics = Still Employment (Class 1 or 2):  
-    - If the query includes employment + another topic, keep it in Class 1 or 2.  
-    - Example: *"Employment status in Ahmedabad and real estate?"* → Class 1.  
-    - Example: *"Jobs in Delhi and tourism industry?"* → Class 1.  
-
-    3 Only Classify as "Other Intent" (Class 3) if a Completely Different Topic is Asked:  
-    - Approvals, incentives, vendor searches, or unrelated topics → Class 3.  
-    - Example: *"What incentives are available in Mumbai?"* → Class 3.  
-    - Example: *"Approvals needed for setting up a factory in Gujarat?"* → Class 3.  
-
-    Final Output Instructions:
-    - Strictly return only the classification number (1, 2, or 3).  
-    - Do NOT return multiple classifications.  
-    - Do NOT provide explanations or additional text.  
-
-    Query:  
-    {query}  
-
-    Output:  
-    (Return only one classification number: 1, 2, or 3)
-    """
-
-
-    # Create a PromptTemplate for chaining
-    prompt_template = PromptTemplate(
-        input_variables=["query"],
-        template=refined_prompt,
-    )
-
-    # Use the prompt in a chain
-    chain = prompt_template | llm
-    # Run the chain and capture the response
-    response = chain.invoke({"query": query})
-    update_llm_token(response)
-
-    # Use regex to extract a valid classification number
-    match = re.search(r"^\s*([1-3])\s*$", response.content.strip())
-    if match:
-        classification_number = int(match.group(1))
-        classification_category = category_mapping[classification_number]
-        return {
-            "raw_prompt": refined_prompt,
-            "classification_number": classification_number,
-            "classification_category": classification_category,
-        }
-    else:
-        raise ValueError(f"Unexpected or invalid response from LLM: {response}")
 
 def generate_dynamic_message(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm,chatId) -> str:
     """
