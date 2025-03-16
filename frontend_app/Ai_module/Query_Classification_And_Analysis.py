@@ -3,12 +3,14 @@ import re
 import json 
 from typing import List, Dict, Tuple, Union
 # from dotenv import load_dotenv
+import spacy
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from rapidfuzz import fuzz, process
 import frappe
 from frontend_app.Management_Class.helpers.utility import update_llm_token  
 import configparser
+
 # from langchain_openai import ChatOpenAI
 config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 config = configparser.ConfigParser()
@@ -25,6 +27,9 @@ llm_deepseek = ChatGroq(groq_api_key=groq_api_key, model_name="deepseek-r1-disti
 # llm_openai_inf_4o = ChatOpenAI(model="gpt-4o", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_4 = ChatOpenAI(model="gpt-4", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_3_5 = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0.0, api_key=openai_key)
+
+# Load the SpaCy model for better entity recognition
+nlp = spacy.load("en_core_web_lg")
 
 # Define a function to refine the query using history
 def refine_query_with_history(history, latest_query, llm):
@@ -1094,6 +1099,96 @@ def extract_keywords_from_query(
 
     # Determine final return value
     return {"KEYWORDS": final_keywords if final_keywords else None}
+
+# General exclusion terms
+EXCLUSION_TERMS = [
+    "incentive", "subsidy", "approval", "supplier", "vendor",
+    "suppliers", "vendors", "approvals"
+]
+
+# Quantity, Units, and Time Periods (for Scratch module only)
+QUANTITY_TERMS = [
+    "quantity", "amount", "number", "total", "count", "volume", "mass", "capacity"
+]
+QUANTITY_UNITS = [
+    "kg", "kilogram", "ton", "litre", "liter", "meter", "m", "cm", "cubic",
+    "grams", "lbs", "pounds", "barrels", "tpa"
+]
+TIME_PERIOD_TERMS = [
+    "year", "month", "day", "hour", "weekly", "annually", "quarterly", "biweekly"
+]
+
+# Entity exclusions based on module
+MODULE_ENTITY_EXCLUSIONS = {
+    "Query to search Incentives": {"GPE", "LOC"},
+    "Query to Get Approvals": {"GPE", "LOC"},
+    "Query to search Vendors": {"GPE", "LOC"},
+    "Query to build industry from Scratch": {"QUANTITY", "CARDINAL", "ORDINAL", "DATE", "TIME", "PERCENT", "MONEY"}
+}
+
+# Convert exclusion terms to SpaCy Doc objects for similarity comparison
+def get_exclusion_docs(module: str):
+    """Get exclusion terms as SpaCy Doc objects based on the module."""
+    if module == "Query to build industry from Scratch":
+        terms = EXCLUSION_TERMS + QUANTITY_TERMS + QUANTITY_UNITS + TIME_PERIOD_TERMS
+    else:
+        terms = EXCLUSION_TERMS
+    return [nlp(term) for term in terms]
+
+def is_similar_to_exclusion(word: str, exclusion_docs) -> bool:
+    """Check if the word is semantically similar to any exclusion term."""
+    word_doc = nlp(word)
+    return any(word_doc.similarity(ex_doc) > 0.7 for ex_doc in exclusion_docs)
+
+def get_entity_label(word: str, doc) -> str:
+    """Get the entity label for a given word from the SpaCy doc."""
+    for ent in doc.ents:
+        if word in ent.text.lower():
+            return ent.label_
+    return ""
+
+def extract_important_words(text: str, module: str = "") -> List[str]:
+    """Extract important words based on module-specific rules."""
+    
+    doc = nlp(text)
+    exclusion_docs = get_exclusion_docs(module)
+
+    # Step 1: Extract noun chunks and named entities
+    noun_chunks = {chunk.text.strip().lower() for chunk in doc.noun_chunks}
+    named_entities = {
+        ent.text.strip().lower() for ent in doc.ents
+        if ent.label_ not in MODULE_ENTITY_EXCLUSIONS.get(module, set())
+    }
+
+    # Step 2: Extract proper nouns and common nouns
+    important_pos = {token.text.strip().lower() for token in doc if token.pos_ in {"NOUN", "PROPN"}}
+
+    # Step 3: Combine terms and prioritize longer phrases
+    combined_terms = noun_chunks.union(named_entities)
+
+    final_terms = set()
+    for term in combined_terms:
+        if not any(term != existing and term in existing for existing in combined_terms):
+            final_terms.add(term)
+
+    # Include single important words if not already in longer terms
+    final_terms.update({
+        word for word in important_pos
+        if not any(word in phrase for phrase in final_terms)
+    })
+
+    # Step 4: Final Filtering
+    filtered_terms = [
+        word for word in final_terms
+        if not is_similar_to_exclusion(word, exclusion_docs)
+        and not nlp.vocab[word].is_stop
+        and get_entity_label(word, doc) not in MODULE_ENTITY_EXCLUSIONS.get(module, set())
+    ]
+
+    return list(set(filtered_terms))
+
+
+
 
 def extract_main_industry_and_product_universal(user_query: str, main_industries: List[str], llm) -> Dict[str, str]:
     """

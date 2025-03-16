@@ -14,8 +14,6 @@ from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 warnings.filterwarnings("ignore")
 
-# Load SpaCy model (medium or large recommended)
-nlp = spacy.load("en_core_web_lg")
 
 def fetch_query_results(query):
     """
@@ -1048,8 +1046,8 @@ def handle_vendor_query(
     user_intention = result["classification_category"]
     frappe.log_error(f"user _intesnion {user_intention}")
 
-    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to search Vendors"], module_names_list, llm, "Query to search Vendors", existing_keywords=state["KEYWORDS"])
-    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    keyword_list = extract_important_words(refined_user_input, "Query to search Vendors")
+    state["KEYWORDS"] = keyword_list
     save_state(state,f"QVND_state_{chatId}")
     
     if user_intention == "Vendor Search for location without industry and supply details":

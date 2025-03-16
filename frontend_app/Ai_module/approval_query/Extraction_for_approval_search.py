@@ -665,8 +665,8 @@ def handle_approval_query(
 
     result = classify_approval_query(refined_user_input, llm)
     user_intention = result["classification_category"]
-    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to Get Approvals"], module_names_list, llm, "Query to Get Approvals", existing_keywords=state["KEYWORDS"])
-    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    keyword_list = extract_important_words(refined_user_input, "Query to Get Approvals")
+    state["KEYWORDS"] = keyword_list
     save_state(state,f"QAPP_state_{chatId}")
 
     if user_intention == "Approval Search for area, city, or state without industry":
