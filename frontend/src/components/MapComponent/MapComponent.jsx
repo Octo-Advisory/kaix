@@ -53,32 +53,32 @@ function MapComponent({ solutions }) {
       duration: 1000 // Animation duration in milliseconds
     });
 
-    // Add a LineString feature to connect these points
-    map.addSource('straight-line', {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: coordinates  // Use your existing coordinates
-        }
-      }
-    });
+    // // Add a LineString feature to connect these points
+    // map.addSource('straight-line', {
+    //   type: 'geojson',
+    //   data: {
+    //     type: 'Feature',
+    //     geometry: {
+    //       type: 'LineString',
+    //       coordinates: coordinates  // Use your existing coordinates
+    //     }
+    //   }
+    // });
  
-    // Add a layer to display the line
-    map.addLayer({
-      id: 'straight-line-layer',
-      type: 'line',
-      source: 'straight-line',
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round'
-      },
-      paint: {
-        'line-color': '#ff0000', // Red color
-        'line-width': 3
-      }
-    });
+    // // Add a layer to display the line
+    // map.addLayer({
+    //   id: 'straight-line-layer',
+    //   type: 'line',
+    //   source: 'straight-line',
+    //   layout: {
+    //     'line-join': 'round',
+    //     'line-cap': 'round'
+    //   },
+    //   paint: {
+    //     'line-color': '#ff0000', // Red color
+    //     'line-width': 3
+    //   }
+    // });
 
     
     solutions.forEach(item=>{
@@ -96,7 +96,9 @@ function MapComponent({ solutions }) {
                   coordinates: [parsedCoord],
               },
           },
-      });
+      }
+    
+    );
 
       // Add fill layer for polygon
       map.addLayer({

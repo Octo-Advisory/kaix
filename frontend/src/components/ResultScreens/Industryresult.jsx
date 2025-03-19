@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import 'leaflet/dist/leaflet.css';
-// import { result } from './data'
 import './Industryresult.css'
 
 import { FaMapMarkedAlt, FaBuilding } from "react-icons/fa";

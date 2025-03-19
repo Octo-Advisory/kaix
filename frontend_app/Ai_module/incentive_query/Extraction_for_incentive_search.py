@@ -340,8 +340,8 @@ def call_incentive_search(input,chatId):
     query_intent = query_intent['classification_category']
     log_to_file("query intent",query_intent)
 
-    keyword_dict = extract_keywords_from_query(refine_user_input, field_with_description["Query to search Incentives"], module_names_list, llm_70b_vers, "Query to search Incentives")
-    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    keyword_list = extract_important_words(refine_user_input, "Query to search Incentives")
+    state["KEYWORDS"] = keyword_list
     save_state(state,f"QINC_state_{chatId}")
 
     if query_intent == 'Other Intent':

@@ -9,6 +9,7 @@ import Test from '../TestComponent/Test';
 import TestComponent from '../TestComponent/TestComponent';
 import MapComponent from '../MapComponent/MapComponent';
 import Industryresult from '../ResultScreens/Industryresult';
+import Incentiveresult from '../ResultScreens/Incentiveresult';
 // import { useFrappeDocumentEventListener } from 'frappe-react-sdk';
 
 function Home() {
