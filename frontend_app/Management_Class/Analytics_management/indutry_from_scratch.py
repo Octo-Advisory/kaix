@@ -11,7 +11,8 @@ import json
 @frappe.whitelist()
 def industry_from_scratch(aiResponse,chatId):
     try:
-        insert_process(chatId,"Analyzing Your Query","Analyzing Your query","Processing")
+        insert_process(chatId,"Analyzing Your Query","Analyzing Your query","Pending")
+        update_process(chatId,"Analyzing Your Query","Processing")
         insert_process(chatId,"Fetching Data","Fetching Data Based On Your Query","Pending")
         insert_process(chatId,"Analyzing Data","Analyzing Gathered Data","Pending")   
         insert_process(chatId,"Preparing Result","Preparing Result","Pending")
