@@ -1,130 +1,126 @@
-import React, { useState } from 'react'
-import { FaList, FaStar, FaAward } from "react-icons/fa";
+import React, { useState, useEffect } from 'react';
+import { FaList, FaAward, FaMapMarkedAlt, FaSearch } from "react-icons/fa";
 import Details from '../Details/Details';
 import Backtochat from '../Backtochat/Backtochat';
+import MapComponent from '../MapComponent/MapComponent';
 
 function Vendorresult({ result }) {
-  const [viewMode, setViewMode] = useState("all");
-  console.log("result from vendor", result);
+  console.log("result in vendors", result);
   const analytics_response = result["Analytics_response"]
-  console.log("Analytics_response", analytics_response);
+  const user_lat_long = result["latitude_longitude"]
+  console.log("analytics_response", user_lat_long);
 
-  const best_vendors = JSON.parse(analytics_response["final"])
-  const better_vendors = JSON.parse(analytics_response["better"])
-  const all_vendors = JSON.parse(analytics_response["all"])
-  console.log("best", best_vendors);
-  console.log("better", better_vendors);
-  console.log("all", all_vendors);
+  const [activeTab, setActiveTab] = useState("map");
+  const [viewMode, setViewMode] = useState("best");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
 
-  const best_json = [];
-  const better_json = [];
-  const all_json = []
-
-  if (Object.keys(best_vendors).length > 0) {
-    Object.keys(best_vendors["supply_score"]).forEach(index => {
-      best_json.push({
-        "supply_id": best_vendors["supply_id"][index],
-        "supply_score": best_vendors["supply_score"][index],
-        "vendor_id": best_vendors["vendor_id"][index],
-        "vendor_supply_capacity": best_vendors["vendor_supply_capacity"][index],
-        "Distance": best_vendors["Distance"][index]
+  const parseSuppliers = (supplierData) => {
+    if (!supplierData.vendor_id) return [];
+    return Object.keys(supplierData.vendor_id).map(key => {
+      const supplierInfo = {};
+      Object.keys(supplierData).forEach(innerKey => {
+        supplierInfo[innerKey] = supplierData[innerKey][key];
       });
+      return supplierInfo;
     });
-    best_json.sort((a, b) => b.supply_score - a.supply_score);
-  }
+  };
 
-  // Object.keys(better_vendors["supply_id"]).forEach(index => {
-  //   better_json.push({
-  //     "supply_id": best_vendors["supply_id"][index],
-  //     "supply_score": best_vendors["supply_score"][index],
-  //     "vendor_id": best_vendors["vendor_id"][index],
-  //     "vendor_supply_capacity": best_vendors["vendor_supply_capacity"][index],
-  //     "Distance": best_vendors["Distance"][index]
-  //   });
-  // });
-  if (Object.keys(best_vendors).length > 0) {
-    Object.keys(all_vendors["Final_Score_With_Features"]).forEach(index => {
-      all_json.push({
-        "supply_id": all_vendors["supply_id"][index],
-        "vendor_id": all_vendors["vendor_id"][index],
-        "vendor_supply_capacity": all_vendors["vendor_supply_capacity"][index],
-        "Distance": all_vendors["Dist"][index],
-        "supply_score": all_vendors["Final_Score_With_Features"][index]
-      })
-    })
+  const bestSuppliers = parseSuppliers(JSON.parse(analytics_response["Best Supplier"] || "{}"));
+  const betterSuppliers = parseSuppliers(JSON.parse(analytics_response["Better Supplier"] || "{}"));
+  const allSuppliers = parseSuppliers(JSON.parse(analytics_response["Unfiltered All Supplier"] || "{}"));
 
-    all_json.sort((a, b) => b.supply_score - a.supply_score);
-  }
+  const map_bestSuppliers = bestSuppliers.map(supplier => ({ ...supplier, category: "Best", result_type: "Vendor", latitude_longitude: supplier.latitude_longitude.split(",").map(Number), user_lat_long: user_lat_long }));
+  const map_betterSuppliers = betterSuppliers.map(supplier => ({ ...supplier, category: "Better", result_type: "Vendor", latitude_longitude: supplier.latitude_longitude.split(",").map(Number), user_lat_long: user_lat_long }));
+  const map_allSuppliers = allSuppliers.map(supplier => ({ ...supplier, category: "General", result_type: "Vendor", latitude_longitude: supplier.latitude_longitude.split(",").map(Number), user_lat_long: user_lat_long }));
+  // Combine all categorized suppliers into a single array
+  const map_result = [
+    ...map_bestSuppliers,
+    ...map_betterSuppliers,
+    ...map_allSuppliers
+  ];
 
-  const displayedData = viewMode === "best" ? best_json : viewMode === "better" ? better_json : all_json;
+  const getFilteredSuppliers = () => {
+    let suppliers = [];
+    if (viewMode === "best") suppliers = bestSuppliers;
+    else if (viewMode === "better") suppliers = betterSuppliers;
+    else if (viewMode === "all") suppliers = allSuppliers;
+    return suppliers.filter(s => s.vendor_id.toLowerCase().includes(searchQuery.toLowerCase()));
+  };
+
+  const filteredSuppliers = getFilteredSuppliers();
+
+  useEffect(() => {
+    setSelectedSupplier(filteredSuppliers.length > 0 ? filteredSuppliers[0] : null);
+  }, [viewMode, searchQuery]);
 
   return (
     <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
       <div className="w-[95%] h-[95%] mx-auto my-5 p-5 bg-white rounded-lg shadow-md">
-        {/* Title Section */}
-        <div className="top-header flex items-center justify-between">
-          <div className="title w-full p-1 h-[10%] flex-1">
-            <div className="text-5xl">Suppliers</div>
-          </div>
+        <div className="border-b border-gray-200 flex justify-between pb-2">
+          <ul className="flex text-sm font-medium text-gray-500">
+            <li>
+              <button onClick={() => setActiveTab("suppliers")} className={`p-4 border-b-2 ${activeTab === "suppliers" ? "text-blue-600 border-blue-600" : "border-transparent"}`}>
+                <FaList className="w-5 h-5 inline-block mr-2" /> Suppliers
+              </button>
+            </li>
+            <li>
+              <button onClick={() => setActiveTab("map")} className={`p-4 border-b-2 ${activeTab === "map" ? "text-blue-600 border-blue-600" : "border-transparent"}`}>
+                <FaMapMarkedAlt className="w-5 h-5 inline-block mr-2" /> Map
+              </button>
+            </li>
+          </ul>
           <Backtochat />
         </div>
-        {/* Buttons */}
-        <div className="select-sections py-2 h-[10%] flex">
-          <div className="flex items-center gap-2">
-          <button className="cursor-pointer bg-gradient-to-r from-red-400 to-red-600 text-white inline-flex items-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 hover:from-red-500 hover:to-red-700 h-9 px-3" onClick={() => setViewMode("best")}>
-              <FaAward size={22} />
-              Best Supplier
-            </button>
 
-            <button className="cursor-pointer bg-gradient-to-r from-green-400 to-green-600 text-white inline-flex items-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 hover:from-green-500 hover:to-green-700 h-9 px-3" onClick={() => setViewMode("all")}>
-              <FaList size={22} />
-              All Supplier
-            </button>
+        <div className="py-4 h-[94%] overflow-auto">
+          {activeTab === "map" ? (
+            <MapComponent solutions={map_result} />
+          ) : (
+            <div className='w-full h-full'>
+              <div className="flex gap-2 mb-4 items-center">
+                <button className="bg-red-500 text-white px-4 py-2 rounded flex items-center gap-2" onClick={() => setViewMode("best")}> <FaAward /> Best Suppliers </button>
+                {betterSuppliers.length > 0 && (
+                  <button className="bg-yellow-500 text-white px-4 py-2 rounded flex items-center gap-2" onClick={() => setViewMode("better")}> Better Suppliers </button>
+                )}
+                <button className="bg-green-500 text-white px-4 py-2 rounded flex items-center gap-2" onClick={() => setViewMode("all")}> <FaList /> All Suppliers </button>
+                <div className="relative flex-1">
+                  <FaSearch className="absolute left-3 top-3 text-gray-500" />
+                  <input type="text" placeholder="Search Suppliers..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="px-3 py-2 border rounded-lg pl-10 w-full" />
+                </div>
+              </div>
 
-            {/* <button className="cursor-pointer bg-gradient-to-r from-yellow-400 to-yellow-600 text-white inline-flex items-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 hover:from-yellow-500 hover:to-yellow-700 h-9 px-3" onClick={() => setViewMode("better")}>
-              <FaStar size={22} />
-              Better Supplier
-            </button> */}
-
-            
-          </div>
-        </div>
-        {/* Vendors data */}
-        <div className="py-5 h-[80%]">
-          <div className="overflow-auto h-full">
-            {displayedData.length > 0 ? (
-              <table className="w-full border-collapse border">
-                <thead>
-                  <tr className="bg-gray-200 text-center">
-                    <th className="p-3 border">Supply</th>
-                    {/* <th className="p-3 border">Supply Score</th> */}
-                    <th className="p-3 border">Supplier</th>
-                    {/* <th className="p-3 border">Vendor Supply Capacity</th> */}
-                    <th className="p-3 border">Distance(Kms)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayedData.map((val, index) => (
-                    <tr key={index} className="border hover:bg-gray-100">
-                      <td className="p-3 border">{val.supply_id}</td>
-                      {/* <td className="p-3 border">{val.supply_score ? val.supply_score.toFixed(2) : "NA"}</td> */}
-                      <td className="p-3 border">{val.vendor_id}</td>
-                      {/* <td className="p-3 border">{val.vendor_supply_capacity}</td> */}
-                      <td className="p-3 border">{val.Distance ? val.Distance.toFixed(2) : "NA"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="text-center text-gray-500">No data available</p>
-            )}
-          </div>
-
+              <div className="flex h-[90%] overflow-y-auto bg-white shadow">
+                <div className="w-2/3">
+                  {filteredSuppliers.length > 0 ? (
+                    filteredSuppliers.map((supplier, index) => (
+                      <div key={index} className={`p-4 border cursor-pointer shadow-sm ${selectedSupplier?.vendor_id === supplier.vendor_id ? "bg-[#242f6a] text-white border-none" : "bg-white"}`} onClick={() => setSelectedSupplier(supplier)}>
+                        <span className="font-semibold">{supplier.vendor_id}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-gray-500">No suppliers found.</p>
+                  )}
+                </div>
+                {selectedSupplier && (
+                  <div className="w-1/3 bg-[#242f6a] shadow p-4 text-white">
+                    <h2 className="text-xl font-bold">{selectedSupplier.vendor_id}</h2>
+                    <p><strong>Supply:</strong> {selectedSupplier.supply_id}</p>
+                    <p><strong>Capacity:</strong> {selectedSupplier.vendor_supply_capacity}</p>
+                    <p><strong>Experience:</strong> {selectedSupplier.years_of_experience} years</p>
+                    <p><strong>Services:</strong> {selectedSupplier.no_of_servieces}</p>
+                    <p><strong>Employees:</strong> {selectedSupplier.no_of_employees}</p>
+                    <p><strong>Distance:</strong> {selectedSupplier.Dist ? Number(selectedSupplier.Dist).toFixed(2) : "N/A"} km</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <Details />
     </div>
-  )
+  );
 }
 
-export default Vendorresult
+export default Vendorresult;

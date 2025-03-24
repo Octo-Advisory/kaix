@@ -383,11 +383,35 @@ def get_state_list(city_id_list):
     else:
         return None
     
-def get_property_and_employement(zone_id,area_id_list,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user,found_property,found_employment):
+# def get_property_and_employement(zone_id,area_id_list,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user,found_property,found_employment):
+#     # convert list to string to use in query
+#     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
+
+#     sql_query_for_property_and_employment_and_employment = f"""
+#     SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability
+#     FROM `tabSurvey No` p
+#     JOIN `tabEmployment City Mapping` e ON p.area = e.area
+#     WHERE (p.zone = '{zone_id}') 
+#     AND (p.area IN ({area_id_str}));
+#     """
+
+#     # Call the function and assign results
+#     results = fetch_query_results(sql_query_for_property_and_employment_and_employment)
+
+#     if results:
+#         # Convert the fetched results into a pandas DataFrame
+#         property_employment_df = pd.DataFrame(results, columns=['property_id', "land_size",'area', 'city', 'village', 'taluka', 'district', 'state', 'distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source', 'latitude_longitude', 'Property Type', "business_location_type", "land_type","pole_shifting", "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following", "road_connectivity", "distance_from_nearest_airport" ,'employment_area_id', 'employmenttype_id', 'availability'])
+#         return property_employment_df,property_employment_df.property_id.unique()
+#     else:
+#         found_property = False
+#         found_employment = False
+#         return None,None
+
+def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_land_for_user, required_UpperMargin_land_for_user, found_property, found_employment):
     # convert list to string to use in query
     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
 
-    sql_query_for_property_and_employment_and_employment = f"""
+    sql_query_for_property_and_employment = f"""
     SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability
     FROM `tabSurvey No` p
     JOIN `tabEmployment City Mapping` e ON p.area = e.area
@@ -396,16 +420,37 @@ def get_property_and_employement(zone_id,area_id_list,required_LowerMargin_land_
     """
 
     # Call the function and assign results
-    results = fetch_query_results(sql_query_for_property_and_employment_and_employment)
+    results = fetch_query_results(sql_query_for_property_and_employment)
 
     if results:
         # Convert the fetched results into a pandas DataFrame
         property_employment_df = pd.DataFrame(results, columns=['property_id', "land_size",'area', 'city', 'village', 'taluka', 'district', 'state', 'distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source', 'latitude_longitude', 'Property Type', "business_location_type", "land_type","pole_shifting", "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following", "road_connectivity", "distance_from_nearest_airport" ,'employment_area_id', 'employmenttype_id', 'availability'])
-        return property_employment_df,property_employment_df.property_id.unique()
+        return property_employment_df, property_employment_df.property_id.unique()
     else:
-        found_property = False
-        found_employment = False
-        return None,None
+        print("No results found in the first query. Executing fallback query...")
+        
+        sql_query_for_connected_property_and_employment = f"""
+        SELECT sn.SID, sn.land_size, sn.parea, sn.pcity, sn.pvillage, sn.ptaluka, sn.pdistrict, sn.pstate, sn.rail_dist, sn.sea_dist, sn.power_dist, sn.latlong, sn.business_loc, sn.land, sn.pole_shift, sn.vicinity, sn.tree_cutiing, sn.road_cutting, sn.cross_following, sn.road_connect, sn.area_dist, sn.emp_area, sn.emp_type, sn.emp_avail
+        FROM `tabConnected Properties` as ccp
+        JOIN `tabConnected Property` p
+        on ccp.parent = p.name
+        JOIN (
+            select prop.name as SID, prop.area_acre as land_size, prop.zone as pzone, prop.area as parea, prop.city as pcity, prop.village as pvillage, prop.taluka as ptaluka, prop.district as pdistrict,  prop.state as pstate, prop.distance_from_nearest_railway_station as rail_dist, prop.distance_from_nearest_seaport as sea_dist, prop.distance_from_power_source as power_dist, prop.latitude_longitude as latlong, prop.business_location_type as business_loc, prop.land_type as land, prop.require_shifting_of_any_electricity_line_or_pole as pole_shift, prop.vicinity_of as vicinity, prop.tree_cutting_involved as tree_cutiing, prop.road_cutting_involved as road_cutting, prop.will_your_industry_cross_the_following as cross_following, prop.road_connectivity as road_connect, prop.distance_from_nearest_airport as area_dist, e.area as emp_area, e.employment_type as emp_type, e.availability as emp_avail
+            FROM `tabSurvey No` prop
+            JOIN `tabEmployment City Mapping` e ON prop.area = e.area 
+            ) as sn
+        on ccp.survey_no = sn.SID
+        WHERE (pzone = '{zone_id}') 
+        AND (parea IN ({area_id_str}));
+        """
+        
+        fallback_results = fetch_query_results(sql_query_for_connected_property_and_employment)
+        
+        if fallback_results:
+            property_employment_df = pd.DataFrame(fallback_results, columns=['property_id', "land_size",'area', 'city', 'village', 'taluka', 'district', 'state', 'distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source', 'latitude_longitude', 'Property Type', "business_location_type", "land_type","pole_shifting", "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following", "road_connectivity", "distance_from_nearest_airport" ,'employment_area_id', 'employmenttype_id', 'availability'])
+            return property_employment_df, property_employment_df.property_id.unique()
+        else:
+            return None, None
     
 def get_property_incentive_mapped(industry_id,sub_sector_id,area_id_list,city_id_list,state_id_list,property_id_list,found_incentive):
     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
@@ -927,8 +972,8 @@ def get_supply_rule(industry_id, sub_sector_id, segment_id,required_capacity_by_
         # Define the column names corresponding to the SELECT statement
         supply_rules_df = pd.DataFrame(results, columns=['supply_id', 'minimum_supply_requirement', 'essentials_items'])
         supply_rules_df.drop_duplicates(subset=["supply_id"], inplace=True)
-        supply_rules_df["minimum_supply_requirement"] = (required_capacity_by_user*supply_rules_df["minimum_supply_requirement"])
         supply_rules_df["minimum_supply_requirement"] = pd.to_numeric(supply_rules_df["minimum_supply_requirement"])
+        supply_rules_df["minimum_supply_requirement"] = (required_capacity_by_user*supply_rules_df["minimum_supply_requirement"])
         supply_rules_df.fillna(0, inplace=True)
         return supply_rules_df
     else:
@@ -1538,5 +1583,5 @@ def filter_df_by_keywords(
     # 5) Create the two DataFrames:
     filtered_df = df.loc[row_match].sort_values(by="aggregated_score", ascending=False)  # Sort by relevance
     remaining_df = df.loc[~row_match].sort_values(by="aggregated_score", ascending=False)  # Sort by relevance
-
+    # log_to_file("Ushan1::::::",filtered_df)
     return filtered_df[["ID", "aggregated_score"]], remaining_df[["ID", "aggregated_score"]]

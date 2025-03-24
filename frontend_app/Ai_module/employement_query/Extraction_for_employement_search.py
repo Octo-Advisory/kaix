@@ -344,6 +344,108 @@ def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Un
     raw_output = response.content.strip()
 
     return extract_json_from_llm_response_employment(raw_output, "KEYWORDS")
+<<<<<<< HEAD
+=======
+ 
+def classify_employment_query(query, llm):
+    """
+    Classify the user's employment search query into two categories:
+    1. Individual employment status.
+    2. Comparison between cities, states, or areas.
+
+    Args:
+        query (str): The user's input query.
+        llm: The language model object.
+
+    Returns:
+        dict: A dictionary with the raw prompt, classification category, and explanation if needed.
+    """
+    # Define the category mapping
+    category_mapping = {
+        1: "Individual employment status",
+        2: "Comparison between cities, states, or areas",
+        3: "Other Intention"
+    }
+
+    # Define the refined prompt string
+    refined_prompt = """
+    You are an expert in analyzing user queries related to employment searches. Your task is to classify the user's intention into one of the following categories:
+
+    1 Individual Employment Status:
+    - The query is about employment statistics, job availability, or unemployment rates in a single location.  
+    - Example: *"What is the employment status in Ahmedabad?"* or *"Job statistics for Gujarat."*  
+    - Even if employment-related words are NOT present, assume it is an employment search if a location is mentioned alone.  
+    - If the user mentions multiple locations, but one of them is only for reference (e.g., *"I live in X but want to search about Y"*), classify under this category.  
+    - DO NOT assume a comparison unless employment search is for multiple locations in the query’s main intent.  
+
+    2 Comparison Between Locations:
+    - The query asks about employment status across multiple locations, either explicitly or implicitly.  
+    - Explicit Comparison: *"Compare employment in Ahmedabad vs Baroda."*  
+    - Implicit Comparison: *"What is the employment situation in Gujarat and Maharashtra?"*  
+    - Even if "compare" is not explicitly mentioned, classify here if employment search involves multiple locations.  
+    - If multiple locations are mentioned AND they are both part of the employment search, classify under this category.  
+    - DO NOT require explicit words like "compare"—use contextual understanding.  
+
+    3 Other Intentions:
+    - Only classify here if the query is entirely unrelated to employment.  
+    - Example: *"Best places to live in Ahmedabad."* or *"How is the weather in Gujarat?"*  
+    - DO NOT classify as Other Intent just because employment is not explicitly mentioned.  
+    - If a query has no employment, no approvals, no incentives, and no vendor search, assume it is employment-related and classify under Class 1 or 2.  
+
+    Special Classification Rules:
+    1 Implicit Employment Queries:  
+    - If a location is mentioned alone, classify as Class 1 or 2 (NOT Class 3).  
+    - Example: *"Ahmedabad?"* → Class 1.  
+    - Example: *"Vadodara vs Surat?"* → Class 2.  
+
+    2 Employment + Other Topics = Still Employment (Class 1 or 2):  
+    - If the query includes employment + another topic, keep it in Class 1 or 2.  
+    - Example: *"Employment status in Ahmedabad and real estate?"* → Class 1.  
+    - Example: *"Jobs in Delhi and tourism industry?"* → Class 1.  
+
+    3 Only Classify as "Other Intent" (Class 3) if a Completely Different Topic is Asked:  
+    - Approvals, incentives, vendor searches, or unrelated topics → Class 3.  
+    - Example: *"What incentives are available in Mumbai?"* → Class 3.  
+    - Example: *"Approvals needed for setting up a factory in Gujarat?"* → Class 3.  
+
+    Final Output Instructions:
+    - Strictly return only the classification number (1, 2, or 3).  
+    - Do NOT return multiple classifications.  
+    - Do NOT provide explanations or additional text.  
+
+    Query:  
+    {query}  
+
+    Output:  
+    (Return only one classification number: 1, 2, or 3)
+    """
+
+
+    # Create a PromptTemplate for chaining
+    prompt_template = PromptTemplate(
+        input_variables=["query"],
+        template=refined_prompt,
+    )
+
+    # Use the prompt in a chain
+    chain = prompt_template | llm
+    # Run the chain and capture the response
+    response = chain.invoke({"query": query})
+    update_llm_token(response)
+
+    # Use regex to extract a valid classification number
+    match = re.search(r"^\s*([1-3])\s*$", response.content.strip())
+    if match:
+        classification_number = int(match.group(1))
+        classification_category = category_mapping[classification_number]
+        return {
+            "raw_prompt": refined_prompt,
+            "classification_number": classification_number,
+            "classification_category": classification_category,
+        }
+    else:
+        raise ValueError(f"Unexpected or invalid response from LLM: {response}")
+>>>>>>> 9e45308 (Eighteenth commit 19/03/25 12:33 krunal)
 
 def generate_dynamic_message(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm,chatId) -> str:
     """

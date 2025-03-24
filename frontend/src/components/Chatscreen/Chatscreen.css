@@ -20,4 +20,26 @@
     filter: blur(5px); /* Apply blur effect */
     pointer-events: none; /* Prevent interaction with the chat screen while progress is visible */
   }
+
+  .main-screen {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .main-screen::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+      linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), 
+      url("../../assets/background_image.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    z-index: -1;
+  }
+  
   

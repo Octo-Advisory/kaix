@@ -1,13 +1,13 @@
 import React from 'react'
-import logo from '../../assets/favicon.png'
+// import logo from '../../assets/favicon.png'
+import logo from '../../assets/MarsAIX Logo.png'
 
 function Navbar() {
   return (
     <>
       <div className="navbar h-16 w-full flex p-4 items-center pt-10 px-6">
         <div className="left flex gap-2 justify-center items-center">
-          <img src={logo} alt="" className='h-8 w-8 relative'/>
-          <h3 className='text-2xl text-[#242f6a]'>Mars 2.0</h3>
+          <img src={logo} alt="" className='h-32 w-40 top-4 left-4'/>
         </div>
       </div>
     </>

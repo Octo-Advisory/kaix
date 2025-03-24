@@ -10,6 +10,7 @@ import TestComponent from '../TestComponent/TestComponent';
 import MapComponent from '../MapComponent/MapComponent';
 import Industryresult from '../ResultScreens/Industryresult';
 import Incentiveresult from '../ResultScreens/Incentiveresult';
+import Vendorresult from '../ResultScreens/Vendorresult';
 // import { useFrappeDocumentEventListener } from 'frappe-react-sdk';
 
 function Home() {
@@ -44,8 +45,8 @@ function Home() {
       </div>
     </div>):(<Chatscreen />)}
     {/* <MapComponent/> */}
-      {/* <Test/> */}
-      {/* <Industryresult/> */}
+      {/* <Vendorresult /> */}
+      {/* <Incentiveresult /> */}
     </>
   );
 }
