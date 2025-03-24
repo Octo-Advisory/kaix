@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import completed from '../../assets/cancel.png'; // Assuming the completed image is imported
-import Backtochat from '../Backtochat/Backtochat';
+// import Backtochat from '../Backtochat/Backtochat';
 
 const Failure = () => {
   const imageRef = useRef(null);
@@ -47,7 +47,7 @@ const Failure = () => {
       >
        Sorry But Something Went Wrong
       </div>
-      <Backtochat/>
+      {/* <Backtochat/> */}
     </div>
   );
 };

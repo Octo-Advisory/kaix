@@ -5,7 +5,7 @@ import Solutionscreen from '../SolutionScreen/Solutionscreen';
 import { useNavigate } from "react-router-dom";
 
 const ConfirmationBox = ({result}) => {
-  console.log("result in confirmation",result);
+  // console.log("result in confirmation",result);
   const navigate = useNavigate();
   const imageRef = useRef(null);
   const textRef = useRef(null);

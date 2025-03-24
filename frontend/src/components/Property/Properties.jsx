@@ -1,70 +1,73 @@
-import React, { useEffect, useState } from 'react'
-import useEmblaCarousel from 'embla-carousel-react'
-import { result } from '../ResultScreens/data'
-import '../ResultScreens/Industryresult.css'
+import React, { useEffect, useState, useCallback } from "react";
+import useEmblaCarousel from "embla-carousel-react";
+import { result } from "../ResultScreens/data";
+import "../ResultScreens/Industryresult.css";
+// import Model from '../ResultScreens/Model';
 
-import Property from './Property';
+import Property from "./Property";
 
-// function Industryresult({ result }) {
-function Properties({ solutions }) {
-    // function Industryresult() {
-    console.log("result in indeustry solution screen", result);
-    const analytics_response = result["Analytics_response"]
-    console.log("Analytics_response", analytics_response);
+function Properties({ solutions ,toggleModal}) {
+    console.log("solutions",solutions);
+    
+    const [resultLen, setResultLen] = useState(0);
+    const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, dragFree: true });
 
-    const [resultLen, setResultLen] = useState(0)
-    // const [solutions, setSolutions] = useState([])
-    const [emblaRef, emblaApi] = useEmblaCarousel({ dragFree: true, watchDrag: false });
-
-
-    // Update the resultLen after the solutions are fetched
     useEffect(() => {
         setResultLen(solutions.length);
-        console.log("final solutions2", solutions);
-    }, [solutions])
+    }, [solutions]);
 
-    const goToNext = () => {
-        if (emblaApi) {
-            emblaApi.scrollNext();
-        }
-    };
-
-    const goToPrev = () => {
-        if (emblaApi) {
-            emblaApi.scrollPrev();
-        }
-    };
-    useEffect(() => {
-        if (emblaApi) {
-            emblaApi.on('select', () => {
-                document.querySelectorAll('.embla__slide').forEach(slide => {
-                    slide.style.backgroundColor = 'rgb(135 197 235 / 41%)';
-                });
-            });
-        }
+    const goToNext = useCallback(() => {
+        if (emblaApi) emblaApi.scrollNext();
     }, [emblaApi]);
 
+    const goToPrev = useCallback(() => {
+        if (emblaApi) emblaApi.scrollPrev();
+    }, [emblaApi]);
+
+    //  const [isModalOpen, setIsModalOpen] = useState(false);
+    //     const [modalData, setModalData] = useState([]);
+    //     const [modalTitle, setModalTitle] = useState('');
+    
+    //     //Toggle modal on click of button
+    //     const toggleModal = (data, title) => {
+    //         setModalData(data);
+    //         setModalTitle(title);
+    //         setIsModalOpen(!isModalOpen);
+    //     };
+
     return (
-        <div className="reuslt-container flex flex-col w-full h-[93%] relative">
-            {/* Navigation Buttons Positioned at Top-Right */}
+        <div className="reuslt-container flex flex-col w-full h-[98%] relative">
             {resultLen > 0 && (
-                <div className="absolute top-2 right-2 flex space-x-2">
-                    <button className="embla__btn embla__prev px-3 py-1 bg-gray-800 text-white rounded" onClick={goToPrev}>Prev</button>
-                    <button className="embla__btn embla__next px-3 py-1 bg-gray-800 text-white rounded" onClick={goToNext}>Next</button>
+                <div className="absolute top-2 right-2 flex space-x-2 z-10">
+                    <button
+                        className="embla__btn embla__prev px-3 py-1 bg-gray-800 text-white rounded"
+                        onClick={goToPrev}
+                        disabled={!emblaApi}
+                    >
+                        Prev
+                    </button>
+                    <button
+                        className="embla__btn embla__next px-3 py-1 bg-gray-800 text-white rounded"
+                        onClick={goToNext}
+                        disabled={!emblaApi}
+                    >
+                        Next
+                    </button>
                 </div>
             )}
 
             <div className="solutions p-1 h-[95%]">
                 <div className="embla h-full" ref={emblaRef}>
-                    <div className="embla__container border-black h-full">
+                    <div className="embla__container border-black h-full flex">
                         {solutions.map((solution, index) => (
-                            <Property solution={solution} key={index} />
+                            <Property solution={solution} key={index} toggleModal={toggleModal} />
                         ))}
                     </div>
                 </div>
             </div>
+            {/* <Model isOpen={isModalOpen} onClose={() => (setIsModalOpen(false))} title={modalTitle} data={modalData} /> */}
         </div>
-    )
+    );
 }
 
-export default Properties
+export default Properties;

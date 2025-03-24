@@ -3,7 +3,7 @@ import frappe
 import pickle
 
 def save_chat(chat_history,chatId):
-    frappe.cache.set(chatId, pickle.dumps(chat_history),ex=600)
+    frappe.cache.set(chatId, pickle.dumps(chat_history),ex=1200)
 
 def delete_chat(key):
     frappe.cache.delete(key)
@@ -24,7 +24,7 @@ def get_chat(key):
         return None
     
 def save_state(state,stateId):
-    frappe.cache.set(stateId,json.dumps(state),ex=600)
+    frappe.cache.set(stateId,json.dumps(state),ex=1200)
 
 def delete_state(key):
     frappe.log_error(f"come here with key {key}")

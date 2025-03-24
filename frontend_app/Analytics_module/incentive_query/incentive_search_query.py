@@ -116,7 +116,7 @@ def get_incentive_data(sub_sector_id=None, industry_id=None, area_id=None, city_
     # Initialize the query string with the common parts
     sql_query = """
     SELECT i.name, i.incentive_name, i.incentive_type, i.quantum_of_assistance, i.incentive_operation_start_date, i.incentive_operation_end_date, iim.sub_sector, iim.industry, iim.area, iim.city, iim.state, 
-           i.incentive_rank, iim.city_level, iim.state_level, iim.country_level, iim.pan_industries
+           i.incentive_rank, i.description, iim.city_level, iim.state_level, iim.country_level, iim.pan_industries
     FROM `tabIncentive Industry Mapping` iim
     JOIN `tabIncentive` i ON i.name = iim.incentive
     WHERE 
@@ -209,10 +209,11 @@ def get_incentive_data(sub_sector_id=None, industry_id=None, area_id=None, city_
     if results:
         Incentive_only_df = pd.DataFrame(results, columns=[
             'incentive_id', 'Incentive_name', 'Incentive Type', 'Incentive Details', 'Incentive Start Date', 'Incentive End Date', 'sub_sector_id', 'industry_id', 
-            'area_id', 'city_id', 'state_id', 'incentive_rank', "city_level", "state_level", 
+            'area_id', 'city_id', 'state_id', 'incentive_rank', 'description',"city_level", "state_level", 
             "country_level", "pan_industries"
         ])
         Incentive_only_df['incentive_rank'] = pd.to_numeric(Incentive_only_df['incentive_rank'], errors='coerce').astype('Int64')
+       
         return (Incentive_only_df)
     else:
         return None
@@ -230,6 +231,7 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
                     'Incentive Details': row['Incentive Details'],
                     'Incentive Start Date': row['Incentive Start Date'],
                     'Incentive End Date': row['Incentive End Date'],
@@ -245,6 +247,7 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
                     'Incentive Name': row['Incentive_name'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
                     'Incentive Details': row['Incentive Details'],
                     'Incentive Start Date': row['Incentive Start Date'],
                     'Incentive End Date': row['Incentive End Date'],
@@ -260,6 +263,7 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
                     'Incentive Name': row['Incentive_name'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
                     'Incentive Details': row['Incentive Details'],
                     'Incentive Start Date': row['Incentive Start Date'],
                     'Incentive End Date': row['Incentive End Date'],
@@ -276,6 +280,7 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
                     'Incentive Name': row['Incentive_name'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
                     'Incentive Details': row['Incentive Details'],
                     'Incentive Start Date': row['Incentive Start Date'],
                     'Incentive End Date': row['Incentive End Date'],
@@ -291,6 +296,7 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
                     'Incentive Name': row['Incentive_name'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
                     'Incentive Details': row['Incentive Details'],
                     'Incentive Start Date': row['Incentive Start Date'],
                     'Incentive End Date': row['Incentive End Date'],
@@ -306,6 +312,7 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
                     'Incentive Name': row['Incentive_name'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
                     'Incentive Details': row['Incentive Details'],
                     'Incentive Start Date': row['Incentive Start Date'],
                     'Incentive End Date': row['Incentive End Date'],
@@ -320,6 +327,7 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
                 'Incentive Name': row['Incentive_name'],
                 'Incentive Type': row['Incentive Type'],
                 'Incentive Rank': row['incentive_rank'],
+                'description': row['description'],
                 'Incentive Details': row['Incentive Details'],
                 'Incentive Start Date': row['Incentive Start Date'],
                 'Incentive End Date': row['Incentive End Date'],
@@ -330,8 +338,7 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
     result_df = pd.DataFrame(results).sort_values(by='Incentive Rank',ascending=False)
     if not keyword_given_by_user:
         return {
-            "Filtered Incentive Data":None,
-            "Unfiltered Incentive Data":result_df.to_json(),
+            "Incentive Data":result_df.to_json(),
             }
     
     else:
@@ -340,16 +347,15 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
 
         if len(filtered_keyword_df) != 0:
             filtered_result_df = pd.merge(result_df, filtered_keyword_df, left_on="Incentive ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score", "Incentive Rank"], ascending=[False, False])
-            unfiltered_result_df = pd.merge(result_df, unfiltered_keyword_df, left_on="Incentive ID", right_on="ID").drop("ID", axis=1).sort_values(by=["Incentive Rank", "aggregated_score"], ascending=[False, False])
+            unfiltered_result_df = pd.merge(result_df, unfiltered_keyword_df, left_on="Incentive ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score", "Incentive Rank"], ascending=[False, False])
+            Final_result_df = pd.concat([filtered_result_df,unfiltered_result_df], axis = 0, ignore_index= True ).sort_values(by= ['aggregated_score'])
             return {            
-                "Filtered Incentive Data":filtered_result_df.to_json(),
-                "Unfiltered Incentive Data":unfiltered_result_df.to_json(),
+                "Incentive Data":Final_result_df.to_json(),
                 }
         else:
-            unfiltered_result_df = pd.merge(result_df, unfiltered_keyword_df, left_on="Approval ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score", "Incentive Rank"], ascending=[False, False])
+            unfiltered_result_df = pd.merge(result_df, unfiltered_keyword_df, left_on="Incentive ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score", "Incentive Rank"], ascending=[False, False])
             return {
-                "Filtered Incentive Data":None,
-                "Unfiltered Incentive Data":unfiltered_result_df.to_json()
+                "Incentive Data":unfiltered_result_df.to_json(),
                 }
 
 def filter_df_by_keywords(

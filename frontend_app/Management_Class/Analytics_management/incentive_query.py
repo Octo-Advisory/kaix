@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from frontend_app.Analytics_module.incentive_query.incentive_search_query import incentive_details,get_incentive_data,fetch_industry_details,fetch_city_details,fetch_area_details,fetch_query_results,fetch_state_details,fetch_sub_sector_details
 from frontend_app.Management_Class.helpers.progress import insert_process,update_process
+import traceback
 
 @frappe.whitelist()
 def call_incentive_query(aiResponse,chatId):
@@ -47,7 +48,8 @@ def call_incentive_query(aiResponse,chatId):
         incentive_keyword_df["Incentive_name"] = incentive_keyword_df["Incentive_name"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
         incentive_keyword_df["Incentive Type"] = incentive_keyword_df["Incentive Type"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
         incentive_keyword_df["Incentive Details"] = incentive_keyword_df["Incentive Details"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
-        incentive_detail = incentive_details(Incentive_only_df,area,city,State,keyword_given_by_user= keywords, incentive_keyword_df = incentive_keyword_df)    
+        incentive_detail = incentive_details(Incentive_only_df,area,city,State,keyword_given_by_user= keywords, incentive_keyword_df = incentive_keyword_df)
+        time.sleep(2)    
         update_process(chatId,"Analyzing Data","Complete")
         update_process(chatId,"Preparing Result","Processing")
         time.sleep(5)

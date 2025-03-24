@@ -5,12 +5,20 @@ import { useSelector } from 'react-redux';
 import 'leaflet/dist/leaflet.css';
 import markerImage from '../../assets/markerImage.png'
 import Property from "../Property/Property";
+import Vendorcards from "../ResultScreens/Vendorcards";
 
-function MapComponent({ solutions }) {
+function MapComponent({ solutions, toggleModal }) {
+  console.log("solutons from map", solutions);
+  const validation_result = useSelector((state) => state.validate.validation_result)
+  console.log("propertyCoord1", validation_result);
+  let propertyCoord = validation_result?.[0]?.[1]?.latitude_longitude?.split(",").map(Number).reverse() ?? null;
+  console.log("propertyCoord2",propertyCoord);
   const [solution, setSolution] = useState({})
   const [isModalOpen, setIsModalOpen] = useState(false);
-  console.log("solutoinis from  map", solutions);
-  const latLongArray = Object.values(solutions).map(item => [...item.lat_long].reverse());
+  // console.log("solutoinis from  map", solutions);
+
+  const latLongArray = Object.values(solutions).map(item => [...item.latitude_longitude].reverse());
+
   console.log("lanlomg", latLongArray);
 
   var map = null;
@@ -31,10 +39,25 @@ function MapComponent({ solutions }) {
     });
     return () => map.remove(); // Cleanup the map instance on unmount
   }, []); // Empty dependency array to run only once
-
+  // Function to validate latitude and longitude
+  function isValidLatLng(coord) {
+    return (
+      Array.isArray(coord) &&
+      coord.length === 2 &&
+      typeof coord[0] === 'number' &&
+      typeof coord[1] === 'number' &&
+      coord[1] >= -90 && coord[1] <= 90 && // Latitude range
+      coord[0] >= -180 && coord[0] <= 180  // Longitude range
+    );
+  }
   const draw = async () => {
+    // Filter out invalid coordinates
+    const validCoordinates = latLongArray.filter(isValidLatLng);
+
     // Define your three coordinates (longitude, latitude)
-    const coordinates = latLongArray
+    //const coordinates = latLongArray
+
+    const coordinates = validCoordinates;
 
     // Get the bounding box
     const bounds = coordinates.reduce((bounds, coord) => bounds.extend(coord), new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
@@ -64,7 +87,7 @@ function MapComponent({ solutions }) {
     //     }
     //   }
     // });
- 
+
     // // Add a layer to display the line
     // map.addLayer({
     //   id: 'straight-line-layer',
@@ -80,57 +103,113 @@ function MapComponent({ solutions }) {
     //   }
     // });
 
-    
-    solutions.forEach(item=>{
-      debugger
-      if(item.result_type === "Industry_Result"){
+
+    solutions.forEach(item => {
+      //#region Code to draw Property Boundry on the map
+      if (item.result_type === "Industry_Result") {
         let parsedCoord = JSON.parse(item.boundary_coordinates);
+        let sourceId = `Custom_Source_${crypto.randomUUID()}`;
         // Add polygon source
-        map.addSource("polygon", {
+        map.addSource(sourceId, {
           type: "geojson",
           data: {
-              type: "Feature",
-              properties: {},
-              geometry: {
-                  type: "Polygon",
-                  coordinates: [parsedCoord],
-              },
+            type: "Feature",
+            properties: {},
+            geometry: {
+              type: "Polygon",
+              coordinates: [parsedCoord],
+            },
           },
-      }
-    
-    );
+        }
 
-      // Add fill layer for polygon
-      map.addLayer({
-          id: "polygon-fill",
+        );
+        let layerId1 = `Custom_polygon_fill_${crypto.randomUUID()}`;
+        let layerId2 = `Custom_polygon-border_${crypto.randomUUID()}`;
+        // Add fill layer for polygon
+        map.addLayer({
+          id: layerId1,
           type: "fill",
-          source: "polygon",
+          source: sourceId,
           layout: {},
           paint: {
-              "fill-color": "#ff0000", // Red color
-              "fill-opacity": 0.5, // 50% transparent
+            "fill-color": "#ff0000", // Red color
+            "fill-opacity": 0.5, // 50% transparent
           },
-      });
+        });
 
-      // Add border for polygon
-      map.addLayer({
-          id: "polygon-border",
+        // Add border for polygon
+        map.addLayer({
+          id: layerId2,
           type: "line",
-          source: "polygon",
+          source: sourceId,
           layout: {},
           paint: {
-              "line-color": "#000000", // Black border
-              "line-width": 2,
+            "line-color": "#000000", // Black border
+            "line-width": 2,
           },
-      });
+        });
       }
+
+      //#endregion
+
 
     })
-    laodbindDataOnMap(elements, "Property")
+
+    //#region Draw connected line between vendor and search city/State
+    let layerId = `Custom_property_vendor_lines_layer_${crypto.randomUUID()}`;
+    const hasVendorResult = solutions.some(item => item.result_type === "Vendor");
     
- 
+    if (hasVendorResult) {
+      if(!propertyCoord){
+        propertyCoord = solution
+      .filter(item => Array.isArray(item?.user_lat_long) && item.user_lat_long.length > 0)
+      .map(item => item.user_lat_long[0].split(",").map(Number))
+      .reverse();
+      }
+      // Generate LineString Features
+      const lines = latLongArray.map(vendorCoord => ({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [propertyCoord, vendorCoord] // Draw a line between property and vendor
+        },
+        properties: {}
+      }));
+
+      // Add Line Source
+      map.addSource('property-vendor-lines', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: lines
+        }
+      });
+
+      // Add Line Layer
+      map.addLayer({
+        id: layerId,
+        type: 'line',
+        source: 'property-vendor-lines',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#ff0000', // Red color lines
+          'line-width': 2
+        }
+      });
+    }
+
+    //#endregion
+
+    //#region Add the pointer on the map
+    addPointerOnMap(elements, crypto.randomUUID())
+    //#endregion    
+
+
   }
-  const laodbindDataOnMap = async (elements, layerType) => {
+  const addPointerOnMap = async (elements, layerType) => {
     let featureCollectionArray = []
     //loop over all the elements in the array and create feature array
     elements.forEach((data) => {
@@ -154,7 +233,9 @@ function MapComponent({ solutions }) {
     map.addImage(imagename, image);
 
     //create sourceId and layerID
-    const sourceId = layerType
+    // Generate a unique ID for the source
+    let sourceId = `polygon-${crypto.randomUUID()}`;
+    // const sourceId = layerType
     const layerId = "Custom_" + layerType
     // Add a GeoJSON source with the point where you want to display the marker
     map.addSource(sourceId, {
@@ -172,24 +253,24 @@ function MapComponent({ solutions }) {
       source: sourceId,
       layout: {
         "icon-image": imagename,
-        "icon-size": 0.09, // Adjust the icon size as necessary
-        //'icon-allow-overlap': true,  // Allow overlap
+        "icon-size": 0.07, // Adjust the icon size as necessary
+        'icon-allow-overlap': true,  // Allow overlap
         // 'icon-ignore-placement': true // Ignore placement rules
       },
     });
     // map.on("click", layerId, (e) => {
     //   let id = e.features[0].properties.id;
-    //   console.log("id", id);
+    //   // console.log("id", id);
 
     //   try {
     //     let parsedId = JSON.parse(id); // Convert string to array
-    //     console.log("Parsed Array:", parsedId);
+    //     // console.log("Parsed Array:", parsedId);
 
     //     if (Array.isArray(parsedId)) {
     //       let targetLatLong = parsedId.reverse(); // Reverse the array
     //       const sol = Object.entries(solutions).find(([item, value]) => {
-    //         console.log("value.lat_long", value.lat_long);
-    //         console.log("targetLatLong", targetLatLong);
+    //         // console.log("value.lat_long", value.lat_long);
+    //         // console.log("targetLatLong", targetLatLong);
 
     //         return (
     //           Array.isArray(value.lat_long) &&
@@ -199,7 +280,7 @@ function MapComponent({ solutions }) {
     //         );
     //       });
 
-    //       console.log("sol is",sol[1]);
+    //       // console.log("sol is",sol[1]);
 
 
     //       setSolution(sol[1])
@@ -207,7 +288,7 @@ function MapComponent({ solutions }) {
     //   } catch (error) {
     //     console.error("Error parsing id:", error);
     //   }
-    //   console.log("solutoin is",solution);
+    //   // console.log("solutoin is",solution);
 
     //   <Property solution={solution} />
 
@@ -222,9 +303,11 @@ function MapComponent({ solutions }) {
         let targetLatLong = parsedId.reverse();
 
         const foundSolution = Object.values(solutions).find(value =>
-          JSON.stringify(value.lat_long) === JSON.stringify(targetLatLong)
+          JSON.stringify(value.latitude_longitude) === JSON.stringify(targetLatLong)
         );
 
+        console.log("foundsolution is",foundSolution);
+        
         if (foundSolution) {
           setSolution(foundSolution);
           setIsModalOpen(true);
@@ -259,10 +342,10 @@ function MapComponent({ solutions }) {
         ref={mapContainerRef} // Attach ref to this container
         style={{ width: "100%", height: "90%" }} // Set width and height for the map container
       />
-
       {isModalOpen && solution && (
-        <Modal onClose={() => setIsModalOpen(false)}>
-          <Property solution={solution} />
+        <Modal key={solution.result_type} onClose={() => setIsModalOpen(false)}>
+          {solution.result_type === "Industry_Result" && <Property solution={solution} toggleModal={toggleModal} />}
+          {solution.result_type === "Vendor" && <Vendorcards supplier={solution} />}
         </Modal>
       )}
 

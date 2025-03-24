@@ -110,6 +110,8 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                 
                 # Calculate aggregated employment type data
                 total_state_summary = state_data.groupby("employment_type")["availability"].sum()
+                with open("log.txt", "a") as file:
+                    file.write(f"\ntotal_state_summary {total_state_summary}")
                 img_base64 = plot_pie_chart(total_state_summary, f"State-wise Employment Status: {state}")
 
                 if not keyword_given_by_user:
@@ -162,6 +164,8 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                 
                  # Always generate the pie chart with all employment types
                 city_summary = city_data.groupby("employment_type")["availability"].sum()
+                with open("log.txt", "a") as file:
+                    file.write(f"\ncity_summary {city_summary}")
                 img_base64 = plot_pie_chart(city_summary, f"City-wise Employment Status: {city}, {state}")
                 if not keyword_given_by_user:
                     # If no keyword is provided, return the full summary as usual
@@ -311,10 +315,30 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
 
 def plot_pie_chart(data, title):
     """
-    Plots a pie chart for employment data and returns it as a base64 string.
+    Plots a pie chart for employment data with actual counts and percentages.
+    Returns the chart as a base64 string.
     """
     fig, ax = plt.subplots()
-    data.plot.pie(autopct='%1.1f%%', startangle=90, legend=False, ax=ax)
+
+    # Define autopct function to show count and percentage
+    def autopct_format(pct):
+        total = sum(data)
+        count = int(round(pct * total / 100))  # Convert percentage to count
+        return f"{count} ({pct:.1f}%)"  # Format as count (percentage)
+
+    # Plot pie chart
+    wedges, texts, autotexts = ax.pie(
+        data, 
+        labels=data.index, 
+        autopct=autopct_format,  # Show count and percentage
+        startangle=90, 
+        wedgeprops={'edgecolor': 'black'}
+    )
+
+    # Adjust font size for better readability
+    for text in texts + autotexts:
+        text.set_fontsize(10)
+
     ax.set_title(title)
     ax.set_ylabel("")  # Remove default ylabel
     

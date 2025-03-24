@@ -108,9 +108,8 @@ def vendor_validation(param):
             elif location_check == True and industry_check != True and supply_check != True:
                 return  {'pass_to_analytics_module': False, 'log': industry_check, 'latitude_longitude': 'None',"location_name":'None', 'from_gujarat': 'None'}
             elif location_check == True and industry_check == True and supply_check != True:
-                location_industry = location_and_industry()
-                location_details = location_industry.get('location_check')
-                industry_details = location_industry.get('industry_check')
+                return location_and_industry()
+
                 # return {'pass_to_analytics_module'}
             elif location_check == True and industry_check != True and supply_check == True:
                 return location_and_supply()

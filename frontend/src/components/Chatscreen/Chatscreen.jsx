@@ -3,11 +3,12 @@ import { AiOutlineClear, AiOutlineSend } from 'react-icons/ai'; // React Icons
 import { FiSend } from 'react-icons/fi';
 import { useDispatch, useSelector } from 'react-redux';
 import { addChatId, addMessage } from '../../Redux/Store/Featuresilces/chat';
-import botLogo1 from '../../assets/favicon.jpeg';
+// import botLogo1 from '../../assets/favicon.jpeg';
+import botLogo1 from '../../assets/MarsAIX icon.png';
 import useChatScroll from '../Hooks/useChatScroll'; // Import the hook
 import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
 import '../Chatscreen/Chatscreen.css';
-import userIcon from '../../assets/user.png'
+import userIcon from '../../assets/MarsAIX person icon.png'
 import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
 import { FrappeContext, useFrappeCreateDoc, useFrappeUpdateDoc } from 'frappe-react-sdk'
@@ -42,11 +43,11 @@ function Chatscreen() {
   const { call } = useContext(FrappeContext)
 
   const suggestions = [
-    "I want to build industry....",
-    "I want to see incetives for cement factory....",
-    "I want to get approvals to setup industry....",
-    "I want to see employement....",
-    "I want suppliers for industry...."
+    "I want to build 1 million tonnes per annum steel factory....",
+    "Show me incentives for cement factory in Vadodara....",
+    "Can I get a list of approvals needed to set up a pharma unit in Bharuch....",
+    "What is manpower availability in Anand....",
+    "I am looking for suppliers for cement industry in Ahmedabad...."
   ]
 
   const createSessionid = () => {
@@ -307,7 +308,7 @@ function Chatscreen() {
   const ref = useChatScroll(messages);
 
   return (
-    <div className="h-screen flex flex-col items-center">
+    <div className="h-screen flex flex-col items-center main-screen">
       <Navbar />
       <div className="flex-1 overflow-y-auto p-4 flex justify-center w-full chatscreen" ref={ref}>
         {messages.length > 0 ? (<div
@@ -417,7 +418,16 @@ function Chatscreen() {
       </div>
 
       <div className="alert-msg mb-5">
-        <p className='text-xs text-[#242f6a]'>Mars 2.0 can make mistakes. Check important info.</p>
+      <p className="text-xs text-[#242f6a]">
+  MarsInfraAIX is still learning and can make mistakes. Please contact us by filling the contact form{" "}
+  <span
+    className="text-blue-500 underline cursor-pointer"
+    onClick={() => document.querySelector(".details-btn")?.click()}
+  >
+    here
+  </span>{" "}
+  to confirm data correctness.
+</p>
       </div>
       <Details />
     </div>

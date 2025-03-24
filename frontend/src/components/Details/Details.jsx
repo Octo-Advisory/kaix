@@ -60,7 +60,7 @@ function Details() {
       <div className="fixed bottom-8 right-6">
         <button
           onClick={() => setIsOpen(prevState => !prevState)}
-          className="group relative flex items-center bg-[#199b7d] text-white px-3 py-2 rounded-full shadow-lg transition"
+          className="group relative flex items-center bg-[#199b7d] text-white px-3 py-2 rounded-full shadow-lg transition details-btn"
         >
           <AiOutlineQuestionCircle size={30} className="text-white" />
           <span className="hidden group-hover:block ml-2 transition-opacity">Contact Us</span>
@@ -87,7 +87,7 @@ function Details() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block">Name</label>
+              <label className="block">Name<span className='text-red-600 p-[2px]'>*</span></label>
               <input
                 type="text"
                 name="name"
@@ -97,7 +97,7 @@ function Details() {
               required/>
             </div>
             <div>
-              <label className="block">Email</label>
+              <label className="block">Email<span className='text-red-600 p-[2px]'>*</span></label>
               <input
                 type="email"
                 name="email"
@@ -107,7 +107,7 @@ function Details() {
               required/>
             </div>
             <div>
-              <label className="block">Mobile Number</label>
+              <label className="block">Mobile Number<span className='text-red-600 p-[2px]'>*</span></label>
               <input
                 type="tel"
                 name="mobile"
@@ -117,7 +117,7 @@ function Details() {
               required/>
             </div>
             <div>
-              <label className="block">Help Category</label>
+              <label className="block">Help Category<span className='text-red-600 p-[2px]'>*</span></label>
               <select
                 name="helpCategory"
                 value={formData.helpCategory}
