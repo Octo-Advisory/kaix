@@ -6,7 +6,7 @@
 
 .embla__container {
   display: flex;
-  background: rgb(135 197 235 / 41%);
+  background: lightgray;
   border-radius: 10px;
 }
 
@@ -16,6 +16,7 @@
   padding: 20px;
   height: 100%;
   border-radius: 10px;
+  background: lightgray;
 }
 
 .embla__controls {

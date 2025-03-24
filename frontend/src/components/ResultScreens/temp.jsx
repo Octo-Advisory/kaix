@@ -11,12 +11,12 @@ import { result } from './data'
 import './Industryresult.css'
 import Model from './Model';
 
-// function Industryresult({ result }) {
-function Industryresult() {
+function Industryresult1({ result }) {
+// function Industryresult() {
     // function Industryresult() {
-    console.log("result in indeustry solution screen", result);
+    // console.log("result in indeustry solution screen", result);
     const analytics_response = result["Analytics_response"]
-    console.log("Analytics_response", analytics_response);
+    // console.log("Analytics_response", analytics_response);
 
     const [resultLen, setResultLen] = useState(0)
     const [solutions, setSolutions] = useState([])
@@ -42,9 +42,9 @@ function Industryresult() {
     }
 
     const fetchData = async (property) => {
-        console.log("proprtis here", property);
+        // console.log("proprtis here", property);
         try {
-            const response = await fetch(`http://172.17.244.12/api/resource/Survey No?fields=["*"]&filters=[["name","=","${property}"]]&order_by=modified asc`, {
+            const response = await fetch(`https://marsinfraix.marsbazaar.com/api/resource/Survey No?fields=["*"]&filters=[["name","=","${property}"]]&order_by=modified asc`, {
                 method: 'GET',
                 headers: {
                     'Authorization': 'token d3de1e0e4e25846:3d3be60aaa3b67c',
@@ -57,7 +57,7 @@ function Industryresult() {
             }
 
             const data = await response.json();
-            console.log("data is", data.data);
+            // console.log("data is", data.data);
             return data.data
         } catch (error) {
             console.error('Error fetching data:', error); // Handles errors
@@ -67,36 +67,36 @@ function Industryresult() {
     const fetchPropertyData = async (analytics_response) => {
         let preaparedSolutions = [];
         const final_scoring_df = JSON.parse(analytics_response['final_scoring_df'])
-        console.log("final_scoring_df", final_scoring_df);
+        // console.log("final_scoring_df", final_scoring_df);
         const property_id = final_scoring_df["Property_ID"]
-        console.log("pid", property_id);
+        // console.log("pid", property_id);
 
         // for supply and vendors
         const Essential_supply_vendor_lookup_df = JSON.parse(analytics_response['Essential_supply_vendor_lookup_df'])
-        console.log("Essential_supply_vendor_lookup_df", Essential_supply_vendor_lookup_df);
+        // console.log("Essential_supply_vendor_lookup_df", Essential_supply_vendor_lookup_df);
 
         const nonEssential_supply_vendor_lookup_df = JSON.parse(analytics_response['Non_essential_supply_vendor_lookup_df'])
-        console.log("nonEssential_supply_vendor_lookup_df", nonEssential_supply_vendor_lookup_df);
+        // console.log("nonEssential_supply_vendor_lookup_df", nonEssential_supply_vendor_lookup_df);
 
         // for employemnt 
         const Employment_lookup_df = JSON.parse(analytics_response['Employment_lookup_df'])
-        console.log("Employment_lookup_df", Employment_lookup_df);
+        // console.log("Employment_lookup_df", Employment_lookup_df);
 
 
         // for incenetive
         const Solution_lookup_df = JSON.parse(analytics_response['Solution_lookup_df'])
-        console.log("Solution_lookup_df", Solution_lookup_df);
+        // console.log("Solution_lookup_df", Solution_lookup_df);
 
         //for approvals
         const Approval_lookup_df = JSON.parse(analytics_response['Approval_lookup_df'])
-        console.log("Approval_lookup_df", Approval_lookup_df);
+        // console.log("Approval_lookup_df", Approval_lookup_df);
 
         const promises = Object.entries(property_id).map(async ([key, value]) => {
-            console.log(`key ${key} value ${value}`);
+            // console.log(`key ${key} value ${value}`);
             try {
                 const get_data = await fetchData(value)
                 const data = get_data[0]
-                console.log("actual result data", data);
+                // console.log("actual result data", data);
 
                 if (data) {
                     const latLong = data.latitude_longitude
@@ -114,7 +114,7 @@ function Industryresult() {
                     const distance_from_nearest_railway_station = data.distance_from_nearest_railway_station
                     const distance_from_nearest_airport = data.distance_from_nearest_airport
                     const distance_from_nearest_seaport = data.distance_from_nearest_seaport
-                    console.log("hahah😒", Essential_supply_vendor_lookup_df["supply_id"]);
+                    // console.log("hahah😒", Essential_supply_vendor_lookup_df["supply_id"]);
 
                     const essential_supply_and_vendor = []
                     const nonessential_supply_and_vendor = []
@@ -142,7 +142,7 @@ function Industryresult() {
                     }
 
 
-                    console.log("essential_supply_and_vendor", essential_supply_and_vendor);
+                    // console.log("essential_supply_and_vendor", essential_supply_and_vendor);
 
 
                     const emp_skill_type = Employment_lookup_df['Skill_Type'][key]
@@ -191,12 +191,12 @@ function Industryresult() {
                         approvals: approvals,
                         road_connectivity: { distance: road_connectivity, status: get_status_for_distance(road_connectivity) }
                     }
-                    console.log("solution json", solution);
+                    // console.log("solution json", solution);
                     preaparedSolutions.push(solution)
-                    console.log("final array is", preaparedSolutions);
+                    // console.log("final array is", preaparedSolutions);
                 }
             } catch (error) {
-                console.log("error is ", error);
+                // console.log("error is ", error);
             }
 
         });
@@ -224,7 +224,7 @@ function Industryresult() {
     // Update the resultLen after the solutions are fetched
     useEffect(() => {
         setResultLen(solutions.length);
-        console.log("final solutions2", solutions);
+        // console.log("final solutions2", solutions);
     }, [solutions])
 
     const goToNext = () => {
@@ -363,4 +363,4 @@ function Industryresult() {
     )
 }
 
-export default Industryresult
+export default Industryresult1

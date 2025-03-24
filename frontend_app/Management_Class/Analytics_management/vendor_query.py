@@ -82,8 +82,10 @@ def call_vendor_query(aiResponse,chatId,validationResult):
        
         response = {
                 "Analytics_response": combined_data,
-                "Is_Error" : False
+                "Is_Error" : False,
+                "latitude_longitude" : latitude_longitude or []
             }
+        time.sleep(1)
         update_process(chatId,"Analyzing Data","Complete")
         update_process(chatId,"Preparing Result","Processing")
         time.sleep(5)
@@ -95,7 +97,8 @@ def call_vendor_query(aiResponse,chatId,validationResult):
             file.write(f"\nerror_message {error_message}")
         response = {
                 "Analytics_response": e,
-                "Is_Error" : True
+                "Is_Error" : True,
+                "latitude_longitude" : latitude_longitude or []
             }
         update_process(chatId,"Analyzing Data","Fail")
         return response

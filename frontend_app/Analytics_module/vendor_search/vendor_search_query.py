@@ -357,10 +357,17 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                 # "property_id": property_id,
                                 "supply_id": supply_id,
                                 # "minimum_supply_requirement": minimum_supply_requirement,
-                                "supply_score": best_ranked_row["Final_Score_With_Features"],
+                                "Final_Score_With_Features": best_ranked_row["Final_Score_With_Features"],
                                 "vendor_id": best_ranked_row["vendor_id"],
                                 "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
-                                "Distance": best_ranked_row["Dist"],
+                                "years_of_experience": best_ranked_row["years_of_experience"],
+                                "no_of_locations": best_ranked_row["no_of_locations"],
+                                "no_of_past_clients": best_ranked_row["no_of_past_clients"],
+                                "no_of_servieces": best_ranked_row["no_of_servieces"],
+                                "no_of_employees": best_ranked_row["no_of_employees"],
+                                "latitude_longitude": best_ranked_row["latitude_longitude"],
+                                "Dist": best_ranked_row["Dist"],
+                                "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                 
                             })
                         else:
@@ -370,21 +377,23 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                             ]
                             if not g_cap.empty:
                                 best_g_cap_row = g_cap.loc[g_cap["Final_Score_With_Features"].idxmax()]
-                                print("The Best Solution: \n", best_g_cap_row[[
-                                    "vendor_id","supply_id", "vendor_supply_capacity", "Dist", "Final Ranking", "Fea_rank", "Final_Score_With_Features"
-                                ]], "\n\nBetter Solution: \n", best_ranked_row[[
-                                    "vendor_id","supply_id", "vendor_supply_capacity", "Dist", "Final Ranking", "Fea_rank", "Final_Score_With_Features"
-                                ]])
                                 better_results.append(
                                     {
                                         # "property_id": property_id,
                                         "supply_id": supply_id,
                                         # "essential": essential,
                                         # "minimum_supply_requirement": minimum_supply_requirement,
-                                        "supply_score": best_ranked_row["Final_Score_With_Features"],
+                                        "Final_Score_With_Features": best_ranked_row["Final_Score_With_Features"],
                                         "vendor_id": best_ranked_row["vendor_id"],
                                         "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
-                                        "Distance": best_ranked_row["Dist"],
+                                        "years_of_experience": best_ranked_row["years_of_experience"],
+                                        "no_of_locations": best_ranked_row["no_of_locations"],
+                                        "no_of_past_clients": best_ranked_row["no_of_past_clients"],
+                                        "no_of_servieces": best_ranked_row["no_of_servieces"],
+                                        "no_of_employees": best_ranked_row["no_of_employees"],
+                                        "latitude_longitude": best_ranked_row["latitude_longitude"],
+                                        "Dist": best_ranked_row["Dist"],
+                                        "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                         
                                     }
                                 )
@@ -393,10 +402,17 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                     "supply_id": supply_id,
                                     # "essential": essential,
                                     # "minimum_supply_requirement": minimum_supply_requirement,
-                                    "supply_score": best_g_cap_row["Final_Score_With_Features"],
+                                    "Final_Score_With_Features": best_g_cap_row["Final_Score_With_Features"],
                                     "vendor_id": best_g_cap_row["vendor_id"],
                                     "vendor_supply_capacity": best_g_cap_row["vendor_supply_capacity"],
-                                    "Distance": best_g_cap_row["Dist"],
+                                    "years_of_experience": best_g_cap_row["years_of_experience"],
+                                    "no_of_locations": best_g_cap_row["no_of_locations"],
+                                    "no_of_past_clients": best_g_cap_row["no_of_past_clients"],
+                                    "no_of_servieces": best_g_cap_row["no_of_servieces"],
+                                    "no_of_employees": best_g_cap_row["no_of_employees"],
+                                    "latitude_longitude": best_g_cap_row["latitude_longitude"],
+                                    "Dist": best_g_cap_row["Dist"],
+                                    "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                     
                                     })
                             else:
@@ -408,18 +424,21 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                     "supply_id": supply_id,
                                     # "essential": essential,
                                     # "minimum_supply_requirement": minimum_supply_requirement,
-                                    "supply_score": best_ranked_row["Final_Score_With_Features"],
+                                    "Final_Score_With_Features": best_ranked_row["Final_Score_With_Features"],
                                     "vendor_id": best_ranked_row["vendor_id"],
                                     "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
-                                    "Distance": best_ranked_row["Dist"],
+                                    "years_of_experience": best_ranked_row["years_of_experience"],
+                                    "no_of_locations": best_ranked_row["no_of_locations"],
+                                    "no_of_past_clients": best_ranked_row["no_of_past_clients"],
+                                    "no_of_servieces": best_ranked_row["no_of_servieces"],
+                                    "no_of_employees": best_ranked_row["no_of_employees"],
+                                    "latitude_longitude": best_ranked_row["latitude_longitude"],
+                                    "Dist": best_ranked_row["Dist"],
+                                    "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                     
                                 })
         final_df = pd.DataFrame(final_results)
         better_df = pd.DataFrame(better_results)
-        with open("log.txt", "a") as file:
-            file.write(f"\nfinal,better,all {final_df}")
-            file.write(f"\nbetter {better_df}")
-            file.write(f"\nall {all_vendors_df}")
         # return final_df.to_json, better_df.to_json, all_vendors_df.to_json
         if not keyword_given_by_user :
             return {"Best Supplier": final_df.to_json(),
@@ -431,7 +450,8 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
             filtered_keyword_df, unfiltered_keyword_df = keyword_result[0], keyword_result[1]
             if len(filtered_keyword_df) != 0:
                 filtered_result_df = pd.merge(all_vendors_df, filtered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
-                unfiltered_result_df = pd.merge(all_vendors_df, unfiltered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["Final_Score_With_Features"], ascending=False)
+                unfiltered_result_df = pd.merge(all_vendors_df, unfiltered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
+                unfiltered_result_df = pd.concat([filtered_result_df, unfiltered_result_df], axis= 0, ignore_index= True).sort_values(by = 'aggregated_score')
                 return {
                         "Best Supplier": final_df.to_json(),
                         "Better Supplier": better_df.to_json(),

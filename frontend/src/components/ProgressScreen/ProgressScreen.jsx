@@ -112,7 +112,7 @@ function ProgressScreen() {
     console.log("message is", messages);
 
     if (messages) {
-      const noPending = messages.some((msg) => msg.status !== 'Pending')
+      const noPending = messages.some((msg) => msg.status == 'Processing')
       if (noPending) setLoading(false)
       const allSuccess = messages.every((msg) => msg.status === 'Complete');
       setAllsuccess(allSuccess);
