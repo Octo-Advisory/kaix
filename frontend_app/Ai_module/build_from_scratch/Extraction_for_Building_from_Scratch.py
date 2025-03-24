@@ -858,33 +858,33 @@ def generate_ai_message(state, history, missing_fields, attempt_count, llm):
     - Ensure the response is concise and presented in a single paragraph.  
     - Avoid splitting the message into multiple paragraphs.
 
-    - Handling Industry-Related Guidance:  
-    - If the user seeks guidance for an industry-related question (e.g., "What is the ideal capacity for a 10 crore investment?"), provide a realistic estimate or a general suggestion based on industry norms and context.  
-    - If exact figures cannot be determined, offer an indicative starting point or general direction (e.g., "Capacities for investments like this typically range based on the production scale and the industry.").  
-    - Clearly state that the decision depends on various factors, such as risk appetite, investment plans, production strategies, and market demand.  
-    - After providing guidance, smoothly transition to request the missing details needed for further assistance.
+    - Strict Hierarchical Reference for Context:  
+    - Always refer to **only the highest available level of specificity** in the provided details, following this hierarchy:  
+        1. **Product** (if available, only mention this and ignore Segment, Sub-Sector, and Main-Industry).  
+        2. If Product is missing or "None," then mention **Segment**.  
+        3. If Segment is missing, "None," or "Not Available in List," then mention **Sub-Sector**.  
+        4. If Sub-Sector is missing, "None," or "Not Available in List," then mention **Main-Industry**.  
+    - **Do NOT mention or refer to lower hierarchy levels** if a higher level (like Product or Segment) is already available.  
+    - Avoid mentioning multiple levels in one response; always stick to the **highest available level** only.
 
-    - Handling Greetings:  
-    - If the user greets (e.g., "Hi", "Hello", "Good morning"), warmly acknowledge the greeting (e.g., "Hello! It’s great to connect with you.")  
-    - Transition directly to ask for the missing details without including disclaimers or unrelated guidance.
+    - Provide Examples for All Missing Details:  
+    - If asking for **Capacity**, provide numeric examples relevant to the context, such as "1000 or 5000."  
+    - If asking for **Capacity Unit**, provide clear examples like "liters or tonnes."  
+    - If asking for **Time Period**, offer examples like "per day, per month, or per annum."  
+    - Integrate these examples naturally into the question, making it clear but concise.  
 
-    - Handling Special Days:  
-    - If the user mentions a special occasion (e.g., birthday, anniversary), warmly acknowledge it (e.g., "Happy Birthday! Wishing you all the best.")  
-    - Transition smoothly to request the missing details without including disclaimers or unrelated guidance.
-
-    - Handling Negative Emotions:  
-    - If the user expresses frustration, anger, or sadness, respond empathetically (e.g., "I’m sorry to hear that. I’m here to help in any way I can.")  
-    - Transition smoothly to request the missing details while maintaining a supportive tone.
+    - Example of a Well-Formulated Question:  
+        - "To proceed further, could you please provide the capacity you're considering, such as 1000 or 5000 kilograms, the unit of measurement like kilograms or tonnes, and the time period such as per day, per month, or per annum for your dairy processing business?"  
 
     - Transitioning to Missing Information:  
     - Ensure the transition to the missing details request feels natural and engaging.  
     - Use clear and professional phrases like "To proceed further," "Additionally," or "To help you better" to connect the response seamlessly to the missing details request.
 
-    - First Three Attempts:  
+    - First Five Attempts:  
     - Focus solely on asking for the missing details concisely and clearly.  
-    - Do not acknowledge or repeat the provided information during the first Three attempts.  
+    - Do not acknowledge or repeat the provided information during the first five attempts.  
 
-    - After Three Attempts:  
+    - After Five Attempts:  
     - Briefly acknowledge the details already provided by the user but without robotic phrasing.  
     - Request the missing details concisely and clearly.
 
@@ -894,8 +894,8 @@ def generate_ai_message(state, history, missing_fields, attempt_count, llm):
     Output Requirements:  
     - The message must be concise, clear, and in a single paragraph.  
     - Do NOT include any explanations, reasoning, or assumptions about the missing details, user input, or context.  
-    - For the first Three attempts, focus only on requesting the missing details.  
-    - After Three attempts, briefly acknowledge the provided details, then request the missing details concisely.  
+    - For the first five attempts, focus only on requesting the missing details.  
+    - After five attempts, briefly acknowledge the provided details, then request the missing details concisely.  
     """
 
     # Format the provided details and missing details
@@ -943,8 +943,8 @@ def gather_industry_details(query, main_industries, llm,chatId):
     chat_history.append(HumanMessage(content=refined_query))
     save_chat(chat_history,f"chat_{chatId}")
     
-    keyword_dict = extract_keywords_from_query(refined_query, field_with_description["Query to build industry from Scratch"], module_names_list, llm, "Query to build industry from Scratch")
-    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    keyword_list = extract_important_words(refined_query, "Query to build industry from Scratch")
+    state["KEYWORDS"] = keyword_list
     save_state(state,f"QIND_state_{chatId}")
     
     with open("log.txt", "a") as file:

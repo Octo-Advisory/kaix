@@ -3,6 +3,9 @@ import pandas as pd
 from math import radians, sin, cos, sqrt, atan2
 import traceback
 import json
+import spacy
+from typing import List, Tuple
+nlp = spacy.load("en_core_web_lg")
 
 def fetch_query_results(query):
     """
@@ -124,9 +127,9 @@ def fetch_supply_data(given_industry_by_user, given_sub_sector_by_user, given_se
 
 def vendor_df(supply_id_str):
     vendor_fetching_query = f""" 
-    select VSC.parent, VSC.supply, VSC.maximum_supply_capacity, 
+    select VSC.parent, VSC.parent, VSC.supply, VSC.maximum_supply_capacity, 
         V.years_of_experience, V.no_of_location, V.no_of_past_clients, 
-        V.no_of_services, V.no_of_employees, V.latitude_longitude
+        V.no_of_services, V.no_of_employees, V.latitude_longitude, V.certifications, VSC.supply_description_by_vendor
     From `tabVendor` AS V
     Join `tabVendor Supply Capacity` as VSC
     ON V.name = VSC.parent
@@ -139,9 +142,9 @@ def vendor_df(supply_id_str):
     # Convert the query results to a pandas DataFrame
     if results:
         # Define the column names corresponding to the SELECT statement
-        vendor_df = pd.DataFrame(results, columns=['vendor_id', 'supply_id', 'vendor_supply_capacity', 
-                                            'years_of_experience', 'no_of_locations', 'no_of_past_clients', 
-                                            'no_of_servieces', 'no_of_employees', 'latitude_longitude'])
+        vendor_df = pd.DataFrame(results, columns=['vendor_id', 'vendor_name', 'supply_id', 'vendor_supply_capacity', 
+                                        'years_of_experience', 'no_of_locations', 'no_of_past_clients', 
+                                        'no_of_servieces', 'no_of_employees', 'latitude_longitude', 'Certifications', 'Description'])
     else:
         vendor_df = pd.DataFrame()
     return vendor_df
@@ -279,7 +282,7 @@ def calculate_adjustment_factor(series, threshold):
 
     return series.apply(adjustment_factor)
 
-def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_range, tolerable_range):
+def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_range, tolerable_range,keyword_given_by_user,vendor_keyword_df):
     try:
         supply_rules_df.fillna(0, inplace=True)
         vendor_df.fillna(0, inplace=True)
@@ -340,7 +343,7 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                         # Find the best vendor based on the logic provided
                         req_cap = minimum_supply_requirement
                         pref_r = prefered_range
-                        final_result_for_vendors_df = vendors_for_supply[["supply_id", "Final_Score_With_Features", "vendor_id", "vendor_supply_capacity", "Dist"]].sort_values(by =["Final_Score_With_Features"], ascending = False)
+                        final_result_for_vendors_df = vendors_for_supply[["supply_id", "Final_Score_With_Features", "vendor_id", "vendor_supply_capacity", 'years_of_experience', 'no_of_locations', 'no_of_past_clients', 'no_of_servieces', 'no_of_employees', 'latitude_longitude', "Dist"]].sort_values(by =["Final_Score_With_Features"], ascending = False)
                         all_vendors_df = pd.concat([all_vendors_df, final_result_for_vendors_df], axis=0)
                         best_ranked_row = vendors_for_supply.loc[
                             vendors_for_supply["Final_Score_With_Features"].idxmax()
@@ -418,18 +421,107 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
             file.write(f"\nbetter {better_df}")
             file.write(f"\nall {all_vendors_df}")
         # return final_df.to_json, better_df.to_json, all_vendors_df.to_json
-        final_json = final_df.to_json() if not final_df.empty else "{}"
-        better_json = better_df.to_json() if not better_df.empty else "{}"
-        all_vendors_json = all_vendors_df.to_json() if not all_vendors_df.empty else "{}"
-
-        combined_data = {
-            "final": final_json,
-            "better": better_json,
-            "all": all_vendors_json
-        }
-        return combined_data
+        if not keyword_given_by_user :
+            return {"Best Supplier": final_df.to_json(),
+                    "Better Supplier": better_df.to_json(),
+                    "Filtered All Supplier" : None,
+                    "Unfiltered All Supplier" : all_vendors_df.to_json()}
+        else:
+            keyword_result = filter_df_by_keywords(keyword_given_by_user, vendor_keyword_df)
+            filtered_keyword_df, unfiltered_keyword_df = keyword_result[0], keyword_result[1]
+            if len(filtered_keyword_df) != 0:
+                filtered_result_df = pd.merge(all_vendors_df, filtered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
+                unfiltered_result_df = pd.merge(all_vendors_df, unfiltered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["Final_Score_With_Features"], ascending=False)
+                return {
+                        "Best Supplier": final_df.to_json(),
+                        "Better Supplier": better_df.to_json(),
+                        "Filtered All Supplier": filtered_result_df.to_json(),
+                        "Unfiltered All Supplier":unfiltered_result_df.to_json()
+                        }
+            else:
+                unfiltered_result_df = pd.merge(all_vendors_df, unfiltered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
+                return {
+                        "Best Supplier": final_df.to_json(),
+                        "Better Supplier": better_df.to_json(),
+                        "Filtered All Supplier": None,
+                        "Unfiltered All Supplier":unfiltered_result_df.to_json()
+                        }
     except Exception as e:
         error_message = traceback.format_exc()
         with open("log.txt", "a") as file:
             file.write(f"\nerror_message from analtics {error_message}")
         return e
+    
+def filter_df_by_keywords(
+    extracted_keywords: List[str],
+    df: pd.DataFrame,
+    spacy_threshold: float = 0.65
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    1) Compute SpaCy similarity for EACH column separately.
+    2) Store the similarity scores as new columns (e.g., "spacy_score_<column_name>").
+    3) Compute an aggregated similarity score per row.
+    4) Sort both DataFrames by the aggregated score.
+    5) Return TWO DataFrames:
+       - `filtered_df`: Rows where at least one column has similarity >= spacy_threshold.
+       - `remaining_df`: Rows where no columns met the threshold.
+
+    Parameters:
+    -----------
+    extracted_keywords : List[str]
+        The list of keywords extracted from the user query (e.g., ["power", "incentive"]).
+
+    df : pd.DataFrame
+        The DataFrame containing textual columns to filter.
+        Non-string columns will be converted to string before similarity computation.
+
+    spacy_threshold : float
+        The minimum SpaCy similarity (0.0-1.0) to consider a row a match.
+
+    Returns:
+    --------
+    Tuple[pd.DataFrame, pd.DataFrame]:
+        - `filtered_df`: Rows where at least one column met the threshold, sorted by relevance.
+        - `remaining_df`: Rows where no columns met the threshold, sorted by relevance.
+    """
+
+    # 1) Concatenate the extracted keywords into a single user text string
+    user_text = " ".join(kw.strip() for kw in extracted_keywords if kw.strip()).lower()
+
+    # If no user_text is available, return empty DataFrames with the same structure
+    if not user_text:
+        return df.iloc[0:0], df.iloc[0:0]  # Return two empty DataFrames
+
+    # Convert user text to a SpaCy Doc object
+    user_doc = nlp(user_text)
+
+    # Copy the DataFrame to avoid modifying the original
+    df = df.copy()
+
+    # Store similarity scores for each column
+    similarity_columns = []
+    # 2) Compute SpaCy similarity for each column separately
+    for col in df.columns:
+        if col == "ID":
+            continue
+        col_name = f"spacy_score_{col}"  # Create column name for similarity score
+        similarity_columns.append(col_name)
+
+        # Convert column to string and lowercase (handle NaN safely)
+        df[col] = df[col].astype(str).str.lower()
+
+        # Compute similarity for each row in the column
+        df[col_name] = df[col].apply(lambda text: user_doc.similarity(nlp(text)) if text.strip() else 0)
+
+    # 3) Compute an aggregated similarity score per row
+    df["aggregated_score"] = (df[similarity_columns].max(axis=1) + df[similarity_columns].mean(axis=1)) / 2
+
+    # 4) Filter rows where at least ONE column has similarity >= threshold
+    mask = df[similarity_columns] >= spacy_threshold  # Check each column individually
+    row_match = mask.any(axis=1)  # If at least one column meets threshold, keep the row
+
+    # 5) Create the two DataFrames:
+    filtered_df = df.loc[row_match].sort_values(by="aggregated_score", ascending=False)  # Sort by relevance
+    remaining_df = df.loc[~row_match].sort_values(by="aggregated_score", ascending=False)  # Sort by relevance
+
+    return filtered_df[["ID", "aggregated_score"]], remaining_df[["ID", "aggregated_score"]]

@@ -3,12 +3,14 @@ import re
 import json 
 from typing import List, Dict, Tuple, Union
 # from dotenv import load_dotenv
+import spacy
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from rapidfuzz import fuzz, process
 import frappe
 from frontend_app.Management_Class.helpers.utility import update_llm_token  
 import configparser
+
 # from langchain_openai import ChatOpenAI
 config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 config = configparser.ConfigParser()
@@ -25,6 +27,9 @@ llm_deepseek = ChatGroq(groq_api_key=groq_api_key, model_name="deepseek-r1-disti
 # llm_openai_inf_4o = ChatOpenAI(model="gpt-4o", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_4 = ChatOpenAI(model="gpt-4", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_3_5 = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0.0, api_key=openai_key)
+
+# Load the SpaCy model for better entity recognition
+nlp = spacy.load("en_core_web_lg")
 
 # Define a function to refine the query using history
 def refine_query_with_history(history, latest_query, llm):
@@ -484,40 +489,43 @@ def extract_comparison_locations(user_input: str, available_areas: List[str], av
 module_names_list = ["Query to build industry from Scratch", "Query to search Vendors", "Query to search Incentives", "Query to Get Approvals", "Query to Get Employee Search", ]
 
 field_with_description = {
-      "Query to search Vendors": {
-            "Vendor Name": "The official name of the vendor or business providing the service or goods (e.g., Bhagwati Chemicals, Agriland Biotech Limited.).",
-            "Supply Description By Vendor": "A brief explanation of the products or services offered by the vendor (e.g., 'We provide high-quality steel rods for construction projects' or 'PCB Assembly|BOM Sourcing|Turnkey Manufacturing|Electronics Manufacturing').",
-            "List of Certifications": "Certifications held by the vendor that validate compliance with industry standards (e.g., ISO 9001, BIS Certification, GMP Certification, ASME Certification, AS9100 (for aerospace, FDA Approval (US)))."
-      },
-      "Query to search Incentives": {
-            "Incentive Name": "The official title of the financial or non-financial support program available (e.g., Startup India Seed Fund, MSME Credit Guarantee Scheme).",
-            "Incentive Type": "The category of the incentive based on the type of support it provides (e.g., Equity Support, Sustenance Allowance, Tax Exemption, Interest Subsidy, Capital Investment Subsidy, Incentive in Power Tariff and Electricity Duty).",
-            "Quantum of Assistance": "The amount or percentage of financial assistance or benefit provided (e.g., 'Seed support up to Rs. 30 Lakh' or 'Capital subsidy of 25% on plant and machinery cost', 'Exemption of electicity duty')."
-      },
-      "Query to Get Approvals": {
-            "Name of License / Approval": "The specific name of the required approval for business operations (e.g., Environmental Clearance, Fire NOC, Factory License).",
-            "Government Department": "The regulatory body or authority issuing the license (e.g., Pollution Control Board, Directorate of Industrial Safety and Health).",
-            "Land Type": "The classification of land where the approval applies (e.g., Agricultural Land, Non-Agricultural Land - Urban, Industrial Land).",
-            "Business Location": "The specific area or industrial zone where the business operates (e.g., GIDC, Non GIDC, DSIRDA, MBSIRDA, GPCP SIRDA).",
-            "Stage": "The phase during which approval is required (e.g., Pre-establishment, Pre-requisite, Pre-operation).",
-            "Mode of Application": "The method by which the approval is obtained (e.g., Online, Offline).",
-            "Vicinity Detail": "Additional details on surroundings that may impact approval (e.g., Forest, Archaeological site, Mineral bearing site (for a non-mining business)).",
-            "Cross Following Details": "Checks if the industry site crosses important utilities (Notified rivers/ nalas/ canals/ drains, Pipeline of Gujarat Gas, Pipeline of Sabarmati Gas, Pipeline of GSPL, Water bodies).",
-            "Tree Cutting": "Indicates whether tree cutting is required (eg: Tree Cutting).",
-            "Road Cutting": "Indicates whether road cutting is required (eg: Road Cutting).",
-            "Require Pole Shifting": "Specifies if shifting of electricity or communication poles is needed (eg: Pole Shifting)."
-      },
-      "Query to build industry from Scratch": {
-            "Property Type": "The type of land based on usage (Non-Agricultural Land, Agricultural Land, Industrial Land, Industrial Park Plot, GIDC Plot, Warehouse, Industrial Plant, Auction Property, Industrial Park).",
-            "Business Location Type": "The classification of the business location (GIDC, Non GIDC, DSIRDA, MBSIRDA, GPCP SIRDA).",
-            "Land Type": "The specific classification of land (Agricultural Land, Non-Agricultural Land (Rural), Non-Agricultural Land (Urban)).",
-            "Location": "The specific area, city, or state where the property is located (e.g., Gujarat, Surat, Waghodia).",
-            "Vicinity of": "Environmental or geographical features nearby (Forest, Archaeological site, Mineral bearing site).",
-            "Tree Cutting Involved": "Indicates whether tree cutting is required for the project (Tree cutting).",
-            "Road Cutting Involved": "Specifies if road cutting is required to establish infrastructure (Road Cutting).",
-            "Will your industry cross the following?": "Checks whether the industry site intersects with important geographical or utility structures (Pipeline of Gujarat Gas, Pipeline of Sabarmati Gas, Pipeline of GSPL, Water bodies, Notified rivers/ nalas/ canals/ drains)."
-      },
+    "Query to search Vendors": {
+        "Vendor Name": "The official name of the vendor or business providing the service or goods (e.g., Bhagwati Chemicals, Agriland Biotech Limited.).",
+        "Supply Description By Vendor": "A brief explanation of the products or services offered by the vendor (e.g., 'We provide high-quality steel rods for construction projects' or 'PCB Assembly|BOM Sourcing|Turnkey Manufacturing|Electronics Manufacturing').",
+        "List of Certifications": "Certifications held by the vendor that validate compliance with industry standards (e.g., ISO 9001, BIS Certification, GMP Certification, ASME Certification, AS9100 (for aerospace), FDA Approval (US))."
+    },
+    "Query to search Incentives": {
+        "Incentive Name": "The official title of the financial or non-financial support program available (e.g., Startup India Seed Fund, MSME Credit Guarantee Scheme, Water Infrastructure Development Program, Industrial Water Subsidy Program, Rehabilitation Support Program).",
+        
+        "Incentive Type": "The category of the incentive based on the type of support it provides. This includes financial and non-financial assistance that improves industrial or business growth. Examples include Equity Support, Sustenance Allowance, Tax Exemption, Interest Subsidy, Capital Investment Subsidy, Incentive in Power Tariff and Electricity Duty, Incentive in Water Duty, Subsidies for Water Infrastructure, Assistance in Water Conservation Initiatives, and Rehabilitation Assistance (for disaster recovery, employee support, or facility restoration).",
+        
+        "Quantum of Assistance": "The amount or percentage of financial assistance or benefit provided. This may include direct financial grants, subsidies, duty exemptions, or infrastructural support. Example statements include 'Seed support up to Rs. 30 Lakh', 'Capital subsidy of 25% on plant and machinery cost', 'Exemption of electricity duty', 'Subsidy of 15% on water infrastructure development', 'Exemption on water duty for industrial processes', or 'Financial assistance of 10 lakh for rehabilitation of industrial facilities post-natural disaster.'"
+    },
+    "Query to Get Approvals": {
+        "Name of License / Approval": "Clearly specify the exact name of the required license, approval, clearance, or permission for business operations. This includes specific approval types such as 'Environmental Clearance', 'Fire NOC', 'Factory License', or any regulatory certificate required for setting up or operating a business. Do not include generic terms like 'approval' or 'license' without context.",
+        "Government Department": "The official name of the specific government authority or department responsible for issuing licenses or approvals. This includes departments like 'Revenue Department', 'Pollution Control Board', 'Fire Department', 'Urban Development Authority', 'Municipal Corporation', or similar regulatory bodies. If the query mentions a department's name (e.g., 'Revenue', 'Fire', 'Environment'), it should always be extracted as a keyword. Do not exclude common department names even if they seem generic. For example, 'Revenue Department' must be included as 'revenue', 'department'.",
+        "Land Type": "The specific classification of land where business operations or approvals apply. This could be terms like 'Agricultural Land', 'Non-Agricultural Land - Urban', or 'Industrial Land'.",
+        "Business Location": "Details about the specific area or industrial zone related to the business, such as 'GIDC', 'Non GIDC', 'DSIRDA', 'MBSIRDA', 'GPCP SIRDA'. Do not include general city or state names.",
+        "Stage": "The specific phase during which the approval is required, like 'Pre-establishment', 'Pre-requisite', or 'Pre-operation'.",
+        "Mode of Application": "Specifies whether the approval process is 'Online' or 'Offline'. Extract only these specific terms.",
+        "Vicinity Detail": "Details about the proximity to critical or sensitive areas affecting the approval process. This includes terms like 'Forest', 'Archaeological site', or 'Mineral bearing site' relevant to the business operation.",
+        "Cross Following Details": "Indicates whether the business site crosses important utilities such as 'Notified rivers', 'nalas', 'canals', 'drains', or specific pipelines (e.g., 'Gujarat Gas', 'Sabarmati Gas', 'GSPL'). Also includes proximity to 'Water bodies'.",
+        "Tree Cutting": "Mentions whether tree cutting is required for the business setup or operations. Keywords include 'tree cutting'.",
+        "Road Cutting": "Indicates whether road cutting is necessary. Keywords include 'road cutting'.",
+        "Require Pole Shifting": "Specifies if shifting of electricity or communication poles is needed. Keywords include 'pole shifting'."
+    },
+    "Query to build industry from Scratch": {
+        "Property Type": "The type of land based on usage (Non-Agricultural Land, Agricultural Land, Industrial Land, Industrial Park Plot, GIDC Plot, Warehouse, Industrial Plant, Auction Property, Industrial Park).",
+        "Business Location Type": "The classification of the business location (GIDC, Non GIDC, DSIRDA, MBSIRDA, GPCP SIRDA).",
+        "Land Type": "The specific classification of land (Agricultural Land, Non-Agricultural Land (Rural), Non-Agricultural Land (Urban)).",
+        "Location": "The specific area, city, or state where the property is located (e.g., Gujarat, Surat, Waghodia).",
+        "Vicinity of": "Environmental or geographical features nearby (Forest, Archaeological site, Mineral bearing site).",
+        "Tree Cutting Involved": "Indicates whether tree cutting is required for the project (Tree cutting).",
+        "Road Cutting Involved": "Specifies if road cutting is required to establish infrastructure (Road Cutting).",
+        "Will your industry cross the following?": "Checks whether the industry site intersects with important geographical or utility structures (Pipeline of Gujarat Gas, Pipeline of Sabarmati Gas, Pipeline of GSPL, Water bodies, Notified rivers/ nalas/ canals/ drains)."
+    }
 }
+
 
 def extract_json_from_llm_response(raw_output: str, json_key: str) -> Dict[str, Union[List[str], None]]:
     """
@@ -601,11 +609,12 @@ def extract_keywords_from_query(
     fields: Dict[str, str],
     module_names: List[str],
     llm,
-    current_module: str
+    current_module: str,
+    existing_keywords: Union[List[str], None] = None
 ) -> Dict[str, Union[List[str], None]]:
     """
-    Extracts relevant single-word keywords from the user's query based on the provided field descriptions, 
-    excluding words that are part of predefined module names or restricted categories.
+    Extracts relevant single-word keywords from the user's query based on the provided field descriptions,
+    excluding words that are part of predefined module names or restricted categories. Also merges with existing keywords.
 
     Parameters:
     ----------
@@ -624,30 +633,23 @@ def extract_keywords_from_query(
     current_module : str
         The name of the current module which may influence the prompt structure.
 
+    existing_keywords : Union[List[str], None]
+        A list of already identified keywords to merge with the newly extracted ones.
+
     Returns:
     -------
     Dict[str, Union[List[str], None]]
-        A dictionary with the key "KEYWORDS" mapping to a list of extracted keywords. 
+        A dictionary with the key "KEYWORDS" mapping to a list of merged extracted keywords.
         If no valid keywords are found, returns {"KEYWORDS": None}.
     """
 
-    # 1) Build a text block enumerating each field with its meaning
-    field_lines = []
-    for idx, (fname, fdesc) in enumerate(fields.items(), start=1):
-        field_lines.append(f"{idx}) {fname}: {fdesc}")
+    # Build a text block enumerating each field with its meaning
+    field_lines = [f"{idx}) {fname}: {fdesc}" for idx, (fname, fdesc) in enumerate(fields.items(), start=1)]
     fields_explained = "\n".join(field_lines)
 
-    # 2) We must ensure each module name is split into single words
-    #    so we can exclude them individually (e.g., "Vendor Management" => "Vendor", "Management").
-    #    We'll store them in a set to remove duplicates and allow quick membership checks.
-    module_words = set()
-    for mod_name in module_names:
-        # split on whitespace
-        for token in mod_name.split():
-            module_words.add(token.strip().lower())
+    # Process module names into individual lowercase words for exclusion
+    module_words = set(token.strip().lower() for mod_name in module_names for token in mod_name.split())
 
-    # Turn the module_names into a user-facing string for the prompt
-    # (though we'll do final filtering in Python as well).
     modules_text = ", ".join(module_names)
 
     ####################################################################
@@ -721,6 +723,258 @@ def extract_keywords_from_query(
         "KEYWORDS": ["word1", "word2"]  # or null if none
         }}
         """.strip()
+        
+    elif current_module == "Query to search Vendors":
+        prompt_template_str = """
+        You are an expert at extracting single-word keywords from a user query.
+
+        1) FOCUS FIELDS (To Be Extracted as Keywords)
+        These are the fields that you must focus on while extracting keywords. If the user's query contains any word that logically matches the meaning of these fields, it must be extracted as a keyword.
+
+        {fields_explained}
+
+        2) RESTRICTED CATEGORIES (Never to Be Extracted)
+        Words from the following restricted categories must NEVER be extracted as keywords because they disrupt the flow.
+
+        - Capacity Units: Measurement units related to capacity, power, or weight.
+        Examples: "MW", "KW", "ton", "kg/day", "liters", "m³", "barrels", "cubic feet", "TPA"
+
+        - Time Periods: Words referring to time durations or periods.
+        Examples: "year", "month", "day", "hour", "weekly", "annually", "quarterly", "biweekly"
+
+        - Product Names: Specific products being manufactured or sold.
+        Examples: "car", "plastic", "steel", "cement", "textiles", "solar panels", "fertilizers"
+
+        - Industry or Specific Sub-Sectors: Names of industries or their sectors.
+        Examples: "automobile", "chemical", "food processing", "IT sector", "agriculture", "textile industry"
+
+        - Specific Supplies: Raw materials or machinery used for industrial production.
+        Examples: "raw material", "machinery", "tools", "equipment", "spare parts", "components"
+
+        - Vendor-Related Terms: Words related to vendors or suppliers.
+        Examples: "vendor", "vendors", "supplier", "suppliers"
+
+        - Locations: Specific areas, cities, states, or countries.
+        Examples: "Delhi", "Mumbai", "Surat", "Gujarat", "Andhra Pradesh", "USA", "industrial zone"
+
+        - Module Names: The following module names and their variations must be excluded from keywords:
+        {modules_text}
+
+        If any word in the query belongs to these categories, do not include them in the extracted keywords.
+
+        Important Extraction Rules
+
+        1. STRICT FOCUS ON FIELDS:
+        Extract any word from the user's query that matches the FOCUS FIELDS.
+        Even if the query is ambiguous, complex, incomplete, or vague, if a word relates to a field meaning, it must be extracted.
+
+        2. IGNORE SENTENCE STRUCTURE COMPLETELY:
+        Keywords must be extracted regardless of how the sentence is structured.
+        Even if the user uses vague, incomplete, or informal language, focus only on extracting words relevant to the fields.
+
+        Example 1: "I want to find ISO 9000 certified suppliers in Mumbai" → ["ISO", "9000"]
+        Example 2: "Search for certified equipment providers" → ["certified"]
+        Example 3: "Looking for reliable vendors in Gujarat for machinery" → null (Because "vendors", "Gujarat", and "machinery" are restricted)
+        Example 4: "Find suppliers for high-quality components" → null (Because "suppliers" and "components" are restricted)
+        Example 5: "List of companies with ISO certification" → ["ISO", "certification"]
+
+        3. Numbers Must Be Extracted If They Are Relevant:
+        If a number is part of a certification or standard (like "ISO 9001", "CE 22000"), it must be included as a keyword.
+        Example: "We need ISO 14001 certified vendors" → ["ISO", "14001"]
+        Example: "Looking for suppliers with CE 22000 certification" → ["CE", "22000"]
+
+        4. Correct Misspelled Words Before Extracting Them:
+        If a word is misspelled, return its corrected form.
+        Example: "certfied suppliers for equipment" → ["certified"]
+        Example: "want to find machnery providers" → null (Because "machinery" is restricted)
+
+        5. Never Extract Restricted or Module Terms:
+        Words from RESTRICTED CATEGORIES or Module Names must never be included in the keywords.
+
+        Output Format
+        - The response must be a JSON object in the exact format below.
+        - If no valid keywords are found, return {{ "KEYWORDS": null }} or {{ "KEYWORDS": None }}.
+        - No explanations, no extra text—only the JSON object.
+
+        User Query:
+        {user_query}
+
+        Final Output (JSON only):
+        {{
+        "KEYWORDS": ["word1", "word2"]  # or null if none
+        }}
+        """.strip()
+
+    elif current_module == "Query to search Incentives":
+        prompt_template_str = """
+        You are an expert at extracting single-word keywords from a user query.
+
+        1) FOCUS FIELDS (To Be Extracted as Keywords)
+        These are the fields that you must focus on while extracting keywords. If the user's query contains any word that logically matches the meaning of these fields, it must be extracted as a keyword.
+
+        {fields_explained}
+
+        2) RESTRICTED CATEGORIES (Never to Be Extracted)
+        Words from the following restricted categories must NEVER be extracted as keywords because they disrupt the flow.
+
+        - Capacity Units: Measurement units related to capacity, power, or weight.
+        Examples: "MW", "KW", "ton", "kg/day", "liters", "m³", "barrels", "cubic feet", "TPA"
+
+        - Time Periods: Words referring to time durations or periods.
+        Examples: "year", "month", "day", "hour", "weekly", "annually", "quarterly", "biweekly"
+
+        - Product Names: Specific products being manufactured or sold.
+        Examples: "car", "plastic", "steel", "cement", "textiles", "solar panels", "fertilizers"
+
+        - Industry or Specific Sub-Sectors: Names of industries or their sectors.
+        Examples: "automobile", "chemical", "food processing", "IT sector", "agriculture", "textile industry"
+
+        - Locations: Specific areas, cities, states, or countries.
+        Examples: "Delhi", "Mumbai", "Surat", "Gujarat", "Andhra Pradesh", "USA", "industrial zone"
+
+        - Module Names: The following module names and their variations must be excluded from keywords:
+        {modules_text}
+
+        3) Supreme Extraction Rule (Overrides All Other Restrictions)
+
+        - If a word is mentioned with context descriptors such as "regarding," "related to," "about," or "in context of," it must always be extracted, even if it falls under restricted categories.
+        - This ensures that key incentive-related terms are never missed, even if they belong to restricted categories.
+
+        Examples:
+        - "Incentives regarding rehabilitation scheme for factories" → ["rehabilitation"]
+        - "I need incentives related to water usage in industries" → ["water"]
+        - "I am searching for schemes about power conservation" → ["power", "conservation"]
+        - "Incentives regarding support for disaster recovery" → ["recovery"]
+        - "Looking for incentives regarding product development" → ["development"]
+
+        4) POWER, WATER, AND REHABILITATION-SPECIFIC RULES:
+        1. If "power," "water," or "rehabilitation" are mentioned in any incentive-related context, they must always be extracted.
+        2. If context is unclear, always extract these terms.
+        3. If they clearly relate to restricted industries, they should be excluded.
+
+        5) STRICT FOCUS ON FIELDS:
+        Extract any word from the user's query that matches the FOCUS FIELDS.
+        Even if the query is ambiguous, complex, incomplete, or vague, if a word relates to a field meaning, it must be extracted.
+
+        6) IGNORE SENTENCE STRUCTURE COMPLETELY:
+        Keywords must be extracted regardless of how the sentence is structured.
+
+        Examples:
+        - "I am looking for water-related incentives for milk processing." → ["water"]
+        - "Incentives regarding rehabilitation scheme for industries." → ["rehabilitation"]
+        - "Subsidies for water infrastructure." → ["water", "infrastructure"]
+        - "Rehabilitation support in disaster-affected areas." → ["rehabilitation"]
+        - "Development incentives for rural areas." → ["development"]
+        - "ISO 9001 certification subsidies." → ["ISO", "9001"]
+
+        7) NUMBERS MUST BE EXTRACTED IF THEY ARE RELEVANT:
+        If a number is part of a certification or standard, it must be included as a keyword.
+        - Example: "We need ISO 14001 certification for subsidy eligibility." → ["ISO", "14001"]  
+        - Example: "I want information about CE 22000." → ["CE", "22000"]
+
+        8) CORRECT MISSPELLED WORDS BEFORE EXTRACTING THEM:
+        Example: "rehabilitaton subsidy related info" → ["rehabilitation"]
+
+        9) NEVER EXTRACT RESTRICTED OR MODULE TERMS UNLESS THE SUPREME RULE APPLIES.
+
+        Output Format:
+        - The response must be a JSON object in the exact format below.
+        - If no valid keywords are found, return {{ "KEYWORDS": null }} or {{ "KEYWORDS": None }}.
+        - No explanations, no extra text—only the JSON object.
+
+        User Query:
+        {user_query}
+
+        Final Output (JSON only):
+        {{
+        "KEYWORDS": ["word1", "word2"]  # or null if none
+        }}
+        """.strip()
+
+
+
+
+    elif current_module == "Query to Get Approvals":
+        prompt_template_str = """
+        You are an expert at extracting single-word keywords from a user query.
+
+        1) FOCUS FIELDS (To Be Extracted as Keywords)
+        These are the fields that you must focus on while extracting keywords. If the user's query contains any word that logically matches the meaning of these fields, it must be extracted as a keyword.
+
+        {fields_explained}
+
+        - For the "Government Department" field, always extract any specific department name mentioned in the query.  
+        Examples include: "Revenue Department", "Pollution Control Board", "Fire Department", "Urban Development Authority", "Environment Ministry", etc.
+
+        2) RESTRICTED CATEGORIES (Never to Be Extracted)
+        Words from the following restricted categories must NEVER be extracted as keywords because they disrupt the flow.
+
+        - Capacity Units: Measurement units related to capacity, power, or weight.
+        Examples: "MW", "KW", "ton", "kg/day", "liters", "m³", "barrels", "cubic feet", "TPA"
+
+        - Time Periods: Words referring to time durations or periods.
+        Examples: "year", "month", "day", "hour", "weekly", "annually", "quarterly", "biweekly"
+
+        - Product Names: Specific products being manufactured or sold.
+        Examples: "car", "plastic", "steel", "cement", "textiles", "solar panels", "fertilizers"
+
+        - Industry or Specific Sub-Sectors: Names of industries or their sectors.
+        Examples: "automobile", "chemical", "food processing", "IT sector", "agriculture", "textile industry"
+
+        - Locations: Specific areas, cities, states, or countries.
+        Examples: "Delhi", "Mumbai", "Surat", "Gujarat", "Andhra Pradesh", "USA", "industrial zone"
+
+        - Approval-Related Terms: Generic approval-related words that must be excluded.
+        Examples: "approval", "approvals", "license", "licenses", "clearance", "permission"
+
+        - Module Names: The following module names and their variations must be excluded from keywords:
+        {modules_text}
+
+        If any word in the query belongs to these categories, do not include them in the extracted keywords.
+
+        3) Important Extraction Rules
+
+        - STRICT EXTRACTION OF FOCUS FIELDS:
+        Always extract any word from the user's query that logically matches the FOCUS FIELDS.  
+        If there is any doubt whether a word belongs to the focus fields or restricted categories, always extract it as a keyword.
+
+        - IGNORE SENTENCE STRUCTURE COMPLETELY:
+        Keywords must be extracted regardless of how the sentence is structured.  
+        Even if the user uses vague, incomplete, or informal language, focus only on extracting words relevant to the fields.
+
+        Example 1: "Need fire NOC in Gujarat for my factory" → ["fire", "NOC"]  
+        Example 2: "Apply for environmental clearance online" → ["environmental", "online"]  
+        Example 3: "Setup approval for plastic factory in Surat" → null (Because "approval", "plastic", and "Surat" are restricted)  
+        Example 4: "I want to find all the approvals required from the revenue department for cement in Vadodara." → ["revenue", "department"]  
+        Example 5: "List approvals needed from fire department" → ["fire", "department"]
+
+        - Numbers Must Be Extracted If They Are Relevant:
+        - If a number is part of a certification or standard (like "ISO 9001", "CE 22000"), it must be included as a keyword.
+        - Example: "ISO 14001 clearance" → ["ISO", "14001"]  
+        - Example: "CE 22000 application" → ["CE", "22000"]
+
+        - Correct Misspelled Words Before Extracting Them:
+        - If a word is misspelled, return its corrected form.
+        - Example: "envrnmntal clearance for fire safty" → ["environmental", "fire", "safety"]  
+        - Example: "lnsurance approval for factory" → ["insurance"]
+
+        - Never Extract Restricted or Module Terms:
+        - If a term clearly belongs to a restricted category, it must never be included.
+
+        4) Output Format:
+        - The response must be a JSON object in the exact format below.
+        - If no valid keywords are found, return {{ "KEYWORDS": null }} or {{ "KEYWORDS": None }}.
+        - No explanations, no extra text—only the JSON object.
+
+        User Query:
+        {user_query}
+
+        Final Output (JSON only):
+        {{
+        "KEYWORDS": ["word1", "word2"]  # or null if none
+        }}
+        """.strip()
+
 
     else:
         prompt_template_str = """
@@ -799,7 +1053,7 @@ def extract_keywords_from_query(
         """.strip()
 
 
-    # 4) Create the PromptTemplate and run the LLM
+    # Create the PromptTemplate and run the LLM
     prompt = PromptTemplate(
         input_variables=["fields_explained", "modules_text", "user_query"],
         template=prompt_template_str
@@ -812,39 +1066,129 @@ def extract_keywords_from_query(
     })
 
     raw_output = response.content.strip()
-    # print(raw_output)
-
     data = extract_json_from_llm_response(raw_output, "KEYWORDS")
     keywords = data.get("KEYWORDS", None)
-    ####################################################################
-    # 6) Final Cleanup in Python
-    #    - Remove empty or whitespace-only
-    #    - Convert to lowercase and compare with module_words
-    ####################################################################
+
+    # Cleanup newly extracted keywords
+    cleaned = []
     if isinstance(keywords, list):
-        cleaned = []
         for kw in keywords:
-            # Ensure single word
-            # (If the LLM accidentally gives us multi-word phrases, we could optionally split them here,
-            #  but ideally the LLM is already returning single words.)
-            # We do a simple split, in case the LLM gave something like "power incentive" in one item.
             for token in kw.split():
                 token_stripped = token.strip()
-                if token_stripped:
-                    # Exclude module words
-                    if token_stripped.lower() not in module_words:
-                        cleaned.append(token_stripped)
-        # Remove duplicates (if desired) by converting to an Ordered set, or just leave them
-        cleaned = list(dict.fromkeys(cleaned))  # preserves order, removes duplicates
+                if token_stripped and token_stripped.lower() not in module_words:
+                    cleaned.append(token_stripped)
 
-        if cleaned:
-            keywords = cleaned
-        else:
-            keywords = None
+    # Merge with existing keywords
+    final_keywords = []
+    seen = set()
+
+    # Add existing keywords first if they exist
+    if existing_keywords:
+        for kw in existing_keywords:
+            kw_lower = kw.lower()
+            if kw_lower not in seen:
+                seen.add(kw_lower)
+                final_keywords.append(kw)
+
+    # Add newly cleaned keywords, ensuring no duplicates
+    for kw in cleaned:
+        kw_lower = kw.lower()
+        if kw_lower not in seen:
+            seen.add(kw_lower)
+            final_keywords.append(kw)
+
+    # Determine final return value
+    return {"KEYWORDS": final_keywords if final_keywords else None}
+
+# General exclusion terms
+EXCLUSION_TERMS = [
+    "incentive", "subsidy", "approval", "supplier", "vendor",
+    "suppliers", "vendors", "approvals"
+]
+
+# Quantity, Units, and Time Periods (for Scratch module only)
+QUANTITY_TERMS = [
+    "quantity", "amount", "number", "total", "count", "volume", "mass", "capacity"
+]
+QUANTITY_UNITS = [
+    "kg", "kilogram", "ton", "litre", "liter", "meter", "m", "cm", "cubic",
+    "grams", "lbs", "pounds", "barrels", "tpa"
+]
+TIME_PERIOD_TERMS = [
+    "year", "month", "day", "hour", "weekly", "annually", "quarterly", "biweekly"
+]
+
+# Entity exclusions based on module
+MODULE_ENTITY_EXCLUSIONS = {
+    "Query to search Incentives": {"GPE", "LOC"},
+    "Query to Get Approvals": {"GPE", "LOC"},
+    "Query to search Vendors": {"GPE", "LOC"},
+    "Query to build industry from Scratch": {"QUANTITY", "CARDINAL", "ORDINAL", "DATE", "TIME", "PERCENT", "MONEY"}
+}
+
+# Convert exclusion terms to SpaCy Doc objects for similarity comparison
+def get_exclusion_docs(module: str):
+    """Get exclusion terms as SpaCy Doc objects based on the module."""
+    if module == "Query to build industry from Scratch":
+        terms = EXCLUSION_TERMS + QUANTITY_TERMS + QUANTITY_UNITS + TIME_PERIOD_TERMS
     else:
-        keywords = None
+        terms = EXCLUSION_TERMS
+    return [nlp(term) for term in terms]
 
-    return {"KEYWORDS": keywords}
+def is_similar_to_exclusion(word: str, exclusion_docs) -> bool:
+    """Check if the word is semantically similar to any exclusion term."""
+    word_doc = nlp(word)
+    return any(word_doc.similarity(ex_doc) > 0.7 for ex_doc in exclusion_docs)
+
+def get_entity_label(word: str, doc) -> str:
+    """Get the entity label for a given word from the SpaCy doc."""
+    for ent in doc.ents:
+        if word in ent.text.lower():
+            return ent.label_
+    return ""
+
+def extract_important_words(text: str, module: str = "") -> List[str]:
+    """Extract important words based on module-specific rules."""
+    
+    doc = nlp(text)
+    exclusion_docs = get_exclusion_docs(module)
+
+    # Step 1: Extract noun chunks and named entities
+    noun_chunks = {chunk.text.strip().lower() for chunk in doc.noun_chunks}
+    named_entities = {
+        ent.text.strip().lower() for ent in doc.ents
+        if ent.label_ not in MODULE_ENTITY_EXCLUSIONS.get(module, set())
+    }
+
+    # Step 2: Extract proper nouns and common nouns
+    important_pos = {token.text.strip().lower() for token in doc if token.pos_ in {"NOUN", "PROPN"}}
+
+    # Step 3: Combine terms and prioritize longer phrases
+    combined_terms = noun_chunks.union(named_entities)
+
+    final_terms = set()
+    for term in combined_terms:
+        if not any(term != existing and term in existing for existing in combined_terms):
+            final_terms.add(term)
+
+    # Include single important words if not already in longer terms
+    final_terms.update({
+        word for word in important_pos
+        if not any(word in phrase for phrase in final_terms)
+    })
+
+    # Step 4: Final Filtering
+    filtered_terms = [
+        word for word in final_terms
+        if not is_similar_to_exclusion(word, exclusion_docs)
+        and not nlp.vocab[word].is_stop
+        and get_entity_label(word, doc) not in MODULE_ENTITY_EXCLUSIONS.get(module, set())
+    ]
+
+    return list(set(filtered_terms))
+
+
+
 
 def extract_main_industry_and_product_universal(user_query: str, main_industries: List[str], llm) -> Dict[str, str]:
     """
@@ -1305,6 +1649,74 @@ def generate_dynamic_confirmation_message(static_confirmation: str, llm) -> str:
     chain = prompt_template | llm
     message = chain.invoke({
         "static_confirmation": static_confirmation
+    })
+
+    return message.content.strip()
+
+def generate_fallback_message(chat_history_for_context: List[dict], confirmation_message: str, llm) -> str:
+    """
+    Generate a dynamic fallback message using LLM when the user responds 'no' to a confirmation message.
+
+    Parameters:
+        chat_history_for_context (List[dict]): The list of conversation history with user and AI messages.
+        confirmation_message (str): The confirmation message the user responded 'no' to.
+        llm: The language model instance.
+
+    Returns:
+        str: The dynamically generated fallback message.
+    """
+
+    # Prepare the conversation history context
+    recent_history = "\n".join(chat_history_for_context)
+
+    # Define the prompt
+    prompt = """
+    You are a professional assistant specializing in creating formal, engaging, and contextually relevant fallback messages.
+    Your goal is to craft a polite and professional response when the user indicates that the confirmation message was incorrect.
+
+    ---
+
+    Key Instructions
+    1. The message should naturally convey that the provided details may not fully align with the user's needs. 
+       - Use phrasing like "It seems the provided details may not fully align with your needs" or a similar, contextually natural variation.
+       - Avoid copying the exact phrasing from the prompt unless it fits naturally in the response.
+    2. Politely ask the user to specify the correct or missing details without using direct apologies.
+    3. Avoid language that implies fault, such as 'I apologize.' Instead, use neutral and professional phrasing.
+    4. Do NOT assume or infer details that were not explicitly provided.
+    5. Ensure the tone is empathetic, professional, and user-friendly.
+    6. The response must be concise (no more than 3 lines) and encourage the user to provide the correct details.
+
+    ---
+
+    Inputs
+    1. Recent Conversation History:
+    - {recent_history}
+
+    2. Previous Confirmation Message:
+    - "{confirmation_message}"
+
+    ---
+
+    Final Response Guidelines:
+    - Begin with a sentence that naturally conveys that the provided details may not fully align with the user's needs.
+    - Use variations like "It seems..." or "It appears..." to keep the tone conversational and engaging.
+    - Politely ask the user to specify the correct or missing details.
+    - Maintain a professional, engaging, and empathetic tone.
+    - Do NOT infer or assume details not mentioned in the chat history or confirmation message.
+    - Keep the response concise (within 3 lines).
+    - Do NOT use phrases like 'I apologize.'
+
+    """
+
+    # Prepare input to the model
+    prompt_template = PromptTemplate(
+        input_variables=["recent_history", "confirmation_message"],
+        template=prompt
+    )
+    chain = prompt_template | llm
+    message = chain.invoke({
+        "recent_history": recent_history,
+        "confirmation_message": confirmation_message
     })
 
     return message.content.strip()

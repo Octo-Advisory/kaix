@@ -168,7 +168,7 @@ def get_property_approval_data(sub_sector_id=None, industry_id=None, area_id=Non
     pd.DataFrame or None: DataFrame containing property approval details if records exist, otherwise None.
     """
     query = f"""
-    SELECT a.name, a.license_approval,a.business_location_type as ABLT, a.land_type as ALT, a.vicinity_detail as AVD, a.cross_following_details as ACFD,a.road_cutting, a.delivery_schedule_in_working_days, a.mode_of_application, a.stage, a.is_dependent, a.depends_on, a.area, a.city, a.city_level, a.state, a.state_level, a.country_level, a.sub_sector, a.industry, a.pan_industries
+    SELECT a.name, a.license_approval, a.government_department, a.business_location_type as ABLT, a.land_type as ALT, a.vicinity_detail as AVD, a.cross_following_details as ACFD, a.road_cutting, a.tree_cutting, a.require_pole_shifting, a.delivery_schedule_in_working_days, a.mode_of_application, a.stage, a.is_dependent, a.depends_on, a.area, a.city, a.city_level, a.state, a.state_level, a.country_level, a.sub_sector, a.industry, a.pan_industries 
     FROM `tabLicenses and Approvals Type` a
     WHERE
     """
@@ -238,9 +238,7 @@ def get_property_approval_data(sub_sector_id=None, industry_id=None, area_id=Non
     
     # Convert the results into a DataFrame
     if results:
-        property_approval_mapped_df = pd.DataFrame(results, columns=['approval_id', 'approval_name','Approval_business_location', 'Approval_land_type', 'Approval_vicinity_detail', 'Approval_cross_following', 'Approval_Road_cutiing', 'time_taken', 'online_or_offline', 
-                                         'stages', 'is_dependent', 'dependent_approval_ids', 
-                                         'area_id', 'city_id', 'city_level', 'state', 'state_level', 'country_level', 'sub_sector', 'industry', 'pan_industries'])
+        property_approval_mapped_df = pd.DataFrame(results, columns=['approval_id', 'approval_name', 'Government Department','Business_location', 'Land_type', 'Vicinity_detail', 'Cross_following', 'Road Cutting', 'Tree Cutting', 'Pole Shifting', 'Time Taken', 'online_or_offline', 'stages', 'is_dependent', 'dependent_approval_ids', 'area_id', 'city_id', 'city_level', 'state', 'state_level', 'country_level', 'sub_sector', 'industry', 'pan_industries'])
         return property_approval_mapped_df
     else:
         return None

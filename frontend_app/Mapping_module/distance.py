@@ -11,8 +11,8 @@ from frontend_app.Management_Class.helpers.utility import checkApiThreshold
 
 #region Global Varialble Declaration
 profile = "mapbox/driving"
-#access_token="pk.eyJ1IjoidmlzaGFsY2hhdWhhbjUyNSIsImEiOiJjbHo1M2J5cmszdXF3MmtzaHFyaW9qazMxIn0.7vJesIZKhldn0HKYoAfgpw"  
-access_token = ""
+access_token="pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ"  
+
 #endregion
 
 #region Helper Functions
@@ -42,8 +42,8 @@ def createBatch(destinations):
 @frappe.whitelist()
 def calculateDistance(source,destination):
     profile = "mapbox/driving"
-    #access_token="pk.eyJ1IjoidmlzaGFsY2hhdWhhbjUyNSIsImEiOiJjbHo1M2J5cmszdXF3MmtzaHFyaW9qazMxIn0.7vJesIZKhldn0HKYoAfgpw"    
-    access_token = ""
+    access_token="pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ"    
+
     url = f"https://api.mapbox.com/directions-matrix/v1/{profile}/{source};{destination}?sources=0&access_token={access_token}&annotations=distance"
     
     response = requests.get(url)
@@ -210,8 +210,8 @@ def CalculatePropVenDistance(data):
 
 
         customDestinationArray = []
-        #access_token="pk.eyJ1IjoidmlzaGFsY2hhdWhhbjUyNSIsImEiOiJjbHo1M2J5cmszdXF3MmtzaHFyaW9qazMxIn0.7vJesIZKhldn0HKYoAfgpw"   
-        access_token = "" 
+        access_token="pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ"   
+        
         dest=""
         batches = createBatch(destinations)
         for sourceitem in source:

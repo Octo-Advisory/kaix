@@ -665,8 +665,8 @@ def handle_approval_query(
 
     result = classify_approval_query(refined_user_input, llm)
     user_intention = result["classification_category"]
-    keyword_dict = extract_keywords_from_query(refined_user_input, field_with_description["Query to Get Approvals"], module_names_list, llm, "Query to Get Approvals")
-    state["KEYWORDS"] = keyword_dict["KEYWORDS"]
+    keyword_list = extract_important_words(refined_user_input, "Query to Get Approvals")
+    state["KEYWORDS"] = keyword_list
     save_state(state,f"QAPP_state_{chatId}")
 
     if user_intention == "Approval Search for area, city, or state without industry":
@@ -717,7 +717,7 @@ def handle_approval_query(
                     (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
                     ''
                     )
-                    message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                    message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
                     dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                     chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
@@ -825,7 +825,7 @@ def handle_approval_query(
                             (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
                             ''
                             )
-                            message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                            message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
                             dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                             chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                             save_chat(chat_history,f"chat_{chatId}")
@@ -1033,7 +1033,7 @@ def handle_approval_query(
                 (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
                 ''
                 )
-                message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get("Location_info").get('Area')} under the city {state.get("Location_info").get("City")} in {state.get("Location_info").get("State")}. Is this information correct?"
+                message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
                 dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                 chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                 save_chat(chat_history,f"chat_{chatId}")
