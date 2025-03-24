@@ -7,7 +7,7 @@ import markerImage from '../../assets/markerImage.png'
 import Property from "../Property/Property";
 import Vendorcards from "../ResultScreens/Vendorcards";
 
-function MapComponent({ solutions }) {
+function MapComponent({ solutions, toggleModal }) {
   console.log("solutons from map", solutions);
   const validation_result = useSelector((state) => state.validate.validation_result)
   console.log("propertyCoord1", validation_result);
@@ -344,7 +344,7 @@ function MapComponent({ solutions }) {
       />
       {isModalOpen && solution && (
         <Modal key={solution.result_type} onClose={() => setIsModalOpen(false)}>
-          {solution.result_type === "Industry_Result" && <Property solution={solution} />}
+          {solution.result_type === "Industry_Result" && <Property solution={solution} toggleModal={toggleModal} />}
           {solution.result_type === "Vendor" && <Vendorcards supplier={solution} />}
         </Modal>
       )}

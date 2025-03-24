@@ -7,6 +7,7 @@ import Properties from '../Property/Properties';
 import MapComponent from '../MapComponent/MapComponent';
 import Backtochat from '../Backtochat/Backtochat';
 import Details from '../Details/Details';
+import Model from '../ResultScreens/Model';
 
 function Industryresult({ result }) {
   // function Industryresult() {
@@ -237,6 +238,18 @@ function Industryresult({ result }) {
     }
   }
 
+  // Move modal state here
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalData, setModalData] = useState([]);
+  const [modalTitle, setModalTitle] = useState('');
+
+  // Define toggleModal at the Industry level
+  const toggleModal = (data, title) => {
+      setModalData(data);
+      setModalTitle(title);
+      setIsModalOpen(!isModalOpen);
+  };
+
   return (
     <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
       <div className="w-[98%] h-[98%] mx-auto p-4 bg-white rounded-lg shadow-md">
@@ -282,14 +295,15 @@ function Industryresult({ result }) {
       ) : (
         <div className="mt-1 w-full h-full">
           {activeTab === "property" ? (
-            <Properties solutions={solutions} />
+            <Properties solutions={solutions} toggleModal={toggleModal}/>
           ) : (
-            <MapComponent solutions={solutions} />
+            <MapComponent solutions={solutions} toggleModal={toggleModal}/>
           )}
         </div>
       )}
       </div>
       <Details />
+      <Model isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={modalTitle} data={modalData} />
     </div>
   )
 }

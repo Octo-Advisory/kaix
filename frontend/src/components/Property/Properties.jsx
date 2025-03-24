@@ -2,11 +2,11 @@ import React, { useEffect, useState, useCallback } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { result } from "../ResultScreens/data";
 import "../ResultScreens/Industryresult.css";
-import Model from '../ResultScreens/Model';
+// import Model from '../ResultScreens/Model';
 
 import Property from "./Property";
 
-function Properties({ solutions }) {
+function Properties({ solutions ,toggleModal}) {
     console.log("solutions",solutions);
     
     const [resultLen, setResultLen] = useState(0);
@@ -24,16 +24,16 @@ function Properties({ solutions }) {
         if (emblaApi) emblaApi.scrollPrev();
     }, [emblaApi]);
 
-     const [isModalOpen, setIsModalOpen] = useState(false);
-        const [modalData, setModalData] = useState([]);
-        const [modalTitle, setModalTitle] = useState('');
+    //  const [isModalOpen, setIsModalOpen] = useState(false);
+    //     const [modalData, setModalData] = useState([]);
+    //     const [modalTitle, setModalTitle] = useState('');
     
-        //Toggle modal on click of button
-        const toggleModal = (data, title) => {
-            setModalData(data);
-            setModalTitle(title);
-            setIsModalOpen(!isModalOpen);
-        };
+    //     //Toggle modal on click of button
+    //     const toggleModal = (data, title) => {
+    //         setModalData(data);
+    //         setModalTitle(title);
+    //         setIsModalOpen(!isModalOpen);
+    //     };
 
     return (
         <div className="reuslt-container flex flex-col w-full h-[98%] relative">
@@ -65,7 +65,7 @@ function Properties({ solutions }) {
                     </div>
                 </div>
             </div>
-            <Model isOpen={isModalOpen} onClose={() => (setIsModalOpen(false))} title={modalTitle} data={modalData} />
+            {/* <Model isOpen={isModalOpen} onClose={() => (setIsModalOpen(false))} title={modalTitle} data={modalData} /> */}
         </div>
     );
 }
