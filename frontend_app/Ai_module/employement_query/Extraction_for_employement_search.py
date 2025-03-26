@@ -344,8 +344,6 @@ def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Un
     raw_output = response.content.strip()
 
     return extract_json_from_llm_response_employment(raw_output, "KEYWORDS")
-<<<<<<< HEAD
-=======
  
 def classify_employment_query(query, llm):
     """
@@ -445,7 +443,6 @@ def classify_employment_query(query, llm):
         }
     else:
         raise ValueError(f"Unexpected or invalid response from LLM: {response}")
->>>>>>> 9e45308 (Eighteenth commit 19/03/25 12:33 krunal)
 
 def generate_dynamic_message(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm,chatId) -> str:
     """

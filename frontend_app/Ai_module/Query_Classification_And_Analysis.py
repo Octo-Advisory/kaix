@@ -7,7 +7,6 @@ import spacy
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from rapidfuzz import fuzz, process
-import spacy
 import frappe
 from frontend_app.Management_Class.helpers.utility import update_llm_token  
 import configparser
@@ -17,7 +16,6 @@ config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_manage
 config = configparser.ConfigParser()
 config.read(config_file)
 groq_api_key = config['Key']['groq_key']
-nlp = spacy.load("en_core_web_lg")
 
 # Initialize LLM    
 llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.0)
@@ -188,7 +186,6 @@ def classify_query(user_query):
     update_llm_token(category)
 
     return category.content.strip()
-
 
 def extract_location_from_query(user_input: str, available_areas: List[str], available_cities: List[str], available_states: List[str], llm) -> Dict[str, Dict[str, str]]:
     """
@@ -492,7 +489,6 @@ def extract_comparison_locations(user_input: str, available_areas: List[str], av
 module_names_list = ["Query to build industry from Scratch", "Query to search Vendors", "Query to search Incentives", "Query to Get Approvals", "Query to Get Employee Search", ]
 
 field_with_description = {
-<<<<<<< HEAD
     "Query to search Vendors": {
         "Vendor Name": "The official name of the vendor or business providing the service or goods (e.g., Bhagwati Chemicals, Agriland Biotech Limited.).",
         "Supply Description By Vendor": "A brief explanation of the products or services offered by the vendor (e.g., 'We provide high-quality steel rods for construction projects' or 'PCB Assembly|BOM Sourcing|Turnkey Manufacturing|Electronics Manufacturing').",
@@ -528,8 +524,6 @@ field_with_description = {
         "Road Cutting Involved": "Specifies if road cutting is required to establish infrastructure (Road Cutting).",
         "Will your industry cross the following?": "Checks whether the industry site intersects with important geographical or utility structures (Pipeline of Gujarat Gas, Pipeline of Sabarmati Gas, Pipeline of GSPL, Water bodies, Notified rivers/ nalas/ canals/ drains)."
     }
-=======
->>>>>>> 9e45308 (Eighteenth commit 19/03/25 12:33 krunal)
 }
 
 
@@ -1109,11 +1103,7 @@ def extract_keywords_from_query(
 # General exclusion terms
 EXCLUSION_TERMS = [
     "incentive", "subsidy", "approval", "supplier", "vendor",
-<<<<<<< HEAD
     "suppliers", "vendors", "approvals"
-=======
-    "suppliers", "vendors", "approvals", "land", "property"
->>>>>>> 9e45308 (Eighteenth commit 19/03/25 12:33 krunal)
 ]
 
 # Quantity, Units, and Time Periods (for Scratch module only)
@@ -1128,30 +1118,6 @@ TIME_PERIOD_TERMS = [
     "year", "month", "day", "hour", "weekly", "annually", "quarterly", "biweekly"
 ]
 
-<<<<<<< HEAD
-=======
-EXCLUSION_TERMS_SCRATCH = ["production unit", "company", "industry", "factory"]
-
-# Extended removal terms list
-REMOVE_TERMS = [
-    "incentive", "incentives", "subsidy", "subsidies", "approval", "approvals",
-    "supplier", "suppliers", "vendor", "vendors", "land", "lands", "property",
-    "properties", "industry", "industries", "factory", "factories", "scheme",
-    "schemes", "policy", "policies", "department", "departments", "supply",
-    "supplies", "benefit", "benefits", "company", "companies", "production",
-    "productions", "unit", "units", "organization",
-    "organizations", "corporation", "corporations", "firm", "firms", "manufacturing",
-    "manufacturings", "manufacture", "manufactures", "process", "processes",
-    "operation", "operations", "development", "developments", "construction",
-    "constructions", "building", "buildings", "ministry", "ministries", "authority",
-    "authorities", "office", "offices", "license", "licenses", "permit", "permits",
-    "registration", "registrations", "investment", "investments", "funding",
-    "fundings", "grant", "grants", "entity", "entities", "sector", "sectors",
-    "initiative", "initiatives"
-]
-
-
->>>>>>> 9e45308 (Eighteenth commit 19/03/25 12:33 krunal)
 # Entity exclusions based on module
 MODULE_ENTITY_EXCLUSIONS = {
     "Query to search Incentives": {"GPE", "LOC"},
@@ -1160,7 +1126,6 @@ MODULE_ENTITY_EXCLUSIONS = {
     "Query to build industry from Scratch": {"QUANTITY", "CARDINAL", "ORDINAL", "DATE", "TIME", "PERCENT", "MONEY"}
 }
 
-<<<<<<< HEAD
 # Convert exclusion terms to SpaCy Doc objects for similarity comparison
 def get_exclusion_docs(module: str):
     """Get exclusion terms as SpaCy Doc objects based on the module."""
@@ -1224,66 +1189,6 @@ def extract_important_words(text: str, module: str = "") -> List[str]:
 
 
 
-=======
-def get_exclusion_docs(module: str):
-    if module == "Query to build industry from Scratch":
-        terms = EXCLUSION_TERMS + QUANTITY_TERMS + QUANTITY_UNITS + TIME_PERIOD_TERMS + EXCLUSION_TERMS_SCRATCH
-    else:
-        terms = EXCLUSION_TERMS
-    return [nlp(term) for term in terms]
-
-def is_similar_to_exclusion(word: str, exclusion_docs) -> bool:
-    word_doc = nlp(word)
-    return any(word_doc.similarity(ex_doc) > 0.7 for ex_doc in exclusion_docs)
-
-def get_entity_label(word: str, doc) -> str:
-    for ent in doc.ents:
-        if word in ent.text.lower():
-            return ent.label_
-    return ""
-
-def remove_terms_from_phrase(phrase: str) -> str:
-    words = phrase.split()
-    filtered_words = [word for word in words if word.lower() not in [term.lower() for term in REMOVE_TERMS]]
-    return ' '.join(filtered_words)
-
-def extract_important_words(text: str, module: str = "") -> List[str]:
-    doc = nlp(text)
-    exclusion_docs = get_exclusion_docs(module)
-
-    noun_chunks = {chunk.text.strip().lower() for chunk in doc.noun_chunks}
-    named_entities = {
-        ent.text.strip().lower() for ent in doc.ents
-        if ent.label_ not in MODULE_ENTITY_EXCLUSIONS.get(module, set())
-    }
-
-    important_pos = {token.text.strip().lower() for token in doc if token.pos_ in {"NOUN", "PROPN"}}
-
-    combined_terms = noun_chunks.union(named_entities)
-
-    final_terms = set()
-    for term in combined_terms:
-        if not any(term != existing and term in existing for existing in combined_terms):
-            final_terms.add(term)
-
-    final_terms.update({
-        word for word in important_pos
-        if not any(word in phrase for phrase in final_terms)
-    })
-
-    filtered_terms = [
-        word for word in final_terms
-        if not is_similar_to_exclusion(word, exclusion_docs)
-        and not nlp.vocab[word].is_stop
-        and get_entity_label(word, doc) not in MODULE_ENTITY_EXCLUSIONS.get(module, set())
-    ]
-
-    # Strictly remove terms within phrases
-    refined_terms = [remove_terms_from_phrase(term) for term in filtered_terms]
-    refined_terms = [term for term in refined_terms if term]  # Remove empty strings
-
-    return list(set(refined_terms))
->>>>>>> 9e45308 (Eighteenth commit 19/03/25 12:33 krunal)
 
 def extract_main_industry_and_product_universal(user_query: str, main_industries: List[str], llm) -> Dict[str, str]:
     """
