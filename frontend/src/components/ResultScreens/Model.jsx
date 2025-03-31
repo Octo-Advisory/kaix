@@ -50,7 +50,7 @@ function Model({ isOpen, onClose, title, data }) {
               <div className="text-gray-700 text-start">
                 {item.total_vendor
                   ? `${item.total_vendor} suppliers for ${item.supply} with the top choice ${item.nearest_venodor_distance} km away`
-                  : item.incentive_name || item.approval_name}
+                  : item.incentive_type || item.approval_name}
               </div>
             </div>
           ))}

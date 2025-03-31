@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -8,21 +8,8 @@ import { FaTimesCircle } from 'react-icons/fa';
 import { GoAlertFill } from "react-icons/go";
 import Model from '../ResultScreens/Model';
 
-function Property({ solution ,toggleModal}) {
+function Property({ solution, toggleModal }) {
     console.log("soluyoin from property is", solution);
-
-    // Add model states to handle modal
-    // const [isModalOpen, setIsModalOpen] = useState(false);
-    // const [modalData, setModalData] = useState([]);
-    // const [modalTitle, setModalTitle] = useState('');
-
-    // //Toggle modal on click of button
-    // const toggleModal = (data, title) => {
-    //     setModalData(data);
-    //     setModalTitle(title);
-    //     setIsModalOpen(!isModalOpen);
-    // };
-
 
     // Define default Leaflet icona
     const defaultIcon = L.icon({
@@ -38,20 +25,33 @@ function Property({ solution ,toggleModal}) {
         danger: <GoAlertFill size={20} color="red" />,
     }
 
+    // Create a ref for the map
+    const mapRef = useRef(null);
+
+    // Use effect to update the map view when solution changes
+    useEffect(() => {
+        if (mapRef.current && solution.latitude_longitude) {
+            mapRef.current.setView(solution.latitude_longitude, 13);
+        }
+    }, [solution]);
 
     return (
-        <div className="embla__slide rounded-md">
+        <div className="embla__slide rounded-b-lg">
             <div className="slide-content flex flex-col h-full overflow-y-auto">
                 <div className="addres w-full h-[6%] py-2 flex items-center text-start text-xl">{solution.address}</div>
                 <div className="first-row flex w-full h-[33%]">
                     <div className="location-image w-[25%] h-full">
                         <MapContainer
+                            key={solution.address}
                             center={solution.latitude_longitude || [0, 0]}
                             zoom={13}
                             style={{ height: '100%', width: '100%' }}
                             className='rounded-xl'
                             attributionControl={false}
                             zoomControl={false}
+                            whenCreated={(map) => {
+                                mapRef.current = map;
+                            }}
                         >
                             <TileLayer
                                 attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
@@ -115,26 +115,49 @@ function Property({ solution ,toggleModal}) {
                         </div>
                     </div>
                 </div>
-                <div className="third-row flex flex-col pt-5 text-lg">
-                    <div className="section-title text-start text-xl text-dodgerblue">Incentive & Approvals
+                <div className="third-row flex flex-col gap-1 text-lg">
+                    <div className="section-title text-start text-xl text-dodgerblue flex">
+                        <div className="section-title text-xl flex-1">Incentives</div>
+                        <div className="section-title text-xl flex-1">Approvals</div>
                     </div>
                     <div className="Content flex px-2 py-2 gap-2">
+                        {/* Left Side - Incentives */}
                         <div className="left flex flex-1 text-start flex-col gap-3 border-r border-black">
-                            {solution.incentives.slice(0, 5).map((item, index) => {
-                                return (<div key={index} className="items flex gap-3"><div className="icon flex items-center justify-center">{statusIcon.good}</div><div className="text">{item.incentive_name}</div></div>)
-                            })}
-                            {solution.incentives.length && <button className='text-xs' onClick={() => toggleModal(solution.incentives, 'Incentives')}>Show More...</button>}
+
+                            {solution.incentives.slice(0, 5).map((item, index) => (
+                                <div key={index} className="items flex gap-3">
+                                    <div className="icon flex items-center justify-center">{statusIcon.good}</div>
+                                    <div className="text">{item.incentive_type}</div>
+                                </div>
+                            ))}
+                            {solution.incentives.length > 5 && (
+                                <button className="text-xs" onClick={() => toggleModal(solution.incentives, 'Incentives')}>
+                                    Show More...
+                                </button>
+                            )}
                         </div>
+
+                        {/* Right Side - Approvals */}
                         <div className="right flex-1 text-start flex flex-col gap-3">
-                            {solution.approvals.slice(0, 5).map((item, index) => {
-                                return (<div key={index} className="items flex gap-3"><div className="icon flex items-center justify-center">{statusIcon.good}</div><div className="text">{item.approval_name}</div></div>)
-                            })}
-                            {solution.approvals.length > 5 && <button className='text-xs' onClick={() => toggleModal(solution.approvals, 'Approvals')}>Show More...</button>}
+
+                            {solution.approvals.slice(0, 5).map((item, index) => (
+                                <div key={index} className="items flex gap-3">
+                                    <div className="icon flex items-center justify-center">{statusIcon.good}</div>
+                                    <div className="text">{item.approval_name}</div>
+                                </div>
+                            ))}
+                            {solution.approvals.length > 5 && (
+                                <button className="text-xs" onClick={() => toggleModal(solution.approvals, 'Approvals')}>
+                                    Show More...
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
+
+
+
             </div>
-            {/* <Model isOpen={isModalOpen} onClose={() => (setIsModalOpen(false))} title={modalTitle} data={modalData} /> */}
         </div>
     )
 }

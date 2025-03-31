@@ -47,6 +47,7 @@ function Home() {
     {/* <MapComponent/> */}
       {/* <Vendorresult /> */}
       {/* <Incentiveresult /> */}
+      {/* <Industryresult /> */}
     </>
   );
 }

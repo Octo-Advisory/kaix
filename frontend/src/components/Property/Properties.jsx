@@ -1,71 +1,30 @@
-import React, { useEffect, useState, useCallback } from "react";
-import useEmblaCarousel from "embla-carousel-react";
-import { result } from "../ResultScreens/data";
-import "../ResultScreens/Industryresult.css";
-// import Model from '../ResultScreens/Model';
-
+import React, { useState } from "react";
 import Property from "./Property";
+import "../ResultScreens/Industryresult.css";
 
-function Properties({ solutions ,toggleModal}) {
-    console.log("solutions",solutions);
-    
-    const [resultLen, setResultLen] = useState(0);
-    const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, dragFree: true });
-
-    useEffect(() => {
-        setResultLen(solutions.length);
-    }, [solutions]);
-
-    const goToNext = useCallback(() => {
-        if (emblaApi) emblaApi.scrollNext();
-    }, [emblaApi]);
-
-    const goToPrev = useCallback(() => {
-        if (emblaApi) emblaApi.scrollPrev();
-    }, [emblaApi]);
-
-    //  const [isModalOpen, setIsModalOpen] = useState(false);
-    //     const [modalData, setModalData] = useState([]);
-    //     const [modalTitle, setModalTitle] = useState('');
-    
-    //     //Toggle modal on click of button
-    //     const toggleModal = (data, title) => {
-    //         setModalData(data);
-    //         setModalTitle(title);
-    //         setIsModalOpen(!isModalOpen);
-    //     };
+function Properties({ solutions, toggleModal }) {
+    const [activeTab, setActiveTab] = useState(0);
 
     return (
-        <div className="reuslt-container flex flex-col w-full h-[98%] relative">
-            {resultLen > 0 && (
-                <div className="absolute top-2 right-2 flex space-x-2 z-10">
-                    <button
-                        className="embla__btn embla__prev px-3 py-1 bg-gray-800 text-white rounded"
-                        onClick={goToPrev}
-                        disabled={!emblaApi}
-                    >
-                        Prev
-                    </button>
-                    <button
-                        className="embla__btn embla__next px-3 py-1 bg-gray-800 text-white rounded"
-                        onClick={goToNext}
-                        disabled={!emblaApi}
-                    >
-                        Next
-                    </button>
+        <div className="result-container flex flex-col w-full h-[94%] relative">
+            {solutions.length > 0 && (
+                <div className="tabs-container flex w-full rounded-t-lg gap-1">
+                    {solutions.map((_, index) => (
+                        <div
+                            key={index}
+                            className={`tab-item p-2 text-lg font-medium cursor-pointer border border-gray-300 rounded-t-md transition-all 
+                            ${activeTab === index ? "bg-[#d3d3d3] text-blue-600 border-none" : "bg-white text-black hover:bg-gray-200"}`}
+                            onClick={() => setActiveTab(index)}
+                        >
+                            Option {index + 1}
+                        </div>
+                    ))}
                 </div>
             )}
 
-            <div className="solutions p-1 h-[95%]">
-                <div className="embla h-full" ref={emblaRef}>
-                    <div className="embla__container border-black h-full flex">
-                        {solutions.map((solution, index) => (
-                            <Property solution={solution} key={index} toggleModal={toggleModal} />
-                        ))}
-                    </div>
-                </div>
+            <div className="solutions-content h-[95%] border border-gray-300 rounded-b-lg bg-gray-100">
+                {solutions.length > 0 && <Property solution={solutions[activeTab]} toggleModal={toggleModal} />}
             </div>
-            {/* <Model isOpen={isModalOpen} onClose={() => (setIsModalOpen(false))} title={modalTitle} data={modalData} /> */}
         </div>
     );
 }

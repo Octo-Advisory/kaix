@@ -8,11 +8,12 @@ import MapComponent from '../MapComponent/MapComponent';
 import Backtochat from '../Backtochat/Backtochat';
 import Details from '../Details/Details';
 import Model from '../ResultScreens/Model';
+import { result } from './data';
 
 function Industryresult({ result }) {
-  // function Industryresult() {
+//   function Industryresult() {
 
-  const [activeTab, setActiveTab] = useState("map");
+  const [activeTab, setActiveTab] = useState("property");
   const [isLoading, setIsLoading] = useState(true);
   // console.log("result in indeustry solution screen", result);
   const analytics_response = result["Analytics_response"]
