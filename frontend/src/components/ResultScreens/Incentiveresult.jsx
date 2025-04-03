@@ -5,10 +5,10 @@ import Backtochat from "../Backtochat/Backtochat";
 import DOMPurify from 'dompurify';
 import "../ResultScreens/incentives.css"
 
-// function Incentiveresult({ result }) {
-function Incentiveresult() {
-  // console.log("result in incentives", result);
-  // const Analytics_response = result["Analytics_response"];
+function Incentiveresult({ result }) {
+// function Incentiveresult() {
+  console.log("result in incentives", result);
+  const Analytics_response = result["Analytics_response"];
   const [selectedIncentive, setSelectedIncentive] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
