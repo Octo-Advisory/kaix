@@ -361,6 +361,15 @@ def get_dependent_approval_time(testing_df1, dep_approval, approval_hierarchy, c
         return lst_dep_appr
     
 def get_efficient_time_for_land(all_approval_included_df):
+    """
+    Calculates the total approval time required for a given land, considering dependencies among approval stages.
+    
+    Parameters:
+        all_approval_included_df (DataFrame): The input DataFrame containing approval details.
+    
+    Returns:
+        tuple: A dictionary of efficient times for each stage, total approval time, and online approval percentage.
+    """
     testing_df1 = all_approval_included_df
     testing_df1 = testing_df1.rename(columns= name_change_mapping_for_approval)
     # Convert "Time Taken" to numeric, coercing errors to NaN (in case of invalid strings)
@@ -490,9 +499,27 @@ def get_efficient_time_for_land(all_approval_included_df):
             "Approval Data":result_df.to_json()}
 
 def calculate_efficiency(df, area_id=None, city_id=None, state_id=None, keyword_given_by_user = None, approval_keyword_df =None):
-        
+    """
+    Calculates the effective time required for approvals based on location hierarchy (Area, City, State, Country)
+    and filters approvals using user-provided keywords if applicable.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing approval details.
+        area_id (str, optional): Area identifier for filtering approvals.
+        city_id (str, optional): City identifier for filtering approvals.
+        state_id (str, optional): State identifier for filtering approvals.
+        keyword_given_by_user (str, optional): Keywords provided by the user to filter approvals.
+        approval_keyword_df (pd.DataFrame, optional): DataFrame containing keyword-based scores for approvals.
+
+    Returns:
+        dict: A dictionary containing the total effective time, online approval percentage,
+              and JSON-serialized approval data.
+    """
+
+    # Compute the total approval time and online approval percentage    
     _, efficient_time, online_percentage_given = get_efficient_time_for_land(df)
-    results = []
+
+    results = [] # Stores filtered approval data
     if area_id:
         # Area-level approvals
         area_df = df[df['area_id'] == area_id]

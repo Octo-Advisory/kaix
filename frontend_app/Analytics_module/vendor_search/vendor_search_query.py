@@ -40,6 +40,19 @@ def normalize_series(series, highest_is_worst=True):
         return 1 + (((series - min_val) / (max_val - min_val)) * 9)
 
 def fetch_supply_data(given_industry_by_user, given_sub_sector_by_user, given_segment_by_user,given_supplies_by_user):
+    """
+    Fetches supply data based on the provided industry, sub-sector, and segment.
+    If no industry, sub-sector, or segment is given, it returns the supply_id provided by the user.
+    
+    Parameters:
+    given_industry_by_user (str): Industry name provided by the user.
+    given_sub_sector_by_user (str): Sub-sector name provided by the user.
+    given_segment_by_user (str): Segment name provided by the user.
+    given_supplies_by_user (any): Supply data provided by the user.
+    
+    Returns:
+    list or None: List of supplies if found, None if no results are available.
+    """
 
     if given_industry_by_user is None and given_sub_sector_by_user is None and given_segment_by_user is None:
         # print("No industry, sub-sector, or segment provided. Returning supply_id_str.")
@@ -126,6 +139,16 @@ def fetch_supply_data(given_industry_by_user, given_sub_sector_by_user, given_se
             return None
 
 def vendor_df(supply_id_str):
+    """
+    Fetch vendor details from the database based on the given supply ID(s).
+
+    Args:
+        supply_id_str (str): A comma-separated string of supply IDs.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing vendor details or an empty DataFrame if no results are found.
+    """
+    
     vendor_fetching_query = f""" 
     select VSC.parent, VSC.parent, VSC.supply, VSC.maximum_supply_capacity, 
         V.years_of_experience, V.no_of_location, V.no_of_past_clients, 
@@ -151,6 +174,17 @@ def vendor_df(supply_id_str):
 
 # Function to transform data
 def transform_data_for_map_call(vendor_latlong_df, property_latlong_df):
+    """
+    Transforms vendor and property location data into a structured dictionary format.
+    
+    Args:
+        vendor_latlong_df (pd.DataFrame): DataFrame containing vendor details with 'vendor_id' and 'latitude_longitude'.
+        property_latlong_df (pd.DataFrame): DataFrame containing property details with 'property_id' and 'latitude_longitude'.
+    
+    Returns:
+        dict: A dictionary containing vendor and property location data formatted for mapping.
+    """
+
     input_data = {
         "Vendor": [
             {"id": row["vendor_id"], "latlong": row["latitude_longitude"]}
@@ -194,6 +228,17 @@ def calculate_distance(loc1: str, loc2: str) -> float:
     return distance
 
 def is_valid_latlong(latlong: str) -> bool:
+    """
+    Validates whether a given latitude-longitude string is correctly formatted 
+    and falls within acceptable geographic ranges.
+
+    Args:
+        latlong (str): A string containing latitude and longitude separated by a comma.
+
+    Returns:
+        bool: True if the latitude and longitude are valid, False otherwise.
+    """
+
     try:
         # Split the input string into lat and lon
         lat, lon = map(float, latlong.split(","))
@@ -207,6 +252,19 @@ def is_valid_latlong(latlong: str) -> bool:
         return False  # In case conversion to float fails
 
 def calculate_distance(loc1: str, loc2: str) -> float:
+    """
+    Calculates the great-circle distance in kilometers between two latitude-longitude points
+    using the Haversine formula.
+    
+    Parameters:
+    loc1 (str): Latitude and longitude of the first location in "lat,lon" format.
+    loc2 (str): Latitude and longitude of the second location in "lat,lon" format.
+    
+    Returns:
+    float: The distance between the two locations in kilometers.
+           Returns 0.0 if the input coordinates are invalid.
+    """
+
     # Check if both loc1 and loc2 are valid lat/lon strings
     if not (is_valid_latlong(loc1) and is_valid_latlong(loc2)):
         return 0.0  # Return 0 if any of the coordinates are invalid
@@ -268,6 +326,20 @@ def calculate_vendor_property_distances(input_data: dict) -> dict:
 
 
 def calculate_adjustment_factor(series, threshold):
+    """
+    Calculates an adjustment factor for each value in the given series based on a specified threshold.
+
+    The adjustment factor is computed using a base value and a range, with normalization applied 
+    to values above the threshold.
+
+    Args:
+        series (pd.Series): A Pandas Series containing numerical values.
+        threshold (float): The minimum value required for a nonzero adjustment factor.
+
+    Returns:
+        pd.Series: A series with computed adjustment factors.
+    """
+
     base_value = 0.00001
     range_value = 0.00002 - 0.00001
     filtered_series = series[series >= threshold]
@@ -275,6 +347,14 @@ def calculate_adjustment_factor(series, threshold):
     max_val = filtered_series.max()
 
     def adjustment_factor(value):
+        """
+        Computes the adjustment factor for a single value.
+        
+        - Returns 0 if the value is below the threshold.
+        - Normalizes values within the range of min_val to max_val.
+        - Applies scaling to compute the final adjustment factor.
+        """
+
         if threshold - value > 0:
             return 0
         normalized = (value - min_val) / (max_val - min_val) if max_val != min_val else 0
@@ -283,6 +363,33 @@ def calculate_adjustment_factor(series, threshold):
     return series.apply(adjustment_factor)
 
 def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_range, tolerable_range,keyword_given_by_user,vendor_keyword_df):
+    """
+    Computes supply scores for vendors based on supply capacity, distance, and other factors.
+
+    This function ranks vendors for each property and supply combination based on various parameters 
+    like supply capacity, distance, and additional experience-based features. It returns the best 
+    suppliers, better alternatives, and optionally filters vendors based on keyword relevance.
+
+    Args:
+        property_latlong_df (pd.DataFrame): DataFrame containing property IDs and their latitude-longitude.
+        supply_rules_df (pd.DataFrame): DataFrame containing supply rules, including supply ID and requirements.
+        vendor_df (pd.DataFrame): DataFrame containing vendor details such as ID, supply capacity, and experience.
+        prefered_range (tuple): Preferred range of distance for vendor selection.
+        tolerable_range (tuple): Tolerable range of distance for vendor selection.
+        keyword_given_by_user (str or None): Keyword provided by the user for vendor filtering. If None, filtering is skipped.
+        vendor_keyword_df (pd.DataFrame): DataFrame containing vendor IDs and associated keywords.
+
+    Returns:
+        dict: A dictionary containing:
+            - "Best Supplier" (JSON): Best-ranked vendors for each supply-property combination.
+            - "Better Supplier" (JSON): Alternative vendors if the best-ranked vendor does not meet requirements.
+            - "Filtered All Supplier" (JSON or None): Vendors filtered based on keyword relevance, if applicable.
+            - "Unfiltered All Supplier" (JSON): All vendors before applying keyword-based filtering.
+
+    Raises:
+        Exception: If an error occurs during processing, the error is logged to a file and returned.
+    """
+    
     try:
         supply_rules_df.fillna(0, inplace=True)
         vendor_df.fillna(0, inplace=True)

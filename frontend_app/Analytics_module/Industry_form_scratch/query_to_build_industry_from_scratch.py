@@ -3,6 +3,7 @@ from datetime import datetime
 import pandas as pd
 import json
 import sys
+from math import radians, sin, cos, sqrt, atan2
 from numpy import average
 import numpy as np
 import traceback
@@ -24,23 +25,6 @@ def fetch_query_results(query):
     except:
         return None
     
-def normalize_series(series, highest_is_worst=True):
-    """
-    Normalizes a Pandas Series to a range of 1 to 10 using Min-Max scaling.
-    Handles edge cases where all values in the series are identical.
-    """
-    min_val = series.min()
-    max_val = series.max()
-
-    # Handle cases where all values are identical
-    if min_val == max_val:
-        return pd.Series([5] * len(series), index=series.index)  # Assign a neutral score (midpoint of 1-10)
-
-    # Perform Min-Max scaling
-    if highest_is_worst:
-        return 1 + ((1 - ((series - min_val) / (max_val - min_val))) * 9)
-    else:
-        return 1 + (((series - min_val) / (max_val - min_val)) * 9)
     
 def normalize_series(series, highest_is_worst=True):
     """
@@ -408,6 +392,27 @@ def get_state_list(city_id_list):
 #         return None,None
 
 def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_land_for_user, required_UpperMargin_land_for_user, found_property, found_employment):
+    """
+    Fetch property and employment details based on a given zone and area list.
+
+    This function queries the database to retrieve properties and their corresponding employment details.
+    If no results are found, a fallback query is executed to fetch connected properties.
+
+    Args:
+        zone_id (str): The ID of the zone for filtering properties.
+        area_id_list (list of str): List of area IDs to filter properties.
+        required_LowerMargin_land_for_user (float): Lower bound for land size requirement (unused in function).
+        required_UpperMargin_land_for_user (float): Upper bound for land size requirement (unused in function).
+        found_property (bool): Flag indicating whether property data was previously found (unused in function).
+        found_employment (bool): Flag indicating whether employment data was previously found (unused in function).
+
+    Returns:
+        tuple: 
+            - pd.DataFrame: DataFrame containing property and employment details (if found).
+            - np.ndarray: Array of unique property IDs (if found).
+            - (None, None): If no results are found in both queries.
+    """
+
     # convert list to string to use in query
     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
 
@@ -453,6 +458,28 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
             return None, None
     
 def get_property_incentive_mapped(industry_id,sub_sector_id,area_id_list,city_id_list,state_id_list,property_id_list,found_incentive):
+    """
+    Retrieve incentives mapped to properties based on industry and location filters.
+
+    This function constructs and executes an SQL query to fetch incentives applicable to 
+    properties based on industry type, sub-sector, and location (area, city, state, country-level). 
+    The function ensures that only active incentives (within the operation date range) are considered.
+
+    Args:
+        industry_id (str): The ID of the industry for which incentives are to be fetched.
+        sub_sector_id (str): The ID of the sub-sector under which the industry falls.
+        area_id_list (list of str): List of area IDs to filter incentives at the area level.
+        city_id_list (list of str): List of city IDs to filter incentives at the city level.
+        state_id_list (list of str): List of state IDs to filter incentives at the state level.
+        property_id_list (list of str): List of property IDs for which incentives need to be mapped.
+        found_incentive (bool): A flag to track whether any incentives were found.
+
+    Returns:
+        tuple: 
+            - Pandas DataFrame containing incentive details if found, else None.
+            - Boolean flag `found_incentive` indicating whether incentives were retrieved.
+    """
+    
     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
     city_id_str = ', '.join(f"'{area_id}'" for area_id in city_id_list)
     state_id_str = ', '.join(f"'{state_id}'" for state_id in state_id_list)
@@ -498,6 +525,24 @@ WHERE
         return None,found_incentive
 
 def transform_dataframes(df):
+    """
+    Transforms the input DataFrame into two separate DataFrames:
+    
+    1. The first DataFrame (`df1`) groups data by 'property_id' and extracts the first occurrence of
+       selected columns related to land size and distances.
+    
+    2. The second DataFrame (`df2`) pivots the table so that 'employmenttype_id' values become 
+       columns, with 'availability' as the corresponding values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame containing property and employment data.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: Two transformed DataFrames:
+            - `df1`: Contains unique 'property_id' with land size and distance-related information.
+            - `df2`: Contains 'property_id' with employment types as columns and their availability values.
+    """
+
     # First DataFrame: Select unique property_id with distances
     df1 = df.groupby("property_id")[
         ["land_size", "distance_from_nearest_railway_station", "distance_from_nearest_seaport", "distance_from_power_source","distance_from_nearest_airport","road_connectivity"]
@@ -511,6 +556,24 @@ def transform_dataframes(df):
     return df1, df2
 
 def calculate_land_size_score(size, lower_limit, upper_limit, k1=0.028125):
+    """
+    Calculate a land size score based on how well the given size meets or exceeds the required lower limit.
+
+    The score follows an exponential decay function when the size is below the lower limit.
+    - If `size` >= `lower_limit`, the function returns the maximum score (10).
+    - If `size` < `lower_limit`, the score is computed as:
+      score = 10 * exp(-k1 * (lower_limit - size)), with a minimum score of 1.
+
+    Args:
+        size (float): The actual land size.
+        lower_limit (float): The minimum required land size.
+        upper_limit (float): (Unused in the function) Can be reserved for future modifications.
+        k1 (float, optional): The exponential decay constant (default is 0.028125).
+
+    Returns:
+        float: A score between 1 and 10, indicating how well the land size meets the lower limit.
+    """
+
     if size >= lower_limit:
         return 10
     else:
@@ -625,6 +688,29 @@ def calculate_employment_availability_score(df, sub_sector_id):
     return df
 
 def calculate_incentive_weighted_score(scores):
+    """
+    Compute a final incentive score using a weighted ranking approach.
+
+    The function follows these steps:
+    1. Ranks the scores in descending order.
+    2. Assigns weights using an exponential decay formula (1 / 2^(i-1)).
+    3. Computes weighted scores by multiplying each ranked score with its respective weight.
+    4. Computes the final weighted score and the average score.
+    5. Combines both scores using a weighted combination (70% weighted score, 30% average score).
+    
+    Args:
+        scores (list): A list of numerical scores.
+
+    Returns:
+        dict: A dictionary containing:
+            - "Ranked Scores": List of scores sorted in descending order.
+            - "Weights": Corresponding weights for each score.
+            - "Weighted Scores": The weighted scores after applying weights.
+            - "Final Weighted Score": The sum of weighted scores.
+            - "Average Score": The mean of all scores.
+            - "Final_Score": The final effective score after applying weighted combination.
+    """
+
     # Rank the scores in descending order
     ranked_scores = sorted(scores, reverse=True)
     # Define the weights using 1 / 2^(i-1)
@@ -648,6 +734,23 @@ def calculate_incentive_weighted_score(scores):
 
 # Define the function to calculate the final incentive scores for each property from the DataFrame
 def calculate_property_wise_incentive_scores(df):
+    """
+    Calculate weighted incentive scores for each property based on its associated incentives.
+
+    This function performs the following steps:
+    1. Converts the 'incentive_rank' column to numeric format.
+    2. Groups incentives by property and collects ranks in a list.
+    3. Computes weighted scores using `calculate_incentive_weighted_score()`.
+    4. Sorts properties by final computed score.
+    5. Normalizes final scores on a scale of 1 to 10.
+
+    Args:
+        df (pd.DataFrame): A DataFrame containing 'property_id' and 'incentive_rank' columns.
+
+    Returns:
+        pd.DataFrame: A DataFrame with computed weighted scores, sorted by final score.
+    """
+
     # Convert the 'incentive_rank' to numeric (in case it's stored as strings like '1', '2', etc.)
     df["incentive_rank"] = pd.to_numeric(df["incentive_rank"], errors='coerce')
     df.fillna(0, inplace=True)
@@ -689,6 +792,25 @@ def calculate_property_wise_incentive_scores(df):
     return final_results_sorted
 
 def get_property_wise_incentive_score(property_incentive_mapped_df,property_employment_df,found_incentive):
+    """
+    Compute property-wise incentive scores based on the availability of incentive data.
+
+    If incentives are found (`found_incentive=True`), this function calculates incentive scores
+    using `calculate_property_wise_incentive_scores()`. Otherwise, it assigns a default neutral score.
+
+    Args:
+        property_incentive_mapped_df (pd.DataFrame): 
+            DataFrame containing mapped incentives for properties.
+        property_employment_df (pd.DataFrame): 
+            DataFrame containing employment-related data for properties.
+        found_incentive (bool): 
+            Flag indicating whether incentives were found.
+
+    Returns:
+        pd.DataFrame: 
+            A DataFrame containing `"Property ID"` and `"Scaled Final Score"` for each property.
+    """
+
     if found_incentive:
         df_with_property_wise_incentive_score = calculate_property_wise_incentive_scores(property_incentive_mapped_df)
 
@@ -701,6 +823,28 @@ def get_property_wise_incentive_score(property_incentive_mapped_df,property_empl
         return df_with_property_wise_incentive_score
     
 def get_property_approval_mapped(industry_id,sub_sector_id,area_id_list,city_id_list,state_id_list,property_id_list,found_approval):
+    """
+    Retrieves property-wise mapped approvals based on industry, sub-sector, and location-based filtering.
+
+    This function constructs a SQL query to fetch relevant approval data from the `tabLicenses and Approvals Type` table 
+    and maps it to properties listed in the `tabSurvey No` table. The filtering criteria ensure that the approvals match 
+    specific location (area, city, state, country) and industry-based conditions.
+
+    Args:
+        industry_id (str): Industry ID for filtering approvals.
+        sub_sector_id (str): Sub-sector ID for filtering approvals.
+        area_id_list (list): List of area IDs to filter approvals.
+        city_id_list (list): List of city IDs to filter approvals.
+        state_id_list (list): List of state IDs to filter approvals.
+        property_id_list (list): List of property IDs to map approvals.
+        found_approval (bool): Flag to track if any approval is found.
+
+    Returns:
+        tuple: 
+            - Pandas DataFrame containing mapped approvals if found, otherwise None.
+            - Updated `found_approval` flag (True if approvals found, else False).
+    """
+
     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
     city_id_str = ', '.join(f"'{area_id}'" for area_id in city_id_list)
     state_id_str = ', '.join(f"'{state_id}'" for state_id in state_id_list)
@@ -757,6 +901,22 @@ WHERE
     
 
 def get_dependent_approval_time(testing_df1, dep_approval, approval_hierarchy, current_approval_main_stage, current_approval_id, effecient_time = None, infinity_loop_lst=None):
+    """
+    Recursively calculates the total time required for an approval, including its dependent approvals.
+
+    Parameters:
+    - testing_df1 (DataFrame): The dataset containing approval information.
+    - dep_approval (str): The ID of the dependent approval being processed.
+    - approval_hierarchy (list): A list defining the order of approval stages.
+    - current_approval_main_stage (str): The stage of the current approval.
+    - current_approval_id (str): The ID of the approval for which the time is being calculated.
+    - effecient_time (dict, optional): A dictionary storing calculated times for previous stages.
+    - infinity_loop_lst (list, optional): A list tracking approvals to prevent infinite loops.
+
+    Returns:
+    - list: A list containing the total time taken for the dependent approval.
+    """
+
     if not infinity_loop_lst:
         infinity_loop_lst = []
         current_approval_id_independent = current_approval_id
@@ -824,6 +984,22 @@ def get_dependent_approval_time(testing_df1, dep_approval, approval_hierarchy, c
         return lst_dep_appr
 
 def get_efficient_time_for_land(all_approval_included_df):
+    """
+    Computes the efficient approval time for land-related processes based on different approval stages
+    and dependencies. Returns a dictionary of approval times per stage, the total approval time, and 
+    the percentage of online approvals.
+
+    Args:
+        all_approval_included_df (pd.DataFrame): DataFrame containing all approvals with details like
+        approval ID, stage, dependency, time taken, and mode of approval (online/offline).
+
+    Returns:
+        tuple: A tuple containing:
+            - effecient_time (dict): Approval times for each stage.
+            - total_approval_time_for_given_land (int): Total time required for approvals.
+            - online_count (float): Percentage of online approvals.
+    """
+
     name_change_mapping_for_approval = {
         "approval_id": "Approval ID",
         "stages":"Stages",
@@ -874,6 +1050,29 @@ def get_efficient_time_for_land(all_approval_included_df):
 
 # Function to calculate property efficiency and rankings
 def calculate_property_efficiency(df):
+    """
+    Calculate the efficiency of property approvals by evaluating approval time and online processing percentage.
+
+    This function processes each unique property in the given DataFrame and computes:
+    - Total approval time.
+    - Percentage of approvals processed online.
+    - Normalized ranking based on approval time and online percentage.
+    - Final weighted efficiency score.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame containing property approval data.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing efficiency metrics for each property, including:
+                      - 'Property ID': Unique identifier for the property.
+                      - 'Efficient Approval Time': Total time taken for approvals.
+                      - 'Online Percentage': Percentage of approvals processed online.
+                      - 'Approval Time Rank': Normalized rank for approval time.
+                      - 'Online Percentage Rank': Normalized rank for online processing.
+                      - 'Final Score': Overall efficiency score based on weighted ranking.
+    """
+
+    # Initialize a list to store efficiency results for each property
     property_results = []
 
     # Loop through each unique property_id
@@ -910,6 +1109,24 @@ def calculate_property_efficiency(df):
     return result_df
 
 def get_property_wise_approval_score(found_approval,property_approval_mapped_df,property_employment_df):
+    """
+    Computes the approval score for each property based on approval data availability.
+
+    Parameters:
+    ----------
+    found_approval : bool
+        Indicates whether approval data is available.
+    property_approval_mapped_df : pd.DataFrame
+        DataFrame containing approval-related data for properties.
+    property_employment_df : pd.DataFrame
+        DataFrame containing property employment data (used if approval data is unavailable).
+
+    Returns:
+    -------
+    pd.DataFrame
+        A DataFrame containing property-wise approval scores.
+    """
+    
     if found_approval:
         df_with_property_wise_approval_score = calculate_property_efficiency(property_approval_mapped_df)
         df_with_property_wise_approval_score.sort_values(by=["Final Score"], ascending=False)
@@ -922,6 +1139,22 @@ def get_property_wise_approval_score(found_approval,property_approval_mapped_df,
         return df_with_property_wise_approval_score
 
 def fetch_supply_data(industry_id, sub_sector_id=None, segment_id=None):
+    """
+    Fetches supply-related data from the 'tabSupply Rules' table based on the given industry, sub-sector, and segment.
+    The function follows a hierarchical fallback approach:
+    1. Tries to fetch data for the (Industry, Sub-sector, Segment) combination.
+    2. If no data is found, it retries with (Industry, Sub-sector) only.
+    3. If still no data is found, it retries with (Industry) only.
+    4. If no data is available at any level, returns None.
+
+    Args:
+        industry_id (str): The industry ID to search for.
+        sub_sector_id (str, optional): The sub-sector ID to search for. Defaults to None.
+        segment_id (str, optional): The segment ID to search for. Defaults to None.
+
+    Returns:
+        list or None: A list of results (if found) or None (if no data is available).
+    """
 
     if industry_id is not None and sub_sector_id is not None and segment_id is not None:
 
@@ -965,6 +1198,24 @@ def fetch_supply_data(industry_id, sub_sector_id=None, segment_id=None):
         return results
     
 def get_supply_rule(industry_id, sub_sector_id, segment_id,required_capacity_by_user):
+    """
+    Fetches and processes supply rules based on industry, sub-sector, and segment.
+
+    This function retrieves supply-related data for a given industry, sub-sector, 
+    and segment. It then adjusts the minimum supply requirement based on 
+    the user's required capacity.
+
+    Args:
+        industry_id (str): The industry ID for which supply rules need to be fetched.
+        sub_sector_id (str): The sub-sector ID under the industry.
+        segment_id (str): The segment ID under the sub-sector.
+        required_capacity_by_user (float): The required capacity specified by the user.
+
+    Returns:
+        pd.DataFrame or None: A DataFrame containing supply rules if available, 
+        else returns None.
+    """
+
     results = fetch_supply_data(industry_id, sub_sector_id, segment_id)
 
     # Check if there are results and convert to DataFrame
@@ -1015,6 +1266,22 @@ def get_vendor_df(supply_rules_df):
         return vendor_df
     
 def transform_data_for_map_call(vendor_latlong_df, property_latlong_df):
+    """
+    Fetches vendor details based on supply IDs from the provided supply rules DataFrame.
+
+    This function retrieves vendor data from the database by:
+    - Extracting supply IDs from `supply_rules_df`
+    - Constructing an SQL query to fetch vendor-related information
+    - Executing the query and processing results into a Pandas DataFrame
+
+    Args:
+        supply_rules_df (pd.DataFrame): A DataFrame containing supply IDs for which vendors are to be fetched.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing vendor details, including supply capacity, experience, locations, 
+                      past clients, services, employees, and location coordinates.
+    """
+
     input_data = {
         "Vendor": [
             {"id": row["vendor_id"], "latlong": row["latitude_longitude"]}
@@ -1091,6 +1358,21 @@ def transform_data_for_map_call(vendor_latlong_df, property_latlong_df):
 
 
 def calculate_adjustment_factor(series, threshold):
+    """
+    Compute an adjustment factor for each value in the given Pandas Series 
+    based on a specified threshold. The adjustment factor is calculated 
+    using min-max normalization and a predefined value range.
+
+    Args:
+        series (pd.Series): A Pandas Series containing numerical values.
+        threshold (float): The threshold value. Values below this threshold 
+                           will have an adjustment factor of 0.
+
+    Returns:
+        pd.Series: A series where each value is replaced with its 
+                   corresponding adjustment factor.
+    """
+    
     base_value = 0.00001
     range_value = 0.00002 - 0.00001
     filtered_series = series[series >= threshold]
@@ -1106,6 +1388,24 @@ def calculate_adjustment_factor(series, threshold):
     return series.apply(adjustment_factor)
 
 def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_range, tolerable_range):
+    """
+    Calculates supply scores for vendors based on their ability to meet supply requirements 
+    for various properties. Vendors are ranked based on multiple factors, including:
+    - Supply capacity
+    - Distance from property
+    - Experience and other qualitative metrics
+
+    Parameters:
+        property_latlong_df (DataFrame): Contains property IDs and their latitude-longitude.
+        supply_rules_df (DataFrame): Contains supply requirements for properties.
+        vendor_df (DataFrame): Contains vendor details, including capacity and locations.
+        prefered_range (tuple): Preferred distance range for vendor selection.
+        tolerable_range (tuple): Maximum tolerable distance range for alternative vendors.
+
+    Returns:
+        final_df (DataFrame): Best vendor selection per property-supply combination.
+        better_df (DataFrame): Alternative vendors if no optimal vendor is found.
+    """
     try:
         final_results = []  # Store results for all property-supply combinations
         better_results = []
@@ -1345,6 +1645,24 @@ def calculate_final_supply_mapped_property_scores_with_condition(property_mapped
         return final_scores_df
 
 def process_incentive_df_to_send_solution_screen(df):
+    """
+    Processes the incentive DataFrame by grouping incentives at the property level.
+
+    This function sorts the DataFrame by `property_id` and `incentive_rank`, 
+    then aggregates all incentive-related details as lists for each property.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing incentive details with columns like 
+                           'property_id', 'incentive_id', 'incentive_name', 
+                           'incentive_type', 'incentive_operation_start_date', 
+                           'incentive_operation_end_date', 'quantum_of_assistance', 
+                           and 'incentive_rank'.
+
+    Returns:
+        pd.DataFrame: Grouped DataFrame where each `property_id` has a list of associated 
+                      incentives along with their attributes.
+    """
+
     grouped_df = (
         df.sort_values(by=['property_id', 'incentive_rank'], ascending=[True, False])
         .groupby('property_id')
@@ -1363,6 +1681,21 @@ def process_incentive_df_to_send_solution_screen(df):
     return grouped_df
 
 def process_approval_df_to_send_solution_screen(df):
+    """
+    Processes an approval DataFrame to prepare it for the solution screen.
+
+    The function:
+    - Assigns a numerical order to different approval stages.
+    - Sorts approvals within each property by stage order and time taken.
+    - Groups approvals by property ID and aggregates related details as lists.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing approval details.
+
+    Returns:
+        pd.DataFrame: Processed DataFrame with grouped approval details per property.
+    """
+
     # Define custom stage order
     stage_order = {'Pre-Requisite': 1, 'Pre-Establishment': 2, 'Pre-Operation': 3, 'Others': 4}
 
@@ -1384,6 +1717,23 @@ def process_approval_df_to_send_solution_screen(df):
     return grouped_df
 
 def process_supply_vendor_df_to_send_solution_screen(df):
+    """
+    Processes the supply-vendor DataFrame to group data by property_id and categorize supplies into essential and non-essential.
+    
+    This function:
+    1. Separates the DataFrame into essential and non-essential supplies.
+    2. Sorts vendors by the number of vendors found per property.
+    3. Aggregates vendor-related details into lists for each property.
+    4. Returns two DataFrames: one for essential supplies and another for non-essential supplies.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing vendor-supply data, including property_id, vendor_id, supply_id, etc.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: 
+        - First DataFrame contains essential supply information.
+        - Second DataFrame contains non-essential supply information.
+    """
     log_to_file("df is",str(df))
     if not df.empty:
         essential_supply_df = df[df["essential"]]
@@ -1431,6 +1781,20 @@ def process_supply_vendor_df_to_send_solution_screen(df):
         return pd.DataFrame(), pd.DataFrame()
 
 def sort_by_scores(df, scores_df, for_final_return = False):
+    """
+    Sorts the given DataFrame (`df`) based on the order of property IDs 
+    present in another DataFrame (`scores_df`).
+
+    Args:
+        df (pd.DataFrame): The DataFrame to be sorted.
+        scores_df (pd.DataFrame): The reference DataFrame containing the desired order of property IDs.
+        for_final_return (bool, optional): Flag to determine whether to use 'property_id' or 'Property_ID'.
+                                           Defaults to False.
+
+    Returns:
+        pd.DataFrame: A new DataFrame sorted according to the order of property IDs in `scores_df`.
+    """
+
     if not for_final_return:
         df_sorted = df.set_index('property_id').reindex(scores_df['Property_ID']).reset_index()
         return df_sorted
@@ -1438,9 +1802,21 @@ def sort_by_scores(df, scores_df, for_final_return = False):
         df_sorted = df.set_index('Property_ID').reindex(scores_df['Property_ID']).reset_index()
         return df_sorted
 
-from math import radians, sin, cos, sqrt, atan2
+
 #Temp. Distance Calculations
 def calculate_distance(loc1: str, loc2: str) -> float:
+    """
+    Calculates the great-circle distance (in kilometers) between two latitude-longitude coordinates 
+    using the Haversine formula.
+
+    Args:
+        loc1 (str): Latitude and longitude of the first location as a comma-separated string (e.g., "lat,lon").
+        loc2 (str): Latitude and longitude of the second location as a comma-separated string (e.g., "lat,lon").
+
+    Returns:
+        float: The calculated distance in kilometers. Returns 0.0 if the input coordinates are invalid.
+    """
+
     # Check if both loc1 and loc2 are valid lat/lon strings
     if not (is_valid_latlong(loc1) and is_valid_latlong(loc2)):
         return 0.0  # Return 0 if any of the coordinates are invalid
@@ -1500,6 +1876,16 @@ def calculate_vendor_property_distances(input_data: dict) -> dict:
     return output
 
 def is_valid_latlong(latlong: str) -> bool:
+    """
+    Validates whether the given latitude-longitude string is correctly formatted and falls within valid ranges.
+
+    Args:
+        latlong (str): Latitude and longitude as a comma-separated string (e.g., "lat,lon").
+
+    Returns:
+        bool: True if the input represents a valid latitude and longitude; False otherwise.
+    """
+    
     try:
         # Split the input string into lat and lon
         lat, lon = map(float, latlong.split(","))
