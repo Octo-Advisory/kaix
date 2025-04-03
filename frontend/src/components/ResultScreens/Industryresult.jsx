@@ -8,7 +8,7 @@ import MapComponent from '../MapComponent/MapComponent';
 import Backtochat from '../Backtochat/Backtochat';
 import Details from '../Details/Details';
 import Model from '../ResultScreens/Model';
-import { result } from './data';
+// import { result } from './data';
 
 function Industryresult({ result }) {
 //   function Industryresult() {

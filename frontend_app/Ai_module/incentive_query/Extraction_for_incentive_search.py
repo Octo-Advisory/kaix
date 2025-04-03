@@ -1,6 +1,6 @@
 import re 
 import pandas as pd
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Union ,Optional
 from click import prompt
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -11,6 +11,58 @@ from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,
 from datetime import datetime
 import json
 from frontend_app.Management_Class.helpers.utility import update_llm_token
+
+@frappe.whitelist()
+def extract_incentive_details_using_ai(description: str, llm=llm_70b_vers_creative) -> Dict[str, List[str]]:
+    """
+    Uses an AI model to extract structured incentive details dynamically.
+
+    Parameters:
+        description (str): The incentive description provided by the user.
+        llm: The language model instance.
+
+    Returns:
+        Dict[str, List[str]]: A dictionary where keys are category names, 
+                              and values are lists of relevant points.
+    """
+    prompt = """
+    You are an expert in analyzing government and business incentive descriptions. 
+    Your task is to extract structured information from the following incentive description 
+    and categorize it under relevant sections. Only include categories that are explicitly mentioned.
+
+    Categories to consider:
+    - Eligibility: Who can apply or qualify for the incentive.
+    - Benefits: Financial support, subsidies, tax exemptions, or any direct advantages.
+    - Requirements: Conditions or criteria that must be met to receive the incentive.
+    - Process: Steps or application procedures involved.
+    - Other Details: Any additional relevant information.
+
+    Description:
+    {description}
+
+    Output format (only include categories present in the text):
+    {{
+        "Eligibility": ["..."],
+        "Benefits": ["..."],
+        "Requirements": ["..."],
+        "Process": ["..."],
+        "Other Details": ["..."]
+    }}
+
+    Do not add any explanations, notes, or additional text. Only return valid JSON.
+    - Ensure each category is formatted as a list of short points.
+    - Exclude any category if it is not explicitly mentioned in the description.
+    """
+    
+    prompt_template = PromptTemplate(
+        input_variables=["description"],
+        template=prompt
+    )
+
+    chain = prompt_template| llm
+    response = chain.invoke({"description": description})
+    update_llm_token(response)
+    return response.content.strip()
 
 def fetch_query_results(query):
     """
@@ -375,7 +427,7 @@ def call_incentive_search(input,chatId):
             log_to_file("state['Sub-Sector']",state['Sub-Sector'])
             if state['Sub-Sector'] == 'None':
                 static_follow_up = "Could you share more specific details about the product you're interested in?"
-                if location_follow_up != 'None':
+                if location_follow_up != 'None' and location_follow_up != "Not Available in List":
                     static_follow_up = f"{location_follow_up} Could you share more specific details about the product you're interested in?"
                 message = generate_dynamic_message_for_incentive(Chat_history_normal,static_follow_up,refine_user_input,llm_70b_vers_creative,chatId)
                 response = {
@@ -398,6 +450,13 @@ def call_incentive_search(input,chatId):
                     response = {
                         "Ai_response": dynamic_confirmation_message,
                         "Is_confirmation" : True,
+                        "State" : state
+                    }
+                    return response
+                elif location_follow_up == "Not Available in List":
+                    response = {
+                        "Ai_response": "Not Available in List",
+                        "Is_confirmation" : False,
                         "State" : state
                     }
                     return response
@@ -478,7 +537,7 @@ def get_location_from_query(user_query,area_list,city_list,state_list,city_area_
             state['State'] = parent_state
         save_state(state,f"QINC_state_{chatId}")
         if state['Area'] == state['City'] == state['State'] == "Not Available in List":
-            return "Could you provide the area, city, or state? This will help me give you better details."
+            return "Not Available in List"
         if state['Area'] == 'None' and state['City'] == 'None':
             if state['State'] != 'None' and state["Only_State_Attempt_Count"] <2:
                 state["Only_State_Attempt_Count"] += 1
@@ -509,3 +568,95 @@ def log_to_file(key,value):
     
     with open("log2.txt", "a", encoding="utf-8") as file:
         file.write(json.dumps(log_entry) + "\n")
+
+def get_static_follow_up_for_incentive(incentive_state: Dict[str, Optional[str]]) -> str:
+    """
+    Generates a structured static follow-up message based on the user's incentive query intent and provided details.
+
+    This function determines the missing and provided details from the incentive state and generates a natural and 
+    engaging follow-up message accordingly.
+
+    Parameters:
+    -----------
+    incentive_state : Dict[str, Optional[str]]
+        A dictionary maintaining extracted user-provided details:
+        - 'Area', 'City', 'State', 'Product', 'Main-Industry', 'Sub-Sector'
+        
+    user_intention : str
+        The classified intent of the user's query, which can be one of the following:
+        - "Incentive Search for area, city, or state without industry"
+        - "Incentive Search for industry without location"
+        - "Incentive Search for area, city, or state with industry"
+        - "Other Intent"
+
+    Returns:
+    --------
+    str
+        A structured follow-up message requesting the missing information while acknowledging the provided details.
+    """
+    
+    # Extract existing details
+    location_info = {k: v for k, v in incentive_state.items() if k in ["Area", "City", "State"]}
+    industry_info = {k: v for k, v in incentive_state.items() if k in ["Main-Industry", "Sub-Sector", "Product"]}
+    
+    # Check if all details are missing
+    all_location_missing = all(value == "None" for value in location_info.values())
+    all_industry_missing = all(value == "None" for key, value in industry_info.items() if key != "Product")
+
+    # Store provided and missing details
+    provided_details = []
+    missing_details = []
+
+    # Location handling logic
+    if not all_location_missing:
+        if location_info["Area"] != "None":
+            provided_details.append(f"You're looking for incentives in {location_info['Area']}, {location_info['City']}.")
+        elif location_info["City"] != "None" and location_info["State"] != "None":
+            provided_details.append(f"You're looking for incentives in {location_info['City']}, {location_info['State']}.")
+        elif location_info["State"] != "None" and location_info["Area"] == "None" and location_info["City"] == "None" and incentive_state["Only_State_Attempt_Count"] < 2:
+            return (
+                f"""{location_info["State"]} has many cities and areas, and incentive details can vary based on location. Could you please share the specific city or area within {location_info["State"]}? This will help us provide you with the most accurate information."""
+            )
+        elif location_info["State"] != "None" and location_info["Area"] == "None" and location_info["City"] == "None" and incentive_state["Only_State_Attempt_Count"] >= 2:
+            provided_details.append(f"You're looking for incentives in {location_info['State']}.")
+    
+    # Industry handling logic
+    if not all_industry_missing:
+        if industry_info["Main-Industry"] != "None" and industry_info["Sub-Sector"] != "None":
+            if industry_info["Product"] == "None":
+                provided_details.append(f"You're looking incentives for {industry_info['Sub-Sector']} sector under {industry_info['Main-Industry']}.")
+            else:
+                provided_details.append(f"You're looking incentives for {industry_info['Product']} product.")
+        elif industry_info["Main-Industry"] != "None":
+            if industry_info["Product"] == "None":
+                return (
+                    f"""We see that you're looking incentives for {industry_info["Main-Industry"]}. To provide the most accurate information about incentives, could you share a bit more about what specifically you’re looking for or any key details related to your requirement?"""
+                )
+            else:
+                return (
+                    f"""We see that you're looking incentives for {industry_info["Product"]} product. To provide the most accurate information about incentives, could you share a bit more about what specifically you’re looking for or any key details related to your requirement?"""
+                )
+    
+    # Identifying missing details
+    if all_location_missing:
+        missing_details.append("Also, could you share the location (area or city) you're looking for incentives in?")
+    if all_industry_missing:
+        missing_details.append("Also, let me know which product or industry you're seeking incentives for.")
+    
+    # Construct the follow-up message with proper conjunctions
+    if not provided_details:
+        # Case 1: No details provided at all
+        return (
+            "To assist you better, could you share the location (area or city) and the product or industry you're looking for incentives in?"
+        )
+    else:
+        # Case 2: Some details provided, acknowledge them naturally and ask for missing ones with smooth transitions
+        message = " ".join(provided_details)
+        
+        if missing_details:
+            if len(missing_details) == 2:
+                message += f" However, I still need more details. {missing_details[0]} {missing_details[1]}"
+            else:
+                message += f" But {missing_details[0]}"
+        
+        return message

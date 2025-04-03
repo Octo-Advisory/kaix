@@ -3,7 +3,6 @@ import { AiOutlineClear, AiOutlineSend } from 'react-icons/ai'; // React Icons
 import { FiSend } from 'react-icons/fi';
 import { useDispatch, useSelector } from 'react-redux';
 import { addChatId, addMessage } from '../../Redux/Store/Featuresilces/chat';
-// import botLogo1 from '../../assets/favicon.jpeg';
 import botLogo1 from '../../assets/MarsAIX icon.png';
 import useChatScroll from '../Hooks/useChatScroll'; // Import the hook
 import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
@@ -12,10 +11,8 @@ import userIcon from '../../assets/MarsAIX person icon.png'
 import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
 import { FrappeContext, useFrappeCreateDoc, useFrappeUpdateDoc } from 'frappe-react-sdk'
-import ProgressScreen from '../ProgressScreen/ProgressScreen'
 import { addAIresponse, clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
 import { addResult } from '../../Redux/Store/Featuresilces/validation'
-import { useTypewriter } from "react-simple-typewriter";
 import { useNavigate } from "react-router-dom";
 import Details from '../Details/Details';
 
@@ -25,14 +22,11 @@ function Chatscreen() {
   const messages = useSelector((state) => state.chat.messages);
   const chatId = useSelector((state) => state.chat.chatID);
   const [loading, setLoading] = useState(false);
-  const [dataloading, setDataloading] = useState(false);
   const [disabled, setDisabled] = useState(false);
-  const [showerror, setShowerror] = useState(null);
   const { createDoc, isLoading, error } = useFrappeCreateDoc('');
   const [partialResponse, setPartialResponse] = useState('');
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('');
-  const [isProgressVisible, setIsProgressVisible] = useState(false);
   const responseAi = useSelector((state) => state.ai.aiReponse)
   const [placeholder, setPlaceholder] = useState("");
   const [charIndex, setCharIndex] = useState(0);
@@ -57,14 +51,14 @@ function Chatscreen() {
     createDoc("Session", doc).then((resp) => dispatch(addChatId(resp.name)));
   }
 
-  const fetchAIResponse = async (message, chatId) => {
+  const fetchAIResponse = async (message, confirmationMessage, chatId) => {
     try {
       const result = await call.get("frontend_app.Management_Class.Ai_management.AI.ai_module_call", {
         input: message,
+        confirmationMessage: confirmationMessage,
         chatId: chatId
       });
       console.log("message", result);
-
       return result.message;  // Return the result so that the calling function gets it.
     } catch (err) {
       console.log("error occurred 😂", err);
@@ -73,37 +67,38 @@ function Chatscreen() {
   };
 
 
-  const storeChatInChildTable = async () => {
-    const messageLength = messages.length
+  const storeLatestChatInChildTable = async () => {
+    const messageLength = messages.length;
 
-    if (messageLength > 0 && messageLength % 4 === 0) {
+    // Ensure there is at least one complete User-AI pair
+    if (messageLength < 2) return;
 
-      for (let i = 0; i <= 1; i++) {
-        const ain = messageLength - (2 * i + 1);   // AI message index
-        const uin = messageLength - (2 * i + 2);   // User message index
+    // Extract latest user-AI pair
+    const ain = messageLength - 1; // AI message index
+    const uin = messageLength - 2; // User message index
 
-        const chatDoc = {
-          user: messages[uin]['text'],
-          ai: messages[ain]['text'],
-          parent: chatId,
-          parentfield: "chat_history",
-          parenttype: "Session",
-        };
-        try {
-          await createDoc("Chat history", chatDoc);
-        } catch (error) {
-          console.error('Error saving to child table:', error);
-        }
-      }
+    // Ensure correct message type (assuming alternate sequence: User → AI)
+    if (messages[uin]['sender'] !== 'user' || messages[ain]['sender'] !== 'ai') {
+      return; // Skip storing if the order is incorrect
+    }
+
+    const chatDoc = {
+      user: messages[uin]['text'],
+      ai: messages[ain]['text'],
+      parent: chatId,
+      parentfield: "chat_history",
+      parenttype: "Session",
+    };
+
+    try {
+      await createDoc("Chat history", chatDoc);
+    } catch (error) {
+      console.error('Error saving to child table:', error);
     }
   };
 
   const handleSendbtn = async () => {
     if (message.trim()) {
-      // if (messages.length === 0 && !chatId) {
-      //   createSessionid();
-      //   return;
-      // }
       const newUserMessage = {
         sender: 'user',
         text: message,
@@ -113,9 +108,9 @@ function Chatscreen() {
       dispatch(addMessage(newUserMessage));
       setMessage('');
       setLoading(true)
-      // setDisabled(true)
+      setDisabled(true)
 
-      const resp = await fetchAIResponse(message, chatId);
+      const resp = await fetchAIResponse(message, "", chatId);
       console.log("ai response is", resp);
       const aiResponse = resp.Ai_response
       console.log("reponse is", aiResponse);
@@ -129,28 +124,11 @@ function Chatscreen() {
           timestamp: new Date().toISOString(),
         };
         dispatch(addMessage(newAIMessage));
-        // let index = -1;
-
-        // const typingInterval = setInterval(() => {
-        //   setPartialResponse((prev) => prev + aiResponse1.charAt(index));
-        //   index++;
-        //   if (index >= aiResponse.length) {
-        //     clearInterval(typingInterval);
-        //     const newAIMessage = {
-        //       sender: 'ai',
-        //       text: aiResponse1,
-        //       timestamp: new Date().toISOString(),
-        //     };
-        //     dispatch(addMessage(newAIMessage));
-        //     setPartialResponse(''); // Clear partial response
-        //     setDisabled(false);
-        //   }
-        // }, 5);
         dispatch(addAIresponse(resp))
         setConfirmationMessage(aiResponse);
         setConfirmationPending(true);
         setLoading(false);
-        // setDisabled(true);
+        setDisabled(true);
         return;
       }
 
@@ -217,25 +195,16 @@ function Chatscreen() {
 
   const handleConfirmation = async (response) => {
     setConfirmationPending(false);
-    const confirmationMessage = {
+    const confirmationMessages = {
       sender: 'user',
       text: response === 'yes' ? 'Yes' : 'No',
       timestamp: new Date().toISOString(),
     };
-    dispatch(addMessage(confirmationMessage));
-
-    // const newAIMessage = {
-    //   sender: 'ai',
-    //   text: "Thank you for response",
-    //   timestamp: new Date().toISOString(),
-    // };
-    // dispatch(addMessage(newAIMessage));
-    // setDisabled(false);
+    dispatch(addMessage(confirmationMessages));
 
     if (response == 'yes') {
       const validationResult = await hanldeValidation()
       console.log("validation result from chatscreen", validationResult);
-      // console.log("validation result1", validationResult[0]);
       const aiResp = validationResult && validationResult.length > 0
         ? (validationResult[0] ? "Thank you for your response" : "We have your query, we will get back to you soon.")
         : "We have your query, we will get back to you soon.";
@@ -246,19 +215,31 @@ function Chatscreen() {
       };
       dispatch(addMessage(newAIMessage));
       // if (validationResult[0]) {
-      setIsProgressVisible(true);
       navigate("/progress");
-      // setTimeout(() => {
-      //   setIsProgressVisible(true);
-      // }, 0); // Ensure setTimeout executes properly
-      // }
     } else {
-      const newAIMessage = {
-        sender: 'ai',
-        text: "Alright! If you ever feel like chatting or need help, just let me know.",
-        timestamp: new Date().toISOString(),
-      };
-      dispatch(addMessage(newAIMessage));
+      setLoading(true)
+      const noAIreponse = await fetchAIResponse("NOFROMUSER", confirmationMessage, chatId)
+      console.log("noAIResponse", noAIreponse);
+      const noaiResponse = noAIreponse.Ai_response
+      console.log("noaiResponse is", noaiResponse);
+
+      let index = -1;
+      setLoading(false)
+      const typingInterval = setInterval(() => {
+        setPartialResponse((prev) => prev + noaiResponse.charAt(index));
+        index++;
+        if (index >= noaiResponse.length) {
+          clearInterval(typingInterval);
+          const newAIMessage = {
+            sender: 'ai',
+            text: noaiResponse,
+            timestamp: new Date().toISOString(),
+          };
+          dispatch(addMessage(newAIMessage));
+          setPartialResponse(''); // Clear partial response
+          setDisabled(false);
+        }
+      }, 5);
       dispatch(clearAiresponse())
       try {
         await updateDoc("Session", chatId, {
@@ -272,8 +253,10 @@ function Chatscreen() {
   };
 
   useEffect(() => {
-    storeChatInChildTable();
-  }, [messages])
+    if (messages.length >= 2) {
+      storeLatestChatInChildTable();
+    }
+  }, [messages]);
 
   useEffect(() => {
     if (messages.length === 0 && !chatId) {
@@ -377,11 +360,6 @@ function Chatscreen() {
         </div>
       )}
 
-      {/* {isProgressVisible && (
-        <div className="absolute top-0 left-0 right-0 bottom-0 bg-opacity-50 bg-black z-50 flex justify-center items-center">
-          <ProgressScreen />
-        </div>
-      )} */}
       <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#19a282] rounded-3xl p-2 bg-white shadow-lg">
         <div className="flex-grow">
           <textarea
@@ -418,16 +396,16 @@ function Chatscreen() {
       </div>
 
       <div className="alert-msg mb-5">
-      <p className="text-xs text-[#242f6a]">
-  MarsInfraAIX is still learning and can make mistakes. Please contact us by filling the contact form{" "}
-  <span
-    className="text-blue-500 underline cursor-pointer"
-    onClick={() => document.querySelector(".details-btn")?.click()}
-  >
-    here
-  </span>{" "}
-  to confirm data correctness.
-</p>
+        <p className="text-xs text-[#242f6a]">
+          MarsInfraAIX is still learning and can make mistakes. Please contact us by filling the contact form{" "}
+          <span
+            className="text-blue-500 underline cursor-pointer"
+            onClick={() => document.querySelector(".details-btn")?.click()}
+          >
+            here
+          </span>{" "}
+          to confirm data correctness.
+        </p>
       </div>
       <Details />
     </div>

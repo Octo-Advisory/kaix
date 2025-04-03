@@ -1,366 +1,267 @@
-import React, { useEffect, useState } from 'react'
-import useEmblaCarousel from 'embla-carousel-react'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import markerIconPng from "leaflet/dist/images/marker-icon.png";
-import { FaCheckCircle } from 'react-icons/fa';
-import { FaTimesCircle } from 'react-icons/fa';
-import { GoAlertFill } from "react-icons/go";
-import { result } from './data'
-import './Industryresult.css'
-import Model from './Model';
+import React, { useEffect, useState } from "react";
+import { FaSearch, FaCalendarAlt, FaInfoCircle, FaCheckCircle, FaAward, FaIndustry, FaBuilding, FaChartLine, FaFileAlt } from "react-icons/fa";
+import DOMPurify from "dompurify";
+import '../src/App.css'
 
-function Industryresult1({ result }) {
-// function Industryresult() {
-    // function Industryresult() {
-    // console.log("result in indeustry solution screen", result);
-    const analytics_response = result["Analytics_response"]
-    // console.log("Analytics_response", analytics_response);
+export default function IncentiveList() {  
+  const [selectedIncentive, setSelectedIncentive] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
-    const [resultLen, setResultLen] = useState(0)
-    const [solutions, setSolutions] = useState([])
-    const [emblaRef, emblaApi] = useEmblaCarousel({ dragFree: true, watchDrag: false });
+  const processIncentives = (data) => {
+    return data["Incentive ID"]
+      ? Object.keys(data["Incentive ID"]).map((id) => ({
+          id,
+          name: data["Incentive ID"]?.[id] || "Unnamed Incentive",
+          name1: data["Incentive Name"]?.[id],
+          type: data["Incentive Type"]?.[id] || "N/A",
+          rank: data["Incentive Rank"]?.[id] || "N/A",
+          aggregated_score: data["aggregated_score"]?.[id] || 0,
+          details: data["Incentive Details"]?.[id] || "N/A",
+          startDate: data["Incentive Start Date"]?.[id]
+            ? new Date(data["Incentive Start Date"][id]).toLocaleDateString()
+            : "N/A",
+          endDate: data["Incentive End Date"]?.[id]
+            ? new Date(data["Incentive End Date"][id]).toLocaleDateString()
+            : "N/A",
+          level: data["Level"]?.[id] || "N/A",
+          description: data["description"]?.[id] || "No description available",
+        }))
+      : [];
+  };
 
-    // Add model states to handle modal
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalData, setModalData] = useState([]);
-    const [modalTitle, setModalTitle] = useState('');
+  const incentive_data = JSON.parse(Analytics_response["Incentive Data"]);
+  const incentives = processIncentives(incentive_data).sort(
+    (a, b) => b.aggregated_score - a.aggregated_score
+  );
 
-    //Toggle modal on click of button
-    const toggleModal = (data, title) => {
-        setModalData(data);
-        setModalTitle(title);
-        setIsModalOpen(!isModalOpen);
-    };
+  const displayedIncentives = incentives.filter(
+    (incentive) =>
+      incentive.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      incentive.type?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-    const statusIcon = {
-        good: <FaCheckCircle size={20} color="green" />,
-        bad: <FaTimesCircle size={20} color="red" />,
-        warning: <GoAlertFill size={20} color="yellow" />,
-        danger: <GoAlertFill size={20} color="red" />,
+  useEffect(() => {
+    if (searchQuery === "") {
+      setSelectedIncentive(incentives.length > 0 ? incentives[0] : null);
+    } else {
+      setSelectedIncentive(
+        displayedIncentives.length > 0 ? displayedIncentives[0] : null
+      );
     }
+  }, [searchQuery]);
 
-    const fetchData = async (property) => {
-        // console.log("proprtis here", property);
-        try {
-            const response = await fetch(`https://marsinfraix.marsbazaar.com/api/resource/Survey No?fields=["*"]&filters=[["name","=","${property}"]]&order_by=modified asc`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': 'token d3de1e0e4e25846:3d3be60aaa3b67c',
-                    'Content-Type': 'application/json'
-                }
-            });
-            // Check if the response is OK
-            if (!response.ok) {
-                throw new Error(`Error: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            // console.log("data is", data.data);
-            return data.data
-        } catch (error) {
-            console.error('Error fetching data:', error); // Handles errors
-        }
-    }
-
-    const fetchPropertyData = async (analytics_response) => {
-        let preaparedSolutions = [];
-        const final_scoring_df = JSON.parse(analytics_response['final_scoring_df'])
-        // console.log("final_scoring_df", final_scoring_df);
-        const property_id = final_scoring_df["Property_ID"]
-        // console.log("pid", property_id);
-
-        // for supply and vendors
-        const Essential_supply_vendor_lookup_df = JSON.parse(analytics_response['Essential_supply_vendor_lookup_df'])
-        // console.log("Essential_supply_vendor_lookup_df", Essential_supply_vendor_lookup_df);
-
-        const nonEssential_supply_vendor_lookup_df = JSON.parse(analytics_response['Non_essential_supply_vendor_lookup_df'])
-        // console.log("nonEssential_supply_vendor_lookup_df", nonEssential_supply_vendor_lookup_df);
-
-        // for employemnt 
-        const Employment_lookup_df = JSON.parse(analytics_response['Employment_lookup_df'])
-        // console.log("Employment_lookup_df", Employment_lookup_df);
-
-
-        // for incenetive
-        const Solution_lookup_df = JSON.parse(analytics_response['Solution_lookup_df'])
-        // console.log("Solution_lookup_df", Solution_lookup_df);
-
-        //for approvals
-        const Approval_lookup_df = JSON.parse(analytics_response['Approval_lookup_df'])
-        // console.log("Approval_lookup_df", Approval_lookup_df);
-
-        const promises = Object.entries(property_id).map(async ([key, value]) => {
-            // console.log(`key ${key} value ${value}`);
-            try {
-                const get_data = await fetchData(value)
-                const data = get_data[0]
-                // console.log("actual result data", data);
-
-                if (data) {
-                    const latLong = data.latitude_longitude
-                    const latLongArray = latLong ? latLong.split(', ').map(coord => parseFloat(coord)) : []
-                    const area = data.area
-                    const city = data.city
-                    const district = data.district
-                    const availability_of_local_transportation = data.availability_of_local_transportation
-                    const road_connectivity = data.road_connectivity
-                    const area_acre = data.area_acre
-                    const state = data.state
-                    const property_type = data.property_type
-                    const business_location_type = data.business_location_type
-                    const distance_from_power_source = data.distance_from_power_source
-                    const distance_from_nearest_railway_station = data.distance_from_nearest_railway_station
-                    const distance_from_nearest_airport = data.distance_from_nearest_airport
-                    const distance_from_nearest_seaport = data.distance_from_nearest_seaport
-                    // console.log("hahah😒", Essential_supply_vendor_lookup_df["supply_id"]);
-
-                    const essential_supply_and_vendor = []
-                    const nonessential_supply_and_vendor = []
-
-                    if (Essential_supply_vendor_lookup_df["No_of_vendors_found"][key] > 0) {
-                        const ess_supply_id = Essential_supply_vendor_lookup_df["supply_id"][key]
-                        const ess_No_of_vendors_found = Essential_supply_vendor_lookup_df["No_of_vendors_found"][key]
-                        const ess_Distance = Essential_supply_vendor_lookup_df["Distance"][key]
-
-                        ess_supply_id.forEach((supply, index) => {
-                            const supply_vendor = { supply: supply, total_vendor: ess_No_of_vendors_found[index], nearest_venodor_distance: ess_Distance[index], status: get_status_for_distance(ess_Distance[index]) }
-                            essential_supply_and_vendor.push(supply_vendor)
-                        })
-                    }
-
-                    if (nonEssential_supply_vendor_lookup_df["No_of_vendors_found"][key] > 0) {
-                        const noness_supply_id = nonEssential_supply_vendor_lookup_df["supply_id"][key]
-                        const noness_No_of_vendors_found = nonEssential_supply_vendor_lookup_df["No_of_vendors_found"][key]
-                        const noness_Distance = nonEssential_supply_vendor_lookup_df["Distance"][key]
-
-                        noness_supply_id.forEach((supply, index) => {
-                            const supply_vendor = { supply: supply, total_vendor: noness_No_of_vendors_found[index], nearest_venodor_distance: noness_Distance[index], status: get_status_for_distance(noness_Distance[index]) }
-                            nonessential_supply_and_vendor.push(supply_vendor)
-                        })
-                    }
-
-
-                    // console.log("essential_supply_and_vendor", essential_supply_and_vendor);
-
-
-                    const emp_skill_type = Employment_lookup_df['Skill_Type'][key]
-                    const count = Employment_lookup_df[`${emp_skill_type}`][key]
-
-                    // for incentive make array
-                    const incenetives = []
-                    const incentive_name = Solution_lookup_df['incentive_name'][key]
-                    const incentive_type = Solution_lookup_df['incentive_type'][key]
-                    const incentive_rank = Solution_lookup_df['incentive_rank'][key]
-                    incentive_name.forEach((incentive, index) => {
-                        const inc = { incentive_name: incentive, incentive_rank: incentive_rank[index], incentive_type: incentive_type[index] }
-                        incenetives.push(inc)
-                    })
-
-                    // for approvals make array
-                    const approval_name = Approval_lookup_df["approval_name"][key]
-                    const government_department = Approval_lookup_df["government_department"][key]
-                    const online_or_offline = Approval_lookup_df["online_or_offline"][key]
-                    const stages = Approval_lookup_df["stages"][key]
-                    const time_taken = Approval_lookup_df["time_taken"][key]
-                    const approvals = []
-
-                    approval_name.forEach((approval, index) => {
-                        const appr = { approval_name: approval_name[index], government_department: government_department[index], online_or_offline: online_or_offline[index], stages: stages[index], time_taken: time_taken[index] }
-                        approvals.push(appr)
-                    })
-
-                    const road_transport = availability_of_local_transportation == 'Yes' ? 'good' : 'bad'
-
-                    const solution = {
-                        address: `${area || city}, ${district}, ${state}`,
-                        property_type: property_type,
-                        total_area: area_acre,
-                        lat_long: latLongArray,
-                        business_location_type: business_location_type || 'GIDC',
-                        availability_of_local_transportation: road_transport,
-                        seaport: { distance: distance_from_nearest_seaport, status: get_status_for_distance(distance_from_nearest_seaport) },
-                        airport: { distance: distance_from_nearest_airport, status: get_status_for_distance(distance_from_nearest_airport) },
-                        power: { distance: distance_from_power_source, status: get_status_for_distance(distance_from_power_source) },
-                        railway: { distance: distance_from_nearest_railway_station, status: get_status_for_distance(distance_from_nearest_railway_station) },
-                        essential_vendors: essential_supply_and_vendor,
-                        nonessential_vendors: nonessential_supply_and_vendor,
-                        employement: { type: emp_skill_type, count: count },
-                        incentives: incenetives,
-                        approvals: approvals,
-                        road_connectivity: { distance: road_connectivity, status: get_status_for_distance(road_connectivity) }
-                    }
-                    // console.log("solution json", solution);
-                    preaparedSolutions.push(solution)
-                    // console.log("final array is", preaparedSolutions);
-                }
-            } catch (error) {
-                // console.log("error is ", error);
-            }
-
-        });
-
-        await Promise.all(promises);
-        setSolutions(preaparedSolutions);
-    };
-
-    useEffect(() => {
-        fetchPropertyData(analytics_response);
-    }, []);
-
-    const get_status_for_distance = (distance) => {
-        if (distance < 100) {
-            return "good";
-        } else if (distance >= 100 && distance < 200) {
-            return "warning";
-        } else if (distance >= 200 && distance < 300) {
-            return "danger";
-        } else {
-            return "bad";
-        }
-    }
-
-    // Update the resultLen after the solutions are fetched
-    useEffect(() => {
-        setResultLen(solutions.length);
-        // console.log("final solutions2", solutions);
-    }, [solutions])
-
-    const goToNext = () => {
-        if (emblaApi) {
-            emblaApi.scrollNext();
-        }
-    };
-
-    const goToPrev = () => {
-        if (emblaApi) {
-            emblaApi.scrollPrev();
-        }
-    };
-    useEffect(() => {
-        if (emblaApi) {
-            emblaApi.on('select', () => {
-                document.querySelectorAll('.embla__slide').forEach(slide => {
-                    slide.style.backgroundColor = 'rgb(135 197 235 / 41%)';
-                });
-            });
-        }
-    }, [emblaApi]);
-
-    // Define default Leaflet icon
-    const defaultIcon = L.icon({
-        iconUrl: markerIconPng,
-        iconSize: [25, 41],
-        iconAnchor: [12, 41]
-    });
-
-    return (
-        <div className="reuslt-container flex flex-col w-full h-full">
-            <div className="result-title w-full h-[5%] flex items-center justify-center p-5 text-2xl">
-                We Found <p className='font-bold text-red-600 px-1'>{resultLen}</p> Results For Your Query
+  return (
+    <div className="flex flex-col items-center justify-center w-full h-screen bg-gray-50 overflow-hidden">
+      <div className="w-[95%] h-[95%] mx-auto my-0 p-6 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 mb-4">
+          <div className="flex items-center">
+            <div className="p-3 mr-4 bg-blue-50 rounded-lg">
+              <FaIndustry className="text-xl text-blue-600" />
             </div>
-            <div className="solutions px-16 h-[95%] pb-6">
-                <div className="embla h-full" ref={emblaRef}>
-                    <div className="embla__container border-black h-full" >
-                        {solutions.map((solution, index) => (
-                            <div key={index} className="embla__slide rounded-md">
-                                <div className="slide-content flex flex-col h-full">
-                                    <div className="addres w-full h-[6%] p-2 flex items-center text-start text-2xl">{solution.address}</div>
-                                    <div className="first-row flex w-full h-[33%]">
-                                        <div className="location-image w-[25%] h-full">
-                                            <MapContainer center={solution.lat_long} zoom={13} style={{ height: '100%', width: '100%' }} className='rounded-xl' attributionControl={false} zoomControl={false}>
-                                                <TileLayer
-                                                    attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
-                                                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                                                />
-                                                <Marker position={solution.lat_long} icon={defaultIcon}>
-                                                    <Popup>
-                                                        Location: <br />
-                                                        Latitude: {solution.lat_long[0]} <br />
-                                                        Longitude: {solution.lat_long[1]}
-                                                    </Popup>
-                                                </Marker>
-                                            </MapContainer>
-                                        </div>
-                                        <div className="details w-[75%] flex flex-col">
-                                            <div className="title px-5 text-start text-xl text-dodgerblue">Land Maping</div>
-                                            <div className="Content flex px-5 py-5 gap-2">
-                                                <div className="left flex flex-1 text-start flex-col gap-3 border-r border-black">
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon.good}</div><div className="text">{solution.property_type}</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon.good}</div><div className="text">{solution.total_area} Acre</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon[solution.seaport.status]}</div><div className="text">{solution.seaport['distance']} Kms From Seaport</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon[solution.railway.status]}</div><div className="text">{solution.railway['distance']} Kms From Railway Line</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon[solution.power.status]}</div><div className="text">{solution.power['distance']} Kms From Power Plant</div></div>
-                                                </div>
-                                                <div className="right flex-1 text-start flex flex-col gap-3">
-                                                    <div className="items flex gap-3"><div className="icon"><FaCheckCircle size={20} color="green" /></div><div className="text">{solution.business_location_type}</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon[solution.availability_of_local_transportation]}</div><div className="text">Avaibility Of Local Transportaion</div></div>
-                                                    <div className="items flex gap-3"><div className="icon">{statusIcon[solution.road_connectivity.status]}</div><div className="text">{solution.road_connectivity['distance']} Kms From Road Connectivity</div></div>
-                                                    <div className="items flex gap-3"><div className="icon"><FaCheckCircle size={20} color="green" /></div><div className="text">Available {solution.employement['count']} {solution.employement['type']} Manpower</div></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="second-row flex flex-col py-5 gap-1">
-                                        <div className="section-title text-start text-xl text-dodgerblue">Vendors & Suppliers Mapping</div>
-                                        <div className="Content flex px-2 py-2 gap-2">
-                                            <div className="left flex flex-1 text-start flex-col gap-3 border-r border-black">
-                                                {solution.essential_vendors.length > 0 ? (
-                                                    solution.essential_vendors.slice(0, 5).map((item, ind) => {
-                                                        const roundedDistance = parseFloat(item.nearest_vendor_distance.toFixed(2));
-                                                        return (
-                                                            <div key={ind} className="items flex gap-3">
-                                                                <div className="icon">{statusIcon[item.status]}</div>
-                                                                <div className="text">
-                                                                    {item.total_vendor} suppliers for {item.supply} with the top choice {roundedDistance} km away
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })
-                                                ) : (
-                                                    <div>No supplier available</div>
-                                                )}
-                                                {solution.essential_vendors.length > 5 && <button className='text-sm' onClick={() => toggleModal(solution.essential_vendors, 'Vendors')}>Show More...</button>}
-                                            </div>
-                                            <div className="right flex-1 text-start flex flex-col gap-3">
-                                                {solution.nonessential_vendors.slice(0, 5).map((item, index) => {
-                                                    const roundedDistance = parseFloat(item.nearest_venodor_distance.toFixed(2));
-                                                    return (<div key={index} className="items flex gap-3"><div className="icon">{statusIcon[item.status]}</div><div className="text">{item.total_vendor} suppliers for {item.supply} with the top choice {roundedDistance} km away</div></div>)
-                                                })}
-                                                {solution.nonessential_vendors.length > 5 && <button className='text-sm' onClick={() => toggleModal(solution.nonessential_vendors, 'Vendors')}>Show More...</button>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="third-row flex flex-col pt-5">
-                                        <div className="section-title text-start text-xl text-dodgerblue">Incentive & Approvals
-                                        </div>
-                                        <div className="Content flex px-2 py-2 gap-2">
-                                            <div className="left flex flex-1 text-start flex-col gap-3 border-r border-black">
-                                                {solution.incentives.slice(0, 5).map((item, index) => {
-                                                    return (<div key={index} className="items flex gap-3"><div className="icon"><FaCheckCircle size={20} color="green" /></div><div className="text">{item.incentive_name}</div></div>)
-                                                })}
-                                                {solution.incentives.length && <button className='text-sm' onClick={() => toggleModal(solution.incentives, 'Incentives')}>Show More...</button>}
-                                            </div>
-                                            <div className="right flex-1 text-start flex flex-col gap-3">
-                                                {solution.approvals.slice(0, 5).map((item, index) => {
-                                                    return (<div key={index} className="items flex gap-3"><div className="icon"><FaCheckCircle size={20} color="green" /></div><div className="text">{item.approval_name}</div></div>)
-                                                })}
-                                                {solution.approvals.length > 5 && <button className='text-sm' onClick={() => toggleModal(solution.approvals, 'Approvals')}>Show More...</button>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-                <button className="embla__prev" onClick={goToPrev}>Prev</button>
-                <button className="embla__next" onClick={goToNext}>Next</button>
-                <Model isOpen={isModalOpen} onClose={() => (setIsModalOpen(false))} title={modalTitle} data={modalData} />
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-800">Incentives Catalog</h1>
+              <p className="text-gray-500">Browse available incentive programs</p>
             </div>
+          </div>
         </div>
-    )
-}
+  
+        {/* Search Bar */}
+        <div className="relative mb-4">
+          <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by program name or type..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-12 pr-4 py-3 w-full border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 placeholder-gray-400 text-gray-700"
+          />
+        </div>
+  
+        {/* Main Content Area */}
+        <div className="flex flex-1 min-h-0 overflow-hidden bg-white rounded-lg border border-gray-200">
+          {/* Incentive List - Scrollable */}
+          <div className="w-1/3 border-r border-gray-200 flex flex-col">
+            <div className="overflow-y-auto flex-1">
+              {displayedIncentives.length > 0 ? (
+                <div className="space-y-2 p-2">
+                  {displayedIncentives.map((incentive) => (
+                    <div
+                      key={incentive.id}
+                      className={`p-4 cursor-pointer rounded-lg transition-all duration-200 ${
+                        selectedIncentive?.id === incentive.id
+                          ? "bg-blue-50 border-l-4 border-blue-500"
+                          : "hover:bg-gray-50 border-l-4 border-transparent"
+                      }`}
+                      onClick={() => setSelectedIncentive(incentive)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <h3 className={`font-medium ${
+                          selectedIncentive?.id === incentive.id ? "text-blue-700" : "text-gray-700"
+                        }`}>
+                          {incentive.type}
+                        </h3>
+                        {/* {selectedIncentive?.id === incentive.id && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                            Selected
+                          </span>
+                        )} */}
+                      </div>
+                      {/* <div className="flex items-center mt-2 text-sm text-gray-500">
+                        <FaBuilding className="mr-2" />
+                        <span>{incentive.level}</span>
+                      </div> */}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                  <FaSearch className="text-gray-300 text-3xl mb-3" />
+                  <h3 className="text-lg font-medium text-gray-500">No programs found</h3>
+                  <p className="text-gray-400">Try a different search term</p>
+                </div>
+              )}
+            </div>
+          </div>
+  
+          {/* Detailed View - Scrollable Content */}
+          {selectedIncentive && (
+            <div className="w-2/3 flex flex-col">
+              <div className="overflow-y-auto flex-1 p-6">
+                <div className="mb-8">
+                  <div className="flex items-center mb-2">
+                    <div className="p-2 mr-3 bg-blue-100 rounded-lg">
+                      <FaChartLine className="text-blue-600" />
+                    </div>
+                    <h2 className="text-2xl font-semibold text-gray-800">{selectedIncentive.name1}</h2>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className="px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-full">
+                      {selectedIncentive.type}
+                    </span>
+                    <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">
+                      {selectedIncentive.level}
+                    </span>
+                  </div>
+                </div>
 
-export default Industryresult1
+                
+  
+                {/* Key Dates */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div className="flex items-center">
+                      <FaCalendarAlt className="mr-3 text-gray-500" />
+                      <div>
+                        <div className="text-sm text-gray-500 mb-1">Start Date</div>
+                        <div className="font-medium text-gray-700">{selectedIncentive.startDate}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div className="flex items-center">
+                      <FaCalendarAlt className="mr-3 text-gray-500" />
+                      <div>
+                        <div className="text-sm text-gray-500 mb-1">End Date</div>
+                        <div className="font-medium text-gray-700">{selectedIncentive.endDate}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Details Section */}
+                {selectedIncentive.details !== "N/A" && (
+                  <div className="mb-8">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                      <FaFileAlt className="mr-2 text-blue-500" />
+                      Additional Details
+                    </h3>
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                      <div
+                        className="prose text-gray-700 max-w-none"
+                        dangerouslySetInnerHTML={{
+                          __html: DOMPurify.sanitize(selectedIncentive.details),
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+  
+                {/* Program Description */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                    <FaInfoCircle className="mr-2 text-blue-500" />
+                    Program Details
+                  </h3>
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div
+                      className="prose text-gray-700 max-w-none"
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(selectedIncentive.description),
+                      }}
+                    />
+                  </div>
+                </div>
+
+                
+  
+                {/* Features Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                      <FaCheckCircle className="mr-2 text-green-500" />
+                      Eligibility Criteria
+                    </h3>
+                    <ul className="space-y-2">
+                      <li className="flex items-start">
+                        <span className="text-green-500 mr-2">✓</span>
+                        <span className="text-gray-700">Registered business entity</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-green-500 mr-2">✓</span>
+                        <span className="text-gray-700">Minimum 2 years in operation</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-green-500 mr-2">✓</span>
+                        <span className="text-gray-700">Annual revenue over $100k</span>
+                      </li>
+                    </ul>
+                  </div>
+  
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                      <FaAward className="mr-2 text-yellow-500" />
+                      Key Benefits
+                    </h3>
+                    <ul className="space-y-2">
+                      <li className="flex items-start">
+                        <span className="text-yellow-500 mr-2">★</span>
+                        <span className="text-gray-700">Tax credit opportunities</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-yellow-500 mr-2">★</span>
+                        <span className="text-gray-700">Equipment and technology grants</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="text-yellow-500 mr-2">★</span>
+                        <span className="text-gray-700">Energy efficiency rebates</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Fixed Footer with CTA */}
+              {/* <div className="p-4 border-t border-gray-200 bg-white">
+                <button className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition duration-200">
+                  Apply for This Program
+                </button>
+              </div> */}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

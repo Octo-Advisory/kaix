@@ -1,6 +1,6 @@
 import frappe
 from langchain.prompts import PromptTemplate
-from frontend_app.Ai_module.Query_Classification_And_Analysis import classify_query,llm_70b_vers_creative,refine_query_with_history,llm_70b_vers
+from frontend_app.Ai_module.Query_Classification_And_Analysis import classify_query,llm_70b_vers_creative,refine_query_with_history,llm_70b_vers,generate_fallback_message
 from frontend_app.Ai_module.employement_query.Extraction_for_employement_search import call_handle_employment_query
 from frontend_app.Ai_module.build_from_scratch.Extraction_for_Building_from_Scratch import entry_build_from_scratch
 from frontend_app.Ai_module.incentive_query.Extraction_for_incentive_search import call_incentive_search
@@ -14,8 +14,20 @@ from frontend_app.Log_management.createlog import log
 from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 @frappe.whitelist(allow_guest=True)
-def ai_module_call(input,chatId):
+def ai_module_call(input,confirmationMessage,chatId):
     try:
+        if input == "NOFROMUSER":
+            chat_history = get_chat(f"chat_{chatId}") or []
+            Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+            resp = generate_fallback_message(Chat_history_normal,confirmationMessage,llm_70b_vers_creative)
+            response = { 
+                    "Ai_response": resp,
+                    "Is_confirmation" : None,
+                    "Error":None
+                }
+            return response
+
+
         # Check if user intention is already determined
         user_intension = check_user_intension(chatId)
 
@@ -107,7 +119,6 @@ def ai_module_call(input,chatId):
             log(chatId,'debug','response',str(response),'AI.py','ai') 
             return response
          
-
     except Exception as e:
         error_details = traceback.format_exc()
         with open("log3.txt", "a") as file:
