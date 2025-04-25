@@ -1,6 +1,6 @@
 import re 
 import pandas as pd
-from typing import List, Dict, Tuple, Union ,Optional
+from typing import List, Dict, Tuple, Union ,Optional, Any
 from click import prompt
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -11,6 +11,7 @@ from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,
 from datetime import datetime
 import json
 from frontend_app.Management_Class.helpers.utility import update_llm_token
+from frontend_app.Management_Class.Ai_management.AI import *
 
 def fetch_query_results(query):
     """
@@ -78,20 +79,34 @@ def refine_query_with_history_for_incentive(history, latest_query, llm):
     # Fallback to the entire response if no match is found
     return refined_text
 
-def classify_incentive_query(query, llm):
+def classify_incentive_query(query: str, llm: Any) -> Dict[str, Any]:
     """
-    Classify the user's incentive search query into the following categories:
-    1. Incentive Search for area, city, or state without industry
-    2. Incentive Search for industry without location
-    3. Incentive Search for area, city, or state with industry
-    4. Other Intent
+    Classifies a user's incentive-related query into one of five predefined categories
+    based on content and context.
+
+    Categories:
+        1: Incentive Search for area, city, or state without industry
+        2: Incentive Search for industry without location
+        3: Incentive Search for area, city, or state with industry
+        4: Other Intent
+        5: Negatively Intended Query
+
+    Guidelines:
+        - Classify as 1 if query focuses on a location but not an industry.
+        - Classify as 2 if query focuses on an industry but not a location.
+        - Classify as 3 if query includes both a location and an industry.
+        - Classify as 4 if the query is unrelated or unclear.
+        - Classify as 5 if the user expresses negative intent towards incentives.
 
     Args:
         query (str): The user's input query.
-        llm: The language model object.
+        llm (Any): A language model object that can interpret and classify the query.
 
     Returns:
-        dict: A dictionary with the raw prompt, classification category, and explanation if needed.
+        Dict[str, Any]: A dictionary containing:
+            - "raw_prompt" (str): The full prompt sent to the LLM.
+            - "classification_number" (int): The numerical category (1–5).
+            - "classification_category" (str): Description of the category.
     """
     # Define the category mapping
     category_mapping = {
@@ -99,9 +114,10 @@ def classify_incentive_query(query, llm):
         2: "Incentive Search for industry without location",
         3: "Incentive Search for area, city, or state with industry",
         4: "Other Intent",
+        5: "Negatively Intended Query"
     }
 
-    # Define the raw prompt string
+    # Final Incentive Sub-classification Prompt
     raw_prompt = """
     You are an expert in analyzing user queries related to incentive searches. Your task is to classify the user's intention into one of the following categories:
 
@@ -109,17 +125,85 @@ def classify_incentive_query(query, llm):
     2. Incentive Search for individual industry without location.
     3. Incentive Search for area, city, or state with industry.
     4. Other Intent.
+    5. Negative Intent.
 
-    Additional Guidelines:
-    - If the query is focused on one specific location (e.g., "incentives in Ahmedabad" or "incentives for Gujarat"), classify it as category 1.
-    - If the query is specific to one industry but does not reference any location (e.g., "incentives for paracetamol production" or "benefits for textile industry"), classify it as category 2.
-    - If the query mentions both a location and an industry (e.g., "incentives for IT in Gujarat" or "manufacturing benefits in Maharashtra"), classify it as category 3.
-    - If the query does not clearly fall into the above categories or is unrelated, classify it as category 4.
+    Use the following rules to determine the correct classification:
 
-    Query: {query}
+    Rule 1: Positive Incentive Focus
+    - If the query shows positive interest in incentives, always classify it into Class 1, 2, or 3 depending on the structure of the query:
+    - Class 1: If the query refers to a specific area, city, or state without mentioning any industry or product.
+        - Example: "What incentives are available in Ahmedabad?"
+    - Class 2: If the query refers to a specific industry, product, or sector without mentioning any location.
+        - Example: "Are there benefits for setting up a dairy factory?"
+    - Class 3: If the query clearly includes both location and industry (or product).
+        - Example: "Incentives for the textile industry in Gujarat"
+    - This rule takes full precedence — even if other topics are present and mentioned negatively or positively, a positive reference to incentives means the query belongs in Class 1, 2, or 3 based on the above distinctions.
+
+    Rule 2: Negative Incentive Focus
+    - If the query negatively mentions incentives, and:
+    - No other topics are present → Class 5
+    - Other topics are present:
+        - If all other topics are also negatively mentioned → Class 5
+        - If any one other topic is positively mentioned → Class 4
+
+    Rule 3: No Mention of Incentives
+    - If the query does not mention incentives at all:
+    - If all other topics (vendors, employment, approvals, building an industry) are negatively mentioned → Class 5
+    - If any one of the other topics is positively mentioned → Class 4
+
+    Rule 4: Understanding “Other Intent” (Class 4)
+    - Use this category if the query is not clearly about incentives or other relevant business intents.
+    - Examples include queries about unrelated topics such as:
+        - Tourism
+        - Politics
+        - Education (non-industry)
+        - Lifestyle or real estate
+        - Travel or cultural queries
+    - Also classify as Class 4 when the query contains a mix of negative and positive intents across different business topics and does not qualify for Class 1, 2, 3, or 5.
+
+    Clarifications on “Other Topics” Mentioned in Rules:
+    - Other topics refer to business-related intents including:
+        - Vendor or supplier search
+        - Approvals, permissions, clearances, or licenses
+        - Employment or job-related queries
+        - Intent to build, start, set up, develop, or establish an industry or factory
+    - Do not rely solely on keywords like "vendor" or "approval" — evaluate the full sentence and its context.
+    - Identify paraphrased or conceptually similar terms and treat them as the corresponding category.
+    - Use contextual understanding to determine whether the user’s intent is positive or negative.
+
+    Other Topic Definition:
+    - These refer to the other business-related categories:
+    - Approvals
+    - Employment
+    - Vendors
+    - Building an industry from scratch
+
+    Additional Understanding Requirement:
+    - Do not rely solely on specific keywords like “approvals,” “vendors,” “employment,” “incentives,” or “building industry from scratch.”
+    - Always analyze the full context of the query to determine whether these intents are present — even if users use alternative phrasing or synonyms.
+    - Examples:
+        - “Permissions,” “licenses,” “NOCs,” or “clearances” should be interpreted as approval-related.
+        - “Suppliers,” “distributors,” or “raw material sources” may indicate vendor search.
+        - “Jobs,” “workforce,” “manpower,” or “recruitment” may imply employment intent.
+        - “Subsidies,” “tax breaks,” “grants,” or “financial support” may suggest incentives.
+        - “Starting operations,” “setting up a factory,” “establishing infrastructure,” or “launching a new unit” may indicate building industry from scratch.
+    - Understand user intent even if the sentence is vague, mixed, or includes implied meanings rather than explicit phrases.
+
+    Interpretation Rules:
+    - Do not classify based on keywords alone. Understand the overall context and tone of the query.
+    - Do not misclassify vague or mixed queries — use reasoning to infer the true user intent.
+    - Mixed or complex language like "I don't want incentives, but I'm exploring vendors" → Class 4 (positive vendor intent dominates).
+    - The presence of positive language in any topic (other than incentives) makes the overall query intent not fully negative → Class 4.
+
+    Output Instructions:
+    - Strictly return only the classification number (1, 2, 3, 4, or 5).
+    - Do not return explanations or multiple classifications.
+
+    Query:
+    {query}
 
     Output:
-    Classify the query into one of the categories (1, 2, 3, or 4). Provide the classification number only.
+    (Return only one classification number)
     """
 
     # Create a PromptTemplate for chaining
@@ -132,10 +216,9 @@ def classify_incentive_query(query, llm):
     chain = prompt_template | llm
     # Run the chain and capture the response
     response = chain.invoke({"query": query})
-    update_llm_token(response)
 
     # Use regex to extract a valid classification number
-    match = re.search(r"^\s*([1-4])\s*$", response.content.strip())
+    match = re.search(r"^\s*([1-5])\s*$", response.content.strip())
     if match:
         classification_number = int(match.group(1))
         classification_category = category_mapping[classification_number]
@@ -336,46 +419,106 @@ def call_incentive_search(input,chatId):
         state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None', "KEYWORDS": None, "Only_State_Attempt_Count": 1}
         save_state(state,f"QINC_state_{chatId}")
     log_to_file("state1",state)
-    query_intent = classify_incentive_query(input,llm=llm_70b_vers)
+    query_intent = classify_incentive_query(refine_user_input,llm=llm_70b_vers)
     query_intent = query_intent['classification_category']
     log_to_file("query intent",query_intent)
 
-    keyword_list = extract_important_words(refine_user_input, "Query to search Incentives")
-    state["KEYWORDS"] = keyword_list
-    save_state(state,f"QINC_state_{chatId}")
-
-    if query_intent == 'Other Intent':
-        static_follow_up = "Could you provide specific query?"
-        message = generate_dynamic_message_for_incentive(Chat_history_normal,static_follow_up,refine_user_input,llm_70b_vers_creative,chatId)
+    if query_intent == "Negatively Intended Query":
+        message = respond_to_negative_query(
+            query_intent, 
+            append_user_to_history=False, 
+            append_AI_to_history=False, 
+            llm=llm_70b_vers,
+            chatId=chatId)
+        chat_history.append(AIMessage(content=f"{message}"))
+        save_chat(chat_history,f"chat_{chatId}")
         response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "State" : state 
-                }
+            "Ai_response": message,
+            "Is_confirmation" : None,
+            "State" : state 
+        }
         return response
     else:
-        area_list, city_list, state_list, city_area_mapped_dict, state_city_mapped_dict = get_available_area_city_state()
-        final_json = get_json_for_industry()
-        main_industries = get_main_industry(final_json)
-        location_follow_up = get_location_from_query(refine_user_input,area_list,city_list,state_list,city_area_mapped_dict, state_city_mapped_dict,state,llm_70b_vers,chatId)
-        log_to_file("location_follow_up",location_follow_up)
-        main_industry_extracted_data,main_industry_validated_data = extract_main_industry_and_product_universal(refine_user_input,main_industries,llm_70b_vers)
-        log_to_file("main_industry_validated_data",main_industry_validated_data)
-        if main_industry_validated_data['Main-Industry'] != "None":
-            if state['Main-Industry'] != main_industry_validated_data['Main-Industry'] or state['Product'] != main_industry_validated_data['Product']:
-                state['Main-Industry'] = main_industry_validated_data['Main-Industry'] 
-                state['Product'] = main_industry_validated_data['Product']
+        keyword_list = extract_important_words(refine_user_input, "Query to search Incentives")
+        state["KEYWORDS"] = keyword_list
+        save_state(state,f"QINC_state_{chatId}")
+
+        if query_intent == 'Other Intent':
+            static_follow_up = "Could you provide specific query?"
+            message = generate_dynamic_message_for_incentive(Chat_history_normal,static_follow_up,refine_user_input,llm_70b_vers_creative,chatId)
+            response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : None,
+                        "State" : state 
+                    }
+            return response
+        else:
+            area_list, city_list, state_list, city_area_mapped_dict, state_city_mapped_dict = get_available_area_city_state()
+            final_json = get_json_for_industry()
+            main_industries = get_main_industry(final_json)
+            location_follow_up = get_location_from_query(refine_user_input,area_list,city_list,state_list,city_area_mapped_dict, state_city_mapped_dict,state,llm_70b_vers,chatId)
+            log_to_file("location_follow_up",location_follow_up)
+            main_industry_extracted_data,main_industry_validated_data = extract_main_industry_and_product_universal(refine_user_input,main_industries,llm_70b_vers)
+            log_to_file("main_industry_validated_data",main_industry_validated_data)
+            if main_industry_validated_data['Main-Industry'] != "None":
+                if state['Main-Industry'] != main_industry_validated_data['Main-Industry'] or state['Product'] != main_industry_validated_data['Product']:
+                    state['Main-Industry'] = main_industry_validated_data['Main-Industry'] 
+                    state['Product'] = main_industry_validated_data['Product']
+                    save_state(state,f"QINC_state_{chatId}")
+                sub_sectors = get_sub_sectors(final_json,state['Main-Industry'])
+                sub_sector_extracted_Data,sub_sector_validated_Data = extract_sub_sector_and_product_universal(refine_user_input,sub_sectors,llm_70b_vers,state['Main-Industry'],state['Product'])
+                log_to_file("sub_sector_validated_Data",sub_sector_validated_Data)
+                state['Sub-Sector'] = sub_sector_validated_Data['Sub-Sector']
+                state['Product'] = sub_sector_validated_Data["Product"]
                 save_state(state,f"QINC_state_{chatId}")
-            sub_sectors = get_sub_sectors(final_json,state['Main-Industry'])
-            sub_sector_extracted_Data,sub_sector_validated_Data = extract_sub_sector_and_product_universal(refine_user_input,sub_sectors,llm_70b_vers,state['Main-Industry'],state['Product'])
-            log_to_file("sub_sector_validated_Data",sub_sector_validated_Data)
-            state['Sub-Sector'] = sub_sector_validated_Data['Sub-Sector']
-            state['Product'] = sub_sector_validated_Data["Product"]
-            save_state(state,f"QINC_state_{chatId}")
-            log_to_file("state['Sub-Sector']",state['Sub-Sector'])
-            if state['Sub-Sector'] == 'None':
+                log_to_file("state['Sub-Sector']",state['Sub-Sector'])
+                if state['Sub-Sector'] == 'None':
+                    static_follow_up = "Could you share more specific details about the product you're interested in?"
+                    if location_follow_up != 'None' and location_follow_up != "Not Available in List":
+                        static_follow_up = f"{location_follow_up} Could you share more specific details about the product you're interested in?"
+                    message = generate_dynamic_message_for_incentive(Chat_history_normal,static_follow_up,refine_user_input,llm_70b_vers_creative,chatId)
+                    response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "State" : state
+                        }
+                    return response
+                else:
+                    log_to_file("location_follow_up",location_follow_up)
+                    if location_follow_up == 'None':
+                        selected_option = next(
+                        (state.get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
+                        ''
+                        )
+                        message = f"We have identified, you are looking for incentives related to {selected_option} production in {state.get('Area')} under the city {state.get('City')} in {state.get('State')}. Is this information correct?"
+                        dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                        chat_history.append(AIMessage(content=f"{dynamic_confirmation_message}"))
+                        save_chat(chat_history,f"chat_{chatId}")
+                        response = {
+                            "Ai_response": dynamic_confirmation_message,
+                            "Is_confirmation" : True,
+                            "State" : state
+                        }
+                        return response
+                    elif location_follow_up == "Not Available in List":
+                        response = {
+                            "Ai_response": "Not Available in List",
+                            "Is_confirmation" : False,
+                            "State" : state
+                        }
+                        return response
+                    else:
+                        message = generate_dynamic_message_for_incentive(Chat_history_normal,location_follow_up,refine_user_input,llm_70b_vers_creative,chatId)
+                        response = {
+                                "Ai_response": message,
+                                "Is_confirmation" : None,
+                                "State" : state
+                            }
+                        return response
+                
+            else:
                 static_follow_up = "Could you share more specific details about the product you're interested in?"
-                if location_follow_up != 'None' and location_follow_up != "Not Available in List":
+                if location_follow_up != 'None':
                     static_follow_up = f"{location_follow_up} Could you share more specific details about the product you're interested in?"
                 message = generate_dynamic_message_for_incentive(Chat_history_normal,static_follow_up,refine_user_input,llm_70b_vers_creative,chatId)
                 response = {
@@ -384,50 +527,6 @@ def call_incentive_search(input,chatId):
                         "State" : state
                     }
                 return response
-            else:
-                log_to_file("location_follow_up",location_follow_up)
-                if location_follow_up == 'None':
-                    selected_option = next(
-                    (state.get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
-                    ''
-                    )
-                    message = f"We have identified, you are looking for incentives related to {selected_option} production in {state.get('Area')} under the city {state.get('City')} in {state.get('State')}. Is this information correct?"
-                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=f"{dynamic_confirmation_message}"))
-                    save_chat(chat_history,f"chat_{chatId}")
-                    response = {
-                        "Ai_response": dynamic_confirmation_message,
-                        "Is_confirmation" : True,
-                        "State" : state
-                    }
-                    return response
-                elif location_follow_up == "Not Available in List":
-                    response = {
-                        "Ai_response": "Not Available in List",
-                        "Is_confirmation" : False,
-                        "State" : state
-                    }
-                    return response
-                else:
-                    message = generate_dynamic_message_for_incentive(Chat_history_normal,location_follow_up,refine_user_input,llm_70b_vers_creative,chatId)
-                    response = {
-                            "Ai_response": message,
-                            "Is_confirmation" : None,
-                            "State" : state
-                        }
-                    return response
-             
-        else:
-            static_follow_up = "Could you share more specific details about the product you're interested in?"
-            if location_follow_up != 'None':
-                static_follow_up = f"{location_follow_up} Could you share more specific details about the product you're interested in?"
-            message = generate_dynamic_message_for_incentive(Chat_history_normal,static_follow_up,refine_user_input,llm_70b_vers_creative,chatId)
-            response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "State" : state
-                }
-            return response
 
 def get_json_for_industry():
     final_json = {}
