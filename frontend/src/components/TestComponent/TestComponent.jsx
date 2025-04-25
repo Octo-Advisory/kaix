@@ -1,248 +1,657 @@
-import React, { useState, useContext } from "react";
-import { FrappeContext } from "frappe-react-sdk";
-import { FaList, FaStar, FaAward } from "react-icons/fa";
+import React, { useState, useRef } from 'react';
+import { 
+  IoMdNotificationsOutline, 
+  IoMdArrowDropdown,
+  IoMdArrowDropup,
+  IoMdLogOut,
+  IoMdTrash,
+  IoMdColorPalette,
+  IoMdPerson,
+  IoMdLock,
+  IoMdGlobe,
+  IoMdMail,
+  IoMdHelpCircle,
+  IoMdInformationCircle
+} from "react-icons/io";
+import {IoClose,IoSettingsOutline} from "react-icons/io5";
+import { CiLock, CiUser } from "react-icons/ci";
 
-function ChatScreen() {
-  const [viewMode, setViewMode] = useState("all");
-  const analytics_response = {
-    final: {
-      supply_id: { 0: "Boxes", 1: "Packaging Materials" },
-      supply_score: { 0: 6.8412660905, 1: 6.4206700697 },
-      vendor_id: {
-        0: "MS Paper and Engineering Works",
-        1: "Kirti Paper Bag Sales Agency",
-      },
-      vendor_supply_capacity: { 0: 5000.0, 1: 10000.0 },
-      Distance: { 0: 6.09, 1: 2.18 },
-    },
-    better: {
-      supply_id: { 10: "Boxes", 7: "Packaging Materials" },
-      supply_score: { 10: 6.5, 7: 6.2 },
-      vendor_id: {
-        10: "Swiss Pac Pvt Ltd",
-        7: "Expert Kraft",
-      },
-      vendor_supply_capacity: { 10: 8000.0, 7: 9000.0 },
-      Distance: { 10: 4.5, 7: 3.1 },
-    },
-    all: {
-      supply_id: {
-        10: "Boxes",
-        17: "Boxes",
-        11: "Boxes",
-        0: "Boxes",
-        14: "Boxes",
-        5: "Boxes",
-        1: "Boxes",
-        8: "Boxes",
-        7: "Packaging Materials",
-        12: "Packaging Materials",
-        13: "Packaging Materials",
-        15: "Packaging Materials",
-        20: "Packaging Materials",
-        21: "Packaging Materials",
-        22: "Packaging Materials",
-        23: "Packaging Materials",
-        24: "Packaging Materials",
-        25: "Packaging Materials",
-        26: "Packaging Materials",
-        27: "Packaging Materials",
-        28: "Packaging Materials",
-      },
-      Final_Score_With_Features: {
-        10: 6.84,
-        17: 6.33,
-        11: 6.30,
-        0: 6.07,
-        14: 5.76,
-        5: 5.72,
-        1: 5.38,
-        8: 3.77,
-        7: 6.42,
-        12: 6.39,
-        13: 6.39,
-        15: 6.39,
-        20: 6.39,
-        21: 6.39,
-        22: 6.39,
-        23: 6.39,
-        24: 6.39,
-        25: 6.39,
-        26: 6.39,
-        27: 6.39,
-        28: 6.39,
-      },
-      vendor_id: {
-        10: "MS Paper and Engineering Works",
-        17: "Swiss Pac Pvt Ltd",
-        11: "Nagdev Plastic Industries",
-        0: "A1 Enterprise",
-        14: "RSTRADERS",
-        5: "Himja Vacuum Packaging",
-        1: "Aaaka Plastics",
-        8: "Krishna Plastic and Packaging Industries",
-        7: "Kirti Paper Bag Sales Agency",
-        12: "Nagdev Plastic Industries",
-        13: "Nagdev Plastic Industries",
-        15: "Nagdev Plastic Industries",
-        20: "Nagdev Plastic Industries",
-        21: "Nagdev Plastic Industries",
-        22: "Nagdev Plastic Industries",
-        23: "Nagdev Plastic Industries",
-        24: "Nagdev Plastic Industries",
-        25: "Nagdev Plastic Industries",
-        26: "Nagdev Plastic Industries",
-        27: "Nagdev Plastic Industries",
-        28: "Nagdev Plastic Industries",
-      },
-      vendor_supply_capacity: {
-        10: 5000.0,
-        17: 5000.0,
-        11: 5000.0,
-        0: 100000.0,
-        14: 5000.0,
-        5: 5000.0,
-        1: 5000.0,
-        8: 5000.0,
-        7: 10000.0,
-        12: 10000.0,
-        13: 10000.0,
-        15: 10000.0,
-        20: 10000.0,
-        21: 10000.0,
-        22: 10000.0,
-        23: 10000.0,
-        24: 10000.0,
-        25: 10000.0,
-        26: 10000.0,
-        27: 10000.0,
-        28: 10000.0,
-      },
-      Dist: {
-        10: 6.09,
-        17: 15.46,
-        11: 5.53,
-        0: 3.79,
-        14: 1.94,
-        5: 3.49,
-        1: 2.68,
-        8: 101.47,
-        7: 2.17,
-        12: 5.53,
-        13: 5.53,
-        15: 5.53,
-        20: 5.53,
-        21: 5.53,
-        22: 5.53,
-        23: 5.53,
-        24: 5.53,
-        25: 5.53,
-        26: 5.53,
-        27: 5.53,
-        28: 5.53,
-      },
-    },
+const SettingsModal = ({ onClose }) => {
+  const [activeTab, setActiveTab] = useState('Profile');
+  const [user, setUser] = useState({
+    name: 'John Smith',
+    email: 'john@gmail.com',
+    company: 'Pharmaceutical Pvt Ltd.',
+    position: 'Senior Manager',
+    phone: '+1 (555) 123-4567',
+    avatar: null
+  });
+  
+  // Form validation states
+  const [errors, setErrors] = useState({
+    name: '',
+    email: '',
+    phone: ''
+  });
+  
+  // Refs
+  const fileInputRef = useRef(null);
+  
+  // Settings states
+  const [industry, setIndustry] = useState('Pharmaceutical');
+  const [industryDropdown, setIndustryDropdown] = useState(false);
+  const industries = ['Pharmaceutical', 'Chemical', 'Automotive', 'Healthcare', 'Technology'];
+  
+  const [language, setLanguage] = useState('English');
+  const [languageDropdown, setLanguageDropdown] = useState(false);
+  const languages = ['English', 'Hindi', 'Gujarati', 'Spanish', 'French'];
+  
+  const [theme, setTheme] = useState('Light');
+  const [themeDropdown, setThemeDropdown] = useState(false);
+  const themes = ['Light', 'Dark', 'System'];
+  
+  // Toggle states
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [pushNotifications, setPushNotifications] = useState(true);
+  const [securityAlerts, setSecurityAlerts] = useState(true);
+  
+  // Danger zone states
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Validate form fields
+  const validateField = (name, value) => {
+    let error = '';
+    
+    if (name === 'name' && !value.trim()) {
+      error = 'Name is required';
+    } else if (name === 'email') {
+      if (!value.trim()) {
+        error = 'Email is required';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        error = 'Invalid email format';
+      }
+    } else if (name === 'phone' && !/^\+?[\d\s\-()]+$/.test(value)) {
+      error = 'Invalid phone number';
+    }
+    
+    setErrors(prev => ({ ...prev, [name]: error }));
+    return !error;
   };
 
-  const best_vendors = analytics_response["final"]
-  const better_vendors = analytics_response["better"]
-  const all_vendors = analytics_response["all"]
-  console.log("best", best_vendors);
-  console.log("better", better_vendors);
-  console.log("all", all_vendors);
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setUser(prev => ({ ...prev, [name]: value }));
+    validateField(name, value);
+  };
 
-  const best_json = [];
-  const better_json = [];
-  const all_json = []
+  const handleSaveChanges = () => {
+    // Validate all fields before saving
+    const isNameValid = validateField('name', user.name);
+    const isEmailValid = validateField('email', user.email);
+    const isPhoneValid = validateField('phone', user.phone);
+    
+    if (isNameValid && isEmailValid && isPhoneValid) {
+      // Here you would typically make an API call to save changes
+      alert('Settings saved successfully!');
+    }
+  };
 
-  Object.keys(best_vendors["supply_id"]).forEach(index => {
-    best_json.push({
-      "supply_id": best_vendors["supply_id"][index],
-      "supply_score": best_vendors["supply_score"][index],
-      "vendor_id": best_vendors["vendor_id"][index],
-      "vendor_supply_capacity": best_vendors["vendor_supply_capacity"][index],
-      "Distance": best_vendors["Distance"][index]
-    });
-  });
+  const handleDeleteAccount = () => {
+    // Account deletion logic
+    alert('Account deletion initiated');
+    setShowDeleteConfirm(false);
+    onClose();
+  };
 
-  // Object.keys(better_vendors["supply_id"]).forEach(index => {
-  //   better_json.push({
-  //     "supply_id": best_vendors["supply_id"][index],
-  //     "supply_score": best_vendors["supply_score"][index],
-  //     "vendor_id": best_vendors["vendor_id"][index],
-  //     "vendor_supply_capacity": best_vendors["vendor_supply_capacity"][index],
-  //     "Distance": best_vendors["Distance"][index]
-  //   });
-  // });
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.match('image.*')) {
+        alert('Please select an image file');
+        return;
+      }
+      
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        alert('Image size should be less than 2MB');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setUser(prev => ({ ...prev, avatar: event.target.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
-  Object.keys(all_vendors["supply_id"]).forEach(index => {
-    all_json.push({
-      "supply_id": all_vendors["supply_id"][index],
-      "vendor_id": all_vendors["vendor_id"][index],
-      "vendor_supply_capacity": all_vendors["vendor_supply_capacity"][index],
-      "Distance": all_vendors["Dist"][index],
-      "supply_score": all_vendors["Final_Score_With_Features"][index]
-    })
-  })
+  const removePhoto = () => {
+    setUser(prev => ({ ...prev, avatar: null }));
+  };
 
-  const displayedData = viewMode === "best" ? best_json : viewMode === "better" ? better_json : all_json;
+  const triggerFileInput = () => {
+    fileInputRef.current.click();
+  };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full h-screen bg-[#f4f4f9]">
-      <div className="w-[95%] h-[95%] mx-auto my-5 p-5 bg-white rounded-lg shadow-md">
-        <div className="title w-full p-1 h-[10%]">
-          <div className="text-5xl text-center it">Supply & Vendors</div>
-        </div>
-
-        <div className="select-sections py-2 h-[10%]">
-          <div className="flex items-center gap-2">
-            <button className="cursor-pointer bg-gradient-to-r from-green-400 to-green-600 text-white inline-flex items-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 hover:from-green-500 hover:to-green-700 h-9 px-3" onClick={() => setViewMode("all")}>
-              <FaList size={22} />
-              All Vendors
-            </button>
-
-            <button className="cursor-pointer bg-gradient-to-r from-yellow-400 to-yellow-600 text-white inline-flex items-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 hover:from-yellow-500 hover:to-yellow-700 h-9 px-3" onClick={() => setViewMode("better")}>
-              <FaStar size={22} />
-              Better Vendors
-            </button>
-
-            <button className="cursor-pointer bg-gradient-to-r from-red-400 to-red-600 text-white inline-flex items-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 hover:from-red-500 hover:to-red-700 h-9 px-3" onClick={() => setViewMode("best")}>
-              <FaAward size={22} />
-              Best Vendors
-            </button>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl h-[85vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-[#0e2044] text-white p-4 flex justify-between items-center">
+          <div className="flex items-center space-x-3">
+            <IoSettingsOutline className="text-xl" />
+            <h2 className="text-xl font-bold">Account Settings</h2>
           </div>
+          <button 
+            onClick={onClose}
+            className="p-1 rounded-full hover:bg-white hover:bg-opacity-20 transition"
+          >
+            <IoClose className="text-xl" />
+          </button>
         </div>
-
-        <div className="venodr-listing py-5 h-[80%]">
-          <div className="overflow-auto h-full">
-          <table className="w-full">
-              <thead>
-                <tr>
-                  <th className="p-3 border">Supply ID</th>
-                  <th className="p-3 border">Final Score</th>
-                  <th className="p-3 border">Vendor ID</th>
-                  <th className="p-3 border">Vendor Supply Capacity</th>
-                  <th className="p-3 border">Distance(Km)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedData.map((val, index) => {
-                  return (<tr key={index} className="border text-center hover:bg-gray-100">
-                    <td className="p-3 border">{val.supply_id}</td>
-                    <td className="p-3 border">{val.supply_score.toFixed(2)}</td>
-                    <td className="p-3 border">{val.vendor_id}</td>
-                    <td className="p-3 border">{val.vendor_supply_capacity}</td>
-                    <td className="p-3 border">{val.Distance.toFixed(2)}</td>
-                  </tr>)
-                })}
-              </tbody>
-            </table>
-          </div>
+        
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar */}
+          <div className="w-56 bg-gray-50 border-r flex flex-col">
+            <div className="p-4 border-b">
+              <div className="flex items-center space-x-3">
+                {user.avatar ? (
+                  <img 
+                    src={user.avatar} 
+                    alt="User" 
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                    <CiUser className="text-gray-600 text-xl" />
+                  </div>
+                )}
+                <div>
+                  <p className="font-medium">{user.name}</p>
+                  <p className="text-xs text-gray-500">{user.email}</p>
+                </div>
+              </div>
+            </div>
             
+            <nav className="flex-1 overflow-y-auto p-2">
+              <button
+                onClick={() => setActiveTab('Profile')}
+                className={`w-full flex items-center space-x-2 p-3 rounded-lg text-left transition ${activeTab === 'Profile' ? 'bg-[#41b655] text-white' : 'hover:bg-gray-100'}`}
+              >
+                <IoMdPerson />
+                <span>Profile</span>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('Security')}
+                className={`w-full flex items-center space-x-2 p-3 rounded-lg text-left transition ${activeTab === 'Security' ? 'bg-[#41b655] text-white' : 'hover:bg-gray-100'}`}
+              >
+                <IoMdLock />
+                <span>Security</span>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('Notifications')}
+                className={`w-full flex items-center space-x-2 p-3 rounded-lg text-left transition ${activeTab === 'Notifications' ? 'bg-[#41b655] text-white' : 'hover:bg-gray-100'}`}
+              >
+                <IoMdNotificationsOutline />
+                <span>Notifications</span>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('Preferences')}
+                className={`w-full flex items-center space-x-2 p-3 rounded-lg text-left transition ${activeTab === 'Preferences' ? 'bg-[#41b655] text-white' : 'hover:bg-gray-100'}`}
+              >
+                <IoMdColorPalette />
+                <span>Preferences</span>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('DangerZone')}
+                className={`w-full flex items-center space-x-2 p-3 rounded-lg text-left transition ${activeTab === 'DangerZone' ? 'bg-red-100 text-red-600' : 'hover:bg-gray-100'}`}
+              >
+                <IoMdInformationCircle />
+                <span>Danger Zone</span>
+              </button>
+            </nav>
+            
+            <div className="p-4 border-t">
+              <button className="w-full flex items-center justify-center space-x-2 p-2 text-red-600 rounded-lg hover:bg-red-50 transition">
+                <IoMdLogOut />
+                <span>Log Out</span>
+              </button>
+            </div>
+          </div>
+          
+          {/* Main Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {/* Profile Tab */}
+            {activeTab === 'Profile' && (
+              <div className="space-y-6 h-full flex flex-col">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Personal Information</h3>
+                  <button 
+                    onClick={handleSaveChanges}
+                    className="px-4 py-2 bg-[#41b655] text-white rounded-lg hover:bg-green-600 transition disabled:opacity-50"
+                    disabled={Object.values(errors).some(error => error)}
+                  >
+                    Save Changes
+                  </button>
+                </div>
+                
+                <div className="flex flex-col md:flex-row gap-6 flex-1 overflow-auto">
+                  <div className="flex flex-col items-center space-y-3">
+                    {user.avatar ? (
+                      <img 
+                        src={user.avatar} 
+                        alt="User" 
+                        className="w-24 h-24 rounded-full object-cover border-4 border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-gray-200 flex items-center justify-center">
+                        <CiUser className="text-gray-600 text-4xl" />
+                      </div>
+                    )}
+                    <input 
+                      type="file" 
+                      ref={fileInputRef}
+                      onChange={handlePhotoUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <div className="flex space-x-2">
+                      <button 
+                        onClick={triggerFileInput}
+                        className="text-sm px-3 py-1 bg-[#41b655] text-white rounded-lg hover:bg-green-600 transition"
+                      >
+                        {user.avatar ? 'Change' : 'Upload'}
+                      </button>
+                      {user.avatar && (
+                        <button 
+                          onClick={removePhoto}
+                          className="text-sm px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Personal Information Group */}
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-gray-700 border-b pb-2">Personal Details</h4>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Full Name*</label>
+                        <input
+                          type="text"
+                          name="name"
+                          value={user.name}
+                          onChange={handleInputChange}
+                          onBlur={(e) => validateField('name', e.target.value)}
+                          className={`w-full px-3 py-2 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-[#41b655] focus:border-transparent`}
+                        />
+                        {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email*</label>
+                        <input
+                          type="email"
+                          name="email"
+                          value={user.email}
+                          onChange={handleInputChange}
+                          onBlur={(e) => validateField('email', e.target.value)}
+                          className={`w-full px-3 py-2 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-[#41b655] focus:border-transparent`}
+                        />
+                        {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                        <input
+                          type="tel"
+                          name="phone"
+                          value={user.phone}
+                          onChange={handleInputChange}
+                          onBlur={(e) => validateField('phone', e.target.value)}
+                          className={`w-full px-3 py-2 border ${errors.phone ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-[#41b655] focus:border-transparent`}
+                        />
+                        {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+                      </div>
+                    </div>
+                    
+                    {/* Professional Information Group */}
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-gray-700 border-b pb-2">Professional Details</h4>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                        <input
+                          type="text"
+                          name="company"
+                          value={user.company}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#41b655] focus:border-transparent"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                        <input
+                          type="text"
+                          name="position"
+                          value={user.position}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#41b655] focus:border-transparent"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+                        <div className="relative">
+                          <button
+                            onClick={() => setIndustryDropdown(!industryDropdown)}
+                            className="w-full flex justify-between items-center px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                          >
+                            <span>{industry}</span>
+                            {industryDropdown ? <IoMdArrowDropup /> : <IoMdArrowDropdown />}
+                          </button>
+                          {industryDropdown && (
+                            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+                              {industries.map((item) => (
+                                <button
+                                  key={item}
+                                  onClick={() => {
+                                    setIndustry(item);
+                                    setIndustryDropdown(false);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${industry === item ? 'bg-[#41b655] text-white hover:bg-[#41b655]' : ''}`}
+                                >
+                                  {item}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Security Tab */}
+            {activeTab === 'Security' && (
+              <div className="space-y-6 h-full flex flex-col">
+                <h3 className="text-lg font-semibold">Security Settings</h3>
+                
+                <div className="space-y-4 flex-1 overflow-auto">
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-medium">Password</h4>
+                        <p className="text-sm text-gray-500">Last changed 3 months ago</p>
+                      </div>
+                      <button className="text-[#41b655] hover:underline">Change Password</button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-medium">Login Activity</h4>
+                        <p className="text-sm text-gray-500">View your recent login history</p>
+                      </div>
+                      <button className="text-[#41b655] hover:underline">View Activity</button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-medium">Session Management</h4>
+                        <p className="text-sm text-gray-500">Manage active sessions</p>
+                      </div>
+                      <button className="text-[#41b655] hover:underline">Manage Sessions</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Notifications Tab */}
+            {activeTab === 'Notifications' && (
+              <div className="space-y-6 h-full flex flex-col">
+                <h3 className="text-lg font-semibold">Notification Preferences</h3>
+                
+                <div className="space-y-4 flex-1 overflow-auto">
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-medium">Email Notifications</h4>
+                        <p className="text-sm text-gray-500">Receive notifications via email</p>
+                      </div>
+                      <div 
+                        onClick={() => setEmailNotifications(!emailNotifications)}
+                        className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${emailNotifications ? 'bg-[#41b655]' : 'bg-gray-300'}`}
+                      >
+                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${emailNotifications ? 'translate-x-6' : ''}`}></div>
+                      </div>
+                    </div>
+                    
+                    {emailNotifications && (
+                      <div className="mt-3 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-sm">Product Updates</p>
+                            <p className="text-xs text-gray-500">News about new features and improvements</p>
+                          </div>
+                          <input type="checkbox" defaultChecked className="h-4 w-4 text-[#41b655] rounded" />
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-sm">Security Alerts</p>
+                            <p className="text-xs text-gray-500">Important notifications about your account security</p>
+                          </div>
+                          <input type="checkbox" defaultChecked className="h-4 w-4 text-[#41b655] rounded" />
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-sm">Marketing Communications</p>
+                            <p className="text-xs text-gray-500">News and offers (you can unsubscribe anytime)</p>
+                          </div>
+                          <input type="checkbox" className="h-4 w-4 text-[#41b655] rounded" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-medium">Push Notifications</h4>
+                        <p className="text-sm text-gray-500">Receive notifications on your device</p>
+                      </div>
+                      <div 
+                        onClick={() => setPushNotifications(!pushNotifications)}
+                        className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${pushNotifications ? 'bg-[#41b655]' : 'bg-gray-300'}`}
+                      >
+                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${pushNotifications ? 'translate-x-6' : ''}`}></div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-medium">Security Alerts</h4>
+                        <p className="text-sm text-gray-500">Get notified about important security events</p>
+                      </div>
+                      <div 
+                        onClick={() => setSecurityAlerts(!securityAlerts)}
+                        className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${securityAlerts ? 'bg-[#41b655]' : 'bg-gray-300'}`}
+                      >
+                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${securityAlerts ? 'translate-x-6' : ''}`}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Preferences Tab */}
+            {activeTab === 'Preferences' && (
+              <div className="space-y-6 h-full flex flex-col">
+                <h3 className="text-lg font-semibold">App Preferences</h3>
+                
+                <div className="space-y-4 flex-1 overflow-auto">
+                  <div className="p-4 border rounded-lg">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
+                    <div className="relative">
+                      <button
+                        onClick={() => setLanguageDropdown(!languageDropdown)}
+                        className="w-full flex justify-between items-center px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                      >
+                        <span>{language}</span>
+                        {languageDropdown ? <IoMdArrowDropup /> : <IoMdArrowDropdown />}
+                      </button>
+                      {languageDropdown && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+                          {languages.map((item) => (
+                            <button
+                              key={item}
+                              onClick={() => {
+                                setLanguage(item);
+                                setLanguageDropdown(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${language === item ? 'bg-[#41b655] text-white hover:bg-[#41b655]' : ''}`}
+                            >
+                              {item}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Theme</label>
+                    <div className="relative">
+                      <button
+                        onClick={() => setThemeDropdown(!themeDropdown)}
+                        className="w-full flex justify-between items-center px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                      >
+                        <span>{theme}</span>
+                        {themeDropdown ? <IoMdArrowDropup /> : <IoMdArrowDropdown />}
+                      </button>
+                      {themeDropdown && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+                          {themes.map((item) => (
+                            <button
+                              key={item}
+                              onClick={() => {
+                                setTheme(item);
+                                setThemeDropdown(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${theme === item ? 'bg-[#41b655] text-white hover:bg-[#41b655]' : ''}`}
+                            >
+                              {item}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Time Zone</label>
+                    <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#41b655] focus:border-transparent">
+                      <option>(UTC-05:00) Eastern Time (US & Canada)</option>
+                      <option>(UTC-08:00) Pacific Time (US & Canada)</option>
+                      <option>(UTC+00:00) London</option>
+                      <option>(UTC+05:30) India</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Danger Zone Tab */}
+            {activeTab === 'DangerZone' && (
+              <div className="space-y-6 h-full flex flex-col">
+                <h3 className="text-lg font-semibold text-red-600">Danger Zone</h3>
+                
+                <div className="space-y-4 flex-1 overflow-auto">
+                  <div className="p-4 border border-red-200 rounded-lg bg-red-50">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-medium text-red-700">Delete Account</h4>
+                        <p className="text-sm text-red-600">Permanently delete your account and all data</p>
+                      </div>
+                      <button 
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    
+                    {showDeleteConfirm && (
+                      <div className="mt-4 p-4 bg-white border border-red-300 rounded-lg">
+                        <h5 className="font-medium mb-2">Are you absolutely sure?</h5>
+                        <p className="text-sm text-gray-600 mb-4">
+                          This action cannot be undone. This will permanently delete your account and remove all data associated with it.
+                        </p>
+                        <div className="flex justify-end space-x-3">
+                          <button 
+                            onClick={() => setShowDeleteConfirm(false)}
+                            className="px-3 py-1 border rounded-lg hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                          <button 
+                            onClick={handleDeleteAccount}
+                            className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                          >
+                            Confirm Deletion
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-medium text-yellow-700">Export Data</h4>
+                        <p className="text-sm text-yellow-600">Download all your data in a ZIP file</p>
+                      </div>
+                      <button className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition">
+                        Export
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-medium">Deactivate Account</h4>
+                        <p className="text-sm text-gray-600">Temporarily disable your account</p>
+                      </div>
+                      <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+                        Deactivate
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
-}
+};
 
-export default ChatScreen;
+export default SettingsModal;

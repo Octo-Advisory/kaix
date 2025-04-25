@@ -450,7 +450,7 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                         # Find the best vendor based on the logic provided
                         req_cap = minimum_supply_requirement
                         pref_r = prefered_range
-                        final_result_for_vendors_df = vendors_for_supply[["supply_id", "Final_Score_With_Features", "vendor_id", "vendor_supply_capacity", 'years_of_experience', 'no_of_locations', 'no_of_past_clients', 'no_of_servieces', 'no_of_employees', 'latitude_longitude', "Dist"]].sort_values(by =["Final_Score_With_Features"], ascending = False)
+                        final_result_for_vendors_df = vendors_for_supply[["supply_id", "Final_Score_With_Features", "vendor_id"]].sort_values(by =["Final_Score_With_Features"], ascending = False) #, "vendor_supply_capacity", 'years_of_experience', 'no_of_locations', 'no_of_past_clients', 'no_of_servieces', 'no_of_employees', 'latitude_longitude', "Dist"
                         all_vendors_df = pd.concat([all_vendors_df, final_result_for_vendors_df], axis=0)
                         best_ranked_row = vendors_for_supply.loc[
                             vendors_for_supply["Final_Score_With_Features"].idxmax()
@@ -466,14 +466,14 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                 # "minimum_supply_requirement": minimum_supply_requirement,
                                 "Final_Score_With_Features": best_ranked_row["Final_Score_With_Features"],
                                 "vendor_id": best_ranked_row["vendor_id"],
-                                "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
-                                "years_of_experience": best_ranked_row["years_of_experience"],
-                                "no_of_locations": best_ranked_row["no_of_locations"],
-                                "no_of_past_clients": best_ranked_row["no_of_past_clients"],
-                                "no_of_servieces": best_ranked_row["no_of_servieces"],
-                                "no_of_employees": best_ranked_row["no_of_employees"],
-                                "latitude_longitude": best_ranked_row["latitude_longitude"],
-                                "Dist": best_ranked_row["Dist"],
+                                # "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
+                                # "years_of_experience": best_ranked_row["years_of_experience"],
+                                # "no_of_locations": best_ranked_row["no_of_locations"],
+                                # "no_of_past_clients": best_ranked_row["no_of_past_clients"],
+                                # "no_of_servieces": best_ranked_row["no_of_servieces"],
+                                # "no_of_employees": best_ranked_row["no_of_employees"],
+                                # "latitude_longitude": best_ranked_row["latitude_longitude"],
+                                # "Dist": best_ranked_row["Dist"],
                                 "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                 
                             })
@@ -492,14 +492,14 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                         # "minimum_supply_requirement": minimum_supply_requirement,
                                         "Final_Score_With_Features": best_ranked_row["Final_Score_With_Features"],
                                         "vendor_id": best_ranked_row["vendor_id"],
-                                        "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
-                                        "years_of_experience": best_ranked_row["years_of_experience"],
-                                        "no_of_locations": best_ranked_row["no_of_locations"],
-                                        "no_of_past_clients": best_ranked_row["no_of_past_clients"],
-                                        "no_of_servieces": best_ranked_row["no_of_servieces"],
-                                        "no_of_employees": best_ranked_row["no_of_employees"],
-                                        "latitude_longitude": best_ranked_row["latitude_longitude"],
-                                        "Dist": best_ranked_row["Dist"],
+                                        # "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
+                                        # "years_of_experience": best_ranked_row["years_of_experience"],
+                                        # "no_of_locations": best_ranked_row["no_of_locations"],
+                                        # "no_of_past_clients": best_ranked_row["no_of_past_clients"],
+                                        # "no_of_servieces": best_ranked_row["no_of_servieces"],
+                                        # "no_of_employees": best_ranked_row["no_of_employees"],
+                                        # "latitude_longitude": best_ranked_row["latitude_longitude"],
+                                        # "Dist": best_ranked_row["Dist"],
                                         "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                         
                                     }
@@ -511,14 +511,14 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                     # "minimum_supply_requirement": minimum_supply_requirement,
                                     "Final_Score_With_Features": best_g_cap_row["Final_Score_With_Features"],
                                     "vendor_id": best_g_cap_row["vendor_id"],
-                                    "vendor_supply_capacity": best_g_cap_row["vendor_supply_capacity"],
-                                    "years_of_experience": best_g_cap_row["years_of_experience"],
-                                    "no_of_locations": best_g_cap_row["no_of_locations"],
-                                    "no_of_past_clients": best_g_cap_row["no_of_past_clients"],
-                                    "no_of_servieces": best_g_cap_row["no_of_servieces"],
-                                    "no_of_employees": best_g_cap_row["no_of_employees"],
-                                    "latitude_longitude": best_g_cap_row["latitude_longitude"],
-                                    "Dist": best_g_cap_row["Dist"],
+                                    # "vendor_supply_capacity": best_g_cap_row["vendor_supply_capacity"],
+                                    # "years_of_experience": best_g_cap_row["years_of_experience"],
+                                    # "no_of_locations": best_g_cap_row["no_of_locations"],
+                                    # "no_of_past_clients": best_g_cap_row["no_of_past_clients"],
+                                    # "no_of_servieces": best_g_cap_row["no_of_servieces"],
+                                    # "no_of_employees": best_g_cap_row["no_of_employees"],
+                                    # "latitude_longitude": best_g_cap_row["latitude_longitude"],
+                                    # "Dist": best_g_cap_row["Dist"],
                                     "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                     
                                     })
@@ -533,14 +533,14 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                     # "minimum_supply_requirement": minimum_supply_requirement,
                                     "Final_Score_With_Features": best_ranked_row["Final_Score_With_Features"],
                                     "vendor_id": best_ranked_row["vendor_id"],
-                                    "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
-                                    "years_of_experience": best_ranked_row["years_of_experience"],
-                                    "no_of_locations": best_ranked_row["no_of_locations"],
-                                    "no_of_past_clients": best_ranked_row["no_of_past_clients"],
-                                    "no_of_servieces": best_ranked_row["no_of_servieces"],
-                                    "no_of_employees": best_ranked_row["no_of_employees"],
-                                    "latitude_longitude": best_ranked_row["latitude_longitude"],
-                                    "Dist": best_ranked_row["Dist"],
+                                    # "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
+                                    # "years_of_experience": best_ranked_row["years_of_experience"],
+                                    # "no_of_locations": best_ranked_row["no_of_locations"],
+                                    # "no_of_past_clients": best_ranked_row["no_of_past_clients"],
+                                    # "no_of_servieces": best_ranked_row["no_of_servieces"],
+                                    # "no_of_employees": best_ranked_row["no_of_employees"],
+                                    # "latitude_longitude": best_ranked_row["latitude_longitude"],
+                                    # "Dist": best_ranked_row["Dist"],
                                     "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                     
                                 })

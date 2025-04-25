@@ -256,13 +256,13 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
             for _, row in area_df.iterrows():
                 results.append({
                     'Incentive ID': row['incentive_id'],
-                    # 'Incentive Name': row['Incentive_name'],
-                    # 'Incentive Type': row['Incentive Type'],
-                    # 'Incentive Rank': row['incentive_rank'],
-                    # 'description': row['description'],
-                    # 'Incentive Details': row['Incentive Details'],
-                    # 'Incentive Start Date': row['Incentive Start Date'],
-                    # 'Incentive End Date': row['Incentive End Date'],
+                    'Incentive Name': row['Incentive_name'],
+                    'Incentive Type': row['Incentive Type'],
+                    'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'Area'
                 })
         
@@ -272,13 +272,13 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
             for _, row in city_df.iterrows():
                 results.append({
                     'Incentive ID': row['incentive_id'],
-                    # 'Incentive Name': row['Incentive_name'],
-                    # 'Incentive Type': row['Incentive Type'],
-                    # 'Incentive Rank': row['incentive_rank'],
-                    # 'description': row['description'],
-                    # 'Incentive Details': row['Incentive Details'],
-                    # 'Incentive Start Date': row['Incentive Start Date'],
-                    # 'Incentive End Date': row['Incentive End Date'],
+                    'Incentive Name': row['Incentive_name'],
+                    'Incentive Type': row['Incentive Type'],
+                    'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'City'
                 })
         
@@ -288,13 +288,13 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
             for _, row in state_df.iterrows():
                 results.append({
                     'Incentive ID': row['incentive_id'],
-                    # 'Incentive Name': row['Incentive_name'],
-                    # 'Incentive Type': row['Incentive Type'],
-                    # 'Incentive Rank': row['incentive_rank'],
-                    # 'description': row['description'],
-                    # 'Incentive Details': row['Incentive Details'],
-                    # 'Incentive Start Date': row['Incentive Start Date'],
-                    # 'Incentive End Date': row['Incentive End Date'],
+                    'Incentive Name': row['Incentive_name'],
+                    'Incentive Type': row['Incentive Type'],
+                    'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'State'
                 })
     
@@ -305,13 +305,13 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
             for _, row in city_df.iterrows():
                 results.append({
                     'Incentive ID': row['incentive_id'],
-                    # 'Incentive Name': row['Incentive_name'],
-                    # 'Incentive Type': row['Incentive Type'],
-                    # 'Incentive Rank': row['incentive_rank'],
-                    # 'description': row['description'],
-                    # 'Incentive Details': row['Incentive Details'],
-                    # 'Incentive Start Date': row['Incentive Start Date'],
-                    # 'Incentive End Date': row['Incentive End Date'],
+                    'Incentive Name': row['Incentive_name'],
+                    'Incentive Type': row['Incentive Type'],
+                    'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'City'
                 })
         
@@ -321,13 +321,13 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
             for _, row in state_df.iterrows():
                 results.append({
                     'Incentive ID': row['incentive_id'],
-                    # 'Incentive Name': row['Incentive_name'],
-                    # 'Incentive Type': row['Incentive Type'],
-                    # 'Incentive Rank': row['incentive_rank'],
-                    # 'description': row['description'],
-                    # 'Incentive Details': row['Incentive Details'],
-                    # 'Incentive Start Date': row['Incentive Start Date'],
-                    # 'Incentive End Date': row['Incentive End Date'],
+                    'Incentive Name': row['Incentive_name'],
+                    'Incentive Type': row['Incentive Type'],
+                    'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'State'
                 })
     elif state_id:
@@ -337,13 +337,13 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
             for _, row in state_df.iterrows():
                 results.append({
                     'Incentive ID': row['incentive_id'],
-                    # 'Incentive Name': row['Incentive_name'],
-                    # 'Incentive Type': row['Incentive Type'],
-                    # 'Incentive Rank': row['incentive_rank'],
-                    # 'description': row['description'],
-                    # 'Incentive Details': row['Incentive Details'],
-                    # 'Incentive Start Date': row['Incentive Start Date'],
-                    # 'Incentive End Date': row['Incentive End Date'],
+                    'Incentive Name': row['Incentive_name'],
+                    'Incentive Type': row['Incentive Type'],
+                    'Incentive Rank': row['incentive_rank'],
+                    'description': row['description'],
+                    'Incentive Details': row['Incentive Details'],
+                    'Incentive Start Date': row['Incentive Start Date'],
+                    'Incentive End Date': row['Incentive End Date'],
                     'Level': 'State'
                 })
     # Country-level approvals
@@ -352,13 +352,13 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
         for _, row in country_df.iterrows():
             results.append({
                 'Incentive ID': row['incentive_id'],
-                # 'Incentive Name': row['Incentive_name'],
-                # 'Incentive Type': row['Incentive Type'],
-                # 'Incentive Rank': row['incentive_rank'],
-                # 'description': row['description'],
-                # 'Incentive Details': row['Incentive Details'],
-                # 'Incentive Start Date': row['Incentive Start Date'],
-                # 'Incentive End Date': row['Incentive End Date'],
+                'Incentive Name': row['Incentive_name'],
+                'Incentive Type': row['Incentive Type'],
+                'Incentive Rank': row['incentive_rank'],
+                'description': row['description'],
+                'Incentive Details': row['Incentive Details'],
+                'Incentive Start Date': row['Incentive Start Date'],
+                'Incentive End Date': row['Incentive End Date'],
                 'Level': 'Country'
             })
     

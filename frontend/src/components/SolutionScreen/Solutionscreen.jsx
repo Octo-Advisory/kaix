@@ -22,8 +22,9 @@ function Solutionscreen() {
   if (result.length === 0) {
     return null; // Prevents rendering if navigation happens
   }
-  // console.log("resultin solution scdeen", result);
+  console.log("resultin solution scdeen", result);
   const user_intension = result[0]["user_intension"]
+  const Analytics_response = result[0]?.["Analytics_response"]
   return (
     <div className='h-screen flex w-full items-center'>
       {user_intension === "Query to build industry from Scratch" ? (
@@ -31,9 +32,9 @@ function Solutionscreen() {
       ) : user_intension === "Query to Get Employee Search" ? (
         <Empresult result={result[0]} />
       ) : user_intension === "Query to search Incentives" ? (
-        <Incentiveresult result={result[0]} />
+        <Incentiveresult result={JSON.parse(Analytics_response["Incentive Data"])} />
       ) : user_intension === "Query to Get Approvals" ? (
-        <Approvalresult result={result[0]} />
+        <Approvalresult result={Analytics_response} />
       ) : user_intension === "Query to search Vendors" ? (
         <Vendorresult result={result[0]} />) : (
         "Server Error"

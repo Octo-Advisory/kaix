@@ -12,58 +12,6 @@ from datetime import datetime
 import json
 from frontend_app.Management_Class.helpers.utility import update_llm_token
 
-@frappe.whitelist()
-def extract_incentive_details_using_ai(description: str, llm=llm_70b_vers_creative) -> Dict[str, List[str]]:
-    """
-    Uses an AI model to extract structured incentive details dynamically.
-
-    Parameters:
-        description (str): The incentive description provided by the user.
-        llm: The language model instance.
-
-    Returns:
-        Dict[str, List[str]]: A dictionary where keys are category names, 
-                              and values are lists of relevant points.
-    """
-    prompt = """
-    You are an expert in analyzing government and business incentive descriptions. 
-    Your task is to extract structured information from the following incentive description 
-    and categorize it under relevant sections. Only include categories that are explicitly mentioned.
-
-    Categories to consider:
-    - Eligibility: Who can apply or qualify for the incentive.
-    - Benefits: Financial support, subsidies, tax exemptions, or any direct advantages.
-    - Requirements: Conditions or criteria that must be met to receive the incentive.
-    - Process: Steps or application procedures involved.
-    - Other Details: Any additional relevant information.
-
-    Description:
-    {description}
-
-    Output format (only include categories present in the text):
-    {{
-        "Eligibility": ["..."],
-        "Benefits": ["..."],
-        "Requirements": ["..."],
-        "Process": ["..."],
-        "Other Details": ["..."]
-    }}
-
-    Do not add any explanations, notes, or additional text. Only return valid JSON.
-    - Ensure each category is formatted as a list of short points.
-    - Exclude any category if it is not explicitly mentioned in the description.
-    """
-    
-    prompt_template = PromptTemplate(
-        input_variables=["description"],
-        template=prompt
-    )
-
-    chain = prompt_template| llm
-    response = chain.invoke({"description": description})
-    update_llm_token(response)
-    return response.content.strip()
-
 def fetch_query_results(query):
     """
     Executes a given SQL query and returns the results.
