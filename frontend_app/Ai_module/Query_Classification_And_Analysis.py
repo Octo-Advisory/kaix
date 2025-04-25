@@ -2,13 +2,16 @@ import os
 import re
 import json 
 from typing import List, Dict, Tuple, Union
+import copy
 # from dotenv import load_dotenv
 import spacy
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from rapidfuzz import fuzz, process
+from langchain.schema import HumanMessage, AIMessage
 import frappe
 from frontend_app.Management_Class.helpers.utility import update_llm_token  
+from frontend_app.Management_Class.Redis_management.Redis_chat import get_chat,save_chat,get_state,save_state
 import configparser
 
 # from langchain_openai import ChatOpenAI
@@ -91,8 +94,36 @@ def refine_query_with_history(history, latest_query, llm):
 
 # Define the function
 @frappe.whitelist()
-def classify_query(user_query):
-    # Define the refined prompt template 
+def classify_query(user_query: str) -> str:
+    """
+    Classifies a business-related query into one of eight predefined categories based on its intent and context.
+
+    Parameters:
+    -----------
+    user_query : str
+        A user-submitted query related to industry or business.
+
+    Returns:
+    --------
+    str
+        A single category name from the following list that best matches the user's query:
+        
+        - "Query to build industry from Scratch"
+        - "Query to search Vendors"
+        - "Query to search Incentives"
+        - "Query to Get Approvals"
+        - "Query to Get Employee Search"
+        - "Negatively Intended Query"
+        - "Other industry-related queries"
+        - "Valueless queries"
+
+    Notes:
+    ------
+    - The classification is powered by a language model and follows strict rules for interpreting the query’s intent.
+    - Only one category is returned per query.
+    - The function does not provide explanations or return multiple categories.
+    """
+    
     prompt_template = """
     You are an expert in understanding business-related queries and classifying them into a single most relevant category.
     Your task is to strictly assign the query to only one category, even if multiple classes seem applicable.  
@@ -125,14 +156,21 @@ def classify_query(user_query):
         - Example: What is the availability of employment in XYZ area for the Pharmaceutical industry?  
         - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
 
+    6. Negatively Intended Query:
+        - Example: I don't want to search for incentives for the cement industry in Ahmedabad.  
+        - This category is used for queries where the user clearly expresses that they do not want to proceed with a specific industry-related topic (such as incentives, approvals, vendors, land, or employment).  
+        - This includes statements where the user rejects, declines, or expresses disinterest, such as "I don't want to...", "No need to...", or "I'm not looking for...".  
+        - Classify here only if the overall intent is negative toward one or more categories and there is no indication that the user still wants to proceed within the same topic under different parameters (e.g., different city or industry).  
+        - Do not classify vague queries or neutral statements under this category unless the negative intent is explicit or clearly implied in context.
+
     If None of the Above Apply, Use These Two Categories:
 
-    6. Other industry-related queries:  
+    7. Other industry-related queries:  
         - Example: What is the role of AI in manufacturing?  
         - This refers to general industry discussions, trends, or innovations that do not fit into the above categories.
         - Queries about selling property, renting facilities, or unrelated infrastructure transactions should be classified here.
 
-    7. Valueless queries:  
+    8. Valueless queries:  
         - Example: Who is Donald Trump?  
         - This refers to queries that are irrelevant to business, industry setup, or supply chains.  
         - If the query contains industry-related words but the intent is not meaningful, classify it here.  
@@ -169,7 +207,7 @@ def classify_query(user_query):
     Output:  
     (Return only one category name from the list)
     """
- 
+
 
     # Initialize the LLM
     # Create the prompt
@@ -183,7 +221,6 @@ def classify_query(user_query):
 
     # Run the query through the chain
     category = chain.invoke({"query": user_query})
-    update_llm_token(category)
 
     return category.content.strip()
 
@@ -1300,7 +1337,7 @@ def extract_main_industry_and_product_universal(user_query: str, main_industries
     }
 
     # Validate against the provided list of Segments
-    validated_data = extracted_data.copy()
+    validated_data = copy.deepcopy(extracted_data)
     if main_industry not in main_industries and main_industry != "None":
         validated_data["Main-Industry"] = "Not Available in list"
 
@@ -1447,7 +1484,7 @@ def extract_sub_sector_and_product_universal(
     }
 
     # Validate against the provided list of Segments
-    validated_data = extracted_data.copy()
+    validated_data = copy.deepcopy(extracted_data)
     if sub_sector not in sub_sectors and sub_sector != "None":
         validated_data["Sub-Sector"] = "Not Available in list"
 
@@ -1593,7 +1630,7 @@ def extract_segment_and_product_universal(
     }
 
     # Validate against the provided list of Segments
-    validated_data = extracted_data.copy()
+    validated_data = copy.deepcopy(extracted_data)
     if segment not in segments and segment != "None":
         validated_data["Segment"] = "Not Available in list"
 
@@ -1720,7 +1757,6 @@ def generate_fallback_message(chat_history_for_context: List[dict], confirmation
     })
 
     return message.content.strip()
-
 
 @frappe.whitelist()
 def extract_incentive_details_using_ai(description: str, llm=llm_70b_vers_creative) -> Dict[str, List[str]]:
