@@ -15,6 +15,9 @@ import { addAIresponse, clearAiresponse } from '../../Redux/Store/Featuresilces/
 import { addResult } from '../../Redux/Store/Featuresilces/validation'
 import { useNavigate } from "react-router-dom";
 import Details from '../Details/Details';
+import { BiSidebar } from "react-icons/bi";
+import { IoSearch } from "react-icons/io5";
+import SideBar from '../SideBar/SideBar';
 
 function Chatscreen() {
   const [message, setMessage] = useState('');
@@ -289,10 +292,15 @@ function Chatscreen() {
   }, [charIndex, suggestionIndex, isDeleting]);
 
   const ref = useChatScroll(messages);
+  const [sideBar, setSideBar]=useState(false)
+
 
   return (
-    <div className="h-screen flex flex-col items-center main-screen">
-      <Navbar />
+  <div className='h-screen w-screen relative flex flex-row '>
+    <SideBar setSideBar={setSideBar} sideBar={sideBar}/>
+    <div className="h-screen flex flex-col items-center w-full transition-width duration-300 ease-in-out main-screen">
+      
+      <Navbar setSideBar={setSideBar} sideBar={sideBar}/>
       <div className="flex-1 overflow-y-auto p-4 flex justify-center w-full chatscreen" ref={ref}>
         {messages.length > 0 ? (<div
           className="chats flex flex-col space-y-5 w-[50%] mx-auto"
@@ -408,6 +416,7 @@ function Chatscreen() {
         </p>
       </div>
       <Details />
+    </div>
     </div>
   );
 }
