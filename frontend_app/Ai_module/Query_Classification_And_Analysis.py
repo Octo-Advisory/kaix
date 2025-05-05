@@ -1,7 +1,7 @@
 import os
 import re
 import json 
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Union, Any
 import copy
 # from dotenv import load_dotenv
 import spacy
@@ -1278,6 +1278,7 @@ def extract_main_industry_and_product_universal(user_query: str, main_industries
     - Ensure that the output is strictly limited to the required JSON format and contains no explanations, reasoning, or comments.  
     - Do not provide additional text, explanations, or reasoning within the fields of the JSON object.  
     - Each field in the JSON must only contain the exact extracted information or the specified fallback values (e.g., "None").  
+    - If the query mentions only a location but no specific industry or product context, do not infer the industry from prior knowledge of the location. Instead, return None.
 
     Output Format:
     Output the result strictly as a JSON object in the following format:  
@@ -1419,6 +1420,7 @@ def extract_sub_sector_and_product_universal(
     - Strictly limit the output to the required JSON format and ensure that it contains no explanations, reasoning, or additional text.  
     - Do not provide reasoning like *"This matches because..."* or *"Assumed based on context."*  
     - Each field in the JSON must contain only the extracted information or the specified fallback values (`"None"`).  
+    - If the query mentions only a location but no specific industry or product context, do not infer the sub-sector from prior knowledge of the location. Instead, return None.
 
     Provided List of Sub-Sectors:  
     {sub_sectors_str}  
@@ -1486,7 +1488,7 @@ def extract_sub_sector_and_product_universal(
     # Validate against the provided list of Segments
     validated_data = copy.deepcopy(extracted_data)
     if sub_sector not in sub_sectors and sub_sector != "None":
-        validated_data["Sub-Sector"] = "Not Available in list"
+        validated_data["Sub-Sector"] = "Not Available in List"
 
     return extracted_data, validated_data
 
@@ -1570,6 +1572,7 @@ def extract_segment_and_product_universal(
     - Ensure that the output strictly adheres to the specified JSON format without any additional reasoning, explanations, or comments.
     - Do not include any reasoning or justification in the fields. For example, avoid entries such as `"This matches because..."` or `"Assumed based on the context..."`.
     - Each field should only contain the extracted information or the specified fallback values (e.g., "None").
+    - If the query mentions only a location but no specific industry or product context, do not infer the segment from prior knowledge of the location. Instead, return None.
 
     Output the result strictly as a JSON object in the following format:
     {{
@@ -1809,3 +1812,202 @@ def extract_incentive_details_using_ai(description: str, llm=llm_70b_vers_creati
     response = chain.invoke({"description": description})
     update_llm_token(response)
     return response.content.strip()
+
+def update_user_intension(user_intension,chatId):
+    query = "UPDATE `tabSession` SET user_intension = %s WHERE name = %s"
+    frappe.db.sql(query, (user_intension, chatId))
+    frappe.db.commit() 
+
+def respond_to_negative_query(
+    user_message: str,
+    append_user_to_history: bool,
+    append_AI_to_history: bool,
+    llm,
+    chatId,
+    update_intention = True
+) -> str:
+    """
+    Reacts to negative intent in user queries by acknowledging it and 
+    politely redirecting users to supported industry-related alternatives.
+
+    Parameters:
+    - user_message (str): The most recent user input.
+    - append_user_to_history (bool): Flag to determine whether to add the user message to chat history.
+    - llm: A language model instance that supports the `.invoke()` method for prompt completion.
+
+    Returns:
+    - str: A short, polite AI-generated redirection message (max two lines).
+    """
+    chat_history = get_chat(f"chat_{chatId}") or []
+    Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-4:]]
+    if append_user_to_history:
+        chat_history.append(HumanMessage(content=user_message))
+        save_chat(chat_history,f"chat_{chatId}")
+
+    prompt_template = """
+    You are a professional AI assistant designed to help users with industry-related queries. 
+    Sometimes users may express that they do not want to proceed with a certain type of query, 
+    such as searching for vendors, incentives, employment, approvals, or land.
+
+    Your task is to:
+    - Politely acknowledge the user's intent to not continue with the current path.
+    - Respect their decision without repeating the rejected topic.
+    - Encourage them to explore other areas the platform supports — but limit suggestions to one or two concise, relevant alternatives.
+    - Keep the response short, natural, and conversational — a maximum of two lines.
+    
+    Input Usage Guidelines:
+    - Use the latest user message to understand the user’s current concern or direction.
+    - Refer to the recent conversation history only when needed to maintain context, avoid repetition, or recognize prior negative expressions.
+    - Do not restate or repeat what was already covered unless it helps clarify or smoothly redirect the conversation.
+
+    Important Instructions:
+    - Do NOT mention or re-suggest the category the user rejected — even in a different location, product, or form.
+    - If the user’s rejection appears to be specific to a location, product, or context, you may offer assistance in other locations or products — but only if it does not reintroduce the rejected category.
+    - Suggest one alternative direction naturally (two if needed) based on platform capabilities:
+        - Building an industry from scratch
+        - Searching for employment in a city or state
+        - Inquiring about incentives
+        - Finding vendors for their industry
+        - Searching for the approvals
+    - Never use "how to build an industry" or anything that implies your platform teaches or trains users. 
+    You are assisting them in setting up or building, not educating them.
+    - Keep the response strictly within two lines, using concise and polite phrasing.
+
+    Inputs:
+    - Latest user message: {user_message}
+    - Recent conversation history: {chat_history}
+
+    Output Requirements:
+    - The message should be in one short paragraph with no more than two lines.
+    - It must feel polite, helpful, and actionable — inviting the user to continue exploring relevant options.
+    - Do NOT list all supported categories. Suggest only 1–2 in natural language, avoiding list-like structure.
+    """
+
+    prompt = PromptTemplate(
+        input_variables=["user_message", "chat_history"],
+        template=prompt_template
+    )
+    chain = prompt | llm
+
+    result = chain.invoke({
+        "user_message": user_message,
+        "chat_history": "\n".join(Chat_history_normal)
+    })
+    message_from_ai = result.content.strip()
+    if append_AI_to_history:
+        chat_history.append(AIMessage(content=message_from_ai))
+        save_chat(chat_history,f"chat_{chatId}")
+    if update_intention:
+        update_user_intension("Negatively Intended Query", chatId)
+    return message_from_ai
+
+def detect_module_switch_intent(
+    user_query: str,
+    current_modules: list,
+    llm: Any,
+    chat_history: list,
+) -> dict:
+    """
+    Detects whether the user is attempting to switch from the current module(s) to a different one,
+    based on recent conversation history and the latest user query.
+
+    Parameters:
+    -----------
+    user_query : str
+        The latest message from the user.
+
+    current_modules : list
+        A list of currently active modules. Example:
+        ["Query to search Incentives"], or
+        ["Query to search Incentives", "Query to Get Approvals"]
+    
+    chat_history : list
+    A list of Message objects (HumanMessage or AIMessage), from which last few turns will be extracted.
+
+    llm : Any
+        The language model to be used (e.g., LLMChain, LangChain-compatible model).
+
+    Returns:
+    --------
+    dict
+        A JSON object with the key "switch_module" and a boolean value:
+        {
+            "switch_module": true or false
+        }
+
+    Notes:
+    ------
+    - This function does not classify the destination module; it only detects if the user
+      wants to exit the current modules based on a shift in intent.
+    """
+    Chat_history_normal = "\n".join(chat_history)
+
+    # Updated prompt
+    prompt_template = """
+    You are a smart assistant that helps decide if a user wants to switch away from the current conversation topics (called "modules").
+
+    Based on the user's most recent message, the last few exchanges, and the list of current modules, determine whether the user is
+    trying to change the topic to something outside the current active modules.
+
+    Only return "True" if it is very likely that the user wants to exit the current module(s) and move to another topic/module.
+    If the user is continuing the same conversation (asking for more detail, clarification, or responding to the assistant), return "False".
+
+    Modules include:
+    - Query to build industry from Scratch
+    - Query to search Vendors
+    - Query to search Incentives
+    - Query to Get Approvals
+    - Query to Get Employee Search
+
+    Strict Module Switch Detection Rules:
+    1. If the user mentions any module that is not part of the current module list, treat it as intent to switch.
+    2. If the user mentions multiple modules — whether or not current modules are included — it is a switch if any module lies outside the current ones.
+    Example: If current modules are ["Query to search Incentives"], and the user says “I want to check vendors and incentives”, this should be "True".
+    3. If the user is replying to the last AI message in a way that continues the same topic (e.g., confirming, following up, or asking for details),
+    you should return "False" and NOT consider this as an intent switch.
+    4. If the user’s message is vague, complex, or indirectly worded, do not rely on specific keywords. Instead, analyze the overall meaning
+    of the message to determine whether they are continuing the current topic or shifting to a new one.
+
+    Additional Understanding Requirement:
+    - Do not rely solely on specific keywords like “approvals,” “vendors,” “employment,” “incentives,” or “building industry from scratch.”
+    - Always analyze the full context of the query to determine whether these intents are present — even if users use alternative phrasing or synonyms.
+    - Examples:
+        - “Permissions,” “licenses,” “NOCs,” or “clearances” should be interpreted as approval-related.
+        - “Suppliers,” “distributors,” or “raw material sources” may indicate vendor search.
+        - “Jobs,” “workforce,” “manpower,” or “recruitment” may imply employment intent.
+        - “Subsidies,” “tax breaks,” “grants,” or “financial support” may suggest incentives.
+        - “Starting operations,” “setting up a factory,” “establishing infrastructure,” or “launching a new unit” may indicate building industry from scratch.
+    - Understand user intent even if the sentence is vague, mixed, or includes implied meanings rather than explicit phrases.
+
+    Respond with only one word: True or False
+
+    Current Modules:
+    {current_modules}
+
+    Recent Chat History:
+    {chat_history}
+
+    Latest User Message:
+    {user_query}
+
+    Output:
+    """
+
+    prompt = PromptTemplate(
+        input_variables=["current_modules", "chat_history", "user_query"],
+        template=prompt_template
+    )
+
+    chain = prompt | llm
+    result = chain.invoke({
+        "current_modules": str(current_modules),
+        "chat_history": Chat_history_normal,
+        "user_query": user_query
+    })
+
+    response = result.content.strip().lower()
+    switch_flag = response == "true"
+
+    return {
+        "switch_module": switch_flag
+    }

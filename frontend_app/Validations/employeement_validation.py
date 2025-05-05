@@ -2,6 +2,10 @@ import frappe
 
 @frappe.whitelist(allow_guest=True)
 def employment_query_validation(param):
+    '''This method extracts the parameters and checks the user intention.
+    If user intention is to find employees at a single location then parameter_check() executes else
+    comparison_parameter_check() executes. First of all this function validates whether the parameter are complete and the values are there in the database or not.
+    Then further employment values are found using several conditions in the database for the area,city, or state'''
     allLogs = []
 
     # 'User Intention': 'Comparison between cities, states, or areas'

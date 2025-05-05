@@ -37,7 +37,7 @@ def validation(aiResponse,user_intension):
                 file.write(f"\nparam {param}")
             result =  vendor_validation(param)
             with open("log.txt", "a") as file:
-                file.write(f"\nresult {result}")
+                file.write(f"\nresult by ushan {result}")
             location_check = result.get('location_check',{})
             with open("log.txt", "a") as file:
                 file.write(f"\nlocation_check {location_check}")

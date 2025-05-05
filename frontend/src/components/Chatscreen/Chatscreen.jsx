@@ -10,7 +10,7 @@ import '../Chatscreen/Chatscreen.css';
 import userIcon from '../../assets/MarsAIX person icon.png'
 import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
-import { FrappeContext, useFrappeCreateDoc, useFrappeUpdateDoc } from 'frappe-react-sdk'
+import { FrappeContext, useFrappeAuth, useFrappeCreateDoc, useFrappeGetDoc, useFrappeUpdateDoc } from 'frappe-react-sdk'
 import { addAIresponse, clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
 import { addResult } from '../../Redux/Store/Featuresilces/validation'
 import { useNavigate } from "react-router-dom";
@@ -20,6 +20,8 @@ import { IoSearch } from "react-icons/io5";
 import SideBar from '../SideBar/SideBar';
 
 function Chatscreen() {
+  const { currentUser } = useFrappeAuth();
+  const { data: userDoc } = useFrappeGetDoc('User', currentUser || '');
   const [message, setMessage] = useState('');
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.chat.messages);
@@ -173,26 +175,40 @@ function Chatscreen() {
 
   const hanldeValidation = async () => {
     try {
-      const respo = await fetch(`api/resource/Session?fields=["user_intension"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
+      console.log("chat id", chatId);
+  
+      const respo = await fetch(`/api/resource/Session?fields=["user_intension"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
         method: 'GET',
         headers: {
-          // 'Authorization': 'token your_api_token', // Replace with actual token
           'Content-Type': 'application/json'
         }
       });
-
-      const userIntesion = await respo.json()
-      const user_intension = userIntesion['data'][0]['user_intension']
-
-      const result = await validationCall(responseAi, user_intension)
-      dispatch(addResult(result))
-      return result
-
+  
+      // Check if the response is successful (status 200)
+      if (!respo.ok) {
+        throw new Error(`Request failed with status ${respo.status}`);
+      }
+  
+      // Parse the JSON response correctly
+      const userIntesion = await respo.json();
+      console.log("userIntention", userIntesion);
+  
+      // Check if 'data' is present and contains expected data
+      if (userIntesion && userIntesion.data && userIntesion.data.length > 0) {
+        const user_intension = userIntesion.data[0].user_intension;
+  
+        // Call validation and dispatch result
+        const result = await validationCall(responseAi, user_intension);
+        dispatch(addResult(result));
+        return result;
+      } else {
+        console.log("No data found for the given chatId");
+      }
     } catch (error) {
-      console.log("error is", error);
-
+      console.log("error is here", error);
     }
-  }
+  };
+  
 
   const { updateDoc } = useFrappeUpdateDoc()
 
@@ -268,31 +284,71 @@ function Chatscreen() {
     }
   }, [])
 
-  useEffect(() => {
-    const suggestion = suggestions[suggestionIndex];
+  // useEffect(() => {
+  //   const suggestion = suggestions[suggestionIndex];
 
-    if (!isDeleting && charIndex < suggestion.length) {
-      const timeout = setTimeout(() => {
-        setPlaceholder(suggestion.substring(0, charIndex + 1));
-        setCharIndex(charIndex + 1);
-      }, 50);
-      return () => clearTimeout(timeout);
-    } else if (isDeleting && charIndex > 0) {
-      const timeout = setTimeout(() => {
-        setPlaceholder(suggestion.substring(0, charIndex - 1));
-        setCharIndex(charIndex - 1);
-      }, 30);
-      return () => clearTimeout(timeout);
-    } else if (!isDeleting && charIndex === suggestion.length) {
-      setTimeout(() => setIsDeleting(true), 1000);
-    } else if (isDeleting && charIndex === 0) {
-      setIsDeleting(false);
-      setSuggestionIndex((prev) => (prev + 1) % suggestions.length);
-    }
-  }, [charIndex, suggestionIndex, isDeleting]);
+  //   if (!isDeleting && charIndex < suggestion.length) {
+  //     const timeout = setTimeout(() => {
+  //       setPlaceholder(suggestion.substring(0, charIndex + 1));
+  //       setCharIndex(charIndex + 1);
+  //     }, 50);
+  //     return () => clearTimeout(timeout);
+  //   } else if (isDeleting && charIndex > 0) {
+  //     const timeout = setTimeout(() => {
+  //       setPlaceholder(suggestion.substring(0, charIndex - 1));
+  //       setCharIndex(charIndex - 1);
+  //     }, 30);
+  //     return () => clearTimeout(timeout);
+  //   } else if (!isDeleting && charIndex === suggestion.length) {
+  //     setTimeout(() => setIsDeleting(true), 1000);
+  //   } else if (isDeleting && charIndex === 0) {
+  //     setIsDeleting(false);
+  //     setSuggestionIndex((prev) => (prev + 1) % suggestions.length);
+  //   }
+  // }, [charIndex, suggestionIndex, isDeleting]);
 
   const ref = useChatScroll(messages);
   const [sideBar, setSideBar]=useState(false)
+
+  const renderUserAvatar = (sender) => {
+    const isCurrentUser = sender === 'user';
+
+    if (sender !== 'user') {
+      return (
+        <img
+          src={botLogo1}
+          alt="Bot"
+          className="h-8 w-8 relative rounded-full"
+        />
+      );
+    }
+
+    if (isCurrentUser) {      
+      if (userDoc?.user_image) {
+        return (
+          <img
+            src={userDoc.user_image}
+            alt="User"
+            className="h-8 w-8 relative rounded-full object-cover"
+          />
+        );
+      } else {
+        return (
+          <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">
+            {currentUser?.charAt(0).toUpperCase()}
+          </div>
+        );
+      }
+    }
+
+    return (
+      <img
+        src={userIcon}
+        alt="User"
+        className="h-8 w-8 relative rounded-full"
+      />
+    );
+  };
 
 
   return (
@@ -311,19 +367,7 @@ function Chatscreen() {
               key={index}
               className={`flex gap-5 justify-start`}
             >
-              {msg.sender !== 'user' ? (
-                <img
-                  src={botLogo1}
-                  alt=""
-                  className="h-8 w-8 relative rounded-full"
-                />
-              ) : (
-                <img
-                  src={userIcon}
-                  alt=""
-                  className="h-8 w-8 relative rounded-full"
-                />
-              )}
+              {renderUserAvatar(msg.sender)}
               <div className="p-2 rounded-lg max-w-full break-words">
                 <ReactMarkdown>{msg.text}</ReactMarkdown>
               </div>
@@ -371,7 +415,7 @@ function Chatscreen() {
       <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#19a282] rounded-3xl p-2 bg-white shadow-lg">
         <div className="flex-grow">
           <textarea
-            placeholder={messages.length > 0 ? "Message Mars 2.0" : placeholder}
+            placeholder={messages.length > 0 ? "Message Mars 2.0" : "Message Mars 2.0"}
             className="w-full border-none outline-none bg-transparent text-black placeholder-[#242f6a] opacity-70 px-4 py-2 resize-none overflow-y-auto max-h-20 placeholder-opacity-75" // Adjusted classes
             value={message}
             maxLength={250}

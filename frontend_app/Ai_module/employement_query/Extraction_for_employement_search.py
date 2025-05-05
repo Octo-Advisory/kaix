@@ -8,10 +8,9 @@ from langchain.schema import HumanMessage, AIMessage
 import pandas as pd
 import frappe
 import logging
-from Query_Classification_And_Analysis import *
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat
 from frontend_app.Management_Class.helpers.utility import update_llm_token
-from frontend_app.Management_Class.Ai_management.AI import *
+from frontend_app.Management_Class.Ai_management.AI import respond_to_negative_query
 
 logging.basicConfig(
     filename='AIerror.log',  # Log file name

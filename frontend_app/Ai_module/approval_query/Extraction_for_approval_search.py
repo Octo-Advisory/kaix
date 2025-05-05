@@ -10,6 +10,8 @@ from langchain.schema import HumanMessage, AIMessage
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import get_chat,save_chat,get_state,save_state
 from frontend_app.Management_Class.helpers.utility import update_llm_token
+from frontend_app.Management_Class.Ai_management.AI import respond_to_negative_query
+
 
 def fetch_query_results(query):
     """

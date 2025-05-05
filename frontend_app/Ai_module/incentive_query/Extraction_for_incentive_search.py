@@ -424,12 +424,14 @@ def call_incentive_search(input,chatId):
     log_to_file("query intent",query_intent)
 
     if query_intent == "Negatively Intended Query":
+        log_to_file("Negatively Intended Query:::::::::::::::::::::::::",":::::::::::::")
         message = respond_to_negative_query(
-            query_intent, 
+            user_message=refine_user_input, 
             append_user_to_history=False, 
             append_AI_to_history=False, 
             llm=llm_70b_vers,
             chatId=chatId)
+        log_to_file("Negatively Intended Query:::::::::::::::::::::::::",":::::::::::::")
         chat_history.append(AIMessage(content=f"{message}"))
         save_chat(chat_history,f"chat_{chatId}")
         response = {
@@ -437,6 +439,7 @@ def call_incentive_search(input,chatId):
             "Is_confirmation" : None,
             "State" : state 
         }
+        log_to_file("Negatively Intended Query:::::::::::::::::::::::::",response)
         return response
     else:
         keyword_list = extract_important_words(refine_user_input, "Query to search Incentives")
@@ -472,7 +475,7 @@ def call_incentive_search(input,chatId):
                 state['Product'] = sub_sector_validated_Data["Product"]
                 save_state(state,f"QINC_state_{chatId}")
                 log_to_file("state['Sub-Sector']",state['Sub-Sector'])
-                if state['Sub-Sector'] == 'None':
+                if state['Sub-Sector'] == 'None' or state['Sub-Sector'] == 'Not Available in List':
                     static_follow_up = "Could you share more specific details about the product you're interested in?"
                     if location_follow_up != 'None' and location_follow_up != "Not Available in List":
                         static_follow_up = f"{location_follow_up} Could you share more specific details about the product you're interested in?"

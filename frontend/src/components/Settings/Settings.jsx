@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     IoMdNotificationsOutline,
     IoMdArrowDropdown,
@@ -15,15 +15,30 @@ import {
 } from "react-icons/io";
 import { IoClose, IoSettingsOutline } from "react-icons/io5";
 import { CiLock, CiUser } from "react-icons/ci";
+import { useFrappeAuth, useFrappeFileUpload, useFrappeGetDoc, useFrappeUpdateDoc } from 'frappe-react-sdk';
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { ToastContainer } from 'react-toastify';
+
 
 function Settings({onClose}) {
+    const { currentUser } = useFrappeAuth();
+    const { updateDoc } = useFrappeUpdateDoc();
+    const { upload } = useFrappeFileUpload();
+
+    console.log("curent use",currentUser);
+    const { data: userDoc, isLoading, error } = useFrappeGetDoc(
+        "User",
+        currentUser || "Guest" // fallback to a dummy value to avoid hook breaking
+      );
+    
     const [activeTab, setActiveTab] = useState('Profile');
     const [user, setUser] = useState({
-        name: 'John Smith',
-        email: 'john@gmail.com',
-        company: 'Pharmaceutical Pvt Ltd.',
-        position: 'Senior Manager',
-        phone: '+1 (555) 123-4567',
+        name: null,
+        email: null,
+        company: 'Marsbazaar.com',
+        position: 'Developer',
+        phone: null,
         avatar: null
     });
 
@@ -48,7 +63,7 @@ function Settings({onClose}) {
 
     const [theme, setTheme] = useState('Light');
     const [themeDropdown, setThemeDropdown] = useState(false);
-    const themes = ['Light', 'Dark', 'System'];
+    const themes = ['Light', 'Dark'];
 
     // Toggle states
     const [emailNotifications, setEmailNotifications] = useState(true);
@@ -61,6 +76,8 @@ function Settings({onClose}) {
     // Validate form fields
     const validateField = (name, value) => {
         let error = '';
+        console.log("name val",name,value);
+        
 
         if (name === 'name' && !value.trim()) {
             error = 'Name is required';
@@ -70,8 +87,12 @@ function Settings({onClose}) {
             } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
                 error = 'Invalid email format';
             }
-        } else if (name === 'phone' && !/^\+?[\d\s\-()]+$/.test(value)) {
-            error = 'Invalid phone number';
+        } else if (name === 'phone') {
+            const trimmed = value.trim();
+            const phoneRegex = /^\+?[\d\s\-()]{10,20}$/;
+            if (!phoneRegex.test(trimmed)) {
+                error = 'Invalid phone number';
+            }
         }
 
         setErrors(prev => ({ ...prev, [name]: error }));
@@ -84,17 +105,44 @@ function Settings({onClose}) {
         validateField(name, value);
     };
 
-    const handleSaveChanges = () => {
-        // Validate all fields before saving
+    const handleSaveChanges = async () => {
+        if (!user || !currentUser) return;
+    
         const isNameValid = validateField('name', user.name);
-        const isEmailValid = validateField('email', user.email);
         const isPhoneValid = validateField('phone', user.phone);
-
-        if (isNameValid && isEmailValid && isPhoneValid) {
-            // Here you would typically make an API call to save changes
-            alert('Settings saved successfully!');
+    
+        if (isNameValid && isPhoneValid) {
+            try {
+                let userImageURL = user.avatar; // fallback if image isn't changed
+    
+                if (user.avatarFile) {
+                    const uploaded = await upload(user.avatarFile, 'Home');
+                    userImageURL = uploaded?.file_url;
+                }
+    
+                await updateDoc('User', currentUser, {
+                    full_name: user.name,
+                    mobile_no: user.phone,
+                    user_image: userImageURL,
+                });
+    
+                toast.success('Profile updated successfully!', {
+                    position: "top-center",
+                    autoClose: 3000,
+                    theme: "colored",
+                });
+    
+            } catch (err) {
+                console.error('Error updating user:', err);
+                toast.error('Something went wrong while saving.', {
+                    position: "top-center",
+                    autoClose: 3000,
+                    theme: "colored",
+                });
+            }
         }
     };
+    
 
     const handleDeleteAccount = () => {
         // Account deletion logic
@@ -109,15 +157,19 @@ function Settings({onClose}) {
                 alert('Please select an image file');
                 return;
             }
-
-            if (file.size > 2 * 1024 * 1024) { // 2MB limit
+    
+            if (file.size > 2 * 1024 * 1024) {
                 alert('Image size should be less than 2MB');
                 return;
             }
-
+    
             const reader = new FileReader();
             reader.onload = (event) => {
-                setUser(prev => ({ ...prev, avatar: event.target.result }));
+                setUser(prev => ({
+                    ...prev,
+                    avatar: event.target.result,   // for image preview (base64)
+                    avatarFile: file              // store original File for Frappe upload
+                }));
             };
             reader.readAsDataURL(file);
         }
@@ -130,6 +182,20 @@ function Settings({onClose}) {
     const triggerFileInput = () => {
         fileInputRef.current.click();
     };
+
+    useEffect(() => {
+        if (userDoc) {
+          console.log("Fetched user document:", userDoc);
+          setUser({
+            name: userDoc.first_name,
+            email: userDoc.email,
+            company: 'Pharmaceutical Pvt Ltd.',
+            position: "Senior Manager",
+            phone:  userDoc.mobile_no || null,
+            avatar: userDoc.user_image || null
+        })
+        }
+      }, [userDoc]);
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -157,7 +223,7 @@ function Settings({onClose}) {
                                     <img
                                         src={user.avatar}
                                         alt="User"
-                                        className="w-10 h-10 rounded-full object-cover"
+                                        className="w-10 h-10 rounded-full object-cover relative"
                                     />
                                 ) : (
                                     <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
@@ -243,7 +309,7 @@ function Settings({onClose}) {
                                             <img
                                                 src={user.avatar}
                                                 alt="User"
-                                                className="w-24 h-24 rounded-full object-cover border-4 border-gray-200"
+                                                className="w-24 h-24 rounded-full object-cover border-4 border-gray-200 relative"
                                             />
                                         ) : (
                                             <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-gray-200 flex items-center justify-center">
@@ -295,7 +361,7 @@ function Settings({onClose}) {
 
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Email*</label>
-                                                <input
+                                                <input readOnly
                                                     type="email"
                                                     name="email"
                                                     value={user.email}
@@ -649,6 +715,7 @@ function Settings({onClose}) {
                     </div>
                 </div>
             </div>
+            <ToastContainer />
         </div>
     );
 }
