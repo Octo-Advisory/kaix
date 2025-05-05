@@ -10,6 +10,7 @@ import frappe
 import logging
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat
 from frontend_app.Management_Class.helpers.utility import update_llm_token
+from frontend_app.Management_Class.Ai_management.AI import respond_to_negative_query
 
 logging.basicConfig(
     filename='AIerror.log',  # Log file name
@@ -344,72 +345,131 @@ def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Un
     raw_output = response.content.strip()
 
     return extract_json_from_llm_response_employment(raw_output, "KEYWORDS")
-<<<<<<< HEAD
-=======
  
-def classify_employment_query(query, llm):
+def classify_employment_query(query: str, llm) -> dict:
     """
-    Classify the user's employment search query into two categories:
-    1. Individual employment status.
-    2. Comparison between cities, states, or areas.
+    Classifies a user's employment-related query into one of four categories:
+
+    1. Individual Employment Status
+    2. Comparison Between Cities, States, or Areas
+    3. Other Intentions (non-employment topics)
+    4. Negatively Intended Queries (user expresses disinterest or refusal)
+
+    The classification is determined by prompting a language model (LLM) 
+    using a detailed instruction prompt and analyzing the LLM's response.
 
     Args:
-        query (str): The user's input query.
-        llm: The language model object.
+        query (str): The user's input query related to employment or related topics.
+        llm: A language model interface that supports `.invoke()` with prompt chaining.
 
     Returns:
-        dict: A dictionary with the raw prompt, classification category, and explanation if needed.
+        dict: A dictionary containing:
+            - "raw_prompt" (str): The full prompt used to query the LLM.
+            - "classification_number" (int): One of 1, 2, 3, or 4.
+            - "classification_category" (str): The corresponding category label.
+
+    Raises:
+        ValueError: If the model's response is not a valid classification (1-4).
     """
+
     # Define the category mapping
     category_mapping = {
         1: "Individual employment status",
         2: "Comparison between cities, states, or areas",
-        3: "Other Intention"
+        3: "Other Intention",
+        4: "Negatively Intended Query"
     }
 
-    # Define the refined prompt string
+    # Refined prompt for Employment Query Sub-Classification with Negative Intent class
     refined_prompt = """
     You are an expert in analyzing user queries related to employment searches. Your task is to classify the user's intention into one of the following categories:
 
     1 Individual Employment Status:
     - The query is about employment statistics, job availability, or unemployment rates in a single location.  
-    - Example: *"What is the employment status in Ahmedabad?"* or *"Job statistics for Gujarat."*  
+    - Example: "What is the employment status in Ahmedabad?" or "Job statistics for Gujarat."  
     - Even if employment-related words are NOT present, assume it is an employment search if a location is mentioned alone.  
-    - If the user mentions multiple locations, but one of them is only for reference (e.g., *"I live in X but want to search about Y"*), classify under this category.  
+    - If the user mentions multiple locations, but one of them is only for reference (e.g., "I live in X but want to search about Y"), classify under this category.  
     - DO NOT assume a comparison unless employment search is for multiple locations in the query’s main intent.  
 
     2 Comparison Between Locations:
     - The query asks about employment status across multiple locations, either explicitly or implicitly.  
-    - Explicit Comparison: *"Compare employment in Ahmedabad vs Baroda."*  
-    - Implicit Comparison: *"What is the employment situation in Gujarat and Maharashtra?"*  
+    - Explicit Comparison: "Compare employment in Ahmedabad vs Baroda."  
+    - Implicit Comparison: "What is the employment situation in Gujarat and Maharashtra?"  
     - Even if "compare" is not explicitly mentioned, classify here if employment search involves multiple locations.  
     - If multiple locations are mentioned AND they are both part of the employment search, classify under this category.  
     - DO NOT require explicit words like "compare"—use contextual understanding.  
 
     3 Other Intentions:
     - Only classify here if the query is entirely unrelated to employment.  
-    - Example: *"Best places to live in Ahmedabad."* or *"How is the weather in Gujarat?"*  
+    - Example: "Best places to live in Ahmedabad." or "How is the weather in Gujarat?"  
     - DO NOT classify as Other Intent just because employment is not explicitly mentioned.  
     - If a query has no employment, no approvals, no incentives, and no vendor search, assume it is employment-related and classify under Class 1 or 2.  
+
+    4 Negatively Intended Query:
+    - Use this if the user's query clearly expresses a desire to avoid or not continue with employment-related searches.  
+    - Also use this class if the query rejects other supported industry-related topics such as approvals, incentives, vendors, or land — even if the query comes through the employment module.  
+    - Example: "I don't want to search employment in Gujarat." → Class 4  
+    - Example: "I don't want to check incentives or approvals or vendors either." → Class 4  
+    - This class is for any query that **explicitly refuses to proceed with all supported topics**.
 
     Special Classification Rules:
     1 Implicit Employment Queries:  
     - If a location is mentioned alone, classify as Class 1 or 2 (NOT Class 3).  
-    - Example: *"Ahmedabad?"* → Class 1.  
-    - Example: *"Vadodara vs Surat?"* → Class 2.  
+    - Example: "Ahmedabad?" → Class 1.  
+    - Example: "Vadodara vs Surat?" → Class 2.  
 
     2 Employment + Other Topics = Still Employment (Class 1 or 2):  
     - If the query includes employment + another topic, keep it in Class 1 or 2.  
-    - Example: *"Employment status in Ahmedabad and real estate?"* → Class 1.  
-    - Example: *"Jobs in Delhi and tourism industry?"* → Class 1.  
+    - Example: "Employment status in Ahmedabad and real estate?" → Class 1.  
+    - Example: "Jobs in Delhi and tourism industry?" → Class 1.  
 
     3 Only Classify as "Other Intent" (Class 3) if a Completely Different Topic is Asked:  
     - Approvals, incentives, vendor searches, or unrelated topics → Class 3.  
-    - Example: *"What incentives are available in Mumbai?"* → Class 3.  
-    - Example: *"Approvals needed for setting up a factory in Gujarat?"* → Class 3.  
+    - Example: "What incentives are available in Mumbai?" → Class 3.  
+    - Example: "Approvals needed for setting up a factory in Gujarat?" → Class 3.  
+
+    4 Only Classify as "Negatively Intended Query" (Class 4) if User Clearly Rejects Supported Topics:  
+    - If the user expresses clear disinterest or refusal to explore employment or any of the supported industry-related topics (approvals, vendors, incentives, land), classify under Class 4.  
+    - Use contextual understanding even if the rejection is vague but directional.
+
+    Additional Classification Rules (Critical):
+
+    - If employment-related intent is positive, classify as 1 or 2 based on whether the search is for one location or comparison between multiple locations. This takes highest priority — even if other topics are mentioned negatively or positively.
+    - If employment is mentioned negatively:
+    - And no other topics are present → Class 4
+    - And all other topics are also negative → Class 4
+    - And at least one other topic is positive → Class 3
+
+    - If employment is NOT mentioned:
+    - And all other mentioned factors (approvals, vendors, incentives, building industry) are also negative → Class 4
+    - And any one factor is positive → Class 3
+
+    - Other Intent (Class 3) should also be used if the query is about lifestyle, education (non-industry), tourism, politics, general housing, or other completely unrelated areas.
+
+    - Classification should NOT be based on keywords like “job” or “vendor” alone — always analyze the full context of the query.
+    - Use contextual understanding to detect related expressions (e.g., “workforce”, “hiring”, “permissions”, “setup”, “licenses”, “vendors”, etc.)
+
+    Other Topic Definition:
+    - These refer to the other business-related categories:
+    - Approvals
+    - Incentives
+    - Vendors
+    - Building an industry from scratch
+
+    Additional Understanding Requirement:
+    - Do not rely solely on specific keywords like “approvals,” “vendors,” “employment,” “incentives,” or “building industry from scratch.”
+    - Always analyze the full context of the query to determine whether these intents are present — even if users use alternative phrasing or synonyms.
+    - Examples:
+        - “Permissions,” “licenses,” “NOCs,” or “clearances” should be interpreted as approval-related.
+        - “Suppliers,” “distributors,” or “raw material sources” may indicate vendor search.
+        - “Jobs,” “workforce,” “manpower,” or “recruitment” may imply employment intent.
+        - “Subsidies,” “tax breaks,” “grants,” or “financial support” may suggest incentives.
+        - “Starting operations,” “setting up a factory,” “establishing infrastructure,” or “launching a new unit” may indicate building industry from scratch.
+    - Understand user intent even if the sentence is vague, mixed, or includes implied meanings rather than explicit phrases.
+
 
     Final Output Instructions:
-    - Strictly return only the classification number (1, 2, or 3).  
+    - Strictly return only the classification number (1, 2, 3, or 4).  
     - Do NOT return multiple classifications.  
     - Do NOT provide explanations or additional text.  
 
@@ -417,9 +477,8 @@ def classify_employment_query(query, llm):
     {query}  
 
     Output:  
-    (Return only one classification number: 1, 2, or 3)
+    (Return only one classification number: 1, 2, 3, or 4)
     """
-
 
     # Create a PromptTemplate for chaining
     prompt_template = PromptTemplate(
@@ -431,10 +490,9 @@ def classify_employment_query(query, llm):
     chain = prompt_template | llm
     # Run the chain and capture the response
     response = chain.invoke({"query": query})
-    update_llm_token(response)
 
     # Use regex to extract a valid classification number
-    match = re.search(r"^\s*([1-3])\s*$", response.content.strip())
+    match = re.search(r"^\s*([1-4])\s*$", response.content.strip())
     if match:
         classification_number = int(match.group(1))
         classification_category = category_mapping[classification_number]
@@ -445,7 +503,6 @@ def classify_employment_query(query, llm):
         }
     else:
         raise ValueError(f"Unexpected or invalid response from LLM: {response}")
->>>>>>> 9e45308 (Eighteenth commit 19/03/25 12:33 krunal)
 
 def generate_dynamic_message(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm,chatId) -> str:
     """
@@ -667,227 +724,247 @@ def handle_employment_query(
     save_chat(chat_history,f"chat_{chatId}")
     result = classify_employment_query(refined_user_input, llm_70b_vers)
     user_intention = result["classification_category"]
-    keyword_dict = extract_employment_keywords_from_query(refined_user_input, llm)
-    if user_intention == "Individual employment status":
-        classification_data, validated_data = extract_location_from_query(refined_user_input, available_areas= available_areas, available_cities= available_cities, available_states= available_states, llm=llm_70b_vers)
-       
-        # Extract validated details
-        area = validated_data["Area"]
-        city = validated_data["City"]
-        state = validated_data["State"]
-
-        # logging.info(f"area {area} and city {city} and state {state} ")
-
-        classification_data_to_send =  {
-            key: [] if value == "None" else [i_value.strip() for i_value in value.split(",")]
-            for key, value in classification_data.items()
+    if user_intention == "Negatively Intended Query":
+        message = respond_to_negative_query(
+            refined_user_input, 
+            append_user_to_history=False, 
+            append_AI_to_history=False, 
+            llm=llm,
+            chatId=chatId)
+        chat_history.append(AIMessage(content=f"{message}"))
+        save_chat(chat_history,f"chat_{chatId}")
+        response = {
+            "Ai_response": message,
+            "Is_confirmation" : None,
+            "Extracted Data": None,
+            "Validation Data": None,
+            "User Intention": user_intention,
+            "KEYWORDS": None
         }
-        validated_data_to_send = {
-            key: [] if value == "None" else [i_value.strip() for i_value in value.split(",")]
-            for key, value in validated_data.items()
-        }
-
-        # Scenario 1: Area is specified
-        if area != "None":
-            city_to_area_mapping_val_list = [i for lst in list(city_to_area_mapping.values()) for i in lst]
-
-            if area == "Not Available in List":
-                response = {
-                    "Ai_response": "Not Available In List",
-                    "Is_confirmation" : None,
-                    "Extracted Data": classification_data_to_send,
-                    "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
-                }
-                return response
-            
-            elif area in city_to_area_mapping_val_list:
-                parent_city = next((key for key, value in city_to_area_mapping.items() if area in value), None)
-                parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)
-                context = f"Employment status details are available for {parent_city}, which encompasses the area of {area}. Would you like to view the information for {parent_city}?"
-                message = generate_dynamic_message(Chat_history_normal,context, refined_user_input,llm_70b_vers_creative,chatId=chatId)
-                classification_data_to_send["Area"] = []
-                classification_data_to_send["City"] = [parent_city,]
-                classification_data_to_send["State"] = [parent_state,]
-                validated_data_to_send["Area"] = []
-                validated_data_to_send["City"] = [parent_city,]
-                validated_data_to_send["State"] = [parent_state,]
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : True,
-                    "Extracted Data": classification_data_to_send,
-                    "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
-                }
-                return response
-
-            else:
-                response = {
-                    "Ai_response": "Not Available",
-                    "Is_confirmation" : None,
-                    "Extracted Data": None,
-                    "Validation Data": None,
-                    "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
-                }
-                return response
-
-        # Scenario 2: City is specified
-        if city != "None":
-            # logging.info(f"here city is {city}")
-            state_to_city_mapping_val_list = [i for lst in list(state_to_city_mapping.values()) for i in lst]
-            # logging.info(f"state_to_city_mapping_val_list {state_to_city_mapping_val_list} and city {city}")
-            if city == "Not Available in List":
-                response = {
-                    "Ai_response": "Not Available in List",
-                    "Is_confirmation" : None,
-                    "Extracted Data": classification_data_to_send,
-                    "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
-                }
-                return response
-
-            elif city in state_to_city_mapping_val_list:
-                parent_state = next((key for key, value in state_to_city_mapping.items() if city in value), None)
-                classification_data_to_send["Area"] = []
-                classification_data_to_send["City"] = [city,]
-                classification_data_to_send["State"] = [parent_state,]
-                validated_data_to_send["Area"] = []
-                validated_data_to_send["City"] = [city,]
-                validated_data_to_send["State"] = [parent_state,]
-                context = f"We have identified the city as {city} and the state as {parent_state} based on your query. Please confirm if this information is correct"
-                message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
-                # frappe.error_log(f"new generated message is {message}")
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : True,
-                    "Extracted Data": classification_data_to_send,
-                    "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
-                }
-                return response
+        return response
+    else:
+        keyword_dict = extract_employment_keywords_from_query(refined_user_input, llm)
+        if user_intention == "Individual employment status":
+            classification_data, validated_data = extract_location_from_query(refined_user_input, available_areas= available_areas, available_cities= available_cities, available_states= available_states, llm=llm_70b_vers)
         
-            else:
-                response = {
-                    "Ai_response": "Not Available",
-                    "Is_confirmation" : None,
-                    "Extracted Data": None,
-                    "Validation Data": None,
-                    "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
-                }
-                return response
+            # Extract validated details
+            area = validated_data["Area"]
+            city = validated_data["City"]
+            state = validated_data["State"]
 
+            # logging.info(f"area {area} and city {city} and state {state} ")
 
-        # Scenario 3: State is specified
-        if state != "None":
-            if state == "Not Available in List":
-                response = {
-                    "Ai_response": "Not Available in List",
-                    "Is_confirmation" : None,
-                    "Extracted Data": classification_data_to_send,
-                    "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
-                }
-                return response
-
-            elif city == "None":
-                context = f"We have identified the state as {state} based on your query. Please confirm if this information is correct"
-                message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : True,
-                    "Extracted Data": classification_data_to_send,
-                    "Validation Data": validated_data_to_send,
-                    "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
-                }
-                return response
-
-        # Scenario 4: All fields are None
-        if area == city == state == "None":
-            context = "I am unable to understand the exact location or intent related to your query on employment information. Kindly provide the name of a specific city or state, or clarify your request further to assist you better."
-            message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
-            # logging.info(f"chat history 30 {chat_history}")
-            response = {
-                "Ai_response": message,
-                "Is_confirmation" : None,
-                "Extracted Data": None,
-                "Validation Data": None,
-                "User Intention": user_intention,
-                "KEYWORDS": keyword_dict["KEYWORDS"]
-            }
-            return response
-        
-    elif user_intention == "Comparison between cities, states, or areas":
-        # Example Usage
-        classification_data, validated_data = extract_comparison_locations(
-            user_input= refined_user_input,
-            available_areas= available_areas,
-            available_cities= available_cities,
-            available_states=available_states,
-            llm=llm_70b_vers
-        )
-        if validated_data["Area"] == "None" and validated_data["City"] == "None" and validated_data["State"] == "None":
-            context = "I am unable to understand the exact location or intent related to your query on employment information. Kindly provide the name of a specific city or state, or clarify your request further to assist you better."
-            message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
-            response = {
-                "Ai_response": message,
-                "Is_confirmation" : None,
-                "Extracted Data": None,
-                "Validation Data": None,
-                "User Intention": user_intention,
-                "KEYWORDS": keyword_dict["KEYWORDS"]
-            }
-            return response
-        
-        else:
             classification_data_to_send =  {
-                key: [] if value == "None" else [i_value.strip() for i_value in value]
+                key: [] if value == "None" else [i_value.strip() for i_value in value.split(",")]
                 for key, value in classification_data.items()
             }
             validated_data_to_send = {
                 key: [] if value == "None" else [i_value.strip() for i_value in value.split(",")]
                 for key, value in validated_data.items()
             }
-            # Extract and combine all unique locations from the JSON fields
-            locations = set(validated_data_to_send.get('Area', []) + validated_data_to_send.get('City', []) + validated_data_to_send.get('State', []))
-            # Join locations with commas and 'and' for the last item
-            locations_list = list(locations)
-            if len(locations_list) == 1:
-                locations_str = locations_list[0]
-            else:
-                locations_str = ', '.join(locations_list[:-1]) + f", and {locations_list[-1]}"
+
+            # Scenario 1: Area is specified
+            if area != "None":
+                city_to_area_mapping_val_list = [i for lst in list(city_to_area_mapping.values()) for i in lst]
+
+                if area == "Not Available in List":
+                    response = {
+                        "Ai_response": "Not Available In List",
+                        "Is_confirmation" : None,
+                        "Extracted Data": classification_data_to_send,
+                        "Validation Data": validated_data_to_send,
+                        "User Intention": user_intention,
+                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                    }
+                    return response
+                
+                elif area in city_to_area_mapping_val_list:
+                    parent_city = next((key for key, value in city_to_area_mapping.items() if area in value), None)
+                    parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)
+                    context = f"Employment status details are available for {parent_city}, which encompasses the area of {area}. Would you like to view the information for {parent_city}?"
+                    message = generate_dynamic_message(Chat_history_normal,context, refined_user_input,llm_70b_vers_creative,chatId=chatId)
+                    classification_data_to_send["Area"] = []
+                    classification_data_to_send["City"] = [parent_city,]
+                    classification_data_to_send["State"] = [parent_state,]
+                    validated_data_to_send["Area"] = []
+                    validated_data_to_send["City"] = [parent_city,]
+                    validated_data_to_send["State"] = [parent_state,]
+                    response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : True,
+                        "Extracted Data": classification_data_to_send,
+                        "Validation Data": validated_data_to_send,
+                        "User Intention": user_intention,
+                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                    }
+                    return response
+
+                else:
+                    response = {
+                        "Ai_response": "Not Available",
+                        "Is_confirmation" : None,
+                        "Extracted Data": None,
+                        "Validation Data": None,
+                        "User Intention": user_intention,
+                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                    }
+                    return response
+
+            # Scenario 2: City is specified
+            if city != "None":
+                # logging.info(f"here city is {city}")
+                state_to_city_mapping_val_list = [i for lst in list(state_to_city_mapping.values()) for i in lst]
+                # logging.info(f"state_to_city_mapping_val_list {state_to_city_mapping_val_list} and city {city}")
+                if city == "Not Available in List":
+                    response = {
+                        "Ai_response": "Not Available in List",
+                        "Is_confirmation" : None,
+                        "Extracted Data": classification_data_to_send,
+                        "Validation Data": validated_data_to_send,
+                        "User Intention": user_intention,
+                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                    }
+                    return response
+
+                elif city in state_to_city_mapping_val_list:
+                    parent_state = next((key for key, value in state_to_city_mapping.items() if city in value), None)
+                    classification_data_to_send["Area"] = []
+                    classification_data_to_send["City"] = [city,]
+                    classification_data_to_send["State"] = [parent_state,]
+                    validated_data_to_send["Area"] = []
+                    validated_data_to_send["City"] = [city,]
+                    validated_data_to_send["State"] = [parent_state,]
+                    context = f"We have identified the city as {city} and the state as {parent_state} based on your query. Please confirm if this information is correct"
+                    message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
+                    # frappe.error_log(f"new generated message is {message}")
+                    response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : True,
+                        "Extracted Data": classification_data_to_send,
+                        "Validation Data": validated_data_to_send,
+                        "User Intention": user_intention,
+                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                    }
+                    return response
             
-            # Construct the confirmation message
-            message = f"Kindly confirm if you are seeking to compare the employment status between {locations_str}."
-            confirmation_message = generate_dynamic_message(Chat_history_normal, message,refined_user_input, llm_70b_vers_creative,chatId=chatId)
+                else:
+                    response = {
+                        "Ai_response": "Not Available",
+                        "Is_confirmation" : None,
+                        "Extracted Data": None,
+                        "Validation Data": None,
+                        "User Intention": user_intention,
+                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                    }
+                    return response
+
+
+            # Scenario 3: State is specified
+            if state != "None":
+                if state == "Not Available in List":
+                    response = {
+                        "Ai_response": "Not Available in List",
+                        "Is_confirmation" : None,
+                        "Extracted Data": classification_data_to_send,
+                        "Validation Data": validated_data_to_send,
+                        "User Intention": user_intention,
+                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                    }
+                    return response
+
+                elif city == "None":
+                    context = f"We have identified the state as {state} based on your query. Please confirm if this information is correct"
+                    message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
+                    response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : True,
+                        "Extracted Data": classification_data_to_send,
+                        "Validation Data": validated_data_to_send,
+                        "User Intention": user_intention,
+                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                    }
+                    return response
+
+            # Scenario 4: All fields are None
+            if area == city == state == "None":
+                context = "I am unable to understand the exact location or intent related to your query on employment information. Kindly provide the name of a specific city or state, or clarify your request further to assist you better."
+                message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
+                # logging.info(f"chat history 30 {chat_history}")
+                response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": None,
+                    "Validation Data": None,
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
+                }
+                return response
+            
+        elif user_intention == "Comparison between cities, states, or areas":
+            # Example Usage
+            classification_data, validated_data = extract_comparison_locations(
+                user_input= refined_user_input,
+                available_areas= available_areas,
+                available_cities= available_cities,
+                available_states=available_states,
+                llm=llm_70b_vers
+            )
+            if validated_data["Area"] == "None" and validated_data["City"] == "None" and validated_data["State"] == "None":
+                context = "I am unable to understand the exact location or intent related to your query on employment information. Kindly provide the name of a specific city or state, or clarify your request further to assist you better."
+                message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
+                response = {
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": None,
+                    "Validation Data": None,
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
+                }
+                return response
+            
+            else:
+                classification_data_to_send =  {
+                    key: [] if value == "None" else [i_value.strip() for i_value in value]
+                    for key, value in classification_data.items()
+                }
+                validated_data_to_send = {
+                    key: [] if value == "None" else [i_value.strip() for i_value in value.split(",")]
+                    for key, value in validated_data.items()
+                }
+                # Extract and combine all unique locations from the JSON fields
+                locations = set(validated_data_to_send.get('Area', []) + validated_data_to_send.get('City', []) + validated_data_to_send.get('State', []))
+                # Join locations with commas and 'and' for the last item
+                locations_list = list(locations)
+                if len(locations_list) == 1:
+                    locations_str = locations_list[0]
+                else:
+                    locations_str = ', '.join(locations_list[:-1]) + f", and {locations_list[-1]}"
+                
+                # Construct the confirmation message
+                message = f"Kindly confirm if you are seeking to compare the employment status between {locations_str}."
+                confirmation_message = generate_dynamic_message(Chat_history_normal, message,refined_user_input, llm_70b_vers_creative,chatId=chatId)
+                response = {
+                    "Ai_response": confirmation_message,
+                    "Is_confirmation" : True,
+                    "Extracted Data": classification_data_to_send,
+                    "Validation Data": validated_data_to_send,
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
+                }
+                return response
+        
+        else:
+            context = "I am unable to understand the exact location or intent related to your query on employment information. Kindly provide the name of a specific city or state, or clarify your request further to assist you better."
+            message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
             response = {
-                "Ai_response": confirmation_message,
-                "Is_confirmation" : True,
-                "Extracted Data": classification_data_to_send,
-                "Validation Data": validated_data_to_send,
-                "User Intention": user_intention,
-                "KEYWORDS": keyword_dict["KEYWORDS"]
-            }
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                    "Extracted Data": None,
+                    "Validation Data": None,
+                    "User Intention": user_intention,
+                    "KEYWORDS": keyword_dict["KEYWORDS"]
+                }
             return response
-    else:
-        context = "I am unable to understand the exact location or intent related to your query on employment information. Kindly provide the name of a specific city or state, or clarify your request further to assist you better."
-        message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
-        response = {
-                "Ai_response": message,
-                "Is_confirmation" : None,
-                "Extracted Data": None,
-                "Validation Data": None,
-                "User Intention": user_intention,
-                "KEYWORDS": keyword_dict["KEYWORDS"]
-            }
-        return response
     
 
 def call_handle_employment_query(input,chatId):

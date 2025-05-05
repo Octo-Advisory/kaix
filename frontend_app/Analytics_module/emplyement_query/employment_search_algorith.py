@@ -24,6 +24,12 @@ def fetch_query_results(query):
         return None
 
 def get_employment_status():
+    """
+    Fetches employment availability data by joining employment types with location details.
+
+    Returns:
+        pd.DataFrame: Processed employment data containing employment type, city, state, and availability.
+    """
 
     query = """
     SELECT
@@ -63,7 +69,16 @@ warnings.filterwarnings("ignore")
 
 def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
     """
-    Employment search algorithm based on user intention.
+    Employment search algorithm to analyze and retrieve employment data based on user queries.
+    
+    Parameters:
+    - intention (str): Type of analysis (e.g., 'Individual employment status', 'Comparison between cities, states, or areas').
+    - input_data (dict): Contains user input like state, city, or a list of cities for comparison.
+    - chatId (str): Unique identifier for tracking query progress.
+    - keyword_given_by_user (list or None): Employment types to filter (e.g., 'Skilled', 'Unskilled').
+    
+    Returns:
+    - dict: Response containing employment statistics, error flag, and visualization (if applicable).
     """
     try:
         insert_process(chatId,"Analyzing Your Query","Analyzing Your query","Pending")
@@ -289,29 +304,6 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
     except Exception as e:
         return e
 
-# def plot_pie_chart(data, title):
-    # """
-    # Plots a pie chart for employment data.
-    # """
-    # data.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
-    # plt.title(title)
-    # plt.ylabel("")  # Remove default ylabel
-    # plt.show()
-
-# def plot_bar_chart(data, title):
-    # """
-    # Plots a bar chart for comparison between cities, grouped by employment type.
-    # """
-    # # Transpose the data so that cities are grouped under each employment type
-    # data = data.T
-    
-    # data.plot(kind='bar', stacked=False)
-    # plt.title(title)
-    # plt.ylabel("Percentage (%)")
-    # plt.xlabel("Employment Type")
-    # plt.legend(title="City", loc='upper left', bbox_to_anchor=(1, 1))  # Place legend outside the chart
-    # plt.tight_layout()  # Adjust layout to fit everything
-    # plt.show()
 
 def plot_pie_chart(data, title):
     """

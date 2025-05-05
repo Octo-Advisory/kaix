@@ -13,10 +13,10 @@ def call_incentive_query(aiResponse,chatId):
         insert_process(chatId,"Fetching Data","Fetching Data Based On Your Query","Pending")
         insert_process(chatId,"Analyzing Data","Analyzing Gathered Data","Pending")   
         insert_process(chatId,"Preparing Result","Preparing Result","Pending")
-        time.sleep(3)
+        # time.sleep(3)
         update_process(chatId,"Analyzing Your Query","Complete")
         update_process(chatId,"Fetching Data","Processing")
-        time.sleep(4)
+        # time.sleep(4)
 
         with open("log2.txt", "a") as file:
             file.write(f"\naiResponse {aiResponse}")
@@ -30,7 +30,7 @@ def call_incentive_query(aiResponse,chatId):
         given_sub_sector = state.get('Sub-Sector')
         update_process(chatId,"Fetching Data","Complete")
         update_process(chatId,"Analyzing Data","Processing")
-        time.sleep(2)
+        # time.sleep(2)
         main_industry = fetch_industry_details(given_main_industry)
         sub_sector = fetch_sub_sector_details(given_sub_sector)
         area = fetch_area_details(given_area)
@@ -49,10 +49,10 @@ def call_incentive_query(aiResponse,chatId):
         incentive_keyword_df["Incentive Type"] = incentive_keyword_df["Incentive Type"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
         incentive_keyword_df["Incentive Details"] = incentive_keyword_df["Incentive Details"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
         incentive_detail = incentive_details(Incentive_only_df,area,city,State,keyword_given_by_user= keywords, incentive_keyword_df = incentive_keyword_df)
-        time.sleep(2)    
+        # time.sleep(2)    
         update_process(chatId,"Analyzing Data","Complete")
         update_process(chatId,"Preparing Result","Processing")
-        time.sleep(5)
+        # time.sleep(5)
         update_process(chatId,"Preparing Result","Complete")
         response = {
                 "Analytics_response": incentive_detail,

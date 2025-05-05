@@ -1,6 +1,6 @@
 import frappe
 from langchain.prompts import PromptTemplate
-from frontend_app.Ai_module.Query_Classification_And_Analysis import classify_query,llm_70b_vers_creative,refine_query_with_history,llm_70b_vers
+from frontend_app.Ai_module.Query_Classification_And_Analysis import classify_query,llm_70b_vers_creative,refine_query_with_history,llm_70b_vers,generate_fallback_message,respond_to_negative_query
 from frontend_app.Ai_module.employement_query.Extraction_for_employement_search import call_handle_employment_query
 from frontend_app.Ai_module.build_from_scratch.Extraction_for_Building_from_Scratch import entry_build_from_scratch
 from frontend_app.Ai_module.incentive_query.Extraction_for_incentive_search import call_incentive_search
@@ -14,12 +14,24 @@ from frontend_app.Log_management.createlog import log
 from frontend_app.Management_Class.helpers.utility import update_llm_token
 
 @frappe.whitelist(allow_guest=True)
-def ai_module_call(input,chatId):
+def ai_module_call(input,confirmationMessage,chatId):
     try:
+        if input == "NOFROMUSER":
+            chat_history = get_chat(f"chat_{chatId}") or []
+            Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+            resp = generate_fallback_message(Chat_history_normal,confirmationMessage,llm_70b_vers_creative)
+            response = { 
+                    "Ai_response": resp,
+                    "Is_confirmation" : None,
+                    "Error":None
+                }
+            return response
+
+
         # Check if user intention is already determined
         user_intension = check_user_intension(chatId)
 
-        if user_intension in ["Valueless queries","Other industry-related queries",None]:
+        if user_intension in ["Valueless queries","Other industry-related queries","Negatively Intended Query",None]:
             chat_history = get_chat(f"chat_{chatId}") or []
             Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
             refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_70b_vers)
@@ -27,7 +39,7 @@ def ai_module_call(input,chatId):
             with open("testlog.txt", "a") as file:
                 file.write(f"\nuser_intension found {user_intension} for chatId {chatId}")
             update_user_intension(user_intension,chatId)  # Store the classified intention for future use
-        log(chatId,'debug','user_intension',str(user_intension),'AI.py','ai')
+            log(chatId,'debug','user_intension',str(user_intension),'AI.py','ai')
          # Handle different user intentions
         if user_intension == "Query to build industry from Scratch":
             try:
@@ -36,7 +48,7 @@ def ai_module_call(input,chatId):
                 return response
             except Exception as e:
                 response = { 
-                    "Ai_response": "Internal Server Error! Please Try After Some Time....",
+                    "Ai_response": "Something went wrong while processing your request. Please try again shortly 6.",
                     "Is_confirmation" : None,
                     "Error":e,
                 }
@@ -50,7 +62,7 @@ def ai_module_call(input,chatId):
                 return response
             except Exception as e:
                 response = { 
-                    "Ai_response": "Internal Server Error! Please Try After Some Time....",
+                    "Ai_response": "Something went wrong while processing your request. Please try again shortly 5.",
                     "Is_confirmation" : None,
                     "Error":e
                 }
@@ -64,7 +76,7 @@ def ai_module_call(input,chatId):
                 return response
             except Exception as e:
                 response = { 
-                    "Ai_response": "Internal Server Error! Please Try After Some Time....",
+                    "Ai_response": "Something went wrong while processing your request. Please try again shortly 4.",
                     "Is_confirmation" : None,
                     "error": e
                 }
@@ -78,7 +90,7 @@ def ai_module_call(input,chatId):
                 return response
             except Exception as e:
                 response = { 
-                    "Ai_response": "Internal Server Error! Please Try After Some Time....",
+                    "Ai_response": "Something went wrong while processing your request. Please try again shortly 3.",
                     "Is_confirmation" : None,
                     "Error":e
                 }
@@ -92,22 +104,57 @@ def ai_module_call(input,chatId):
                 return response
             except Exception as e:
                 response = { 
-                    "Ai_response": "Internal Server Error! Please Try After Some Time....",
+                    "Ai_response": "Something went wrong while processing your request. Please try again shortly 2.",
                     "Is_confirmation" : None,
                     "error": e
                 }
                 log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
                 return response
-        else:
-            message = generate_dynamic_message(input,user_intension,chatId,llm_70b_vers_creative)
-            response = { 
-                "Ai_response": message,
-                "Is_confirmation" : None,
-            }
-            log(chatId,'debug','response',str(response),'AI.py','ai') 
-            return response
-         
+            
+        elif user_intension == "Negatively Intended Query":
+            try:
+                message = respond_to_negative_query(
+                    user_message=refine_user_input,
+                    append_user_to_history=True,
+                    append_AI_to_history=True,
+                    llm=llm_70b_vers,
+                    chatId=chatId,
+                    update_intention=False
+                    )
+                response = { 
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                }
+                log(chatId,'debug','response',str(response),'AI.py','ai')
+                return response
+            except Exception as e:
+                response = { 
+                    "Ai_response": "Something went wrong while processing your request. Please try again shortly 1.",
+                    "Is_confirmation" : None,
+                    "error": e
+                }
+                log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
+                return response
 
+        else:
+            try:
+                message = generate_dynamic_message(refine_user_input,user_intension,chatId,llm_70b_vers_creative)
+                response = { 
+                    "Ai_response": message,
+                    "Is_confirmation" : None,
+                }
+                log(chatId,'debug','response',str(response),'AI.py','ai') 
+                return response
+            except Exception as e:
+                response = { 
+                    "Ai_response": "Something went wrong while processing your request. Please try again shortly00.",
+                    "Is_confirmation" : None,
+                    "error": e
+                }
+                log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
+                return response
+            
+         
     except Exception as e:
         error_details = traceback.format_exc()
         with open("log3.txt", "a") as file:
@@ -131,6 +178,7 @@ def update_user_intension(user_intension,chatId):
     frappe.db.commit() 
 
 def generate_dynamic_message(user_message, user_intention, chatId,llm):
+
     """
     Handles both valueless queries (e.g., greetings or unrelated queries) and other industry-related queries.
     For valueless queries, it responds politely and redirects the user to industry-building topics.
@@ -234,3 +282,86 @@ def generate_dynamic_message(user_message, user_intention, chatId,llm):
     save_chat(chat_history,f"chat_{chatId}")
     
     return message_from_ai
+
+# def respond_to_negative_query(
+#     user_message: str,
+#     append_user_to_history: bool,
+#     append_AI_to_history: bool,
+#     llm,
+#     chatId,
+#     update_intention = True
+# ) -> str:
+#     """
+#     Reacts to negative intent in user queries by acknowledging it and 
+#     politely redirecting users to supported industry-related alternatives.
+
+#     Parameters:
+#     - user_message (str): The most recent user input.
+#     - append_user_to_history (bool): Flag to determine whether to add the user message to chat history.
+#     - llm: A language model instance that supports the `.invoke()` method for prompt completion.
+
+#     Returns:
+#     - str: A short, polite AI-generated redirection message (max two lines).
+#     """
+#     chat_history = get_chat(f"chat_{chatId}") or []
+#     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-4:]]
+#     if append_user_to_history:
+#         chat_history.append(HumanMessage(content=user_message))
+#         save_chat(chat_history,f"chat_{chatId}")
+
+#     prompt_template = """
+#     You are a professional AI assistant designed to help users with industry-related queries. 
+#     Sometimes users may express that they do not want to proceed with a certain type of query, 
+#     such as searching for vendors, incentives, employment, approvals, or land.
+
+#     Your task is to:
+#     - Politely acknowledge the user's intent to not continue with the current path.
+#     - Respect their decision without repeating the rejected topic.
+#     - Encourage them to explore other areas the platform supports — but limit suggestions to one or two concise, relevant alternatives.
+#     - Keep the response short, natural, and conversational — a maximum of two lines.
+    
+#     Input Usage Guidelines:
+#     - Use the latest user message to understand the user’s current concern or direction.
+#     - Refer to the recent conversation history only when needed to maintain context, avoid repetition, or recognize prior negative expressions.
+#     - Do not restate or repeat what was already covered unless it helps clarify or smoothly redirect the conversation.
+
+#     Important Instructions:
+#     - Do NOT mention or re-suggest the category the user rejected — even in a different location, product, or form.
+#     - If the user’s rejection appears to be specific to a location, product, or context, you may offer assistance in other locations or products — but only if it does not reintroduce the rejected category.
+#     - Suggest one alternative direction naturally (two if needed) based on platform capabilities:
+#         - Building an industry from scratch
+#         - Searching for employment in a city or state
+#         - Inquiring about incentives
+#         - Finding vendors for their industry
+#         - Searching for the approvals
+#     - Never use "how to build an industry" or anything that implies your platform teaches or trains users. 
+#     You are assisting them in setting up or building, not educating them.
+#     - Keep the response strictly within two lines, using concise and polite phrasing.
+
+#     Inputs:
+#     - Latest user message: {user_message}
+#     - Recent conversation history: {chat_history}
+
+#     Output Requirements:
+#     - The message should be in one short paragraph with no more than two lines.
+#     - It must feel polite, helpful, and actionable — inviting the user to continue exploring relevant options.
+#     - Do NOT list all supported categories. Suggest only 1–2 in natural language, avoiding list-like structure.
+#     """
+
+#     prompt = PromptTemplate(
+#         input_variables=["user_message", "chat_history"],
+#         template=prompt_template
+#     )
+#     chain = prompt | llm
+
+#     result = chain.invoke({
+#         "user_message": user_message,
+#         "chat_history": "\n".join(Chat_history_normal)
+#     })
+#     message_from_ai = result.content.strip()
+#     if append_AI_to_history:
+#         chat_history.append(AIMessage(content=message_from_ai))
+#         save_chat(chat_history,f"chat_{chatId}")
+#     if update_intention:
+#         update_user_intension("Negatively Intended Query", chatId)
+#     return message_from_ai

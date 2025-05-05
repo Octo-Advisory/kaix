@@ -15,7 +15,7 @@ export const chatSlice = createSlice({
     initialState,
     reducers: {
         addMessage: (state, action) => {
-            state.messages.push(action.payload); // Adds a new message to the array
+            state.messages = [...state.messages, action.payload]; // Adds a new message to the array
         },
         addChatId: (state,action) => {
             state.chatID = action.payload

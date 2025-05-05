@@ -111,6 +111,21 @@ def fetch_state_details(given_state_by_user):
     return state_id
 
 def get_incentive_data(sub_sector_id=None, industry_id=None, area_id=None, city_id=None, state_id=None, today_date=None):
+    """
+    Retrieves incentive data based on provided location and industry filters.
+    
+    Parameters:
+    sub_sector_id (str, optional): Sub-sector ID for filtering.
+    industry_id (str, optional): Industry ID for filtering.
+    area_id (str, optional): Area ID for location-based filtering.
+    city_id (str, optional): City ID for location-based filtering.
+    state_id (str, optional): State ID for location-based filtering.
+    today_date (str, optional): Date to filter active incentives.
+    
+    Returns:
+    DataFrame: A Pandas DataFrame containing the filtered incentive data.
+    None: If no results match the query.
+    """
     with open("log2.txt", "a") as file:
             file.write(f"\nstate is {sub_sector_id, industry_id, area_id, city_id, state_id, today_date}")
     # Initialize the query string with the common parts
@@ -219,7 +234,21 @@ def get_incentive_data(sub_sector_id=None, industry_id=None, area_id=None, city_
         return None
 
 def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_given_by_user= None, incentive_keyword_df = None):
-    results = []
+    """
+    Retrieves and filters incentive details from the given DataFrame based on location and optional keyword-based filtering.
+    
+    Parameters:
+        df (pd.DataFrame): DataFrame containing incentive data.
+        area_id (int, optional): Area identifier for filtering incentives.
+        city_id (int, optional): City identifier for filtering incentives.
+        state_id (int, optional): State identifier for filtering incentives.
+        keyword_given_by_user (str, optional): Keyword input from user for additional filtering.
+        incentive_keyword_df (pd.DataFrame, optional): DataFrame containing keyword-related incentive scores.
+    
+    Returns:
+        dict: JSON-serialized dictionary containing incentive data, filtered and sorted accordingly.
+    """
+    results = [] # List to store filtered incentive results
     if area_id:
         # Area-level approvals
         area_df = df[df['area_id'] == area_id]
@@ -228,7 +257,6 @@ def incentive_details(df, area_id=None, city_id=None, state_id=None, keyword_giv
                 results.append({
                     'Incentive ID': row['incentive_id'],
                     'Incentive Name': row['Incentive_name'],
-                    'Incentive Type': row['Incentive Type'],
                     'Incentive Type': row['Incentive Type'],
                     'Incentive Rank': row['incentive_rank'],
                     'description': row['description'],

@@ -3,7 +3,6 @@ import { AiOutlineClear, AiOutlineSend } from 'react-icons/ai'; // React Icons
 import { FiSend } from 'react-icons/fi';
 import { useDispatch, useSelector } from 'react-redux';
 import { addChatId, addMessage } from '../../Redux/Store/Featuresilces/chat';
-// import botLogo1 from '../../assets/favicon.jpeg';
 import botLogo1 from '../../assets/MarsAIX icon.png';
 import useChatScroll from '../Hooks/useChatScroll'; // Import the hook
 import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
@@ -11,28 +10,28 @@ import '../Chatscreen/Chatscreen.css';
 import userIcon from '../../assets/MarsAIX person icon.png'
 import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
-import { FrappeContext, useFrappeCreateDoc, useFrappeUpdateDoc } from 'frappe-react-sdk'
-import ProgressScreen from '../ProgressScreen/ProgressScreen'
+import { FrappeContext, useFrappeAuth, useFrappeCreateDoc, useFrappeGetDoc, useFrappeUpdateDoc } from 'frappe-react-sdk'
 import { addAIresponse, clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
 import { addResult } from '../../Redux/Store/Featuresilces/validation'
-import { useTypewriter } from "react-simple-typewriter";
 import { useNavigate } from "react-router-dom";
 import Details from '../Details/Details';
+import { BiSidebar } from "react-icons/bi";
+import { IoSearch } from "react-icons/io5";
+import SideBar from '../SideBar/SideBar';
 
 function Chatscreen() {
+  const { currentUser } = useFrappeAuth();
+  const { data: userDoc } = useFrappeGetDoc('User', currentUser || '');
   const [message, setMessage] = useState('');
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.chat.messages);
   const chatId = useSelector((state) => state.chat.chatID);
   const [loading, setLoading] = useState(false);
-  const [dataloading, setDataloading] = useState(false);
   const [disabled, setDisabled] = useState(false);
-  const [showerror, setShowerror] = useState(null);
   const { createDoc, isLoading, error } = useFrappeCreateDoc('');
   const [partialResponse, setPartialResponse] = useState('');
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('');
-  const [isProgressVisible, setIsProgressVisible] = useState(false);
   const responseAi = useSelector((state) => state.ai.aiReponse)
   const [placeholder, setPlaceholder] = useState("");
   const [charIndex, setCharIndex] = useState(0);
@@ -57,14 +56,14 @@ function Chatscreen() {
     createDoc("Session", doc).then((resp) => dispatch(addChatId(resp.name)));
   }
 
-  const fetchAIResponse = async (message, chatId) => {
+  const fetchAIResponse = async (message, confirmationMessage, chatId) => {
     try {
       const result = await call.get("frontend_app.Management_Class.Ai_management.AI.ai_module_call", {
         input: message,
+        confirmationMessage: confirmationMessage,
         chatId: chatId
       });
       console.log("message", result);
-
       return result.message;  // Return the result so that the calling function gets it.
     } catch (err) {
       console.log("error occurred 😂", err);
@@ -73,37 +72,38 @@ function Chatscreen() {
   };
 
 
-  const storeChatInChildTable = async () => {
-    const messageLength = messages.length
+  const storeLatestChatInChildTable = async () => {
+    const messageLength = messages.length;
 
-    if (messageLength > 0 && messageLength % 4 === 0) {
+    // Ensure there is at least one complete User-AI pair
+    if (messageLength < 2) return;
 
-      for (let i = 0; i <= 1; i++) {
-        const ain = messageLength - (2 * i + 1);   // AI message index
-        const uin = messageLength - (2 * i + 2);   // User message index
+    // Extract latest user-AI pair
+    const ain = messageLength - 1; // AI message index
+    const uin = messageLength - 2; // User message index
 
-        const chatDoc = {
-          user: messages[uin]['text'],
-          ai: messages[ain]['text'],
-          parent: chatId,
-          parentfield: "chat_history",
-          parenttype: "Session",
-        };
-        try {
-          await createDoc("Chat history", chatDoc);
-        } catch (error) {
-          console.error('Error saving to child table:', error);
-        }
-      }
+    // Ensure correct message type (assuming alternate sequence: User → AI)
+    if (messages[uin]['sender'] !== 'user' || messages[ain]['sender'] !== 'ai') {
+      return; // Skip storing if the order is incorrect
+    }
+
+    const chatDoc = {
+      user: messages[uin]['text'],
+      ai: messages[ain]['text'],
+      parent: chatId,
+      parentfield: "chat_history",
+      parenttype: "Session",
+    };
+
+    try {
+      await createDoc("Chat history", chatDoc);
+    } catch (error) {
+      console.error('Error saving to child table:', error);
     }
   };
 
   const handleSendbtn = async () => {
     if (message.trim()) {
-      // if (messages.length === 0 && !chatId) {
-      //   createSessionid();
-      //   return;
-      // }
       const newUserMessage = {
         sender: 'user',
         text: message,
@@ -113,9 +113,9 @@ function Chatscreen() {
       dispatch(addMessage(newUserMessage));
       setMessage('');
       setLoading(true)
-      // setDisabled(true)
+      setDisabled(true)
 
-      const resp = await fetchAIResponse(message, chatId);
+      const resp = await fetchAIResponse(message, "", chatId);
       console.log("ai response is", resp);
       const aiResponse = resp.Ai_response
       console.log("reponse is", aiResponse);
@@ -129,28 +129,11 @@ function Chatscreen() {
           timestamp: new Date().toISOString(),
         };
         dispatch(addMessage(newAIMessage));
-        // let index = -1;
-
-        // const typingInterval = setInterval(() => {
-        //   setPartialResponse((prev) => prev + aiResponse1.charAt(index));
-        //   index++;
-        //   if (index >= aiResponse.length) {
-        //     clearInterval(typingInterval);
-        //     const newAIMessage = {
-        //       sender: 'ai',
-        //       text: aiResponse1,
-        //       timestamp: new Date().toISOString(),
-        //     };
-        //     dispatch(addMessage(newAIMessage));
-        //     setPartialResponse(''); // Clear partial response
-        //     setDisabled(false);
-        //   }
-        // }, 5);
         dispatch(addAIresponse(resp))
         setConfirmationMessage(aiResponse);
         setConfirmationPending(true);
         setLoading(false);
-        // setDisabled(true);
+        setDisabled(true);
         return;
       }
 
@@ -192,50 +175,55 @@ function Chatscreen() {
 
   const hanldeValidation = async () => {
     try {
-      const respo = await fetch(`api/resource/Session?fields=["user_intension"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
+      console.log("chat id", chatId);
+  
+      const respo = await fetch(`/api/resource/Session?fields=["user_intension"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
         method: 'GET',
         headers: {
-          // 'Authorization': 'token your_api_token', // Replace with actual token
           'Content-Type': 'application/json'
         }
       });
-
-      const userIntesion = await respo.json()
-      const user_intension = userIntesion['data'][0]['user_intension']
-
-      const result = await validationCall(responseAi, user_intension)
-      dispatch(addResult(result))
-      return result
-
+  
+      // Check if the response is successful (status 200)
+      if (!respo.ok) {
+        throw new Error(`Request failed with status ${respo.status}`);
+      }
+  
+      // Parse the JSON response correctly
+      const userIntesion = await respo.json();
+      console.log("userIntention", userIntesion);
+  
+      // Check if 'data' is present and contains expected data
+      if (userIntesion && userIntesion.data && userIntesion.data.length > 0) {
+        const user_intension = userIntesion.data[0].user_intension;
+  
+        // Call validation and dispatch result
+        const result = await validationCall(responseAi, user_intension);
+        dispatch(addResult(result));
+        return result;
+      } else {
+        console.log("No data found for the given chatId");
+      }
     } catch (error) {
-      console.log("error is", error);
-
+      console.log("error is here", error);
     }
-  }
+  };
+  
 
   const { updateDoc } = useFrappeUpdateDoc()
 
   const handleConfirmation = async (response) => {
     setConfirmationPending(false);
-    const confirmationMessage = {
+    const confirmationMessages = {
       sender: 'user',
       text: response === 'yes' ? 'Yes' : 'No',
       timestamp: new Date().toISOString(),
     };
-    dispatch(addMessage(confirmationMessage));
-
-    // const newAIMessage = {
-    //   sender: 'ai',
-    //   text: "Thank you for response",
-    //   timestamp: new Date().toISOString(),
-    // };
-    // dispatch(addMessage(newAIMessage));
-    // setDisabled(false);
+    dispatch(addMessage(confirmationMessages));
 
     if (response == 'yes') {
       const validationResult = await hanldeValidation()
       console.log("validation result from chatscreen", validationResult);
-      // console.log("validation result1", validationResult[0]);
       const aiResp = validationResult && validationResult.length > 0
         ? (validationResult[0] ? "Thank you for your response" : "We have your query, we will get back to you soon.")
         : "We have your query, we will get back to you soon.";
@@ -246,19 +234,31 @@ function Chatscreen() {
       };
       dispatch(addMessage(newAIMessage));
       // if (validationResult[0]) {
-      setIsProgressVisible(true);
       navigate("/progress");
-      // setTimeout(() => {
-      //   setIsProgressVisible(true);
-      // }, 0); // Ensure setTimeout executes properly
-      // }
     } else {
-      const newAIMessage = {
-        sender: 'ai',
-        text: "Alright! If you ever feel like chatting or need help, just let me know.",
-        timestamp: new Date().toISOString(),
-      };
-      dispatch(addMessage(newAIMessage));
+      setLoading(true)
+      const noAIreponse = await fetchAIResponse("NOFROMUSER", confirmationMessage, chatId)
+      console.log("noAIResponse", noAIreponse);
+      const noaiResponse = noAIreponse.Ai_response
+      console.log("noaiResponse is", noaiResponse);
+
+      let index = -1;
+      setLoading(false)
+      const typingInterval = setInterval(() => {
+        setPartialResponse((prev) => prev + noaiResponse.charAt(index));
+        index++;
+        if (index >= noaiResponse.length) {
+          clearInterval(typingInterval);
+          const newAIMessage = {
+            sender: 'ai',
+            text: noaiResponse,
+            timestamp: new Date().toISOString(),
+          };
+          dispatch(addMessage(newAIMessage));
+          setPartialResponse(''); // Clear partial response
+          setDisabled(false);
+        }
+      }, 5);
       dispatch(clearAiresponse())
       try {
         await updateDoc("Session", chatId, {
@@ -272,8 +272,10 @@ function Chatscreen() {
   };
 
   useEffect(() => {
-    storeChatInChildTable();
-  }, [messages])
+    if (messages.length >= 2) {
+      storeLatestChatInChildTable();
+    }
+  }, [messages]);
 
   useEffect(() => {
     if (messages.length === 0 && !chatId) {
@@ -282,34 +284,79 @@ function Chatscreen() {
     }
   }, [])
 
-  useEffect(() => {
-    const suggestion = suggestions[suggestionIndex];
+  // useEffect(() => {
+  //   const suggestion = suggestions[suggestionIndex];
 
-    if (!isDeleting && charIndex < suggestion.length) {
-      const timeout = setTimeout(() => {
-        setPlaceholder(suggestion.substring(0, charIndex + 1));
-        setCharIndex(charIndex + 1);
-      }, 50);
-      return () => clearTimeout(timeout);
-    } else if (isDeleting && charIndex > 0) {
-      const timeout = setTimeout(() => {
-        setPlaceholder(suggestion.substring(0, charIndex - 1));
-        setCharIndex(charIndex - 1);
-      }, 30);
-      return () => clearTimeout(timeout);
-    } else if (!isDeleting && charIndex === suggestion.length) {
-      setTimeout(() => setIsDeleting(true), 1000);
-    } else if (isDeleting && charIndex === 0) {
-      setIsDeleting(false);
-      setSuggestionIndex((prev) => (prev + 1) % suggestions.length);
-    }
-  }, [charIndex, suggestionIndex, isDeleting]);
+  //   if (!isDeleting && charIndex < suggestion.length) {
+  //     const timeout = setTimeout(() => {
+  //       setPlaceholder(suggestion.substring(0, charIndex + 1));
+  //       setCharIndex(charIndex + 1);
+  //     }, 50);
+  //     return () => clearTimeout(timeout);
+  //   } else if (isDeleting && charIndex > 0) {
+  //     const timeout = setTimeout(() => {
+  //       setPlaceholder(suggestion.substring(0, charIndex - 1));
+  //       setCharIndex(charIndex - 1);
+  //     }, 30);
+  //     return () => clearTimeout(timeout);
+  //   } else if (!isDeleting && charIndex === suggestion.length) {
+  //     setTimeout(() => setIsDeleting(true), 1000);
+  //   } else if (isDeleting && charIndex === 0) {
+  //     setIsDeleting(false);
+  //     setSuggestionIndex((prev) => (prev + 1) % suggestions.length);
+  //   }
+  // }, [charIndex, suggestionIndex, isDeleting]);
 
   const ref = useChatScroll(messages);
+  const [sideBar, setSideBar]=useState(false)
+
+  const renderUserAvatar = (sender) => {
+    const isCurrentUser = sender === 'user';
+
+    if (sender !== 'user') {
+      return (
+        <img
+          src={botLogo1}
+          alt="Bot"
+          className="h-8 w-8 relative rounded-full"
+        />
+      );
+    }
+
+    if (isCurrentUser) {      
+      if (userDoc?.user_image) {
+        return (
+          <img
+            src={userDoc.user_image}
+            alt="User"
+            className="h-8 w-8 relative rounded-full object-cover"
+          />
+        );
+      } else {
+        return (
+          <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">
+            {currentUser?.charAt(0).toUpperCase()}
+          </div>
+        );
+      }
+    }
+
+    return (
+      <img
+        src={userIcon}
+        alt="User"
+        className="h-8 w-8 relative rounded-full"
+      />
+    );
+  };
+
 
   return (
-    <div className="h-screen flex flex-col items-center main-screen">
-      <Navbar />
+  <div className='h-screen w-screen relative flex flex-row '>
+    <SideBar setSideBar={setSideBar} sideBar={sideBar}/>
+    <div className="h-screen flex flex-col items-center w-full transition-width duration-300 ease-in-out main-screen">
+      
+      <Navbar setSideBar={setSideBar} sideBar={sideBar}/>
       <div className="flex-1 overflow-y-auto p-4 flex justify-center w-full chatscreen" ref={ref}>
         {messages.length > 0 ? (<div
           className="chats flex flex-col space-y-5 w-[50%] mx-auto"
@@ -320,19 +367,7 @@ function Chatscreen() {
               key={index}
               className={`flex gap-5 justify-start`}
             >
-              {msg.sender !== 'user' ? (
-                <img
-                  src={botLogo1}
-                  alt=""
-                  className="h-8 w-8 relative rounded-full"
-                />
-              ) : (
-                <img
-                  src={userIcon}
-                  alt=""
-                  className="h-8 w-8 relative rounded-full"
-                />
-              )}
+              {renderUserAvatar(msg.sender)}
               <div className="p-2 rounded-lg max-w-full break-words">
                 <ReactMarkdown>{msg.text}</ReactMarkdown>
               </div>
@@ -377,15 +412,10 @@ function Chatscreen() {
         </div>
       )}
 
-      {/* {isProgressVisible && (
-        <div className="absolute top-0 left-0 right-0 bottom-0 bg-opacity-50 bg-black z-50 flex justify-center items-center">
-          <ProgressScreen />
-        </div>
-      )} */}
       <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#19a282] rounded-3xl p-2 bg-white shadow-lg">
         <div className="flex-grow">
           <textarea
-            placeholder={messages.length > 0 ? "Message Mars 2.0" : placeholder}
+            placeholder={messages.length > 0 ? "Message Mars 2.0" : "Message Mars 2.0"}
             className="w-full border-none outline-none bg-transparent text-black placeholder-[#242f6a] opacity-70 px-4 py-2 resize-none overflow-y-auto max-h-20 placeholder-opacity-75" // Adjusted classes
             value={message}
             maxLength={250}
@@ -418,18 +448,19 @@ function Chatscreen() {
       </div>
 
       <div className="alert-msg mb-5">
-      <p className="text-xs text-[#242f6a]">
-  MarsInfraAIX is still learning and can make mistakes. Please contact us by filling the contact form{" "}
-  <span
-    className="text-blue-500 underline cursor-pointer"
-    onClick={() => document.querySelector(".details-btn")?.click()}
-  >
-    here
-  </span>{" "}
-  to confirm data correctness.
-</p>
+        <p className="text-xs text-[#242f6a]">
+          MarsInfraAIX is still learning and can make mistakes. Please contact us by filling the contact form{" "}
+          <span
+            className="text-blue-500 underline cursor-pointer"
+            onClick={() => document.querySelector(".details-btn")?.click()}
+          >
+            here
+          </span>{" "}
+          to confirm data correctness.
+        </p>
       </div>
       <Details />
+    </div>
     </div>
   );
 }

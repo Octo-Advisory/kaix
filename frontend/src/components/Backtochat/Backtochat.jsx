@@ -34,9 +34,9 @@ function Backtochat() {
         } catch (err) {
             console.error("Error Updating:", err);
         }
-        navigate("/")
+        navigate("/chat")
     }
-    return (
+    return (    
         <>
             <div className="p-1 text-center">
                 <button

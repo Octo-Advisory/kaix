@@ -8,6 +8,123 @@ from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
 from frontend_app.Management_Class.helpers.utility import update_llm_token
+from frontend_app.Management_Class.Ai_management.AI import *
+
+def classify_industry_setup_query(query: str, llm) -> dict:
+    """
+    Classifies a user's query related to industrial setup assistance into one of three categories:
+
+    Categories:
+        1: Intent to set up or acquire an industry or factory
+        2: Other Intent
+        3: Negative Intent
+
+    Args:
+        query (str): The user's input query.
+        llm: A language model interface that supports `.invoke()`
+
+    Returns:
+        dict: A dictionary containing:
+            - "raw_prompt" (str): The full prompt used to query the LLM.
+            - "classification_number" (int): The classification number (1–3).
+            - "classification_category" (str): Description of the classification category.
+    """
+
+    category_mapping = {
+        1: "Intent to set up or acquire an industry or factory",
+        2: "Other Intent",
+        3: "Negatively Intended Query",
+    }
+
+    raw_prompt = """
+    You are an expert in analyzing user queries related to setting up or acquiring an industrial business. Your task is to classify the user's intention into one of the following categories:
+
+    1. Intent to set up or acquire an industry or factory:
+        - This includes any queries that show the user wants to start, build, buy, or establish a new factory or industrial unit.
+        - This also includes queries asking for help in buying land specifically to set up an industry.
+        - Example queries:
+            - "I want to build a 1 MTPA fly ash plant."
+            - "I want to buy a pharmaceutical factory."
+            - "Need help finding land to set up a dairy industry in Gujarat."
+            - "Looking for locations to establish an EV battery factory."
+
+    2. Other Intent:
+        - The query is clearly related to something else — such as vendors, approvals, employment, incentives — but NOT about industry setup.
+        - The query may also be completely unrelated to industrial context (e.g., tourism, politics, daily news, etc.)
+        - Example:
+            - "What are the vendor options in Gujarat?"
+            - "Employment statistics for Baroda?"
+            - "Tell me about textile incentives in Maharashtra."
+            - "What is the weather in Delhi?"
+
+    3. Negative Intent:
+        - The user clearly expresses disinterest or refusal to engage in anything related to setting up or acquiring an industry.
+        - This includes rejecting not just setup, but also land, factory purchase, or anything associated with it.
+        - Example:
+            - "I don't want to build a factory."
+            - "I'm not looking to buy any land or set up an industry."
+            - "Please don't show me anything about industrial setup."
+
+    Extended Classification Logic for Consistency:
+
+    - Positive Build from Scratch intent → always classify as Class 1, even if other factors (vendors, incentives, employment, approvals) are mentioned either positively or negatively.
+    - If Build from Scratch is mentioned negatively:
+        - And no other factors are present → Class 3
+        - And all other mentioned factors are also negative → Class 3
+        - And at least one other factor is mentioned positively → Class 2
+
+    - If Build from Scratch is not mentioned:
+        - And all other factors (vendors, incentives, employment, approvals) are mentioned negatively → Class 3
+        - And at least one of those is mentioned positively → Class 2
+
+    - Use Class 2 (Other Intent) when the query is clearly about any of the other supported industry-related areas, or completely unrelated (e.g., tourism, politics, personal matters).
+    - Use contextual understanding — do not classify solely based on the presence or absence of specific words like "setup", "build", "approval", "vendor", etc.
+    - Treat contextually related phrases like "launch a unit", "develop my plant", "set up a new operation", "industrial site planning", etc., as valid signals for Class 1.
+
+    Short or Follow-up Style Responses:
+    - If the user provides only a capacity figure, unit of measurement, or time period (e.g., "5000 TPA", "2000 tonnes per annum", "liters per day", "Yearly", "Kilograms"), classify as Class 1.
+    - If the user only mentions an industry name, product, or any manufacturing-related term (e.g., "pharma", "steel", "packaging", "cement") in response — even without verbs or full sentences — treat it as Class 1.
+    - These types of inputs often reflect answers to previous follow-up questions or abbreviated expressions of build-from-scratch intent.
+    - Always assume Class 1 if the phrasing indicates production scale, plant setup, or factory-specific planning — even if the message is brief or lacks sentence structure.
+
+    Additional Understanding Requirement:
+        - Do not rely solely on specific keywords like “approvals,” “vendors,” “employment,” “incentives,” or “building industry from scratch.”
+        - Always analyze the full context of the query to determine whether these intents are present — even if users use alternative phrasing or synonyms.
+        - Examples:
+            - “Permissions,” “licenses,” “NOCs,” or “clearances” should be interpreted as approval-related.
+            - “Suppliers,” “distributors,” or “raw material sources” may indicate vendor search.
+            - “Jobs,” “workforce,” “manpower,” or “recruitment” may imply employment intent.
+            - “Subsidies,” “tax breaks,” “grants,” or “financial support” may suggest incentives.
+            - “Starting operations,” “setting up a factory,” “establishing infrastructure,” or “launching a new unit” may indicate building industry from scratch.
+        - Understand user intent even if the sentence is vague, mixed, or includes implied meanings rather than explicit phrases.
+
+    Final Output Instructions:
+    - Strictly return only the classification number (1, 2, or 3).
+    - Do NOT include explanations or summaries.
+
+    Query:
+    {query}
+
+    Output:
+    (Return only one classification number)
+    """
+
+    prompt_template = PromptTemplate(input_variables=["query"], template=raw_prompt)
+    chain = prompt_template | llm
+
+    response = chain.invoke({"query": query})
+    match = re.search(r"^\s*([1-3])\s*$", response.content.strip())
+
+    if match:
+        classification_number = int(match.group(1))
+        classification_category = category_mapping[classification_number]
+        return {
+            "raw_prompt": raw_prompt,
+            "classification_number": classification_number,
+            "classification_category": classification_category,
+        }
+    else:
+        raise ValueError(f"Invalid classification from LLM: {response}")
 
 def extract_json_main_industry_details(output: str) -> Dict[str, str]:
     """
@@ -197,7 +314,7 @@ def extract_main_industry_and_product_for_scratch(user_query: str, main_industri
     extracted_details = extract_json_main_industry_details(result_text)
 
     # Validate against the provided list of Main Industries
-    validated_data = extracted_details.copy()
+    validated_data = copy.deepcopy(extracted_details)
     if extracted_details["Main-Industry"] not in main_industries and extracted_details["Main-Industry"] != "None":
         validated_data["Main-Industry"] = "Not Available in list"
 
@@ -414,7 +531,7 @@ def extract_sub_sector_and_product_for_scratch(
     extracted_details = extract_json_sub_sector_product(result.content.strip())
 
     # Validation: Check if the extracted sub-sector exists in the provided list
-    validated_data = extracted_details.copy()
+    validated_data = copy.deepcopy(extracted_details)
     if extracted_details["Sub-Sector"] not in sub_sectors and extracted_details["Sub-Sector"] != "None":
         validated_data["Sub-Sector"] = "Not Available in list"
 
@@ -634,7 +751,7 @@ def extract_segment_and_product_for_scratch(
     extracted_data = extract_json_segment_and_product(result_content)
 
     # Validate against the provided list of Segments
-    validated_data = extracted_data.copy()
+    validated_data = copy.deepcopy(extracted_data)
     if extracted_data["Segment"] not in segments and extracted_data["Segment"] != "None":
         validated_data["Segment"] = "Not Available in list"
 
@@ -859,22 +976,42 @@ def generate_ai_message(state, history, missing_fields, attempt_count, llm):
     - Avoid splitting the message into multiple paragraphs.
 
     - Strict Hierarchical Reference for Context:  
-    - Always refer to **only the highest available level of specificity** in the provided details, following this hierarchy:  
-        1. **Product** (if available, only mention this and ignore Segment, Sub-Sector, and Main-Industry).  
-        2. If Product is missing or "None," then mention **Segment**.  
-        3. If Segment is missing, "None," or "Not Available in List," then mention **Sub-Sector**.  
-        4. If Sub-Sector is missing, "None," or "Not Available in List," then mention **Main-Industry**.  
-    - **Do NOT mention or refer to lower hierarchy levels** if a higher level (like Product or Segment) is already available.  
-    - Avoid mentioning multiple levels in one response; always stick to the **highest available level** only.
+    - Always refer to only the highest available level of specificity in the provided details, following this hierarchy:  
+        1. Product (if available, only mention this and ignore Segment, Sub-Sector, and Main-Industry).  
+        2. If Product is missing or "None," then mention Segment.  
+        3. If Segment is missing, "None," or "Not Available in List," then mention Sub-Sector.  
+        4. If Sub-Sector is missing, "None," or "Not Available in List," then mention Main-Industry.  
+    - Do NOT mention or refer to lower hierarchy levels if a higher level (like Product or Segment) is already available.  
+    - Avoid mentioning multiple levels in one response; always stick to the highest available level only.
 
     - Provide Examples for All Missing Details:  
-    - If asking for **Capacity**, provide numeric examples relevant to the context, such as "1000 or 5000."  
-    - If asking for **Capacity Unit**, provide clear examples like "liters or tonnes."  
-    - If asking for **Time Period**, offer examples like "per day, per month, or per annum."  
+    - If asking for Capacity, provide numeric examples relevant to the context, such as "1000 or 5000."  
+    - If asking for Capacity Unit, provide clear examples like "liters or tonnes."  
+    - If asking for Time Period, offer examples like "per day, per month, or per annum."  
     - Integrate these examples naturally into the question, making it clear but concise.  
 
     - Example of a Well-Formulated Question:  
         - "To proceed further, could you please provide the capacity you're considering, such as 1000 or 5000 kilograms, the unit of measurement like kilograms or tonnes, and the time period such as per day, per month, or per annum for your dairy processing business?"  
+
+    - Handling Greetings:  
+    - If the user greets (e.g., "Hi", "Hello", "Good morning"), warmly acknowledge the greeting (e.g., "Hello! It’s great to connect with you.")  
+    - Transition directly to ask for the missing details without including disclaimers or unrelated guidance.
+
+    - Handling Special Days:  
+    - If the user mentions a special occasion (e.g., birthday, anniversary), warmly acknowledge it (e.g., "Happy Birthday! Wishing you all the best.")  
+    - Transition smoothly to request the missing details without including disclaimers or unrelated guidance.
+
+    - Handling Negative Emotions:  
+    - If the user expresses frustration, anger, or sadness, respond empathetically (e.g., "I’m sorry to hear that. I’m here to help in any way I can.")  
+    - Transition smoothly to request the missing details while maintaining a supportive tone.
+
+    - Handling Off-Topic Queries:
+    - If the latest user message is unrelated to business, industry, or construction (e.g., entertainment, sports, programming, casual conversation), the assistant must NOT mention, refer to, or attempt to connect that content to any business context.
+    - Instead, seamlessly redirect to the task by asking for the required business information, without referencing the user’s message.
+    - Example: "Could you please share the product or service you deal with so I can assist you further?"
+    - The redirection should be concise (2–3 lines), professional, and focused solely on gathering the missing business details.
+    - Under no circumstances should the off-topic content (e.g., movie names, code, sports) be included in or influence the wording of the redirected business-related question.
+    - The assistant must always use a clean, general phrasing like: "Could you please share the product or service you deal with so I can assist you further?" without inserting any content from the off-topic user message.
 
     - Transitioning to Missing Information:  
     - Ensure the transition to the missing details request feels natural and engaging.  
@@ -896,6 +1033,9 @@ def generate_ai_message(state, history, missing_fields, attempt_count, llm):
     - Do NOT include any explanations, reasoning, or assumptions about the missing details, user input, or context.  
     - For the first five attempts, focus only on requesting the missing details.  
     - After five attempts, briefly acknowledge the provided details, then request the missing details concisely.  
+    - The final message should be very concise—no more than 2 to 3 lines—while still being clear, complete, and informative.  
+    - Ensure the request includes all the missing details in a professional and easy-to-understand manner, following the prompt’s earlier instructions.  
+    - When responding to off-topic inputs, do not mention the off-topic subject—just proceed to ask for the relevant business details as normal.
     """
 
     # Format the provided details and missing details
@@ -938,157 +1078,62 @@ def gather_industry_details(query, main_industries, llm,chatId):
     chat_history = get_chat(f"chat_{chatId}") or []
 
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
-    
     refined_query = refine_query_with_history(Chat_history_normal, query, llm)
     chat_history.append(HumanMessage(content=refined_query))
     save_chat(chat_history,f"chat_{chatId}")
+    Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     
-    keyword_list = extract_important_words(refined_query, "Query to build industry from Scratch")
-    state["KEYWORDS"] = keyword_list
-    save_state(state,f"QIND_state_{chatId}")
-    
-    with open("log.txt", "a") as file:
-            file.write(f"\nstate2 {state}")
-    # Extract industry details from the refined query
-    is_changed = False
-    extracted_data,validated_data =  extract_main_industry_and_product_for_scratch(refined_query,main_industries,llm)
-    if validated_data['Main-Industry'] != 'None' and validated_data["Main-Industry"] != state['Main-Industry']:
-        state["Main-Industry"] = validated_data["Main-Industry"]
-        state["Product"] = validated_data["Product"]
-        state["Segment"] = 'None'
-        state['Capacity'] = 'None'
-        state["Capacity Unit"] = 'None'
-        state["Time Period"] = 'None'
-        state['product_attempt_count'] = 0
-        state['capacity_attempt_count'] = 0
-        save_state(state,f"QIND_state_{chatId}")
-        is_changed = True
-    
-    if state['Main-Industry'] == 'None' and state['Product'] == 'None':
-        capacity_json = extract_capacity_details(refined_query,llm)
-        
-         # Check if at least one value is not 'None'            
-        if any(value != 'None' for value in capacity_json.values()):
-             # Update only if the value is different and not 'None'
-            for key, value in capacity_json.items():
-                if value != 'None' and state.get(key) != value:
-                    state[key] = value
-            save_state(state,f"QIND_state_{chatId}")
+    result = classify_industry_setup_query(refined_query, llm)
+    user_intention = result["classification_category"]
 
-        chat_history = get_chat(f"chat_{chatId}")
-        state['product_attempt_count'] = state['product_attempt_count'] + 1
-        save_state(state,f"QIND_state_{chatId}")
-        message = generate_ai_message(state,Chat_history_normal,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
+    if user_intention == "Negatively Intended Query":
+        message = respond_to_negative_query(
+            user_intention, 
+            append_user_to_history=False, 
+            append_AI_to_history=False, 
+            llm=llm,
+            chatId=chatId)
         chat_history.append(AIMessage(content=f"{message}"))
         save_chat(chat_history,f"chat_{chatId}")
-        return {"Ai_response": message,
-                "Is_confirmation" : False,
-                "state":state}
-    
-    elif state["Main-Industry"] == 'Not Available in list' and state["Product"] == 'None':
-        capacity_json = extract_capacity_details(refined_query,llm)
+        response = {
+            "Ai_response": message,
+            "Is_confirmation" : False,
+            "state":state
+        }
+        return response
+    else:
+        keyword_list = extract_important_words(refined_query, "Query to build industry from Scratch")
+        state["KEYWORDS"] = keyword_list
+        save_state(state,f"QIND_state_{chatId}")
         
-        if any(value != 'None' for value in capacity_json.values()):
-             # Update only if the value is different and not 'None'
-            for key, value in capacity_json.items():
-                if value != 'None' and state.get(key) != value:
-                    state[key] = value
+        with open("log.txt", "a") as file:
+                file.write(f"\nstate2 {state}")
+        # Extract industry details from the refined query
+        is_changed = False
+        extracted_data,validated_data =  extract_main_industry_and_product_for_scratch(refined_query,main_industries,llm)
+        if validated_data['Main-Industry'] != 'None' and validated_data["Main-Industry"] != state['Main-Industry']:
+            state["Main-Industry"] = validated_data["Main-Industry"]
+            state["Product"] = validated_data["Product"]
+            state["Segment"] = 'None'
+            state['Capacity'] = 'None'
+            state["Capacity Unit"] = 'None'
+            state["Time Period"] = 'None'
+            state['product_attempt_count'] = 0
+            state['capacity_attempt_count'] = 0
             save_state(state,f"QIND_state_{chatId}")
-        missing_fields = [field for field, value in capacity_json.items() if value == 'None']
-        if len(missing_fields) == 0:
-            message = "We've your query, We'll get back to you soon"
-            return {"Ai_response": message,
-                "Is_confirmation" : False,
-                "state":state}
-        else:
-            chat_history = get_chat(f"chat_{chatId}")
-            state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
-            save_state(state,f"QIND_state_{chatId}")
-            message = generate_ai_message(state,Chat_history_normal,missing_fields,state['capacity_attempt_count'],llm_70b_vers_creative)
-            chat_history.append(AIMessage(content=f"{message}"))
-            save_chat(chat_history,f"chat_{chatId}")
-            return {"Ai_response": message,
-                "Is_confirmation" : False,
-                "state":state}
+            is_changed = True
         
-    elif state["Main-Industry"] != 'None':
-        capacity_json = extract_capacity_details(refined_query,llm)
-
-        if any(value != 'None' for value in capacity_json.values()):
-             # Update only if the value is different and not 'None'
-            for key, value in capacity_json.items():
-                if value != 'None' and state.get(key) != value:
-                    state[key] = value
-            save_state(state,f"QIND_state_{chatId}")
-        final_json = get_json_for_industry()
-        if state['Sub-Sector'] == 'None' or is_changed:
+        if state['Main-Industry'] == 'None' and state['Product'] == 'None':
+            capacity_json = extract_capacity_details(refined_query,llm)
             
-            sub_sector = get_sub_sectors(final_json,state["Main-Industry"])
-            sub_extracted_data,sub_validated_data = extract_sub_sector_and_product_for_scratch(refined_query,sub_sector,llm,state["Main-Industry"],state["Product"])
-           
-            state = get_state(f"QIND_state_{chatId}")
-            state["Sub-Sector"] = sub_validated_data["Sub-Sector"]
-            state["Product"] = sub_validated_data["Product"]
-            
-            save_state(state,f"QIND_state_{chatId}")
-        # state = get_state(f"QIND_state_{chatId}")
-        if state['Sub-Sector'] != 'None' and state['Sub-Sector'] != 'Not Available in list':
-            segments = get_segments(final_json,state["Main-Industry"],state['Sub-Sector'])
-
-            segment_extracted_data,segment_validated_data = extract_segment_and_product_for_scratch(refined_query,segments,llm,main_industries,state['Sub-Sector'],state["Product"])
-            
-            state = get_state(f"QIND_state_{chatId}")
-            state["Segment"] = segment_validated_data["Segment"] 
-            state["Product"] = segment_validated_data["Product"]
-            
-            save_state(state,f"QIND_state_{chatId}")
-            capicity_pending_list = get_keys_for_capicity(chatId)
-            if len(capicity_pending_list) > 0:
-                chat_history = get_chat(f"chat_{chatId}")
-                state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
+            # Check if at least one value is not 'None'            
+            if any(value != 'None' for value in capacity_json.values()):
+                # Update only if the value is different and not 'None'
+                for key, value in capacity_json.items():
+                    if value != 'None' and state.get(key) != value:
+                        state[key] = value
                 save_state(state,f"QIND_state_{chatId}")
-                message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=f"{message}"))
-                save_chat(chat_history,f"chat_{chatId}")
-                return {"Ai_response": message,
-                    "Is_confirmation" : False,
-                    "state":state}
-            else:
-                selected_option = next(
-                    (state.get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
-                    ''
-                )
-                confirmation_message_static = f"We have identified that you are looking property for your {selected_option} production with the capacity of {state.get('Capacity')},{state.get('Capacity Unit')},{state.get('Time Period')} based on your query. Please confirm if this information is correct."
-                dynamic_confirmation_message = generate_dynamic_confirmation_message(confirmation_message_static, llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=f"{dynamic_confirmation_message}"))
-                save_chat(chat_history,f"QIND_chat_{chatId}")
-                response = {
-                    "Ai_response" : dynamic_confirmation_message,
-                    "Is_confirmation" : True,                                   
-                    "validated_data" : segment_validated_data,
-                    "state" : state
-                }
-                return response
 
-        elif state['Sub-Sector'] == 'Not Available in list':
-            capicity_pending_list = get_keys_for_capicity(chatId)
-            if len(capicity_pending_list) > 0:
-                chat_history = get_chat(f"chat_{chatId}")
-                state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
-                save_state(state,f"QIND_state_{chatId}")
-                message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=f"{message}"))
-                save_chat(chat_history,f"chat_{chatId}")
-                return {"Ai_response": message,
-                    "Is_confirmation" : False,
-                    "state": state}
-            else:
-                message = "We've your query, We'll get back to you soon"
-                return {"Ai_response": message,
-                "Is_confirmation" : False,
-                "state":state}
-
-        else:
             chat_history = get_chat(f"chat_{chatId}")
             state['product_attempt_count'] = state['product_attempt_count'] + 1
             save_state(state,f"QIND_state_{chatId}")
@@ -1096,16 +1141,130 @@ def gather_industry_details(query, main_industries, llm,chatId):
             chat_history.append(AIMessage(content=f"{message}"))
             save_chat(chat_history,f"chat_{chatId}")
             return {"Ai_response": message,
+                    "Is_confirmation" : False,
+                    "state":state}
+        
+        elif state["Main-Industry"] == 'Not Available in list' and state["Product"] == 'None':
+            capacity_json = extract_capacity_details(refined_query,llm)
+            
+            if any(value != 'None' for value in capacity_json.values()):
+                # Update only if the value is different and not 'None'
+                for key, value in capacity_json.items():
+                    if value != 'None' and state.get(key) != value:
+                        state[key] = value
+                save_state(state,f"QIND_state_{chatId}")
+            missing_fields = [field for field, value in capacity_json.items() if value == 'None']
+            if len(missing_fields) == 0:
+                message = "We've your query, We'll get back to you soon"
+                return {"Ai_response": message,
+                    "Is_confirmation" : False,
+                    "state":state}
+            else:
+                chat_history = get_chat(f"chat_{chatId}")
+                state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
+                save_state(state,f"QIND_state_{chatId}")
+                message = generate_ai_message(state,Chat_history_normal,missing_fields,state['capacity_attempt_count'],llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=f"{message}"))
+                save_chat(chat_history,f"chat_{chatId}")
+                return {"Ai_response": message,
+                    "Is_confirmation" : False,
+                    "state":state}
+            
+        elif state["Main-Industry"] != 'None':
+            capacity_json = extract_capacity_details(refined_query,llm)
+
+            if any(value != 'None' for value in capacity_json.values()):
+                # Update only if the value is different and not 'None'
+                for key, value in capacity_json.items():
+                    if value != 'None' and state.get(key) != value:
+                        state[key] = value
+                save_state(state,f"QIND_state_{chatId}")
+            final_json = get_json_for_industry()
+            if state['Sub-Sector'] == 'None' or is_changed:
+                
+                sub_sector = get_sub_sectors(final_json,state["Main-Industry"])
+                sub_extracted_data,sub_validated_data = extract_sub_sector_and_product_for_scratch(refined_query,sub_sector,llm,state["Main-Industry"],state["Product"])
+            
+                state = get_state(f"QIND_state_{chatId}")
+                state["Sub-Sector"] = sub_validated_data["Sub-Sector"]
+                state["Product"] = sub_validated_data["Product"]
+                
+                save_state(state,f"QIND_state_{chatId}")
+            # state = get_state(f"QIND_state_{chatId}")
+            if state['Sub-Sector'] != 'None' and state['Sub-Sector'] != 'Not Available in list':
+                segments = get_segments(final_json,state["Main-Industry"],state['Sub-Sector'])
+
+                segment_extracted_data,segment_validated_data = extract_segment_and_product_for_scratch(refined_query,segments,llm,main_industries,state['Sub-Sector'],state["Product"])
+                
+                state = get_state(f"QIND_state_{chatId}")
+                state["Segment"] = segment_validated_data["Segment"] 
+                state["Product"] = segment_validated_data["Product"]
+                
+                save_state(state,f"QIND_state_{chatId}")
+                capicity_pending_list = get_keys_for_capicity(chatId)
+                if len(capicity_pending_list) > 0:
+                    chat_history = get_chat(f"chat_{chatId}")
+                    state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
+                    save_state(state,f"QIND_state_{chatId}")
+                    message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=f"{message}"))
+                    save_chat(chat_history,f"chat_{chatId}")
+                    return {"Ai_response": message,
+                        "Is_confirmation" : False,
+                        "state":state}
+                else:
+                    selected_option = next(
+                        (state.get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
+                        ''
+                    )
+                    confirmation_message_static = f"We have identified that you are looking property for your {selected_option} production with the capacity of {state.get('Capacity')},{state.get('Capacity Unit')},{state.get('Time Period')} based on your query. Please confirm if this information is correct."
+                    dynamic_confirmation_message = generate_dynamic_confirmation_message(confirmation_message_static, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=f"{dynamic_confirmation_message}"))
+                    save_chat(chat_history,f"QIND_chat_{chatId}")
+                    response = {
+                        "Ai_response" : dynamic_confirmation_message,
+                        "Is_confirmation" : True,                                   
+                        "validated_data" : segment_validated_data,
+                        "state" : state
+                    }
+                    return response
+
+            elif state['Sub-Sector'] == 'Not Available in list':
+                capicity_pending_list = get_keys_for_capicity(chatId)
+                if len(capicity_pending_list) > 0:
+                    chat_history = get_chat(f"chat_{chatId}")
+                    state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
+                    save_state(state,f"QIND_state_{chatId}")
+                    message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=f"{message}"))
+                    save_chat(chat_history,f"chat_{chatId}")
+                    return {"Ai_response": message,
+                        "Is_confirmation" : False,
+                        "state": state}
+                else:
+                    message = "We've your query, We'll get back to you soon"
+                    return {"Ai_response": message,
+                    "Is_confirmation" : False,
+                    "state":state}
+
+            else:
+                chat_history = get_chat(f"chat_{chatId}")
+                state['product_attempt_count'] = state['product_attempt_count'] + 1
+                save_state(state,f"QIND_state_{chatId}")
+                message = generate_ai_message(state,Chat_history_normal,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
+                chat_history.append(AIMessage(content=f"{message}"))
+                save_chat(chat_history,f"chat_{chatId}")
+                return {"Ai_response": message,
+                    "Is_confirmation" : False,
+                    "state":state}
+        
+        else:
+            response = {
+                "Ai_response": "Please enter valid query with some details.",
                 "Is_confirmation" : False,
-                "state":state}
-    
-    else:
-        response = {
-            "Ai_response": "Please enter valid query with some details.",
-            "Is_confirmation" : False,
-            "state":state
-        }
-        return response
+                "state":state
+            }
+            return response
 
 def extract_json_time_conversion(output):
     """

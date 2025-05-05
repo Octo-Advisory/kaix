@@ -1,15 +1,17 @@
 import os
 import re
 import json 
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Union, Any
+import copy
 # from dotenv import load_dotenv
 import spacy
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 from rapidfuzz import fuzz, process
-import spacy
+from langchain.schema import HumanMessage, AIMessage
 import frappe
 from frontend_app.Management_Class.helpers.utility import update_llm_token  
+from frontend_app.Management_Class.Redis_management.Redis_chat import get_chat,save_chat,get_state,save_state
 import configparser
 
 # from langchain_openai import ChatOpenAI
@@ -17,7 +19,6 @@ config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_manage
 config = configparser.ConfigParser()
 config.read(config_file)
 groq_api_key = config['Key']['groq_key']
-nlp = spacy.load("en_core_web_lg")
 
 # Initialize LLM    
 llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.0)
@@ -93,8 +94,36 @@ def refine_query_with_history(history, latest_query, llm):
 
 # Define the function
 @frappe.whitelist()
-def classify_query(user_query):
-    # Define the refined prompt template 
+def classify_query(user_query: str) -> str:
+    """
+    Classifies a business-related query into one of eight predefined categories based on its intent and context.
+
+    Parameters:
+    -----------
+    user_query : str
+        A user-submitted query related to industry or business.
+
+    Returns:
+    --------
+    str
+        A single category name from the following list that best matches the user's query:
+        
+        - "Query to build industry from Scratch"
+        - "Query to search Vendors"
+        - "Query to search Incentives"
+        - "Query to Get Approvals"
+        - "Query to Get Employee Search"
+        - "Negatively Intended Query"
+        - "Other industry-related queries"
+        - "Valueless queries"
+
+    Notes:
+    ------
+    - The classification is powered by a language model and follows strict rules for interpreting the query’s intent.
+    - Only one category is returned per query.
+    - The function does not provide explanations or return multiple categories.
+    """
+    
     prompt_template = """
     You are an expert in understanding business-related queries and classifying them into a single most relevant category.
     Your task is to strictly assign the query to only one category, even if multiple classes seem applicable.  
@@ -127,14 +156,21 @@ def classify_query(user_query):
         - Example: What is the availability of employment in XYZ area for the Pharmaceutical industry?  
         - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
 
+    6. Negatively Intended Query:
+        - Example: I don't want to search for incentives for the cement industry in Ahmedabad.  
+        - This category is used for queries where the user clearly expresses that they do not want to proceed with a specific industry-related topic (such as incentives, approvals, vendors, land, or employment).  
+        - This includes statements where the user rejects, declines, or expresses disinterest, such as "I don't want to...", "No need to...", or "I'm not looking for...".  
+        - Classify here only if the overall intent is negative toward one or more categories and there is no indication that the user still wants to proceed within the same topic under different parameters (e.g., different city or industry).  
+        - Do not classify vague queries or neutral statements under this category unless the negative intent is explicit or clearly implied in context.
+
     If None of the Above Apply, Use These Two Categories:
 
-    6. Other industry-related queries:  
+    7. Other industry-related queries:  
         - Example: What is the role of AI in manufacturing?  
         - This refers to general industry discussions, trends, or innovations that do not fit into the above categories.
         - Queries about selling property, renting facilities, or unrelated infrastructure transactions should be classified here.
 
-    7. Valueless queries:  
+    8. Valueless queries:  
         - Example: Who is Donald Trump?  
         - This refers to queries that are irrelevant to business, industry setup, or supply chains.  
         - If the query contains industry-related words but the intent is not meaningful, classify it here.  
@@ -171,7 +207,7 @@ def classify_query(user_query):
     Output:  
     (Return only one category name from the list)
     """
- 
+
 
     # Initialize the LLM
     # Create the prompt
@@ -185,10 +221,8 @@ def classify_query(user_query):
 
     # Run the query through the chain
     category = chain.invoke({"query": user_query})
-    update_llm_token(category)
 
     return category.content.strip()
-
 
 def extract_location_from_query(user_input: str, available_areas: List[str], available_cities: List[str], available_states: List[str], llm) -> Dict[str, Dict[str, str]]:
     """
@@ -492,7 +526,6 @@ def extract_comparison_locations(user_input: str, available_areas: List[str], av
 module_names_list = ["Query to build industry from Scratch", "Query to search Vendors", "Query to search Incentives", "Query to Get Approvals", "Query to Get Employee Search", ]
 
 field_with_description = {
-<<<<<<< HEAD
     "Query to search Vendors": {
         "Vendor Name": "The official name of the vendor or business providing the service or goods (e.g., Bhagwati Chemicals, Agriland Biotech Limited.).",
         "Supply Description By Vendor": "A brief explanation of the products or services offered by the vendor (e.g., 'We provide high-quality steel rods for construction projects' or 'PCB Assembly|BOM Sourcing|Turnkey Manufacturing|Electronics Manufacturing').",
@@ -528,8 +561,6 @@ field_with_description = {
         "Road Cutting Involved": "Specifies if road cutting is required to establish infrastructure (Road Cutting).",
         "Will your industry cross the following?": "Checks whether the industry site intersects with important geographical or utility structures (Pipeline of Gujarat Gas, Pipeline of Sabarmati Gas, Pipeline of GSPL, Water bodies, Notified rivers/ nalas/ canals/ drains)."
     }
-=======
->>>>>>> 9e45308 (Eighteenth commit 19/03/25 12:33 krunal)
 }
 
 
@@ -1109,11 +1140,7 @@ def extract_keywords_from_query(
 # General exclusion terms
 EXCLUSION_TERMS = [
     "incentive", "subsidy", "approval", "supplier", "vendor",
-<<<<<<< HEAD
     "suppliers", "vendors", "approvals"
-=======
-    "suppliers", "vendors", "approvals", "land", "property"
->>>>>>> 9e45308 (Eighteenth commit 19/03/25 12:33 krunal)
 ]
 
 # Quantity, Units, and Time Periods (for Scratch module only)
@@ -1128,30 +1155,6 @@ TIME_PERIOD_TERMS = [
     "year", "month", "day", "hour", "weekly", "annually", "quarterly", "biweekly"
 ]
 
-<<<<<<< HEAD
-=======
-EXCLUSION_TERMS_SCRATCH = ["production unit", "company", "industry", "factory"]
-
-# Extended removal terms list
-REMOVE_TERMS = [
-    "incentive", "incentives", "subsidy", "subsidies", "approval", "approvals",
-    "supplier", "suppliers", "vendor", "vendors", "land", "lands", "property",
-    "properties", "industry", "industries", "factory", "factories", "scheme",
-    "schemes", "policy", "policies", "department", "departments", "supply",
-    "supplies", "benefit", "benefits", "company", "companies", "production",
-    "productions", "unit", "units", "organization",
-    "organizations", "corporation", "corporations", "firm", "firms", "manufacturing",
-    "manufacturings", "manufacture", "manufactures", "process", "processes",
-    "operation", "operations", "development", "developments", "construction",
-    "constructions", "building", "buildings", "ministry", "ministries", "authority",
-    "authorities", "office", "offices", "license", "licenses", "permit", "permits",
-    "registration", "registrations", "investment", "investments", "funding",
-    "fundings", "grant", "grants", "entity", "entities", "sector", "sectors",
-    "initiative", "initiatives"
-]
-
-
->>>>>>> 9e45308 (Eighteenth commit 19/03/25 12:33 krunal)
 # Entity exclusions based on module
 MODULE_ENTITY_EXCLUSIONS = {
     "Query to search Incentives": {"GPE", "LOC"},
@@ -1160,7 +1163,6 @@ MODULE_ENTITY_EXCLUSIONS = {
     "Query to build industry from Scratch": {"QUANTITY", "CARDINAL", "ORDINAL", "DATE", "TIME", "PERCENT", "MONEY"}
 }
 
-<<<<<<< HEAD
 # Convert exclusion terms to SpaCy Doc objects for similarity comparison
 def get_exclusion_docs(module: str):
     """Get exclusion terms as SpaCy Doc objects based on the module."""
@@ -1224,66 +1226,6 @@ def extract_important_words(text: str, module: str = "") -> List[str]:
 
 
 
-=======
-def get_exclusion_docs(module: str):
-    if module == "Query to build industry from Scratch":
-        terms = EXCLUSION_TERMS + QUANTITY_TERMS + QUANTITY_UNITS + TIME_PERIOD_TERMS + EXCLUSION_TERMS_SCRATCH
-    else:
-        terms = EXCLUSION_TERMS
-    return [nlp(term) for term in terms]
-
-def is_similar_to_exclusion(word: str, exclusion_docs) -> bool:
-    word_doc = nlp(word)
-    return any(word_doc.similarity(ex_doc) > 0.7 for ex_doc in exclusion_docs)
-
-def get_entity_label(word: str, doc) -> str:
-    for ent in doc.ents:
-        if word in ent.text.lower():
-            return ent.label_
-    return ""
-
-def remove_terms_from_phrase(phrase: str) -> str:
-    words = phrase.split()
-    filtered_words = [word for word in words if word.lower() not in [term.lower() for term in REMOVE_TERMS]]
-    return ' '.join(filtered_words)
-
-def extract_important_words(text: str, module: str = "") -> List[str]:
-    doc = nlp(text)
-    exclusion_docs = get_exclusion_docs(module)
-
-    noun_chunks = {chunk.text.strip().lower() for chunk in doc.noun_chunks}
-    named_entities = {
-        ent.text.strip().lower() for ent in doc.ents
-        if ent.label_ not in MODULE_ENTITY_EXCLUSIONS.get(module, set())
-    }
-
-    important_pos = {token.text.strip().lower() for token in doc if token.pos_ in {"NOUN", "PROPN"}}
-
-    combined_terms = noun_chunks.union(named_entities)
-
-    final_terms = set()
-    for term in combined_terms:
-        if not any(term != existing and term in existing for existing in combined_terms):
-            final_terms.add(term)
-
-    final_terms.update({
-        word for word in important_pos
-        if not any(word in phrase for phrase in final_terms)
-    })
-
-    filtered_terms = [
-        word for word in final_terms
-        if not is_similar_to_exclusion(word, exclusion_docs)
-        and not nlp.vocab[word].is_stop
-        and get_entity_label(word, doc) not in MODULE_ENTITY_EXCLUSIONS.get(module, set())
-    ]
-
-    # Strictly remove terms within phrases
-    refined_terms = [remove_terms_from_phrase(term) for term in filtered_terms]
-    refined_terms = [term for term in refined_terms if term]  # Remove empty strings
-
-    return list(set(refined_terms))
->>>>>>> 9e45308 (Eighteenth commit 19/03/25 12:33 krunal)
 
 def extract_main_industry_and_product_universal(user_query: str, main_industries: List[str], llm) -> Dict[str, str]:
     """
@@ -1336,6 +1278,7 @@ def extract_main_industry_and_product_universal(user_query: str, main_industries
     - Ensure that the output is strictly limited to the required JSON format and contains no explanations, reasoning, or comments.  
     - Do not provide additional text, explanations, or reasoning within the fields of the JSON object.  
     - Each field in the JSON must only contain the exact extracted information or the specified fallback values (e.g., "None").  
+    - If the query mentions only a location but no specific industry or product context, do not infer the industry from prior knowledge of the location. Instead, return None.
 
     Output Format:
     Output the result strictly as a JSON object in the following format:  
@@ -1395,7 +1338,7 @@ def extract_main_industry_and_product_universal(user_query: str, main_industries
     }
 
     # Validate against the provided list of Segments
-    validated_data = extracted_data.copy()
+    validated_data = copy.deepcopy(extracted_data)
     if main_industry not in main_industries and main_industry != "None":
         validated_data["Main-Industry"] = "Not Available in list"
 
@@ -1477,6 +1420,7 @@ def extract_sub_sector_and_product_universal(
     - Strictly limit the output to the required JSON format and ensure that it contains no explanations, reasoning, or additional text.  
     - Do not provide reasoning like *"This matches because..."* or *"Assumed based on context."*  
     - Each field in the JSON must contain only the extracted information or the specified fallback values (`"None"`).  
+    - If the query mentions only a location but no specific industry or product context, do not infer the sub-sector from prior knowledge of the location. Instead, return None.
 
     Provided List of Sub-Sectors:  
     {sub_sectors_str}  
@@ -1542,9 +1486,9 @@ def extract_sub_sector_and_product_universal(
     }
 
     # Validate against the provided list of Segments
-    validated_data = extracted_data.copy()
+    validated_data = copy.deepcopy(extracted_data)
     if sub_sector not in sub_sectors and sub_sector != "None":
-        validated_data["Sub-Sector"] = "Not Available in list"
+        validated_data["Sub-Sector"] = "Not Available in List"
 
     return extracted_data, validated_data
 
@@ -1628,6 +1572,7 @@ def extract_segment_and_product_universal(
     - Ensure that the output strictly adheres to the specified JSON format without any additional reasoning, explanations, or comments.
     - Do not include any reasoning or justification in the fields. For example, avoid entries such as `"This matches because..."` or `"Assumed based on the context..."`.
     - Each field should only contain the extracted information or the specified fallback values (e.g., "None").
+    - If the query mentions only a location but no specific industry or product context, do not infer the segment from prior knowledge of the location. Instead, return None.
 
     Output the result strictly as a JSON object in the following format:
     {{
@@ -1688,7 +1633,7 @@ def extract_segment_and_product_universal(
     }
 
     # Validate against the provided list of Segments
-    validated_data = extracted_data.copy()
+    validated_data = copy.deepcopy(extracted_data)
     if segment not in segments and segment != "None":
         validated_data["Segment"] = "Not Available in list"
 
@@ -1815,3 +1760,254 @@ def generate_fallback_message(chat_history_for_context: List[dict], confirmation
     })
 
     return message.content.strip()
+
+@frappe.whitelist()
+def extract_incentive_details_using_ai(description: str, llm=llm_70b_vers_creative) -> Dict[str, List[str]]:
+    """
+    Uses an AI model to extract structured incentive details dynamically.
+
+    Parameters:
+        description (str): The incentive description provided by the user.
+        llm: The language model instance.
+
+    Returns:
+        Dict[str, List[str]]: A dictionary where keys are category names, 
+                              and values are lists of relevant points.
+    """
+    prompt = """
+    You are an expert in analyzing government and business incentive descriptions. 
+    Your task is to extract structured information from the following incentive description 
+    and categorize it under relevant sections. Only include categories that are explicitly mentioned.
+
+    Categories to consider:
+    - Eligibility: Who can apply or qualify for the incentive.
+    - Benefits: Financial support, subsidies, tax exemptions, or any direct advantages.
+    - Requirements: Conditions or criteria that must be met to receive the incentive.
+    - Process: Steps or application procedures involved.
+    - Other Details: Any additional relevant information.
+
+    Description:
+    {description}
+
+    Output format (only include categories present in the text):
+    {{
+        "Eligibility": ["..."],
+        "Benefits": ["..."],
+        "Requirements": ["..."],
+        "Process": ["..."],
+        "Other Details": ["..."]
+    }}
+
+    Do not add any explanations, notes, or additional text. Only return valid JSON.
+    - Ensure each category is formatted as a list of short points.
+    - Exclude any category if it is not explicitly mentioned in the description.
+    """
+    
+    prompt_template = PromptTemplate(
+        input_variables=["description"],
+        template=prompt
+    )
+
+    chain = prompt_template | llm
+    response = chain.invoke({"description": description})
+    update_llm_token(response)
+    return response.content.strip()
+
+def update_user_intension(user_intension,chatId):
+    query = "UPDATE `tabSession` SET user_intension = %s WHERE name = %s"
+    frappe.db.sql(query, (user_intension, chatId))
+    frappe.db.commit() 
+
+def respond_to_negative_query(
+    user_message: str,
+    append_user_to_history: bool,
+    append_AI_to_history: bool,
+    llm,
+    chatId,
+    update_intention = True
+) -> str:
+    """
+    Reacts to negative intent in user queries by acknowledging it and 
+    politely redirecting users to supported industry-related alternatives.
+
+    Parameters:
+    - user_message (str): The most recent user input.
+    - append_user_to_history (bool): Flag to determine whether to add the user message to chat history.
+    - llm: A language model instance that supports the `.invoke()` method for prompt completion.
+
+    Returns:
+    - str: A short, polite AI-generated redirection message (max two lines).
+    """
+    chat_history = get_chat(f"chat_{chatId}") or []
+    Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-4:]]
+    if append_user_to_history:
+        chat_history.append(HumanMessage(content=user_message))
+        save_chat(chat_history,f"chat_{chatId}")
+
+    prompt_template = """
+    You are a professional AI assistant designed to help users with industry-related queries. 
+    Sometimes users may express that they do not want to proceed with a certain type of query, 
+    such as searching for vendors, incentives, employment, approvals, or land.
+
+    Your task is to:
+    - Politely acknowledge the user's intent to not continue with the current path.
+    - Respect their decision without repeating the rejected topic.
+    - Encourage them to explore other areas the platform supports — but limit suggestions to one or two concise, relevant alternatives.
+    - Keep the response short, natural, and conversational — a maximum of two lines.
+    
+    Input Usage Guidelines:
+    - Use the latest user message to understand the user’s current concern or direction.
+    - Refer to the recent conversation history only when needed to maintain context, avoid repetition, or recognize prior negative expressions.
+    - Do not restate or repeat what was already covered unless it helps clarify or smoothly redirect the conversation.
+
+    Important Instructions:
+    - Do NOT mention or re-suggest the category the user rejected — even in a different location, product, or form.
+    - If the user’s rejection appears to be specific to a location, product, or context, you may offer assistance in other locations or products — but only if it does not reintroduce the rejected category.
+    - Suggest one alternative direction naturally (two if needed) based on platform capabilities:
+        - Building an industry from scratch
+        - Searching for employment in a city or state
+        - Inquiring about incentives
+        - Finding vendors for their industry
+        - Searching for the approvals
+    - Never use "how to build an industry" or anything that implies your platform teaches or trains users. 
+    You are assisting them in setting up or building, not educating them.
+    - Keep the response strictly within two lines, using concise and polite phrasing.
+
+    Inputs:
+    - Latest user message: {user_message}
+    - Recent conversation history: {chat_history}
+
+    Output Requirements:
+    - The message should be in one short paragraph with no more than two lines.
+    - It must feel polite, helpful, and actionable — inviting the user to continue exploring relevant options.
+    - Do NOT list all supported categories. Suggest only 1–2 in natural language, avoiding list-like structure.
+    """
+
+    prompt = PromptTemplate(
+        input_variables=["user_message", "chat_history"],
+        template=prompt_template
+    )
+    chain = prompt | llm
+
+    result = chain.invoke({
+        "user_message": user_message,
+        "chat_history": "\n".join(Chat_history_normal)
+    })
+    message_from_ai = result.content.strip()
+    if append_AI_to_history:
+        chat_history.append(AIMessage(content=message_from_ai))
+        save_chat(chat_history,f"chat_{chatId}")
+    if update_intention:
+        update_user_intension("Negatively Intended Query", chatId)
+    return message_from_ai
+
+def detect_module_switch_intent(
+    user_query: str,
+    current_modules: list,
+    llm: Any,
+    chat_history: list,
+) -> dict:
+    """
+    Detects whether the user is attempting to switch from the current module(s) to a different one,
+    based on recent conversation history and the latest user query.
+
+    Parameters:
+    -----------
+    user_query : str
+        The latest message from the user.
+
+    current_modules : list
+        A list of currently active modules. Example:
+        ["Query to search Incentives"], or
+        ["Query to search Incentives", "Query to Get Approvals"]
+    
+    chat_history : list
+    A list of Message objects (HumanMessage or AIMessage), from which last few turns will be extracted.
+
+    llm : Any
+        The language model to be used (e.g., LLMChain, LangChain-compatible model).
+
+    Returns:
+    --------
+    dict
+        A JSON object with the key "switch_module" and a boolean value:
+        {
+            "switch_module": true or false
+        }
+
+    Notes:
+    ------
+    - This function does not classify the destination module; it only detects if the user
+      wants to exit the current modules based on a shift in intent.
+    """
+    Chat_history_normal = "\n".join(chat_history)
+
+    # Updated prompt
+    prompt_template = """
+    You are a smart assistant that helps decide if a user wants to switch away from the current conversation topics (called "modules").
+
+    Based on the user's most recent message, the last few exchanges, and the list of current modules, determine whether the user is
+    trying to change the topic to something outside the current active modules.
+
+    Only return "True" if it is very likely that the user wants to exit the current module(s) and move to another topic/module.
+    If the user is continuing the same conversation (asking for more detail, clarification, or responding to the assistant), return "False".
+
+    Modules include:
+    - Query to build industry from Scratch
+    - Query to search Vendors
+    - Query to search Incentives
+    - Query to Get Approvals
+    - Query to Get Employee Search
+
+    Strict Module Switch Detection Rules:
+    1. If the user mentions any module that is not part of the current module list, treat it as intent to switch.
+    2. If the user mentions multiple modules — whether or not current modules are included — it is a switch if any module lies outside the current ones.
+    Example: If current modules are ["Query to search Incentives"], and the user says “I want to check vendors and incentives”, this should be "True".
+    3. If the user is replying to the last AI message in a way that continues the same topic (e.g., confirming, following up, or asking for details),
+    you should return "False" and NOT consider this as an intent switch.
+    4. If the user’s message is vague, complex, or indirectly worded, do not rely on specific keywords. Instead, analyze the overall meaning
+    of the message to determine whether they are continuing the current topic or shifting to a new one.
+
+    Additional Understanding Requirement:
+    - Do not rely solely on specific keywords like “approvals,” “vendors,” “employment,” “incentives,” or “building industry from scratch.”
+    - Always analyze the full context of the query to determine whether these intents are present — even if users use alternative phrasing or synonyms.
+    - Examples:
+        - “Permissions,” “licenses,” “NOCs,” or “clearances” should be interpreted as approval-related.
+        - “Suppliers,” “distributors,” or “raw material sources” may indicate vendor search.
+        - “Jobs,” “workforce,” “manpower,” or “recruitment” may imply employment intent.
+        - “Subsidies,” “tax breaks,” “grants,” or “financial support” may suggest incentives.
+        - “Starting operations,” “setting up a factory,” “establishing infrastructure,” or “launching a new unit” may indicate building industry from scratch.
+    - Understand user intent even if the sentence is vague, mixed, or includes implied meanings rather than explicit phrases.
+
+    Respond with only one word: True or False
+
+    Current Modules:
+    {current_modules}
+
+    Recent Chat History:
+    {chat_history}
+
+    Latest User Message:
+    {user_query}
+
+    Output:
+    """
+
+    prompt = PromptTemplate(
+        input_variables=["current_modules", "chat_history", "user_query"],
+        template=prompt_template
+    )
+
+    chain = prompt | llm
+    result = chain.invoke({
+        "current_modules": str(current_modules),
+        "chat_history": Chat_history_normal,
+        "user_query": user_query
+    })
+
+    response = result.content.strip().lower()
+    switch_flag = response == "true"
+
+    return {
+        "switch_module": switch_flag
+    }

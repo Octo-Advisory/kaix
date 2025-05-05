@@ -1,5 +1,6 @@
 import re
 import pandas as pd
+import copy
 from typing import List, Dict, Tuple, Union, Any, Optional
 from click import prompt
 from langchain.prompts import PromptTemplate
@@ -9,6 +10,8 @@ from langchain.schema import HumanMessage, AIMessage
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import get_chat,save_chat,get_state,save_state
 from frontend_app.Management_Class.helpers.utility import update_llm_token
+from frontend_app.Management_Class.Ai_management.AI import respond_to_negative_query
+
 
 def fetch_query_results(query):
     """
@@ -76,20 +79,28 @@ def refine_query_with_history_for_approval(history, latest_query, llm):
     # Fallback to the entire response if no match is found
     return refined_text
 
-def classify_approval_query(query, llm):
+def classify_approval_query(query: str, llm: Any) -> Dict[str, Any]:
     """
-    Classify the user's approval search query into the following categories:
-    1. Approval Search for area, city, or state without industry.
-    2. Approval Search for individual industry without location.
-    3. Approval Search for area, city, or state with industry.
-    4. Other Intent.
+    Classifies a user's approval-related query into one of the predefined intent categories:
+    
+    Categories:
+        1. Approval Search for area, city, or state without industry.
+        2. Approval Search for individual industry without location.
+        3. Approval Search for area, city, or state with industry.
+        4. Other Intent.
+        5. Negative Intent.
+
+    The classification is determined based on rules provided in a structured prompt and evaluated by a language model (LLM).
 
     Args:
         query (str): The user's input query.
-        llm: The language model object.
+        llm (Any): The language model chain object capable of generating text via `.invoke()` method.
 
     Returns:
-        dict: A dictionary with the raw prompt, classification category, and explanation if needed.
+        dict: A dictionary containing:
+            - 'raw_prompt' (str): The prompt provided to the language model.
+            - 'classification_number' (int): The integer classification (1 to 5).
+            - 'classification_category' (str): The textual description of the classification category.
     """
     # Define the category mapping
     category_mapping = {
@@ -97,6 +108,7 @@ def classify_approval_query(query, llm):
         2: "Approval Search for industry without location",
         3: "Approval Search for area, city, or state with industry",
         4: "Other Intent",
+        5: "Negatively Intended Query",
     }
 
     # Define the raw prompt string
@@ -107,17 +119,69 @@ def classify_approval_query(query, llm):
     2. Approval Search for individual industry without location.
     3. Approval Search for area, city, or state with industry.
     4. Other Intent.
+    5. Negative Intent.
 
-    Additional Guidelines:
-    - If the query is focused on one specific location (e.g., "approvals in Ahmedabad" or "approvals for Gujarat"), classify it as category 1.
-    - If the query is specific to one industry but does not reference any location (e.g., "approvals for paracetamol production" or "clearances for textile industry"), classify it as category 2.
-    - If the query mentions both a location and an industry (e.g., "approvals for IT in Gujarat" or "manufacturing permits in Maharashtra"), classify it as category 3.
-    - If the query does not clearly fall into the above categories or is unrelated, classify it as category 4.
+    Important Rules and Classification Logic:
+
+    Rule 1: Positive Approval Queries (Class 1, 2, or 3)
+    - If approvals are mentioned positively, classify based on location and industry details:
+    - Class 1: Only location is mentioned with a positive intent to know about approvals.
+        Example: "What approvals do I need in Ahmedabad?"
+    - Class 2: Only industry is mentioned with a positive intent to know about approvals.
+        Example: "Approvals required for food processing?"
+    - Class 3: Both location and industry are mentioned.
+        Example: "Approvals for textile factory in Gujarat."
+    - If approvals are mentioned positively, classify into Class 1/2/3 regardless of any other factor being present (whether positive or negative).
+
+    Rule 2: Pure Negative Intent (Class 5)
+    - Classify as 5 if approvals are mentioned negatively AND all other mentioned factors (if any) are also mentioned negatively.
+    - “Other factors” include:
+    - Vendor search
+    - Incentive search
+    - Employment-related queries
+    - Building an industry from scratch
+    - Examples:
+    - "I don't want to get approvals for cement factory."
+    - "I don’t want approvals or vendor info."
+    - "I’m not interested in approvals, employment, or incentives."
+
+    Rule 3: Mixed Negative and Positive Intent (Class 4)
+    - If approvals are mentioned negatively BUT at least one other factor is mentioned positively, classify as Class 4 (Other Intent).
+    - Example:
+    - "I don’t want to get approvals, but I want to check employment options."
+    - "Not looking for approvals, but I’m interested in searching vendors."
+
+    Rule 4: No Approval Mentioned (Class 4 or 5)
+    - If approvals are not mentioned at all:
+    - Classify as 5 ONLY if all mentioned factors (vendors, incentives, employment, building from scratch) are also negative.
+    - Otherwise, if even one factor is positive, classify as Class 4.
+
+    Rule 5: Definition of “Other Intent” (Class 4)
+    - Use this category only when:
+    - The query is not clearly about approvals or any of the other mentioned factors.
+    - The query is about completely unrelated topics such as tourism, lifestyle, politics, housing, travel, or non-industry education.
+    - Approvals are mentioned negatively AND at least one of the other factors (vendors, incentives, employment, building from scratch) is mentioned positively.
+
+    Additional Understanding Requirement:
+    - Do not rely solely on specific keywords like “approvals,” “vendors,” “employment,” “incentives,” or “building industry from scratch.”
+    - Always analyze the full context of the query to determine whether these intents are present — even if users use alternative phrasing or synonyms.
+    - Examples:
+        - “Permissions,” “licenses,” “NOCs,” or “clearances” should be interpreted as approval-related.
+        - “Suppliers,” “distributors,” or “raw material sources” may indicate vendor search.
+        - “Jobs,” “workforce,” “manpower,” or “recruitment” may imply employment intent.
+        - “Subsidies,” “tax breaks,” “grants,” or “financial support” may suggest incentives.
+        - “Starting operations,” “setting up a factory,” “establishing infrastructure,” or “launching a new unit” may indicate building industry from scratch.
+    - Understand user intent even if the sentence is vague, mixed, or includes implied meanings rather than explicit phrases.
+
+    Final Output Instructions:
+    - Strictly return only the classification number (1, 2, 3, 4, or 5).
+    - Do NOT return multiple classifications.
+    - Do NOT include explanations, summaries, or justifications.
 
     Query: {query}
 
     Output:
-    Classify the query into one of the categories (1, 2, 3, or 4). Provide the classification number only.
+    (Provide only one classification number: 1, 2, 3, 4, or 5)
     """
 
     # Create a PromptTemplate for chaining
@@ -130,10 +194,9 @@ def classify_approval_query(query, llm):
     chain = prompt_template | llm
     # Run the chain and capture the response
     response = chain.invoke({"query": query})
-    update_llm_token(response)
 
     # Use regex to extract a valid classification number
-    match = re.search(r"^\s*([1-4])\s*$", response.content.strip())
+    match = re.search(r"^\s*([1-5])\s*$", response.content.strip())
     if match:
         classification_number = int(match.group(1))
         classification_category = category_mapping[classification_number]
@@ -665,209 +728,91 @@ def handle_approval_query(
 
     result = classify_approval_query(refined_user_input, llm)
     user_intention = result["classification_category"]
-    keyword_list = extract_important_words(refined_user_input, "Query to Get Approvals")
-    state["KEYWORDS"] = keyword_list
-    save_state(state,f"QAPP_state_{chatId}")
 
-    if user_intention == "Approval Search for area, city, or state without industry":
-        extracted_data, validated_data = extract_location_from_query(refined_user_input, available_areas, available_cities, available_states, llm)
-        area_name = validated_data["Area"]
-        city_name = validated_data["City"]
-        state_name = validated_data["State"]
+    if user_intention == "Negatively Intended Query":
+        message = respond_to_negative_query(
+            user_message=refined_user_input, 
+            append_user_to_history=False, 
+            append_AI_to_history=False, 
+            llm=llm_70b_vers,
+            chatId=chatId
+        )
+        chat_history.append(AIMessage(content=f"{message}"))
+        save_chat(chat_history,f"chat_{chatId}")
+        response = {
+            "Ai_response": message,
+            "Is_confirmation" : None,
+            "Extracted Data": extracted_state,
+            "Validation Data": state,
+            "User Intention": user_intention
+        }
+        return response
+    else:
+        keyword_list = extract_important_words(refined_user_input, "Query to Get Approvals")
+        state["KEYWORDS"] = keyword_list
+        save_state(state,f"QAPP_state_{chatId}")
 
-        extracted_state["Location_info"] = extracted_data
+        if user_intention == "Approval Search for area, city, or state without industry":
+            extracted_data, validated_data = extract_location_from_query(refined_user_input, available_areas, available_cities, available_states, llm)
+            area_name = validated_data["Area"]
+            city_name = validated_data["City"]
+            state_name = validated_data["State"]
 
-        if area_name != "Not Available in List":
-            if area_name != "None":
-                parent_city = next((key for key, value in city_to_area_mapping.items() if area_name in value), None)
-                parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)
-                state["Location_info"]["Area"] = area_name
-                state["Location_info"]["City"] = parent_city
-                state["Location_info"]["State"] = parent_state
-                save_state(state,f"QAPP_state_{chatId}")
+            extracted_state["Location_info"] = extracted_data
 
-            elif city_name != "None":
-                parent_state = next((key for key, value in state_to_city_mapping.items() if city_name in value), None)
-                state["Location_info"]["Area"] = None
-                state["Location_info"]["City"] = city_name
-                state["Location_info"]["State"] = parent_state
-                save_state(state,f"QAPP_state_{chatId}")
+            if area_name != "Not Available in List":
+                if area_name != "None":
+                    parent_city = next((key for key, value in city_to_area_mapping.items() if area_name in value), None)
+                    parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)
+                    state["Location_info"]["Area"] = area_name
+                    state["Location_info"]["City"] = parent_city
+                    state["Location_info"]["State"] = parent_state
+                    save_state(state,f"QAPP_state_{chatId}")
 
-            elif state_name != "None":
-                state["Location_info"]["Area"] = None
-                state["Location_info"]["City"] = None
-                state["Location_info"]["State"] = state_name
-                state["Only_State_Attempt_Count"] += 1
-                save_state(state,f"QAPP_state_{chatId}")
+                elif city_name != "None":
+                    parent_state = next((key for key, value in state_to_city_mapping.items() if city_name in value), None)
+                    state["Location_info"]["Area"] = None
+                    state["Location_info"]["City"] = city_name
+                    state["Location_info"]["State"] = parent_state
+                    save_state(state,f"QAPP_state_{chatId}")
 
-            else:
-                state["Location_info"]["Area"] = None
-                state["Location_info"]["City"] = None
-                state["Location_info"]["State"] = None
-                save_state(state,f"QAPP_state_{chatId}")
-            
-            if (state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None) or (state["Only_State_Attempt_Count"] >= 2):
-                perfect_location_data = True
-            else:
-                perfect_location_data = False
-            
-            if perfect_industry_data and perfect_location_data:
-                if state["Industry_info"]["Main-Industry"] != "Not Available in list" and state["Industry_info"]["Sub-Sector"] != "Not Available in list":
-                    selected_option = next(
-                    (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
-                    ''
-                    )
-                    message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
-                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
-                    response = {
-                        "Ai_response": message,
-                        "Is_confirmation" : True,
-                        "Extracted Data": extracted_state,
-                        "Validation Data": state,
-                        "User Intention": user_intention
-                    }
-                    return response
+                elif state_name != "None":
+                    state["Location_info"]["Area"] = None
+                    state["Location_info"]["City"] = None
+                    state["Location_info"]["State"] = state_name
+                    state["Only_State_Attempt_Count"] += 1
+                    save_state(state,f"QAPP_state_{chatId}")
+
                 else:
-                    message = "Not Available In List"
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
-                    response = {
-                        "Ai_response": message,
-                        "Is_confirmation" : None,
-                        "Extracted Data": extracted_state,
-                        "Validation Data": state,
-                        "User Intention": user_intention
-                    }
-                    return response
-            else:
-                response_static_message = get_static_follow_up_for_approval(state, user_intention)
-                message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-                return response
-        
-        else:
-            state["Location_info"]["Area"] = "Not Available in List"
-            state["Location_info"]["City"] = "Not Available in List"
-            state["Location_info"]["State"] = "Not Available in List"
-            save_state(state,f"QAPP_state_{chatId}")
-            if perfect_industry_data:
-                message = "Not Available In List"
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                response = {
-                    "Ai_response": "Not Available In List",
-                    "Is_confirmation" : None,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-                return response
-            else:
-                response_static_message = get_static_follow_up_for_approval(state, user_intention)
-                message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-                return response
-
-    elif user_intention == "Approval Search for industry without location":
-        main_industry_list = list(main_industry_to_subsector_mapped_dict.keys())
-        extracted_data, validated_data = extract_main_industry_and_product_universal(refined_user_input, main_industry_list, llm)
-        main_industry_name = validated_data["Main-Industry"]
-        product_name = validated_data["Product"]
-        extracted_state["Industry_info"]["Main-Industry"] = extracted_data["Main-Industry"]
-        extracted_state["Industry_info"]["Product"] = extracted_data["Product"] if extracted_data["Product"] != "None" else None
-        if main_industry_name != "Not Available in list":
-            if main_industry_name != "None":
-                state["Industry_info"]["Main-Industry"] = main_industry_name
-                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                save_state(state,f"QAPP_state_{chatId}")
-                sub_sector_list = list(main_industry_to_subsector_mapped_dict[main_industry_name].keys())
-                extracted_data, validated_data = extract_sub_sector_and_product_universal(refined_user_input, sub_sector_list, llm, main_industry_name, product_name)
-                sub_sector_name = validated_data["Sub-Sector"]
-                product_name = validated_data["Product"]
-                extracted_state["Industry_info"]["Sub-Sector"] = extracted_data["Sub-Sector"]
-                extracted_state["Industry_info"]["Product"] = extracted_data["Product"] if extracted_data["Product"] != "None" else None
-                if sub_sector_name != "Not Available in list":
-                    if sub_sector_name != "None":
-                        state["Industry_info"]["Sub-Sector"] = sub_sector_name
-                        state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                        save_state(state,f"QAPP_state_{chatId}")
-                    else:
-                        state["Industry_info"]["Sub-Sector"] = None
-                        state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                        save_state(state,f"QAPP_state_{chatId}")
-                    
-                    if state["Industry_info"]["Main-Industry"] is not None and state["Industry_info"]["Sub-Sector"] is not None:
-                        perfect_industry_data = True
-                    else:
-                        perfect_industry_data = False
-                    
-                    if perfect_industry_data and perfect_location_data:
-                        if state["Location_info"]["Area"] != "Not Available in List" or state["Location_info"]["City"] != "Not Available in List":
-                            selected_option = next(
-                            (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
-                            ''
-                            )
-                            message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
-                            dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
-                            chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
-                            response = {
-                                "Ai_response": dynamic_confirmation_message,
-                                "Is_confirmation" : True,
-                                "Extracted Data": extracted_state,
-                                "Validation Data": state,
-                                "User Intention": user_intention
-                            }
-                            return response
-                        else:
-                            message = "Not Available In List"
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
-                            response = {
-                                "Ai_response": message,
-                                "Is_confirmation" : None,
-                                "Extracted Data": extracted_state,
-                                "Validation Data": state,
-                                "User Intention": user_intention
-                            }
-                            return response
-                    else:
-                        response_static_message = get_static_follow_up_for_approval(state, user_intention)
-                        message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                        chat_history.append(AIMessage(content=message))  # Log user query
+                    state["Location_info"]["Area"] = None
+                    state["Location_info"]["City"] = None
+                    state["Location_info"]["State"] = None
+                    save_state(state,f"QAPP_state_{chatId}")
+                
+                if (state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None) or (state["Only_State_Attempt_Count"] >= 2):
+                    perfect_location_data = True
+                else:
+                    perfect_location_data = False
+                
+                if perfect_industry_data and perfect_location_data:
+                    if state["Industry_info"]["Main-Industry"] != "Not Available in list" and state["Industry_info"]["Sub-Sector"] != "Not Available in list":
+                        selected_option = next(
+                        (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                        ''
+                        )
+                        message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
+                        dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                        chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
                         save_chat(chat_history,f"chat_{chatId}")
                         response = {
                             "Ai_response": message,
-                            "Is_confirmation" : None,
+                            "Is_confirmation" : True,
                             "Extracted Data": extracted_state,
                             "Validation Data": state,
                             "User Intention": user_intention
                         }
                         return response
-   
-                else:
-                    state["Industry_info"]["Sub-Sector"] = "Not Available in list"
-                    state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                    save_state(state,f"QAPP_state_{chatId}")
-                    if perfect_location_data:
+                    else:
                         message = "Not Available In List"
                         chat_history.append(AIMessage(content=message))  # Log user query
                         save_chat(chat_history,f"chat_{chatId}")
@@ -879,129 +824,40 @@ def handle_approval_query(
                             "User Intention": user_intention
                         }
                         return response
-                    else:
-                        response_static_message = get_static_follow_up_for_approval(state, user_intention)
-                        message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"chat_{chatId}")
-                        response = {
-                            "Ai_response": message,
-                            "Is_confirmation" : None,
-                            "Extracted Data": extracted_state,
-                            "Validation Data": state,
-                            "User Intention": user_intention
-                        }
-                        return response
-            else:
-                state["Industry_info"]["Main-Industry"] = None
-                state["Industry_info"]["Sub-Sector"] = None
-                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                save_state(state,f"QAPP_state_{chatId}")
-                response_static_message = get_static_follow_up_for_approval(state, user_intention)
-                message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-                return response
-        else:
-            state["Industry_info"]["Main-Industry"] = "Not Available in list"
-            state["Industry_info"]["Sub-Sector"] = "Not Available in list"
-            state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-            save_state(state,f"QAPP_state_{chatId}")
-            if perfect_location_data:
-                message = "Not Available In List"
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-                return response
-            else:
-                response_static_message = get_static_follow_up_for_approval(state, user_intention)
-                message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-                return response
-
-    elif user_intention == "Approval Search for area, city, or state with industry":
-        extracted_data, validated_data = extract_location_from_query(refined_user_input, available_areas, available_cities, available_states, llm)
-        area_name = validated_data["Area"]
-        city_name = validated_data["City"]
-        state_name = validated_data["State"]
-        extracted_state["Location_info"] = extracted_data
-        main_industry_list = list(main_industry_to_subsector_mapped_dict.keys())
-        ind_extracted_data, ind_validated_data = extract_main_industry_and_product_universal(refined_user_input, main_industry_list, llm)
-        main_industry_name = ind_validated_data["Main-Industry"]
-        product_name = ind_validated_data["Product"]
-        extracted_state["Industry_info"]["Main-Industry"] = ind_extracted_data["Main-Industry"]
-        extracted_state["Industry_info"]["Product"] = ind_extracted_data["Product"] if ind_extracted_data["Product"] != "None" else None
-
-        if area_name != "Not Available in List" and main_industry_name != "Not Available in list":
-            if area_name != "None":
-                parent_city = next((key for key, value in city_to_area_mapping.items() if area_name in value), None)
-                parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)
-                state["Location_info"]["Area"] = area_name
-                state["Location_info"]["City"] = parent_city
-                state["Location_info"]["State"] = parent_state
-                save_state(state,f"QAPP_state_{chatId}")
-            elif city_name != "None":
-                parent_state = next((key for key, value in state_to_city_mapping.items() if city_name in value), None)
-                state["Location_info"]["Area"] = None
-                state["Location_info"]["City"] = city_name
-                state["Location_info"]["State"] = parent_state
-                save_state(state,f"QAPP_state_{chatId}")
-            elif state_name != "None":
-                state["Location_info"]["Area"] = None
-                state["Location_info"]["City"] = None
-                state["Location_info"]["State"] = state_name
-                state["Only_State_Attempt_Count"] += 1
-                save_state(state,f"QAPP_state_{chatId}")
-            else:
-                state["Location_info"]["Area"] = None
-                state["Location_info"]["City"] = None
-                state["Location_info"]["State"] = None
-                save_state(state,f"QAPP_state_{chatId}")
-            if main_industry_name != "None":
-                state["Industry_info"]["Main-Industry"] = main_industry_name
-                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                save_state(state,f"QAPP_state_{chatId}")
-                sub_sector_list = list(main_industry_to_subsector_mapped_dict[main_industry_name].keys())
-                extracted_data, validated_data = extract_sub_sector_and_product_universal(refined_user_input, sub_sector_list, llm, main_industry_name, product_name)
-                sub_sector_name = validated_data["Sub-Sector"]
-                product_name = validated_data["Product"]
-                extracted_state["Industry_info"]["Sub-Sector"] = extracted_data["Sub-Sector"]
-                extracted_state["Industry_info"]["Product"] = extracted_data["Product"] if extracted_data["Product"] != "None" else None
-                if sub_sector_name != "Not Available in list":
-                    if sub_sector_name != "None":
-                        state["Industry_info"]["Sub-Sector"] = sub_sector_name
-                        state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                        save_state(state,f"QAPP_state_{chatId}")
-                    else:
-                        state["Industry_info"]["Sub-Sector"] = None
-                        state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                        save_state(state,f"QAPP_state_{chatId}")
                 else:
-                    state["Industry_info"]["Sub-Sector"] = "Not Available in list"
-                    state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                    save_state(state,f"QAPP_state_{chatId}")
+                    response_static_message = get_static_follow_up_for_approval(state, user_intention)
+                    message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
+                    response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : None,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
+            
+            else:
+                state["Location_info"]["Area"] = "Not Available in List"
+                state["Location_info"]["City"] = "Not Available in List"
+                state["Location_info"]["State"] = "Not Available in List"
+                save_state(state,f"QAPP_state_{chatId}")
+                if perfect_industry_data:
                     message = "Not Available In List"
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
+                    response = {
+                        "Ai_response": "Not Available In List",
+                        "Is_confirmation" : None,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
+                else:
+                    response_static_message = get_static_follow_up_for_approval(state, user_intention)
+                    message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                     chat_history.append(AIMessage(content=message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
                     response = {
@@ -1013,61 +869,202 @@ def handle_approval_query(
                     }
                     return response
 
-            else:
-                state["Industry_info"]["Main-Industry"] = None
-                state["Industry_info"]["Sub-Sector"] = None
-                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                save_state(state,f"QAPP_state_{chatId}")
-                                  
-            if state["Industry_info"]["Main-Industry"] is not None and state["Industry_info"]["Sub-Sector"] is not None:
-                perfect_industry_data = True
-            else:
-                perfect_industry_data = False
-            if (state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None) or (state["Only_State_Attempt_Count"] >= 2):
-                perfect_location_data = True
-            else:
-                perfect_location_data = False
-            
-            if perfect_industry_data and perfect_location_data:
-                selected_option = next(
-                (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
-                ''
-                )
-                message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
-                dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                response = {
-                    "Ai_response": dynamic_confirmation_message,
-                    "Is_confirmation" : True,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-                return response
-            else:
-                response_static_message = get_static_follow_up_for_approval(state, user_intention)
-                message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-                return response
-        
-        else:
-            if area_name == "Not Available in List" and main_industry_name != "Not Available in List":
-                state["Location_info"]["Area"] = "Not Available in List"
-                state["Location_info"]["City"] = "Not Available in List"
-                state["Location_info"]["State"] = "Not Available in List"
-                state["Industry_info"]["Main-Industry"] = main_industry_name if main_industry_name != "None" else None
-                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                save_state(state,f"QAPP_state_{chatId}")
+        elif user_intention == "Approval Search for industry without location":
+            main_industry_list = list(main_industry_to_subsector_mapped_dict.keys())
+            extracted_data, validated_data = extract_main_industry_and_product_universal(refined_user_input, main_industry_list, llm)
+            main_industry_name = validated_data["Main-Industry"]
+            product_name = validated_data["Product"]
+            extracted_state["Industry_info"]["Main-Industry"] = extracted_data["Main-Industry"]
+            extracted_state["Industry_info"]["Product"] = extracted_data["Product"] if extracted_data["Product"] != "None" else None
+            if main_industry_name != "Not Available in list":
                 if main_industry_name != "None":
+                    state["Industry_info"]["Main-Industry"] = main_industry_name
+                    state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                    save_state(state,f"QAPP_state_{chatId}")
+                    sub_sector_list = list(main_industry_to_subsector_mapped_dict[main_industry_name].keys())
+                    extracted_data, validated_data = extract_sub_sector_and_product_universal(refined_user_input, sub_sector_list, llm, main_industry_name, product_name)
+                    sub_sector_name = validated_data["Sub-Sector"]
+                    product_name = validated_data["Product"]
+                    extracted_state["Industry_info"]["Sub-Sector"] = extracted_data["Sub-Sector"]
+                    extracted_state["Industry_info"]["Product"] = extracted_data["Product"] if extracted_data["Product"] != "None" else None
+                    if sub_sector_name != "Not Available in list":
+                        if sub_sector_name != "None":
+                            state["Industry_info"]["Sub-Sector"] = sub_sector_name
+                            state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                            save_state(state,f"QAPP_state_{chatId}")
+                        else:
+                            state["Industry_info"]["Sub-Sector"] = None
+                            state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                            save_state(state,f"QAPP_state_{chatId}")
+                        
+                        if state["Industry_info"]["Main-Industry"] is not None and state["Industry_info"]["Sub-Sector"] is not None:
+                            perfect_industry_data = True
+                        else:
+                            perfect_industry_data = False
+                        
+                        if perfect_industry_data and perfect_location_data:
+                            if state["Location_info"]["Area"] != "Not Available in List" or state["Location_info"]["City"] != "Not Available in List":
+                                selected_option = next(
+                                (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                                ''
+                                )
+                                message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
+                                dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                                chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
+                                save_chat(chat_history,f"chat_{chatId}")
+                                response = {
+                                    "Ai_response": dynamic_confirmation_message,
+                                    "Is_confirmation" : True,
+                                    "Extracted Data": extracted_state,
+                                    "Validation Data": state,
+                                    "User Intention": user_intention
+                                }
+                                return response
+                            else:
+                                message = "Not Available In List"
+                                chat_history.append(AIMessage(content=message))  # Log user query
+                                save_chat(chat_history,f"chat_{chatId}")
+                                response = {
+                                    "Ai_response": message,
+                                    "Is_confirmation" : None,
+                                    "Extracted Data": extracted_state,
+                                    "Validation Data": state,
+                                    "User Intention": user_intention
+                                }
+                                return response
+                        else:
+                            response_static_message = get_static_follow_up_for_approval(state, user_intention)
+                            message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                            chat_history.append(AIMessage(content=message))  # Log user query
+                            save_chat(chat_history,f"chat_{chatId}")
+                            response = {
+                                "Ai_response": message,
+                                "Is_confirmation" : None,
+                                "Extracted Data": extracted_state,
+                                "Validation Data": state,
+                                "User Intention": user_intention
+                            }
+                            return response
+    
+                    else:
+                        state["Industry_info"]["Sub-Sector"] = "Not Available in list"
+                        state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                        save_state(state,f"QAPP_state_{chatId}")
+                        if perfect_location_data:
+                            message = "Not Available In List"
+                            chat_history.append(AIMessage(content=message))  # Log user query
+                            save_chat(chat_history,f"chat_{chatId}")
+                            response = {
+                                "Ai_response": message,
+                                "Is_confirmation" : None,
+                                "Extracted Data": extracted_state,
+                                "Validation Data": state,
+                                "User Intention": user_intention
+                            }
+                            return response
+                        else:
+                            response_static_message = get_static_follow_up_for_approval(state, user_intention)
+                            message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                            chat_history.append(AIMessage(content=message))  # Log user query
+                            save_chat(chat_history,f"chat_{chatId}")
+                            response = {
+                                "Ai_response": message,
+                                "Is_confirmation" : None,
+                                "Extracted Data": extracted_state,
+                                "Validation Data": state,
+                                "User Intention": user_intention
+                            }
+                            return response
+                else:
+                    state["Industry_info"]["Main-Industry"] = None
+                    state["Industry_info"]["Sub-Sector"] = None
+                    state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                    save_state(state,f"QAPP_state_{chatId}")
+                    response_static_message = get_static_follow_up_for_approval(state, user_intention)
+                    message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
+                    response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : None,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
+            else:
+                state["Industry_info"]["Main-Industry"] = "Not Available in list"
+                state["Industry_info"]["Sub-Sector"] = "Not Available in list"
+                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                save_state(state,f"QAPP_state_{chatId}")
+                if perfect_location_data:
+                    message = "Not Available In List"
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
+                    response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : None,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
+                else:
+                    response_static_message = get_static_follow_up_for_approval(state, user_intention)
+                    message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
+                    response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : None,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
+
+        elif user_intention == "Approval Search for area, city, or state with industry":
+            extracted_data, validated_data = extract_location_from_query(refined_user_input, available_areas, available_cities, available_states, llm)
+            area_name = validated_data["Area"]
+            city_name = validated_data["City"]
+            state_name = validated_data["State"]
+            extracted_state["Location_info"] = extracted_data
+            main_industry_list = list(main_industry_to_subsector_mapped_dict.keys())
+            ind_extracted_data, ind_validated_data = extract_main_industry_and_product_universal(refined_user_input, main_industry_list, llm)
+            main_industry_name = ind_validated_data["Main-Industry"]
+            product_name = ind_validated_data["Product"]
+            extracted_state["Industry_info"]["Main-Industry"] = ind_extracted_data["Main-Industry"]
+            extracted_state["Industry_info"]["Product"] = ind_extracted_data["Product"] if ind_extracted_data["Product"] != "None" else None
+
+            if area_name != "Not Available in List" and main_industry_name != "Not Available in list":
+                if area_name != "None":
+                    parent_city = next((key for key, value in city_to_area_mapping.items() if area_name in value), None)
+                    parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)
+                    state["Location_info"]["Area"] = area_name
+                    state["Location_info"]["City"] = parent_city
+                    state["Location_info"]["State"] = parent_state
+                    save_state(state,f"QAPP_state_{chatId}")
+                elif city_name != "None":
+                    parent_state = next((key for key, value in state_to_city_mapping.items() if city_name in value), None)
+                    state["Location_info"]["Area"] = None
+                    state["Location_info"]["City"] = city_name
+                    state["Location_info"]["State"] = parent_state
+                    save_state(state,f"QAPP_state_{chatId}")
+                elif state_name != "None":
+                    state["Location_info"]["Area"] = None
+                    state["Location_info"]["City"] = None
+                    state["Location_info"]["State"] = state_name
+                    state["Only_State_Attempt_Count"] += 1
+                    save_state(state,f"QAPP_state_{chatId}")
+                else:
+                    state["Location_info"]["Area"] = None
+                    state["Location_info"]["City"] = None
+                    state["Location_info"]["State"] = None
+                    save_state(state,f"QAPP_state_{chatId}")
+                if main_industry_name != "None":
+                    state["Industry_info"]["Main-Industry"] = main_industry_name
+                    state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                    save_state(state,f"QAPP_state_{chatId}")
                     sub_sector_list = list(main_industry_to_subsector_mapped_dict[main_industry_name].keys())
                     extracted_data, validated_data = extract_sub_sector_and_product_universal(refined_user_input, sub_sector_list, llm, main_industry_name, product_name)
                     sub_sector_name = validated_data["Sub-Sector"]
@@ -1087,94 +1084,180 @@ def handle_approval_query(
                         state["Industry_info"]["Sub-Sector"] = "Not Available in list"
                         state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                         save_state(state,f"QAPP_state_{chatId}")
-                message = "Not Available In List"
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-                return response
-            elif main_industry_name == "Not Available in List" and area_name != "Not Available in List":
-                state["Industry_info"]["Main-Industry"] = "Not Available in list"
-                state["Industry_info"]["Sub-Sector"] = "Not Available in list"
-                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                save_state(state,f"QAPP_state_{chatId}")
-                if area_name != "None":
-                    parent_city = next((key for key, value in city_to_area_mapping.items() if area_name in value), None)
-                    parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)
-                    state["Location_info"]["Area"] = area_name
-                    state["Location_info"]["City"] = parent_city
-                    state["Location_info"]["State"] = parent_state
-                    save_state(state,f"QAPP_state_{chatId}")
-
-                elif city_name != "None":
-                    parent_state = next((key for key, value in state_to_city_mapping.items() if city_name in value), None)
-                    state["Location_info"]["Area"] = None
-                    state["Location_info"]["City"] = city_name
-                    state["Location_info"]["Area"] = parent_state
-                    save_state(state,f"QAPP_state_{chatId}")
-                
-                elif state_name != "None":
-                    state["Location_info"]["Area"] = None
-                    state["Location_info"]["City"] = None
-                    state["Location_info"]["State"] = state_name
-                    state["Only_State_Attempt_Count"] += 1
-                    save_state(state,f"QAPP_state_{chatId}")
+                        message = "Not Available In List"
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        save_chat(chat_history,f"chat_{chatId}")
+                        response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention
+                        }
+                        return response
 
                 else:
-                    state["Location_info"]["Area"] = None
-                    state["Location_info"]["City"] = None
-                    state["Location_info"]["State"] = None
+                    state["Industry_info"]["Main-Industry"] = None
+                    state["Industry_info"]["Sub-Sector"] = None
+                    state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                     save_state(state,f"QAPP_state_{chatId}")
+                                    
+                if state["Industry_info"]["Main-Industry"] is not None and state["Industry_info"]["Sub-Sector"] is not None:
+                    perfect_industry_data = True
+                else:
+                    perfect_industry_data = False
+                if (state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None) or (state["Only_State_Attempt_Count"] >= 2):
+                    perfect_location_data = True
+                else:
+                    perfect_location_data = False
                 
-                message = "Not Available In List"
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-                return response
-            else:
-                state["Location_info"]["Area"] = "Not Available in List"
-                state["Location_info"]["City"] = "Not Available in List"
-                state["Location_info"]["State"] = "Not Available in List"
-                state["Industry_info"]["Main-Industry"] = "Not Available in list"
-                state["Industry_info"]["Sub-Sector"] = "Not Available in list"
-                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
-                save_state(state,f"QAPP_state_{chatId}")
-                message = "Not Available In List"
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-                return response
+                if perfect_industry_data and perfect_location_data:
+                    selected_option = next(
+                    (state.get("Industry_info").get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get("Industry_info").get(key) not in [None, 'None']),
+                    ''
+                    )
+                    message = f"We have identified, you are looking for approvals related to {selected_option} production in {state.get('Location_info').get('Area')} under the city {state.get('Location_info').get('City')} in {state.get('Location_info').get('State')}. Is this information correct?"
+                    dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=dynamic_confirmation_message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
+                    response = {
+                        "Ai_response": dynamic_confirmation_message,
+                        "Is_confirmation" : True,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
+                else:
+                    response_static_message = get_static_follow_up_for_approval(state, user_intention)
+                    message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
+                    response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : None,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
             
-    else:
-        response_static_message = get_static_follow_up_for_approval(state, user_intention)
-        message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-        chat_history.append(AIMessage(content=message))  # Log user query
-        save_chat(chat_history,f"chat_{chatId}")
-        response = {
-                    "Ai_response": message,
-                    "Is_confirmation" : None,
-                    "Extracted Data": extracted_state,
-                    "Validation Data": state,
-                    "User Intention": user_intention
-                }
-        return response
+            else:
+                if area_name == "Not Available in List" and main_industry_name != "Not Available in List":
+                    state["Location_info"]["Area"] = "Not Available in List"
+                    state["Location_info"]["City"] = "Not Available in List"
+                    state["Location_info"]["State"] = "Not Available in List"
+                    state["Industry_info"]["Main-Industry"] = main_industry_name if main_industry_name != "None" else None
+                    state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                    save_state(state,f"QAPP_state_{chatId}")
+                    if main_industry_name != "None":
+                        sub_sector_list = list(main_industry_to_subsector_mapped_dict[main_industry_name].keys())
+                        extracted_data, validated_data = extract_sub_sector_and_product_universal(refined_user_input, sub_sector_list, llm, main_industry_name, product_name)
+                        sub_sector_name = validated_data["Sub-Sector"]
+                        product_name = validated_data["Product"]
+                        extracted_state["Industry_info"]["Sub-Sector"] = extracted_data["Sub-Sector"]
+                        extracted_state["Industry_info"]["Product"] = extracted_data["Product"] if extracted_data["Product"] != "None" else None
+                        if sub_sector_name != "Not Available in list":
+                            if sub_sector_name != "None":
+                                state["Industry_info"]["Sub-Sector"] = sub_sector_name
+                                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                                save_state(state,f"QAPP_state_{chatId}")
+                            else:
+                                state["Industry_info"]["Sub-Sector"] = None
+                                state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                                save_state(state,f"QAPP_state_{chatId}")
+                        else:
+                            state["Industry_info"]["Sub-Sector"] = "Not Available in list"
+                            state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                            save_state(state,f"QAPP_state_{chatId}")
+                    message = "Not Available In List"
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
+                    response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : None,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
+                elif main_industry_name == "Not Available in List" and area_name != "Not Available in List":
+                    state["Industry_info"]["Main-Industry"] = "Not Available in list"
+                    state["Industry_info"]["Sub-Sector"] = "Not Available in list"
+                    state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                    save_state(state,f"QAPP_state_{chatId}")
+                    if area_name != "None":
+                        parent_city = next((key for key, value in city_to_area_mapping.items() if area_name in value), None)
+                        parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)
+                        state["Location_info"]["Area"] = area_name
+                        state["Location_info"]["City"] = parent_city
+                        state["Location_info"]["State"] = parent_state
+                        save_state(state,f"QAPP_state_{chatId}")
+
+                    elif city_name != "None":
+                        parent_state = next((key for key, value in state_to_city_mapping.items() if city_name in value), None)
+                        state["Location_info"]["Area"] = None
+                        state["Location_info"]["City"] = city_name
+                        state["Location_info"]["Area"] = parent_state
+                        save_state(state,f"QAPP_state_{chatId}")
+                    
+                    elif state_name != "None":
+                        state["Location_info"]["Area"] = None
+                        state["Location_info"]["City"] = None
+                        state["Location_info"]["State"] = state_name
+                        state["Only_State_Attempt_Count"] += 1
+                        save_state(state,f"QAPP_state_{chatId}")
+
+                    else:
+                        state["Location_info"]["Area"] = None
+                        state["Location_info"]["City"] = None
+                        state["Location_info"]["State"] = None
+                        save_state(state,f"QAPP_state_{chatId}")
+                    
+                    message = "Not Available In List"
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
+                    response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : None,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
+                else:
+                    state["Location_info"]["Area"] = "Not Available in List"
+                    state["Location_info"]["City"] = "Not Available in List"
+                    state["Location_info"]["State"] = "Not Available in List"
+                    state["Industry_info"]["Main-Industry"] = "Not Available in list"
+                    state["Industry_info"]["Sub-Sector"] = "Not Available in list"
+                    state["Industry_info"]["Product"] = product_name if product_name != "None" else None
+                    save_state(state,f"QAPP_state_{chatId}")
+                    message = "Not Available In List"
+                    chat_history.append(AIMessage(content=message))  # Log user query
+                    save_chat(chat_history,f"chat_{chatId}")
+                    response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : None,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+                    return response
+                
+        else:
+            response_static_message = get_static_follow_up_for_approval(state, user_intention)
+            message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+            chat_history.append(AIMessage(content=message))  # Log user query
+            save_chat(chat_history,f"chat_{chatId}")
+            response = {
+                        "Ai_response": message,
+                        "Is_confirmation" : None,
+                        "Extracted Data": extracted_state,
+                        "Validation Data": state,
+                        "User Intention": user_intention
+                    }
+            return response
 
 def call_handle_approval_query(user_input,chatId):
     
@@ -1258,7 +1341,7 @@ def call_handle_approval_query(user_input,chatId):
             "Only_State_Attempt_Count": 0
         }
         save_state(state,f"QAPP_state_{chatId}")
-    extracted_state = state.copy()
+    extracted_state = copy.deepcopy(state)
 
     
     response_of_app_query = handle_approval_query(user_input, unique_area_list, unique_city_list, unique_state_list, Industry_data_for_approval, city_area_mapped_dict, state_city_mapped_dict, extracted_state, state, llm_70b_vers,chatId)

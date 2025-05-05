@@ -359,8 +359,8 @@ export default MapComponent;
 const Modal = ({ children, onClose }) => {
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
-        <button className="close-button" onClick={onClose}>×</button>
+      <div className="modal-content overflow-auto">
+        <button className="close-button" onClick={onClose}>X</button>
         {children}
       </div>
     </div>

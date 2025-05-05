@@ -8,7 +8,7 @@ function Vendorresult({ result }) {
   console.log("result in vendors", result);
   const analytics_response = result["Analytics_response"]
   const user_lat_long = result["latitude_longitude"]
-  console.log("analytics_response", user_lat_long);
+  console.log("analytics_response", analytics_response);
 
   const [activeTab, setActiveTab] = useState("map");
   const [viewMode, setViewMode] = useState("best");
@@ -30,9 +30,27 @@ function Vendorresult({ result }) {
   const betterSuppliers = parseSuppliers(JSON.parse(analytics_response["Better Supplier"] || "{}"));
   const allSuppliers = parseSuppliers(JSON.parse(analytics_response["Unfiltered All Supplier"] || "{}"));
 
-  const map_bestSuppliers = bestSuppliers.map(supplier => ({ ...supplier, category: "Best", result_type: "Vendor", latitude_longitude: supplier.latitude_longitude.split(",").map(Number), user_lat_long: user_lat_long }));
-  const map_betterSuppliers = betterSuppliers.map(supplier => ({ ...supplier, category: "Better", result_type: "Vendor", latitude_longitude: supplier.latitude_longitude.split(",").map(Number), user_lat_long: user_lat_long }));
-  const map_allSuppliers = allSuppliers.map(supplier => ({ ...supplier, category: "General", result_type: "Vendor", latitude_longitude: supplier.latitude_longitude.split(",").map(Number), user_lat_long: user_lat_long }));
+  const map_bestSuppliers = bestSuppliers.map(supplier => {
+    const latitudeLongitude = typeof supplier.latitude_longitude === 'string' && supplier.latitude_longitude.includes(',')
+      ? supplier.latitude_longitude.split(",").map(Number)
+      : [];  // Default to empty array if it's not in the correct format
+    return { ...supplier, category: "Best", result_type: "Vendor", latitude_longitude: latitudeLongitude, user_lat_long: user_lat_long };
+  });
+  
+  const map_betterSuppliers = betterSuppliers.map(supplier => {
+    const latitudeLongitude = typeof supplier.latitude_longitude === 'string' && supplier.latitude_longitude.includes(',')
+      ? supplier.latitude_longitude.split(",").map(Number)
+      : [];  // Default to empty array if it's not in the correct format
+    return { ...supplier, category: "Better", result_type: "Vendor", latitude_longitude: latitudeLongitude, user_lat_long: user_lat_long };
+  });
+  
+  const map_allSuppliers = allSuppliers.map(supplier => {
+    const latitudeLongitude = typeof supplier.latitude_longitude === 'string' && supplier.latitude_longitude.includes(',')
+      ? supplier.latitude_longitude.split(",").map(Number)
+      : [];  // Default to empty array if it's not in the correct format
+    return { ...supplier, category: "General", result_type: "Vendor", latitude_longitude: latitudeLongitude, user_lat_long: user_lat_long };
+  });
+  
   // Combine all categorized suppliers into a single array
   const map_result = [
     ...map_bestSuppliers,
