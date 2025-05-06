@@ -4,8 +4,10 @@ import { IoSearch, IoSparklesOutline, IoDiamondOutline } from "react-icons/io5";
 import { RiHistoryLine } from "react-icons/ri";
 import { BsThreeDotsVertical } from "react-icons/bs";
 import Settings from "../Settings/Settings"
+import { useFrappeAuth } from 'frappe-react-sdk';
 
 const SideBar = ({ setSideBar, sideBar }) => {
+    const {currentUser} = useFrappeAuth()
     const [history, setHistory] = useState([
         {'time':'Today', 'messages':[
             {id: 1, text: 'Give me Incentives for Vadodara'},
@@ -212,8 +214,8 @@ const SideBar = ({ setSideBar, sideBar }) => {
                     </div>
                     <span className='text-sm font-medium text-gray-700'>Upgrade to Pro</span>
                 </button>
-                
-                <button 
+
+                {currentUser && <button 
                     className='w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-200 transition-colors'
                     onClick={() => setShowSettings(true)}
                 >
@@ -221,7 +223,9 @@ const SideBar = ({ setSideBar, sideBar }) => {
                         <IoDiamondOutline className='text-amber-600' size={18} />
                     </div>
                     <span className='text-sm font-medium text-gray-700'>Settings</span>
-                </button>
+                </button>}
+                
+                
             </div>
         </div>
     );

@@ -6,7 +6,7 @@ import { BsChatSquareText } from "react-icons/bs";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-function Details() {
+function Details({ isOpen, setIsOpen }) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -32,7 +32,7 @@ function Details() {
     setIsSubmitted(false);
   };
 
-  const [isOpen, setIsOpen] = useState(false);
+  // const [isOpen, setIsOpen] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

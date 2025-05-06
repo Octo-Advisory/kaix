@@ -20,6 +20,7 @@ import { IoSearch } from "react-icons/io5";
 import SideBar from '../SideBar/SideBar';
 
 function Chatscreen() {
+  const [showDetails, setShowDetails] = useState(false);
   const { currentUser } = useFrappeAuth();
   const { data: userDoc } = useFrappeGetDoc('User', currentUser || '');
   const [message, setMessage] = useState('');
@@ -322,8 +323,8 @@ function Chatscreen() {
         />
       );
     }
-
-    if (isCurrentUser) {      
+    
+    if (isCurrentUser && currentUser) {      
       if (userDoc?.user_image) {
         return (
           <img
@@ -452,14 +453,14 @@ function Chatscreen() {
           MarsInfraAIX is still learning and can make mistakes. Please contact us by filling the contact form{" "}
           <span
             className="text-blue-500 underline cursor-pointer"
-            onClick={() => document.querySelector(".details-btn")?.click()}
+            onClick={() => setShowDetails(true)}
           >
             here
           </span>{" "}
           to confirm data correctness.
         </p>
       </div>
-      <Details />
+      <Details isOpen={showDetails} setIsOpen={setShowDetails} />
     </div>
     </div>
   );

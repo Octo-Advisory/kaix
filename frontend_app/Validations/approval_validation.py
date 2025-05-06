@@ -172,7 +172,7 @@ def approval_validation(param):
         else:
             for a in result2:
                     
-                if a['state'] == state and aa['state_level'] == 1:
+                if a['state'] == state and a['state_level'] == 1:
                     if (a['industry'] == industry_name and a['sub_sector'] == subsector):
                         state_level_approvals.append({'stateName': a['state'], 'Approval': a['name'], 'for industry': a['industry'], 'for sub_sector':a['sub_sector'], 'state_level':a['state_level']})
                 
@@ -193,7 +193,7 @@ def approval_validation(param):
         else:
             for a in result2:
                     
-                if ['country_level'] == 1:
+                if a['country_level'] == 1:
                     if (a['industry'] == industry_name and a['sub_sector'] == subsector):
                         country_level_approvals.append({'stateName': a['state'], 'Approval': a['name'], 'for industry': a['industry'], 'for sub_sector':a['sub_sector'], 'state_level':a['state_level']})
                     
@@ -278,11 +278,11 @@ def approval_validation(param):
         
         for a in result2:
                 
-            if (a['city'] == city and a['city_level'] == 1) or (a['city'] == city):
+            if (a['city'] == city and a['city_level'] == 1):
                 if (a['industry'] == industry_name and a['sub_sector'] == subsector):
                     city_level_approvals.append({'cityName': a['city'],'Approval': a['name'],'for industry': a['industry'],'for sub_sector': a['sub_sector'], 'city_level': a['city_level']})
                     
-                elif (a['industry'] == industry_name and a['sub_sector'] is None):
+                elif (a['industry'] == industry_name and (a['sub_sector'] is None or a['sub_sector'] is '')):
                     allLogs.append('Got the city level approval but it was for the industry not the subsector')
                     city_level_approvals.append({'cityName': a['city'],'Approval': a['name'],'for industry': a['industry']})
                     
@@ -299,11 +299,11 @@ def approval_validation(param):
         else:
             for a in result2:
                     
-                if a['state'] == state and aa['state_level'] == 1:
+                if a['state'] == state and a['state_level'] == 1:
                     if (a['industry'] == industry_name and a['sub_sector'] == subsector):
                         state_level_approvals.append({'stateName': a['state'], 'Approval': a['name'], 'for industry': a['industry'], 'for sub_sector':a['sub_sector'], 'state_level':a['state_level']})
                 
-                    elif (a['industry'] == industry_name and a['sub_sector'] is None):
+                    elif (a['industry'] == industry_name and (a['sub_sector'] is None or a['sub_sector'] is '')):
                         allLogs.append('Got the state level approval but it was for the industry not the subsector')
                         state_level_approvals.append({'stateName': a['state'],'Approval': a['name'],'for industry': a['industry'], 'state_level':a['state_level']})
                     
@@ -320,11 +320,11 @@ def approval_validation(param):
         else:
             for a in result2:
                     
-                if ['country_level'] == 1:
+                if a['country_level'] == 1:
                     if (a['industry'] == industry_name and a['sub_sector'] == subsector):
                         country_level_approvals.append({'stateName': a['state'], 'Approval': a['name'], 'for industry': a['industry'], 'for sub_sector':a['sub_sector'], 'state_level':a['state_level']})
                     
-                    elif (a['industry'] == industry_name and a['sub_sector'] is None):
+                    elif (a['industry'] == industry_name and (a['sub_sector'] is None or a['sub_sector'] is '')):
                         allLogs.append('Got the country level approval but it was for the industry not the subsector')
                         country_level_approvals.append({'stateName': a['state'],'Approval': a['name'],'for industry': a['industry'], 'state_level':a['state_level']})
                         
@@ -408,11 +408,11 @@ def approval_validation(param):
         state_level_approvals=[]
         country_level_approvals=[]
         for a in result2:    
-            if a['state'] == state and aa['state_level'] == 1:
+            if a['state'] == state and a['state_level'] == 1:
                 if (a['industry'] == industry_name and a['sub_sector'] == subsector):
                     state_level_approvals.append({'stateName': a['state'], 'Approval': a['name'], 'for industry': a['industry'], 'for sub_sector':a['sub_sector'], 'state_level':a['state_level']})
                 
-                elif (a['industry'] == industry_name and a['sub_sector'] is None):
+                elif (a['industry'] == industry_name and (a['sub_sector'] is None or a['sub_sector'] is '')):
                     allLogs.append('Got the state level approval but it was for the industry not the subsector')
                     state_level_approvals.append({'stateName': a['state'],'Approval': a['name'],'for industry': a['industry'], 'state_level':a['state_level']})
                     
@@ -428,12 +428,11 @@ def approval_validation(param):
             return {'pass_to_analytics': True, 'log':f'Found the approvals for the state {state} ', 'detailed_info':logs}
         else:
             for a in result2:
-                    
-                if ['country_level'] == 1:
+                if a['country_level'] == 1:
                     if (a['industry'] == industry_name and a['sub_sector'] == subsector):
                         country_level_approvals.append({'stateName': a['state'], 'Approval': a['name'], 'for industry': a['industry'], 'for sub_sector':a['sub_sector'], 'state_level':a['state_level']})
                     
-                    elif (a['industry'] == industry_name and a['sub_sector'] is None):
+                    elif (a['industry'] == industry_name and (a['sub_sector'] is None or a['sub_sector'] is '')):
                         allLogs.append('Got the country level approval but it was for the industry not the subsector')
                         country_level_approvals.append({'stateName': a['state'],'Approval': a['name'],'for industry': a['industry'], 'state_level':a['state_level']})
                         
