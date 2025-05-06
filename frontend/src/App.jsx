@@ -12,8 +12,7 @@ import Signup from './components/Signup/Signup';
 import Chatscreen from './components/Chatscreen/Chatscreen';
 import { useFrappeAuth } from "frappe-react-sdk";
 import ForgotPassword from './components/ForgotPassword/ForgotPassword';
-
-
+import Temp from './components/Home/Temp';
 
 const PrivateRoute = () => {
   const { currentUser, isValidating } = useFrappeAuth();
@@ -36,6 +35,7 @@ function App() {
 
         {/* Other routes */}
         <Route path="/chat" element={<Chatscreen />} />
+        <Route path="/temp" element={<Temp />} />
         <Route path="/progress" element={<ProgressScreen />} />
         <Route path="/solution" element={<Solutionscreen />} />
         <Route path="/build" element={<TestComponent />} />

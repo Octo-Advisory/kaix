@@ -200,7 +200,7 @@ def incentive_validation(param):
         else:
             for a in result2:
                     
-                if ['country_level'] == 1:
+                if a['country_level'] == 1:
                     if (a['industry'] == industry_name and a['sub_sector'] == subsector):
                         country_level_incentives.append({'stateName': a['state'], 'Incentive': a['name'], 'for industry': a['industry'], 'for sub_sector':['sub_sector'], 'state_level':['state_level']})
                     
@@ -337,7 +337,7 @@ def incentive_validation(param):
         else:
             for a in result2:
                     
-                if ['country_level'] == 1:
+                if a['country_level'] == 1:
                     if (a['industry'] == industry_name and a['sub_sector'] == subsector):
                         country_level_incentives.append({'stateName': a['state'], 'Incentive': a['name'], 'for industry': a['industry'], 'for sub_sector':a['sub_sector'], 'state_level':a['state_level']})
                     
@@ -454,7 +454,7 @@ def incentive_validation(param):
         else:
             for a in result2:
                     
-                if ['country_level'] == 1:
+                if a['country_level'] == 1:
                     if (a['industry'] == industry_name and a['sub_sector'] == subsector):
                         country_level_incentives.append({'stateName': a['state'], 'Incentive': a['name'], 'for industry': a['industry'], 'for sub_sector':['sub_sector'], 'state_level':['state_level']})
                     
