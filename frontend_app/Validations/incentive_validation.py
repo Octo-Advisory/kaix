@@ -441,7 +441,7 @@ def incentive_validation(param):
                     state_level_incentives.append({'stateName': a['state'],'Incentive': a['name'],'for industry': a['industry'], 'state_level':a['state_level']})
                     
                 elif (a['pan_industries'] == 1):
-                    allLogs.append('Got the state level Incentive but it was for PAN industries, didnt found industry and subsector ok ok ')
+                    allLogs.append('Got the state level Incentive but it was for PAN industries, didnt found industry and subsector')
                     state_level_incentives.append({'stateName': a['state'],'Incentive': a['name'], 'for pan industries': a['pan_industries']})
                     
                         # else:

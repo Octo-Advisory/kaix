@@ -30,7 +30,7 @@ const Navbar = ({ setSideBar, sideBar }) => {
   return (
     <div className="navbar h-16 py-2 w-full flex flex-row items-center pl-2 pr-6 justify-between">
       <div className="relative flex flex-row gap-2 justify-center items-center py-2">
-        {!sideBar && (
+        {!sideBar && currentUser && (
           <BiSidebar onClick={() => setSideBar(true)} className="cursor-pointer" size={30} />
         )}
         <img src={icon} className='relative object-contain h-10 w-10 mix-blend-multiply' />

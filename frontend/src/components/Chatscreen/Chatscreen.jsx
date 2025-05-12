@@ -354,9 +354,8 @@ function Chatscreen() {
 
   return (
   <div className='h-screen w-screen relative flex flex-row '>
-    <SideBar setSideBar={setSideBar} sideBar={sideBar}/>
+    {currentUser && <SideBar setSideBar={setSideBar} sideBar={sideBar}/>}
     <div className="h-screen flex flex-col items-center w-full transition-width duration-300 ease-in-out main-screen">
-      hello
       <Navbar setSideBar={setSideBar} sideBar={sideBar}/>
       <div className="flex-1 overflow-y-auto p-4 flex justify-center w-full chatscreen" ref={ref}>
         {messages.length > 0 ? (<div
