@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import illustration1 from '../../assets/AI-Powered Industrial Solutions.jpg';
+import illustration1 from '../../assets/AI-Powered Industrial Solutionss.jpg';
 import { FaEye, FaEyeSlash, FaArrowRight } from "react-icons/fa";
 import { FiUser } from "react-icons/fi";
 import { HiOutlineMail } from "react-icons/hi";
@@ -262,9 +262,9 @@ const SignUp = () => {
                         alt="AI-Powered Industrial Solutions"
                     />
                     <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                        <h2 className="text-3xl font-bold mb-2">MarsInfraAIX Platform</h2>
+                        <h2 className="text-3xl font-bold mb-2">MarsAIX Platform</h2> {/* Changed by Jenith on 15-5-25 9:49 */}
                         <p className="text-gray-200">
-                            Your gateway to intelligent industrial solutions
+                            Establish your Industrial Project seamlessly with our AI-powered analysis {/* Changed by Jenith on 15-5-25 9:49 */}
                         </p>
                     </div>
                 </div>

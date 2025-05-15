@@ -7,7 +7,7 @@ import Failure from '../Failure/Failure';
 import { FrappeContext, useFrappeEventListener, useFrappeGetDocList } from 'frappe-react-sdk';
 import { useSelector, useDispatch } from 'react-redux';
 import { addAnalyticsResult } from '../../Redux/Store/Featuresilces/analyticsResult';
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 function ProgressScreen() {
   const navigate = useNavigate();
@@ -19,11 +19,12 @@ function ProgressScreen() {
   const [allsuccess, setAllsuccess] = useState(false);
   const [result, setresult] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [intervalId, setIntervalId] = useState(null);
+  const [intervalId, setIntervalId] = useState(null); 
   const validationResult = useSelector((state) => state.validate.validation_result)
   console.log("validation Result", validationResult);
   console.log("aiResponse", aiResponse);
   const dispatch = useDispatch();
+  const { sessionId } = useParams();
 
   useEffect(() => {
     if (aiResponse.length === 0) {
@@ -37,9 +38,9 @@ function ProgressScreen() {
 
   const fetchAnalyticsResponse = async () => {
     try {
-      console.log("chat id in progress", chatId);
+      console.log("chat id in progress", sessionId);
 
-      const result = await call.get("frontend_app.Management_Class.Analytics_management.Analytics.analytics_module_call", { aiResponse: aiResponse, chatId: chatId, validationResult: validationResult });
+      const result = await call.get("frontend_app.Management_Class.Analytics_management.Analytics.analytics_module_call", { aiResponse: aiResponse, chatId: sessionId, validationResult: validationResult });
       console.log("analytics message result", result);
       setresult(result.message)
       dispatch(addAnalyticsResult(result.message))
@@ -52,9 +53,9 @@ function ProgressScreen() {
 
   const fetchData = async () => {
     try {
-      console.log("chatId", chatId);
+      console.log("chatId", sessionId);
 
-      const response = await fetch(`api/resource/Session?fields=["progress.process_name","progress.process_value","progress.status","progress.modified"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
+      const response = await fetch(`api/resource/Session?fields=["progress.process_name","progress.process_value","progress.status","progress.modified"]&filters=[["name","=","${sessionId}"]]&order_by=modified asc`, {
         method: 'GET',
         headers: {
           // 'Authorization': 'token your_api_token', // Replace with actual token
@@ -123,7 +124,7 @@ function ProgressScreen() {
 
   const { data, mutate } = useFrappeGetDocList("Session", {
     fields: ["progress.process_value", "progress.status", "progress.modified", "progress.is_completed"],
-    filters: [["name", "=", chatId]],
+    filters: [["name", "=", sessionId]],
     orderBy: { field: "modified", order: "asc" }
   });
 

@@ -132,7 +132,7 @@ function Approvalresult({ result }) {
                         </div>
                         <div>
                             <h1 className="text-2xl font-semibold text-[#2C53A3]">Approvals Catalog</h1>
-                            <p className="text-[#5A7EC7]">Browse required approvals for your business</p>
+                            <p className="text-[#5A7EC7]">Browse required approvals for your project</p> {/* changed by jenith on 14/05/25 13:23 */}
                         </div>
                     </div>
                     <Backtochat />
@@ -140,7 +140,8 @@ function Approvalresult({ result }) {
 
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex gap-2">
-                        {["Pre-Operation", "Pre-Establishment", "Pre-Requisite", "Others"].map(mode => (
+                        {/* below line changed by jenith on 14/05/25 13:25 */}
+                        {["Pre-Requisite", "Pre-Establishment", "Pre-Operation", "Others"].map(mode => ( 
                             <button
                                 key={mode}
                                 className={`px-4 py-2 rounded-md text-sm font-medium ${viewMode === mode
@@ -271,11 +272,11 @@ function Approvalresult({ result }) {
                                             <p className="text-[#5A7EC7]">{selectedApproval.stage}</p>
                                         </div>
                                         <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
-                                            <h4 className="font-medium text-[#2C53A3] mb-2">Land Type</h4>
-                                            <p className="text-[#5A7EC7]">{selectedApproval.land_type}</p>
+                                            <h4 className="font-medium text-[#2C53A3] mb-2">Zone Type</h4> {/* changed by jenith on 14/05/25 13:26 */}
+                                            <p className="text-[#5A7EC7]">{selectedApproval.land_type}</p> 
                                         </div>
                                         <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
-                                            <h4 className="font-medium text-[#2C53A3] mb-2">Business Location</h4>
+                                            <h4 className="font-medium text-[#2C53A3] mb-2">Project Location</h4> {/* changed by jenith on 14/05/25 13:27 */}
                                             <p className="text-[#5A7EC7]">{selectedApproval.business_location}</p>
                                         </div>
                                     </div>

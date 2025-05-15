@@ -17,6 +17,7 @@
     "@reduxjs/toolkit": "^2.5.0",
     "@shadcn/ui": "^0.0.4",
     "axios": "^1.7.9",
+    "chart.js": "^4.4.9",
     "embla-carousel-react": "^8.5.2",
     "framer-motion": "^12.7.0",
     "frappe-client": "^2.0.2",

@@ -13,7 +13,7 @@ import Responseloader from '../Responseloader/Responseloader';
 import { FrappeContext, useFrappeAuth, useFrappeCreateDoc, useFrappeGetDoc, useFrappeUpdateDoc } from 'frappe-react-sdk'
 import { addAIresponse, clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
 import { addResult } from '../../Redux/Store/Featuresilces/validation'
-import { useNavigate } from "react-router-dom";
+import { replace, useLocation, useNavigate, useParams } from "react-router-dom";
 import Details from '../Details/Details';
 import { BiSidebar } from "react-icons/bi";
 import { IoSearch } from "react-icons/io5";
@@ -39,8 +39,11 @@ function Chatscreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const navigate = useNavigate();
+  const { sessionId } = useParams();
+  const location = useLocation();
   //Create frappe context to call apis
   const { call } = useContext(FrappeContext)
+  console.log("sessoin id from url", sessionId);
 
   const suggestions = [
     "I want to build 1 million tonnes per annum steel factory....",
@@ -103,7 +106,7 @@ function Chatscreen() {
     }
   };
 
-  const handleSendbtn = async () => {
+  const handleSendbtn1 = async () => {
     if (message.trim()) {
       const newUserMessage = {
         sender: 'user',
@@ -176,28 +179,28 @@ function Chatscreen() {
 
   const hanldeValidation = async () => {
     try {
-      console.log("chat id", chatId);
-  
-      const respo = await fetch(`/api/resource/Session?fields=["user_intension"]&filters=[["name","=","${chatId}"]]&order_by=modified asc`, {
+      console.log("chat id", session);
+
+      const respo = await fetch(`/api/resource/Session?fields=["user_intension"]&filters=[["name","=","${session}"]]&order_by=modified asc`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
         }
       });
-  
+
       // Check if the response is successful (status 200)
       if (!respo.ok) {
         throw new Error(`Request failed with status ${respo.status}`);
       }
-  
+
       // Parse the JSON response correctly
       const userIntesion = await respo.json();
       console.log("userIntention", userIntesion);
-  
+
       // Check if 'data' is present and contains expected data
       if (userIntesion && userIntesion.data && userIntesion.data.length > 0) {
         const user_intension = userIntesion.data[0].user_intension;
-  
+
         // Call validation and dispatch result
         const result = await validationCall(responseAi, user_intension);
         dispatch(addResult(result));
@@ -209,7 +212,7 @@ function Chatscreen() {
       console.log("error is here", error);
     }
   };
-  
+
 
   const { updateDoc } = useFrappeUpdateDoc()
 
@@ -223,44 +226,81 @@ function Chatscreen() {
     dispatch(addMessage(confirmationMessages));
 
     if (response == 'yes') {
+      let currentSession = session
+      
+      // STEP 1: Save user's message with idx
+      const idx = chatHistory.length + 1;
+      const chatEntry = await createDoc("Chat history", {
+        user: 'Yes',
+        parent: currentSession,
+        parentfield: "chat_history",
+        parenttype: "Session",
+        idx,
+      });
+
+      if (!chatEntry.name) throw new Error("Failed to save user message");
+
+      mutate(); // Refresh UI to show user message
+      setLoading(true);
+
+      // STEP 2: Get AI response
       const validationResult = await hanldeValidation()
       console.log("validation result from chatscreen", validationResult);
       const aiResp = validationResult && validationResult.length > 0
         ? (validationResult[0] ? "Thank you for your response" : "We have your query, we will get back to you soon.")
         : "We have your query, we will get back to you soon.";
-      const newAIMessage = {
-        sender: 'ai',
-        text: aiResp,
-        timestamp: new Date().toISOString(),
-      };
-      dispatch(addMessage(newAIMessage));
-      // if (validationResult[0]) {
-      navigate("/progress");
-    } else {
-      setLoading(true)
-      const noAIreponse = await fetchAIResponse("NOFROMUSER", confirmationMessage, chatId)
-      console.log("noAIResponse", noAIreponse);
-      const noaiResponse = noAIreponse.Ai_response
-      console.log("noaiResponse is", noaiResponse);
 
-      let index = -1;
-      setLoading(false)
-      const typingInterval = setInterval(() => {
-        setPartialResponse((prev) => prev + noaiResponse.charAt(index));
-        index++;
-        if (index >= noaiResponse.length) {
-          clearInterval(typingInterval);
-          const newAIMessage = {
-            sender: 'ai',
-            text: noaiResponse,
-            timestamp: new Date().toISOString(),
-          };
-          dispatch(addMessage(newAIMessage));
-          setPartialResponse(''); // Clear partial response
-          setDisabled(false);
-        }
-      }, 5);
-      dispatch(clearAiresponse())
+      // STEP 3: Update that row with AI response
+      await updateDoc("Chat history", chatEntry.name, {
+        ai: aiResp
+      });
+
+      mutate(); // Show updated AI message
+      setLoading(false);
+      // if (validationResult[0]) {
+      navigate(`/progress/${sessionId}`);
+    } else {
+      let currentSession = session;
+      // STEP 1: Save user's message with idx
+      const idx = chatHistory.length + 1;
+      const chatEntry = await createDoc("Chat history", {
+        user: "No",
+        parent: currentSession,
+        parentfield: "chat_history",
+        parenttype: "Session",
+        idx,
+      });
+
+      if (!chatEntry.name) throw new Error("Failed to save user message");
+
+      mutate(); // Refresh UI to show user message
+      setLoading(true);
+      
+      // STEP 2: Get AI response
+      const resp = await fetchAIResponse("NOFROMUSER", confirmationMessage,session);
+      const aiResponse = resp.Ai_response;
+
+      if (resp.Is_confirmation) {
+        await updateDoc("Chat history", chatEntry.name, {
+          ai: aiResponse || "Waiting For Confirmation"
+        });
+
+        mutate();
+        setLoading(false);
+        setConfirmationMessage(aiResponse);
+        setConfirmationPending(true);
+        setDisabled(true);
+        return;
+      }
+
+      // STEP 3: Update that row with AI response
+      await updateDoc("Chat history", chatEntry.name, {
+        ai: aiResponse
+      });
+
+      mutate(); // Show updated AI message
+      setLoading(false);
+
       try {
         await updateDoc("Session", chatId, {
           user_intension: "",
@@ -271,6 +311,77 @@ function Chatscreen() {
       }
     }
   };
+  const [session, setSession] = useState(null)
+  const { data, mutate } = useFrappeGetDoc('Session', session || '');
+  const chatHistory = data?.chat_history || [];
+  console.log("data is", chatHistory);
+
+  const handleSendbtn = async () => {
+    if (!message.trim()) return;
+
+    const userMessage = message.trim();
+    setMessage('');
+
+    try {
+      // Ensure session exists
+      let currentSession = session;
+      if (!currentSession) {
+        const nowTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const sessionResp = await createDoc("Session", { time: nowTime, user: currentUser || '' });
+
+        if (!sessionResp.name) throw new Error("Failed to create session");
+        setSession(sessionResp.name);
+        currentSession = sessionResp.name;
+        navigate(`/chat/${currentSession}`,{replace:true})
+        mutate();
+      }
+
+      // STEP 1: Save user's message with idx
+      const idx = chatHistory.length + 1;
+      const chatEntry = await createDoc("Chat history", {
+        user: userMessage,
+        parent: currentSession,
+        parentfield: "chat_history",
+        parenttype: "Session",
+        idx,
+      });
+
+      if (!chatEntry.name) throw new Error("Failed to save user message");
+
+      mutate(); // Refresh UI to show user message
+      setLoading(true);
+
+      // STEP 2: Get AI response
+      const resp = await fetchAIResponse(userMessage, "", currentSession);
+      const aiResponse = resp.Ai_response;
+
+      if (resp.Is_confirmation) {
+        await updateDoc("Chat history", chatEntry.name, {
+          ai: aiResponse || "Waiting For Confirmation"
+        });
+
+        mutate();
+        setLoading(false);
+        setConfirmationMessage(aiResponse);
+        dispatch(addAIresponse(resp))
+        setConfirmationPending(true);
+        setDisabled(true);
+        return;
+      }
+
+      // STEP 3: Update that row with AI response
+      await updateDoc("Chat history", chatEntry.name, {
+        ai: aiResponse
+      });
+
+      mutate(); // Show updated AI message
+      setLoading(false);
+
+    } catch (error) {
+      console.error("Error sending message:", error);
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (messages.length >= 2) {
@@ -278,12 +389,12 @@ function Chatscreen() {
     }
   }, [messages]);
 
-  useEffect(() => {
-    if (messages.length === 0 && !chatId) {
-      createSessionid();
-      // return;    
-    }
-  }, [])
+  // useEffect(() => {
+  //   if (messages.length === 0 && !chatId) {
+  //     createSessionid();
+  //     // return;    
+  //   }
+  // }, [])
 
   // useEffect(() => {
   //   const suggestion = suggestions[suggestionIndex];
@@ -309,7 +420,7 @@ function Chatscreen() {
   // }, [charIndex, suggestionIndex, isDeleting]);
 
   const ref = useChatScroll(messages);
-  const [sideBar, setSideBar]=useState(false)
+  const [sideBar, setSideBar] = useState(false)
 
   const renderUserAvatar = (sender) => {
     const isCurrentUser = sender === 'user';
@@ -323,8 +434,8 @@ function Chatscreen() {
         />
       );
     }
-    
-    if (isCurrentUser && currentUser) {      
+
+    if (isCurrentUser && currentUser) {
       if (userDoc?.user_image) {
         return (
           <img
@@ -351,116 +462,167 @@ function Chatscreen() {
     );
   };
 
+  useEffect(() => {
+    // Validate session ID if provided in URL
+    if (sessionId) {
+      validateSession(sessionId);
+    }else{
+      setSession(null);
+      setConfirmationMessage('');
+      setConfirmationPending(false);
+      setDisabled(false);
+    }
+  }, [sessionId, session]);
+
+  const validateSession = async (sessionId) => {
+    try {
+      const res = await fetch(`/api/resource/Session/${sessionId}`);
+      if (!res.ok) {
+        setSession(null)
+        navigate("/chat", { replace: true })
+      }
+      const sessionData = await res.json();
+      console.log("result is ", sessionData.data.name);
+      if (sessionData.data.name) {
+        setSession(sessionData.data.name)
+      }
+      else {
+        navigate("/chat", { replace: true })
+      }
+    } catch (error) {
+      if (!error.message.includes("404")) {
+      console.error("Unexpected error validating session:", error);
+      }
+      // setInvalidSession(true);
+      setSession(null);
+    }
+  };
+
 
   return (
-  <div className='h-screen w-screen relative flex flex-row '>
-    {currentUser && <SideBar setSideBar={setSideBar} sideBar={sideBar}/>}
-    <div className="h-screen flex flex-col items-center w-full transition-width duration-300 ease-in-out main-screen">
-      <Navbar setSideBar={setSideBar} sideBar={sideBar}/>
-      <div className="flex-1 overflow-y-auto p-4 flex justify-center w-full chatscreen" ref={ref}>
-        {messages.length > 0 ? (<div
-          className="chats flex flex-col space-y-5 w-[50%] mx-auto"
-        // ref={ref}
-        >
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`flex gap-5 justify-start`}
-            >
-              {renderUserAvatar(msg.sender)}
-              <div className="p-2 rounded-lg max-w-full break-words">
-                <ReactMarkdown>{msg.text}</ReactMarkdown>
-              </div>
-            </div>
-          ))}
-          {partialResponse && (
-            <div className="flex gap-5 justify-start">
-              <img
-                src={botLogo1}
-                alt=""
-                className="h-8 w-8 relative rounded-full"
-              />
-              <div className="p-2 rounded-lg max-w-full">
-                <ReactMarkdown>{partialResponse}</ReactMarkdown>
-              </div>
-            </div>
-          )}
-          {loading && (
-            <Responseloader />
-          )}
-        </div>) : (<div className='flex justify-center items-center'><p className='text-5xl text-[#242f6a]'>What can I help with?</p></div>)}
-
-      </div>
-
-      {confirmationPending && (
-        <div className="confirmation-box  p-4 rounded-lg w-[45%] flex flex-col items-center">
-          <p className='text-[#242f6a]'>{confirmationMessage}</p>
-          <div className="flex space-x-4 mt-2">
-            <button
-              className="bg-green-500 text-white px-4 py-2 rounded"
-              onClick={() => handleConfirmation('yes')}
-            >
-              Yes
-            </button>
-            <button
-              className="bg-red-500 text-white px-4 py-2 rounded"
-              onClick={() => handleConfirmation('no')}
-            >
-              No
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#19a282] rounded-3xl p-2 bg-white shadow-lg">
-        <div className="flex-grow">
-          <textarea
-            placeholder={messages.length > 0 ? "Message Mars 2.0" : "Message Mars 2.0"}
-            className="w-full border-none outline-none bg-transparent text-black placeholder-[#242f6a] opacity-70 px-4 py-2 resize-none overflow-y-auto max-h-20 placeholder-opacity-75" // Adjusted classes
-            value={message}
-            maxLength={250}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (!disabled) {
-                  handleSendbtn();
-                }
+    <div className='h-screen w-screen relative flex flex-row '>
+      {currentUser && <SideBar setSideBar={setSideBar} sideBar={sideBar} />}
+      <div className="h-screen flex flex-col items-center w-full transition-width duration-300 ease-in-out main-screen">
+        <Navbar setSideBar={setSideBar} sideBar={sideBar} />
+        <div className="flex-1 overflow-y-auto p-4 flex justify-center w-full chatscreen" ref={ref}>
+          {chatHistory.length > 0 ? (
+            <div className="chats flex flex-col space-y-5 w-[50%] mx-auto">
+              {[...chatHistory]
+                .sort((a, b) => a.idx - b.idx)
+                .map((msg, index) => (
+                  <div key={`chat-${msg.name || index}`}>
+                    {msg.user?.trim() && (
+                      <div className="flex gap-5 justify-start mb-2">
+                        {renderUserAvatar("user")}
+                        <div className="p-2 rounded-lg max-w-full break-words">
+                          <ReactMarkdown>{msg.user}</ReactMarkdown>
+                        </div>
+                      </div>
+                    )}
+                    {msg.ai?.trim() && (
+                      <div className="flex gap-5 justify-start">
+                        <img
+                          src={botLogo1}
+                          alt="AI"
+                          className="h-8 w-8 relative rounded-full"
+                        />
+                        <div className="p-2 rounded-lg max-w-full break-words">
+                          <ReactMarkdown>{msg.ai}</ReactMarkdown>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
               }
-            }}
-            style={{ lineHeight: '1.5' }} //added line height to make it more readable.
-          />
+
+              {partialResponse && (
+                <div className="flex gap-5 justify-start">
+                  <img src={botLogo1} alt="AI" className="h-8 w-8 relative rounded-full" />
+                  <div className="p-2 rounded-lg max-w-full">
+                    <ReactMarkdown>{partialResponse}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
+
+              {loading && <Responseloader />}
+            </div>
+          ) : (
+            <div className="flex justify-center items-center">
+              <p className="text-5xl text-[#242f6a]">What can I help with?</p>
+            </div>
+          )}
         </div>
 
-        {message && (
-          <div className="cursor-pointer p-2" onClick={() => setMessage("")}>
-            <AiOutlineClear size={24} className="text-[#242f6a]" />
+
+        {confirmationPending && (
+          <div className="confirmation-box  p-4 rounded-lg w-[45%] flex flex-col items-center">
+            <p className='text-[#242f6a]'>{confirmationMessage}</p>
+            <div className="flex space-x-4 mt-2">
+              <button
+                className="bg-green-500 text-white px-4 py-2 rounded"
+                onClick={() => handleConfirmation('yes')}
+              >
+                Yes
+              </button>
+              <button
+                className="bg-red-500 text-white px-4 py-2 rounded"
+                onClick={() => handleConfirmation('no')}
+              >
+                No
+              </button>
+            </div>
           </div>
         )}
 
-        <div
-          className={`cursor-pointer p-3 rounded-full transition ${disabled ? "bg-gray-400 cursor-not-allowed" : "bg-[#19a282] hover:bg-[#217964]"
-            }`}
-          onClick={!disabled ? handleSendbtn : null}
-        >
-          <FiSend size={28} className="text-white" />
-        </div>
-      </div>
+        <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#19a282] rounded-3xl p-2 bg-white shadow-lg">
+          <div className="flex-grow">
+            <textarea
+              placeholder={messages.length > 0 ? "Message Mars 2.0" : "Message Mars 2.0"}
+              className="w-full border-none outline-none bg-transparent text-black placeholder-[#242f6a] opacity-70 px-4 py-2 resize-none overflow-y-auto max-h-20 placeholder-opacity-75" // Adjusted classes
+              value={message}
+              maxLength={250}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (!disabled) {
+                    handleSendbtn();
+                  }
+                }
+              }}
+              style={{ lineHeight: '1.5' }} //added line height to make it more readable.
+            />
+          </div>
 
-      <div className="alert-msg mb-5">
-        <p className="text-xs text-[#242f6a]">
-          MarsInfraAIX is still learning and can make mistakes. Please contact us by filling the contact form{" "}
-          <span
-            className="text-blue-500 underline cursor-pointer"
-            onClick={() => setShowDetails(true)}
+          {message && (
+            <div className="cursor-pointer p-2" onClick={() => setMessage("")}>
+              <AiOutlineClear size={24} className="text-[#242f6a]" />
+            </div>
+          )}
+
+          <div
+            className={`cursor-pointer p-3 rounded-full transition ${disabled ? "bg-gray-400 cursor-not-allowed" : "bg-[#19a282] hover:bg-[#217964]"
+              }`}
+            onClick={!disabled ? handleSendbtn : null}
           >
-            here
-          </span>{" "}
-          to confirm data correctness.
-        </p>
+            <FiSend size={28} className="text-white" />
+          </div>
+        </div>
+
+        <div className="alert-msg mb-5">
+          <p className="text-xs text-[#242f6a]">
+            MarsInfraAIX is still learning and can make mistakes. Please contact us by filling the contact form{" "}
+            <span
+              className="text-blue-500 underline cursor-pointer"
+              onClick={() => setShowDetails(true)}
+            >
+              here
+            </span>{" "}
+            to confirm data correctness.
+          </p>
+        </div>
+        <Details isOpen={showDetails} setIsOpen={setShowDetails} />
       </div>
-      <Details isOpen={showDetails} setIsOpen={setShowDetails} />
-    </div>
     </div>
   );
 }
