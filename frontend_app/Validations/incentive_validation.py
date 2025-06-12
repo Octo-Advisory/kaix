@@ -23,7 +23,7 @@ def incentive_validation(param):
 
     def parameter_check():
         '''This function will check as per parameters extracted, it will check and execute further as per the parameters extracted'''
-        if area and city and state:
+        if all([area, city, state]) and area != 'None' and city != 'None' and state != 'None': #changed by jenith on 20-5-25 10:50
             query = f"""SELECT area.area_name, city.city_name, city.state FROM `tabArea` as area INNER JOIN `tabCity` as city ON area.city_display_name = city.city_name WHERE city_display_name='{city}' AND city.state='{state}';"""
             res = frappe.db.sql(query,as_dict=True)
             location_check = []
@@ -35,8 +35,7 @@ def incentive_validation(param):
             else:
                 return {'pass_to_analytics': False, 'log':f'Area {area} was not available in the database', 'detailed_info': None}
                 
-            
-        elif not area and city and state:
+        elif (not area or area == 'None') and all([city, state]) and city != 'None' and state != 'None': #change by jenith on 20-5-25 10:50
             query = f"""SELECT city.city_name, city.state from `tabCity` as city where state='{state}'"""
             res = frappe.db.sql(query,as_dict=True)
             location_check = []
@@ -48,8 +47,7 @@ def incentive_validation(param):
             else:
                 return {'pass_to_analytics': False, 'log':f'City {city} was not available in the database', 'detailed_info': None}
                 
-            
-        elif not area and not city and state:
+        elif (not area or area=='None') and (not city or city=='None') and state and state!='None': #changed by jenith on 20-5-25 10:52
             query = f"""SELECT state_name from `tabState` where state_name ='{state}'"""
             res = frappe.db.sql(query,as_dict=True)
             location_check = []
@@ -62,21 +60,22 @@ def incentive_validation(param):
                 return {'pass_to_analytics': False, 'log':f'State {state} was not available in the database', 'detailed_info': None}
             
             
-        elif not area and not city and not state:
+        # elif not area and not city and not state:
+        elif not all([area, city, state]) or 'None' in [area, city, state]: #change by jenith on 20-5-25 10:56
             return {'pass_to_analytics': False, 'log':'Didnt got anything for the location ', 'detailed_info': None}
             # return [False, 'Didnt got anything for the location ']
     
     def check_for_area():
         '''This function checks first for incentives of industry and sub sector for the area,if not available then for city,if not available then for city,if not available then looks for country level PAN industries'''
-        if not industry_name and not sub_sector:
+        if (not industry_name or industry_name=='None') and (not sub_sector or sub_sector=='None'):
             return {'pass_to_analytics': False, 'log':'Industry and subsector not provided', 'detailed_info': None}
             # return [False, 'Industry and subsector not provided']
             
-        if not industry_name and sub_sector:
+        if (not industry_name or industry_name=='None') and (sub_sector and subsector!='None'):
             return {'pass_to_analytics': False, 'log':'Industry name not provided', 'detailed_info': None}
             # return [False, 'Industry name not provided']
         
-        if industry_name:
+        if (industry_name and industry_name!='None') and (not sub_sector or sub_sector=='None'):
             subsector_check = f"""SELECT name from `tabSub Sector` WHERE industry_id='{industry_name}'"""
             subsector_res = frappe.db.sql(subsector_check,as_dict=True)
             if subsector_res:
@@ -90,7 +89,7 @@ def incentive_validation(param):
                     return {'pass_to_analytics': False, 'log':f'Didnt Found the industry {industry_name} in the database', 'detailed_info': None}
         
         #comparing area zone with the sub sector zone
-        if industry_name and sub_sector:
+        if (industry_name and industry_name!='None') and (sub_sector and sub_sector!='None'):
             subsector =  sub_sector+'-'+industry_name
             #verifying the the given sub sector is of that industry or not 
             first_check = verify_subsector(industry_name,sub_sector)
@@ -108,7 +107,7 @@ def incentive_validation(param):
                 return {'pass_to_analytics': False, 'log':'Area zone didnt match with sub sector zone ', 'detailed_info': None}
                 # return [False,'Area zone didnt match with sub sector zone ']
                 
-        elif industry_name and not sub_sector:
+        elif (industry_name and industry_name!='None') and (not sub_sector or sub_sector=='None'):
             query = f"""SELECT zone_id FROM `tabSub Sector` WHERE industry_id ='{industry_name}'"""
             result = frappe.db.sql(query,as_dict=True)
             zone = set()
@@ -222,15 +221,15 @@ def incentive_validation(param):
         
     def check_for_city():
         '''This function checks incentives for city level for the industry and that sub sector, if not available then for State, if not available then looks for country level PAN industries'''
-        if not industry_name and not sub_sector:
+        if (not industry_name or industry_name=='None') and (not sub_sector or sub_sector=='None'):
             return {'pass_to_analytics': False, 'log':f'Industry and subsector not provided', 'detailed_info': None}
             # return [False, 'Industry and subsector not provided']
             
-        if not industry_name and sub_sector:
+        if (not industry_name or industry_name=='None') and (sub_sector and subsector!='None'):
             return {'pass_to_analytics': False, 'log':f'Industry name not provided', 'detailed_info': None}
             # return [False, 'Industry name not provided']
         
-        if industry_name:
+        if (industry_name and industry_name!='None') and (not sub_sector or sub_sector=='None'): 
             subsector_check = f"""SELECT name from `tabSub Sector` WHERE industry_id='{industry_name}'"""
             subsector_res = frappe.db.sql(subsector_check,as_dict=True)
             if subsector_res:
@@ -244,7 +243,7 @@ def incentive_validation(param):
                     return {'pass_to_analytics': False, 'log':f'Didnt found the industry {industry_name} in the database', 'detailed_info': None}
             
 
-        if industry_name and sub_sector:
+        if (industry_name and industry_name!='None') and (sub_sector and sub_sector!='None'):
             subsector =  sub_sector+'-'+industry_name
             #verifying the the given sub sector is of that industry or not 
             first_check = verify_subsector(industry_name,sub_sector)
@@ -265,7 +264,7 @@ def incentive_validation(param):
                 # allLogs.append(f'No zone found in the city ${city} which is same as sub sector zone')
                 # return [False,allLogs]
                 return {'pass_to_analytics': False, 'log':f'No zone found in the city ${city} which is same as sub sector zone', 'detailed_info': None}
-        elif industry_name and not sub_sector:
+        elif (industry_name and industry_name!='None') and (not sub_sector or sub_sector=='None'):
             query = f"""SELECT zone_id FROM `tabSub Sector` WHERE industry_id ='{industry_name}'"""
             result = frappe.db.sql(query,as_dict=True)
             zone = set()
@@ -359,15 +358,15 @@ def incentive_validation(param):
                 
     def check_for_state():
         '''This function checks incentives for State level for the provided industry and sub sector, if not available then check for country level PAN industries'''
-        if not industry_name and not sub_sector:
+        if (not industry_name or industry_name=='None') and (not sub_sector or sub_sector=='None'):
             return {'pass_to_analytics': False, 'log':f'Industry and subsector not provided', 'detailed_info':None}
             # return [False, 'Industry and subsector not provided']
             
-        if not industry_name and sub_sector:
+        if (not industry_name or industry_name=='None') and (sub_sector and subsector!='None'):
             return {'pass_to_analytics': False, 'log':f'Industry name not provided ', 'detailed_info':None}
             # return [False, 'Industry name not provided ']
             
-        if industry_name:
+        if (industry_name and industry_name!='None') and (not sub_sector or sub_sector=='None'):
             subsector_check = f"""SELECT name from `tabSub Sector` WHERE industry_id='{industry_name}'"""
             subsector_res = frappe.db.sql(subsector_check,as_dict=True)
             if subsector_res:
@@ -381,7 +380,7 @@ def incentive_validation(param):
                     return {'pass_to_analytics': False, 'log':f'Industry name {industry_name} not in the database', 'detailed_info':None}
                     # return [False,'Industry name not in the database']
     
-        if industry_name and sub_sector:
+        if (industry_name and industry_name!='None') and (sub_sector and sub_sector!='None'):
             subsector =  sub_sector+'-'+industry_name
             #verifying the the given sub sector is of that industry or not 
             first_check = verify_subsector(industry_name,sub_sector)
@@ -403,7 +402,7 @@ def incentive_validation(param):
                 return {'pass_to_analytics': False, 'log':f'Didnt found a single city having zone same as sub sector ', 'detailed_info':None}
                 # return [False, 'Didnt found a single city having zone same as sub sector ']
                 
-        elif industry_name and not sub_sector:
+        elif (industry_name and industry_name!='None') and (not sub_sector or sub_sector=='None'):
             query = f"""SELECT zone_id FROM `tabSub Sector` WHERE industry_id ='{industry_name}'"""
             result = frappe.db.sql(query,as_dict=True)
             zone = set()

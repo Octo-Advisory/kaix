@@ -1,23 +1,73 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useContext } from 'react';
 import { BiSidebar, BiChevronDown, BiPlus } from "react-icons/bi";
 import { IoSearch, IoSparklesOutline, IoDiamondOutline } from "react-icons/io5";
 import { RiHistoryLine } from "react-icons/ri";
 import { BsThreeDotsVertical } from "react-icons/bs";
 import Settings from "../Settings/Settings";
-import { useFrappeAuth, useFrappeGetDocList } from 'frappe-react-sdk';
+import { useFrappeAuth, useFrappeGetDocList,FrappeContext } from 'frappe-react-sdk';
 import { useNavigate } from 'react-router-dom';
+import { use } from 'react';
 
 const SideBar = ({ setSideBar, sideBar }) => {
     const { currentUser } = useFrappeAuth();
     const navigate = useNavigate()
+    const call = useContext(FrappeContext)
+
+    const getTitle = async(msg)=>{
+        try {
+        const response = await call.post('frontend_app.Management_Class.helpers.utility.generate_chat_title', {'user_query':msg})
+        if (response?.message) {
+            console.log(response, response.message,'this is the called statement method');
+          } else {
+            console.error('Statement creation failed:', response.message);
+          }
+        } catch (error) {
+            console.error('Error creating the Statement ', error)
+        }
+    }
 
     // Fetching session data from Frappe
     const { data } = useFrappeGetDocList("Session", {
         fields: ['*'],
         filters: [['user', '=', currentUser]],
-        limit: 1000000,
+        limit:1000000,
         orderBy: { field: 'creation', order: 'desc' },
     });
+    // const { data } = useFrappeGetDocList("Session", {
+    //     fields: ['name', 'chat_history.user','creation'],
+    //     filters: [['user', '=', currentUser]],
+    //     limit:1000000,
+    //     orderBy: { field: 'creation', order: 'desc' },
+    // });
+    // const ids = data?.map(d=> d.name)
+    // useEffect(()=>{
+    //     if(data){
+    //     const groupedData = {};
+    //     data.forEach(entry => {
+    //     const { name, user, creation } = entry;
+    //     if (!groupedData[name]) {
+    //         groupedData[name] = {
+    //         name,
+    //         chat_history: [],
+    //         };
+    //     }
+    //     groupedData[name].chat_history.push({ user, creation });
+    //     });
+    //     // Convert object back to array
+    //     const finalOutput = Object.values(groupedData);
+    //     // console.log(finalOutput, 'data gathered')
+    //     const so = finalOutput.map((data,index)=>{
+    //         const filteredChatHistory = data.chat_history.filter(d => d.user !== 'No' && d.user !== 'Yes');
+    //         return {
+    //             ...data,
+    //             chat_history: filteredChatHistory
+    //         };
+    //     })
+    //     // console.log(so,'data')
+    // }
+    // },[data])
+    
+
 
     const [history, setHistory] = useState([]);
 
@@ -33,6 +83,7 @@ const SideBar = ({ setSideBar, sideBar }) => {
 
     useEffect(() => {
         if (data) {
+            // console.log(data,'this is the data called ')
             const formattedHistory = groupMessagesByDate(data);
             setHistory(formattedHistory);
         }
@@ -56,15 +107,15 @@ const SideBar = ({ setSideBar, sideBar }) => {
 
             // Check if the session is from today
             if (sessionDate.toDateString() === today.toDateString()) {
-                groupedHistory[0].messages.push({ id: session.name, text: session.name });
+                groupedHistory[0].messages.push({ id: session.name, text: session.name, title: session.title });
             }
             // Check if the session is from yesterday
             else if (sessionDate.toDateString() === yesterday.toDateString()) {
-                groupedHistory[1].messages.push({ id: session.name, text: session.name });
+                groupedHistory[1].messages.push({ id: session.name, text: session.name,title: session.title });
             }
             // Check if the session is from within the last 7 days
             else if (sessionDate >= sevenDaysAgo) {
-                groupedHistory[2].messages.push({ id: session.name, text: session.name });
+                groupedHistory[2].messages.push({ id: session.name, text: session.name,title: session.title });
             }
         });
 
@@ -114,14 +165,19 @@ const SideBar = ({ setSideBar, sideBar }) => {
         setEditingMessage(null);
     };
  
-    if (showSettings) {
-        return <Settings onClose={() => setShowSettings(false)} />;
-    }
+    // if (showSettings) {
+    //     return <Settings onClose={() => setShowSettings(false)} />;
+    // }
 
     const createNewChat = () =>{
         console.log("clicked but not working")
         navigate('/chat', { replace: true });
     }
+
+    useEffect(()=>{
+        console.log(history,'this is the chat history');
+        
+    },[history])
 
     return (
         <div className={`sidebar relative flex flex-col transition-all duration-300 ease-in-out bg-gradient-to-b from-gray-50 to-gray-100 h-full ${sideBar ? 'w-[280px] min-w-[280px] p-4 opacity-100' : 'w-0 min-w-0 p-0 opacity-0 overflow-hidden'}`}>
@@ -196,7 +252,7 @@ const SideBar = ({ setSideBar, sideBar }) => {
                                             </div>
                                         ) : (
                                             <div className='group flex items-center justify-between p-2 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer'>
-                                                <p className='text-sm text-gray-600 truncate pr-2' onClick={()=>navigate(`/chat/${message.text}`,{replace:true})}>{message.text}</p>
+                                                <p className='text-sm text-gray-600 truncate pr-2' onClick={()=>navigate(`/chat/${message.text}`,{replace:true})}>{message.title}</p>
                                                 <div className="relative">
                                                     <button
                                                         className='opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-gray-700'
@@ -267,6 +323,7 @@ const SideBar = ({ setSideBar, sideBar }) => {
 
 
             </div>
+            {showSettings && <Settings onClose={() => setShowSettings(false)} />}
         </div>
     );
 };

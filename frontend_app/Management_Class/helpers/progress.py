@@ -91,7 +91,7 @@ def insert_process(parentId, process_name, process_value, status):
 
 
 @frappe.whitelist(allow_guest=True)
-def update_process(parentId, process_name, new_status):
+def update_process(parentId, process_name, new_status,is_completed):
     try:
         # Find the child row using Frappe ORM
         child_row = frappe.get_list(
@@ -113,11 +113,12 @@ def update_process(parentId, process_name, new_status):
 
         # Update the status and save the document
         row_doc.status = new_status
+        row_doc.is_completed= is_completed
         row_doc.save(ignore_permissions=True)
 
         frappe.publish_realtime(
             event="progress_update",
-            message={"parentId": parentId, "process_name": process_name, "status": new_status},
+            message={"parentId": parentId, "process_name": process_name, "status": new_status, 'is_complete': is_completed},
             doctype="Session",
             user=frappe.session.user if frappe.session.user != "Guest" else "Guest"
         )

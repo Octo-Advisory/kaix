@@ -1,5 +1,5 @@
 import React from 'react'
-import botLogo1 from '../../assets/MarsAIX icon.png';
+import botLogo1 from '../../assets/New Symbol.png';
 import { AiFillZhihuCircle } from 'react-icons/ai';
 
 function Responseloader() {

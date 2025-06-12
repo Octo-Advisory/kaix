@@ -19,6 +19,7 @@ function Property({ solution, toggleModal }) {
         iconSize: [25, 41],
         iconAnchor: [12, 41]
     });
+    
 
     const statusIcon = {
         good: <FaCheckCircle size={18} className="text-green-500 mt-1" />,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState,useRef } from 'react';
 import Backtochat from '../Backtochat/Backtochat';
 import Details from '../Details/Details';
 import {
@@ -6,15 +6,16 @@ import {
     FaInfoCircle, FaTag, FaLayerGroup, FaStar, FaSync
 } from 'react-icons/fa';
 import DOMPurify from 'dompurify';
+import LogoLoader from '../Responseloader/LogoLoader';
 
 // Parse stringified approval data
 
 
-function Approvalresult({ result }) {
+function Approvalresult({ result,source }) {
     console.log("result in approvals", result);
 
     const approval_data = JSON.parse(result["Approval Data"]);
-    const [viewMode, setViewMode] = useState("Pre-Operation");
+    const [viewMode, setViewMode] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedApproval, setSelectedApproval] = useState(null);
     const [approvalsData, setApprovalsDataData] = useState([]);
@@ -27,9 +28,9 @@ function Approvalresult({ result }) {
                 setLoading(false);
                 return;
             }
-
+           
             const approvalIds = Object.values(approval_data["Approval ID"]);
-
+      
             const fetchPromises = approvalIds.map((id, index) => {
                 const filters = JSON.stringify([["name", "=", id]]);
                 const fields = JSON.stringify(["*"]);
@@ -87,6 +88,7 @@ function Approvalresult({ result }) {
 
             setApprovalsDataData(fetchedApprovals);
             setSelectedApproval(fetchedApprovals.length > 0 ? fetchedApprovals[0] : null);
+            setViewMode(fetchedApprovals.length > 0 ? fetchedApprovals[0].stage : 'Pre-Operation')
             setLoading(false);
         } catch (error) {
             console.error("Error fetching approvals:", error);
@@ -106,25 +108,30 @@ function Approvalresult({ result }) {
     useEffect(() => {
         if (filteredApprovals.length > 0) {
             setSelectedApproval(filteredApprovals[0]);
+            
         } else {
             setSelectedApproval(null);
         }
     }, [viewMode, searchQuery]);
 
+     const containerRef = useRef(null)
+      useEffect(()=>{
+        if(containerRef.current) {
+          containerRef.current.scrollTop = 0;
+        }
+      },[selectedApproval])
+
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-screen w-full bg-[#f8fafc]">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#7AA6DA] mx-auto"></div>
-                    <p className="mt-4 text-[#5A7EC7]">Loading Approvals...</p>
-                </div>
+            <div className="flex items-center justify-center h-screen w-screen">
+                <LogoLoader />
             </div>
         );
     }
     
     return (
-        <div className="flex flex-col items-center justify-center w-full h-screen bg-gradient-to-br from-[#f0f7ff] to-[#e6f0fa] overflow-hidden">
-            <div className="w-[95%] h-[95%] mx-auto my-0 p-6 bg-white bg-opacity-95 rounded-xl shadow-sm border border-white border-opacity-40 flex flex-col backdrop-blur-sm">
+        <div className="flex flex-col items-center justify-center w-full h-screen bg-gradient-to-br from-[#0e2044] to-[#41b655] overflow-hidden">
+            <div className="w-[98%] h-[95%] mx-auto my-0 p-6 bg-white rounded-xl shadow-sm border border-white border-opacity-40 flex flex-col backdrop-blur-sm">
                 <div className="flex items-center justify-between pb-4 mb-4 border-b border-[#B8D1F3]">
                     <div className="flex items-center">
                         <div className="p-3 mr-4 rounded-lg bg-gradient-to-r from-[#FF80AB]/10 to-[#9575CD]/10">
@@ -135,7 +142,39 @@ function Approvalresult({ result }) {
                             <p className="text-[#5A7EC7]">Browse required approvals for your project</p> {/* changed by jenith on 14/05/25 13:23 */}
                         </div>
                     </div>
-                    <Backtochat />
+                    
+                    <div className='relative flex-row flex items-center gap-6'>
+                        <div className="relative flex flex-row items-center gap-4 text-sm">
+                            <div className="flex items-center gap-3 bg-gradient-to-r from-[#B8D1F3]/20 to-[#7AA6DA]/20 px-4 py-0.5 rounded-lg border border-[#B8D1F3]">
+                                <div className="p-2 bg-[#B8D1F3]/30 rounded-full">
+                                    <FaClock className="text-[#2C53A3] text-sm" />
+                                </div>
+                                <div>
+                                    <span className="font-medium text-[#5A7EC7] text-xs">TOTAL TIME</span>
+                                    <div className="flex items-baseline gap-1.5">
+                                        <span className="text-md font-bold text-[#2C53A3]">{result["Total Effective Time"]}</span>
+                                        <span className="text-xs text-[#5A7EC7]/70">days</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 bg-gradient-to-r from-[#81C784]/20 to-[#4CAF50]/20 px-4 py-0.5 rounded-lg border border-[#81C784]">
+                                <div className="p-2 bg-[#81C784]/30 rounded-full">
+                                    <FaCheckCircle className="text-[#2E7D32] text-sm" />
+                                </div>
+                                <div>
+                                    <span className="font-medium text-[#5A7EC7] text-xs">ONLINE</span>
+                                    <div className="flex items-baseline gap-1.5">
+                                        <span className="text-md font-bold text-[#2E7D32]">{result["Online Percentage"]}</span>
+                                        <span className="text-xs text-[#5A7EC7]/70">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {source==="SolutionScreen" && (
+                            <Backtochat />
+                        )}
+                    </div>
                 </div>
 
                 <div className="flex items-center justify-between mb-4">
@@ -154,33 +193,35 @@ function Approvalresult({ result }) {
                             </button>
                         ))}
                     </div>
-                    <div className="flex items-center gap-6 text-sm">
-                        <div className="flex items-center gap-3 bg-gradient-to-r from-[#B8D1F3]/20 to-[#7AA6DA]/20 px-4 py-2.5 rounded-lg border border-[#B8D1F3]">
-                            <div className="p-2 bg-[#B8D1F3]/30 rounded-full">
-                                <FaClock className="text-[#2C53A3] text-sm" />
-                            </div>
-                            <div>
-                                <span className="font-medium text-[#5A7EC7] text-xs">TOTAL TIME</span>
-                                <div className="flex items-baseline gap-1.5">
-                                    <span className="text-lg font-bold text-[#2C53A3]">{result["Total Effective Time"]}</span>
-                                    <span className="text-xs text-[#5A7EC7]/70">days</span>
-                                </div>
-                            </div>
-                        </div>
 
-                        <div className="flex items-center gap-3 bg-gradient-to-r from-[#81C784]/20 to-[#4CAF50]/20 px-4 py-2.5 rounded-lg border border-[#81C784]">
-                            <div className="p-2 bg-[#81C784]/30 rounded-full">
-                                <FaCheckCircle className="text-[#2E7D32] text-sm" />
-                            </div>
-                            <div>
-                                <span className="font-medium text-[#5A7EC7] text-xs">ONLINE</span>
-                                <div className="flex items-baseline gap-1.5">
-                                    <span className="text-lg font-bold text-[#2E7D32]">{result["Online Percentage"]}</span>
-                                    <span className="text-xs text-[#5A7EC7]/70">%</span>
+                    <div className='flex relative flex-row gap-4 text-sm'>
+                        <div className="flex items-center gap-3 bg-gradient-to-r from-[#B8D1F3]/20 to-[#7AA6DA]/20 px-4 py-0.5 rounded-lg border border-[#B8D1F3]">
+                                <div className="p-2 bg-[#B8D1F3]/30 rounded-full">
+                                    <FaClock className="text-[#2C53A3] text-sm" />
+                                </div>
+                                <div>
+                                    <span className="font-medium text-[#5A7EC7] text-xs">TOTAL TIME</span>
+                                    <div className="flex items-baseline gap-1.5">
+                                        <span className="text-md font-bold text-[#2C53A3]">{result[viewMode]}</span>
+                                        <span className="text-xs text-[#5A7EC7]/70">days</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+
+                            <div className="flex items-center gap-3 bg-gradient-to-r from-[#81C784]/20 to-[#4CAF50]/20 px-4 py-0.5 rounded-lg border border-[#81C784]">
+                                <div className="p-2 bg-[#81C784]/30 rounded-full">
+                                    <FaCheckCircle className="text-[#2E7D32] text-sm" />
+                                </div>
+                                <div>
+                                    <span className="font-medium text-[#5A7EC7] text-xs">ONLINE</span>
+                                    <div className="flex items-baseline gap-1.5">
+                                        <span className="text-md font-bold text-[#2E7D32]">{result[`Mode_${viewMode}`]}</span>
+                                        <span className="text-xs text-[#5A7EC7]/70">%</span>
+                                    </div>
+                                </div>
+                            </div>
                     </div>
+                    
                 </div>
 
                 <div className="relative mb-4">
@@ -203,13 +244,19 @@ function Approvalresult({ result }) {
                                         <div
                                             key={approval.id}
                                             className={`p-4 cursor-pointer rounded-lg transition-all duration-200 ${selectedApproval?.id === approval.id
-                                                ? "bg-gradient-to-r from-[#FF80AB]/10 to-[#9575CD]/10 border-l-4 border-[#FF80AB]"
-                                                : "hover:bg-[#E6F0FA]/30 border-l-4 border-transparent"
-                                                }`}
+                                            ? "bg-[#41b655] bg-opacity-20 border-l-4 border-[#41b655] "
+                                            : "bg-[#41b655] bg-opacity-10 border-none"
+                                            }`}
+                                            // style={{
+                                            //     background: selectedApproval?.id === approval.id
+                                            //     ? 'linear-gradient(to right, rgba(255, 128, 171, 0.08), rgba(255, 255, 255, 0.9))'
+                                            //     : 'transparent',
+                                            //     borderLeftColor: selectedApproval?.id === approval.id ? '#FF80AB' : 'transparent'
+                                            // }}
                                             onClick={() => setSelectedApproval(approval)}
                                         >
                                             <div className="flex justify-between items-start">
-                                                <h3 className={`font-medium ${selectedApproval?.id === approval.id ? "text-[#FF80AB]" : "text-[#2C53A3]"
+                                                <h3 className={`font-medium ${selectedApproval?.id === approval.id ?  "text-black" : "text-[#3b69c5]"
                                                     }`}>
                                                     {approval.name}
                                                 </h3>
@@ -235,25 +282,25 @@ function Approvalresult({ result }) {
 
                     {selectedApproval && (
                         <div className="w-2/3 flex flex-col">
-                            <div className="overflow-y-auto flex-1 p-6">
+                            <div ref={containerRef} className="overflow-y-auto flex-1 p-6">
                                 <div className="mb-8">
                                     <div className="flex items-center mb-2">
-                                        <div className="p-2 mr-3 rounded-lg bg-gradient-to-r from-[#B8D1F3]/30 to-[#7AA6DA]/30">
-                                            <FaFileAlt className="text-[#2C53A3]" />
+                                        <div className="p-3 mr-3 rounded-lg bg-blue-100">
+                                            <FaFileAlt className="text-blue-800" />
                                         </div>
                                         <h2 className="text-2xl font-semibold text-[#2C53A3]">{selectedApproval.name}</h2>
                                     </div>
 
                                     <div className="flex flex-wrap gap-2 mb-4">
                                         <span className="px-3 py-1 bg-gradient-to-r from-[#B8D1F3]/20 to-[#7AA6DA]/20 text-[#2C53A3] text-sm rounded-full flex items-center">
-                                            <FaTag className="mr-1" /> {selectedApproval.type}
+                                            <FaBuilding className="mr-2" /> {selectedApproval.type}
                                         </span>
                                         <span className="px-3 py-1 bg-gradient-to-r from-[#E6F0FA]/30 to-[#B8D1F3]/20 text-[#2C53A3] text-sm rounded-full flex items-center">
                                             <FaLayerGroup className="mr-1" /> {selectedApproval.level}
                                         </span>
-                                        <span className="px-3 py-1 bg-gradient-to-r from-[#81C784]/20 to-[#4CAF50]/20 text-[#2E7D32] text-sm rounded-full flex items-center">
+                                        {/* <span className="px-3 py-1 bg-gradient-to-r from-[#81C784]/20 to-[#4CAF50]/20 text-[#2E7D32] text-sm rounded-full flex items-center">
                                             <FaStar className="mr-1" /> Score: {selectedApproval.aggregated_score.toFixed(1)}
-                                        </span>
+                                        </span> */}
                                     </div>
                                 </div>
 
@@ -272,7 +319,7 @@ function Approvalresult({ result }) {
                                             <p className="text-[#5A7EC7]">{selectedApproval.stage}</p>
                                         </div>
                                         <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
-                                            <h4 className="font-medium text-[#2C53A3] mb-2">Zone Type</h4> {/* changed by jenith on 14/05/25 13:26 */}
+                                            <h4 className="font-medium text-[#2C53A3] mb-2">Land Type</h4> {/* changed by jenith on 14/05/25 13:26 */}
                                             <p className="text-[#5A7EC7]">{selectedApproval.land_type}</p> 
                                         </div>
                                         <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
@@ -319,7 +366,6 @@ function Approvalresult({ result }) {
                     )}
                 </div>
             </div>
-            <Details />
         </div>
     );
 }

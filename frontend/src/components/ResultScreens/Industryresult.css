@@ -60,3 +60,21 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #555;
   }
+
+/* Thin light gray scrollbar */
+/* WebKit browsers */
+.hide-scrollbar::-webkit-scrollbar {
+  width: 6px;              /* thin scrollbar width */
+  height: 6px;             /* thin scrollbar height */
+  background: transparent; /* hides track background */
+}
+
+.hide-scrollbar::-webkit-scrollbar-track {
+  background: transparent; /* hide track */
+}
+
+.hide-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #c0c0c0; /* light gray thumb */
+  border-radius: 3px;
+}
+

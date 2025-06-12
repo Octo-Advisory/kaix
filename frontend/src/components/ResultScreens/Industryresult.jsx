@@ -255,7 +255,6 @@ function Industryresult({ result }) {
           </div>
         )}
       </div>
-      <Details />
       <Model isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={modalTitle} data={modalData} />
     </div>
   )

@@ -361,6 +361,7 @@ def get_dependent_approval_time(testing_df1, dep_approval, approval_hierarchy, c
         return lst_dep_appr
     
 def get_efficient_time_for_land(all_approval_included_df):
+
     """
     Calculates the total approval time required for a given land, considering dependencies among approval stages.
     
@@ -370,6 +371,7 @@ def get_efficient_time_for_land(all_approval_included_df):
     Returns:
         tuple: A dictionary of efficient times for each stage, total approval time, and online approval percentage.
     """
+    
     testing_df1 = all_approval_included_df
     testing_df1 = testing_df1.rename(columns= name_change_mapping_for_approval)
     # Convert "Time Taken" to numeric, coercing errors to NaN (in case of invalid strings)
@@ -386,10 +388,33 @@ def get_efficient_time_for_land(all_approval_included_df):
             "Pre-Operation": [],
             "Others": []
             }
+    
+    # Total effecient_time calculation for Approval (Stage-wise)
+
+    online_percentages = {}
+
+    # Total effecient_time calculation for Approval (Stage-wise)
 
     for current_approval_main_stage in approval_hierarchy:
         effecient_time_list = []
         temp_appr_rank_df = testing_df1[testing_df1["Stages"] == current_approval_main_stage]
+
+
+        #### Stage-wise online percentage:
+        # Count Online and Offline modes
+        mode_counts = temp_appr_rank_df['Mode'].value_counts().to_dict()
+        online_mode_count = mode_counts.get('Online', 0)
+        offline_count = mode_counts.get('Offline', 0)
+        total = online_mode_count + offline_count
+
+        # Calculate percentage
+        online_percentage = (online_mode_count / total * 100) if total > 0 else 0
+
+
+        # Append to result dict
+        online_percentages[current_approval_main_stage] = online_percentage
+
+
         if not temp_appr_rank_df.empty:
             for i,j in temp_appr_rank_df.iterrows():
                 current_approval_id_ind = j["Approval ID"]
@@ -398,9 +423,13 @@ def get_efficient_time_for_land(all_approval_included_df):
                     dependent_approval_time = []
                     for dep_approval in dependent_approval:
                         dep_final_time = get_dependent_approval_time(testing_df1=testing_df1,dep_approval=dep_approval, approval_hierarchy=approval_hierarchy,current_approval_main_stage=current_approval_main_stage, effecient_time=effecient_time, current_approval_id=current_approval_id_ind)
+                        # print(dep_final_time)
+                        print(dep_final_time) ###############################################################Change
                         dependent_approval_time.append(sum(dep_final_time))
                     if dependent_approval_time:
+                        print("==>", dependent_approval_time)
                         eff_time = j["Time Taken"] + max(dependent_approval_time)
+                        print(current_approval_id_ind,eff_time)
                         effecient_time_list.append(eff_time)
                 else:
                     effecient_time_list.append(j["Time Taken"])
@@ -409,94 +438,11 @@ def get_efficient_time_for_land(all_approval_included_df):
         effecient_time[current_approval_main_stage].extend(effecient_time_list)
 
     total_approval_time_for_given_land = max(max(effecient_time["Pre-Requisite"]) + max(effecient_time["Pre-Establishment"]) + max(effecient_time["Pre-Operation"]), max(effecient_time["Others"]))
-    return effecient_time, total_approval_time_for_given_land, online_count
-
-# def calculate_efficiency(df, area_id=None, city_id=None, state_id=None):
-    _, efficient_time, online_percentage_given = get_efficient_time_for_land(df)
-    results = []
-    if area_id:
-        # Area-level approvals
-        area_df = df[df['area_id'] == area_id]
-        if not area_df.empty:
-            for _, row in area_df.iterrows():
-                results.append({
-                    'Approval ID': row['approval_id'],
-                    'Approval Name': row['approval_name'],
-                    'Level': 'Area',
-                    'Stages': row['stages']
-                })
-        
-        # City-level approvals
-        city_df = df[(df['city_level'] == 1) & (df['area_id'].isna())]
-        if not city_df.empty:
-            for _, row in city_df.iterrows():
-                results.append({
-                    'Approval ID': row['approval_id'],
-                    'Approval Name': row['approval_name'],
-                    'Level': 'City',
-                    'Stages': row['stages']
-                })
-        
-        # State-level approvals
-        state_df = df[(df['state_level'] == 1) & (df['city_id'].isna()) & (df['area_id'].isna())]
-        if not state_df.empty:
-            for _, row in state_df.iterrows():
-                results.append({
-                    'Approval ID': row['approval_id'],
-                    'Approval Name': row['approval_name'],
-                    'Level': 'State',
-                    'Stages': row['stages']
-                })
-    
-    elif city_id:
-        # City-level approvals
-        city_df = df[(df['city_id'] == city_id) & (df['city_level'] == 1)]
-        if not city_df.empty:
-            for _, row in city_df.iterrows():
-                results.append({
-                    'Approval ID': row['approval_id'],
-                    'Approval Name': row['approval_name'],
-                    'Level': 'City',
-                    'Stages': row['stages']
-                })
-        
-        # State-level approvals
-        state_df = df[(df['state_level'] == 1) & (df['city_id'].isna()) & (df['area_id'].isna())]
-        if not state_df.empty:
-            for _, row in state_df.iterrows():
-                results.append({
-                    'Approval ID': row['approval_id'],
-                    'Approval Name': row['approval_name'],
-                    'Level': 'State',
-                    'Stages': row['stages']
-                })
-    elif state_id:
-        # State-level approvals
-        state_df = df[(df['state_level'] == 1) & (df['city_id'].isna()) & (df['area_id'].isna())]
-        if not state_df.empty:
-            for _, row in state_df.iterrows():
-                results.append({
-                    'Approval ID': row['approval_id'],
-                    'Approval Name': row['approval_name'],
-                    'Level': 'State',
-                    'Stages': row['stages']
-                })
-    # Country-level approvals
-    country_df = df[(df['country_level'] == 1) & (df['state'].isna()) & (df['city_id'].isna()) & (df['area_id'].isna())]
-    if not country_df.empty:
-        for _, row in country_df.iterrows():
-            results.append({
-                'Approval ID': row['approval_id'],
-                'Approval Name': row['approval_name'],
-                'Level': 'Country',
-                'Stages': row['stages']
-            })
-    
-    # Convert to DataFrame
-    result_df = pd.DataFrame(results)
-    return {"Total Effective Time": efficient_time,
-            "Online Percentage":online_percentage_given,
-            "Approval Data":result_df.to_json()}
+    # print("*"*100)
+    # print("total_approval_time_for_given_land:",total_approval_time_for_given_land)
+    # print("total_approval_count:",len(effecient_time["Pre-Requisite"])+len(effecient_time["Pre-Establishment"])+len(effecient_time["Pre-Operation"])+len(effecient_time["Others"]))
+    # print("*"*100)
+    return effecient_time, total_approval_time_for_given_land, online_count, online_percentages
 
 def calculate_efficiency(df, area_id=None, city_id=None, state_id=None, keyword_given_by_user = None, approval_keyword_df =None):
     """
@@ -517,7 +463,7 @@ def calculate_efficiency(df, area_id=None, city_id=None, state_id=None, keyword_
     """
 
     # Compute the total approval time and online approval percentage    
-    _, efficient_time, online_percentage_given = get_efficient_time_for_land(df)
+    Stage_wise_eff_score, efficient_time, online_percentage_given, online_percentages = get_efficient_time_for_land(df)
 
     results = [] # Stores filtered approval data
     if area_id:
@@ -638,7 +584,16 @@ def calculate_efficiency(df, area_id=None, city_id=None, state_id=None, keyword_
         # Convert to DataFrame
         return {"Total Effective Time": efficient_time,
                 "Online Percentage":online_percentage_given,
-                "Approval Data":result_df.to_json()}
+                "Approval Data":result_df.to_json(),
+                "Pre-Requisite": max(Stage_wise_eff_score["Pre-Requisite"]),
+                "Pre-Establishment": max(Stage_wise_eff_score["Pre-Establishment"]),
+                "Pre-Operation": max(Stage_wise_eff_score["Pre-Operation"]),
+                "Others": max(Stage_wise_eff_score["Others"]),
+                "Mode_Pre-Requisite": (online_percentages["Pre-Requisite"]),
+                "Mode_Pre-Establishment": (online_percentages["Pre-Establishment"]),
+                "Mode_Pre-Operation": (online_percentages["Pre-Operation"]),
+                "Mode_Others": (online_percentages["Others"]),
+                }
     else:
         keyword_result = filter_df_by_keywords(keyword_given_by_user, approval_keyword_df)
         filtered_keyword_df, unfiltered_keyword_df = keyword_result[0], keyword_result[1]
@@ -648,12 +603,30 @@ def calculate_efficiency(df, area_id=None, city_id=None, state_id=None, keyword_
             Final_result_df = pd.concat([filtered_result_df,unfiltered_result_df], axis = 0, ignore_index= True ).sort_values(by= ['aggregated_score'])
             return {"Total Effective Time": efficient_time,
                     "Online Percentage":online_percentage_given,
-                    "Approval Data":Final_result_df.to_json()}
+                    "Approval Data":Final_result_df.to_json(),
+                    "Pre-Requisite": max(Stage_wise_eff_score["Pre-Requisite"]),
+                    "Pre-Establishment": max(Stage_wise_eff_score["Pre-Establishment"]),
+                    "Pre-Operation": max(Stage_wise_eff_score["Pre-Operation"]),
+                    "Others": max(Stage_wise_eff_score["Others"]),
+                    "Mode_Pre-Requisite": (online_percentages["Pre-Requisite"]),
+                    "Mode_Pre-Establishment": (online_percentages["Pre-Establishment"]),
+                    "Mode_Pre-Operation": (online_percentages["Pre-Operation"]),
+                    "Mode_Others": (online_percentages["Others"]),
+                    }
         else:
             unfiltered_result_df = pd.merge(result_df, unfiltered_keyword_df, left_on="Approval ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
             return {"Total Effective Time": efficient_time,
                     "Online Percentage":online_percentage_given,
-                    "Approval Data":unfiltered_result_df.to_json()}
+                    "Approval Data":unfiltered_result_df.to_json(),
+                    "Pre-Requisite": max(Stage_wise_eff_score["Pre-Requisite"]),
+                    "Pre-Establishment": max(Stage_wise_eff_score["Pre-Establishment"]),
+                    "Pre-Operation": max(Stage_wise_eff_score["Pre-Operation"]),
+                    "Others": max(Stage_wise_eff_score["Others"]),
+                    "Mode_Pre-Requisite": (online_percentages["Pre-Requisite"]),
+                    "Mode_Pre-Establishment": (online_percentages["Pre-Establishment"]),
+                    "Mode_Pre-Operation": (online_percentages["Pre-Operation"]),
+                    "Mode_Others": (online_percentages["Others"]),
+                    }
 
 def filter_df_by_keywords(
     extracted_keywords: List[str],

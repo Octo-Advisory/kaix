@@ -21,6 +21,7 @@ def vendor_validation(param):
            3. geocode_check() is the function that gets values from mapping modules for coordinates .. also it verifies and only returns true of location is from india
     '''
     try:
+        frappe.log_error('We are in Vendor validation part')
         allLogs=[]
         # Extract location details
         location_info = param.get("Location_info", {})
@@ -138,7 +139,7 @@ def vendor_validation(param):
             supplies_with_no_vendors = industry_check.get('supplies_with_no_vendors')
             if pass_to_analytics_industry:
                 location_check =  location_info_check()
-                pass_to_analytics_location = location_check.get('pass_to_analytics')
+                pass_to_analytics_location = location_check.get('pass_to_analytics_module')
                 latitude_longitude = location_check.get('latitude_longitude')
                 from_gujarat = location_check.get('from_gujarat')
                 location_name = location_check.get('location_name')
@@ -146,9 +147,9 @@ def vendor_validation(param):
                 if pass_to_analytics_location:
                     return {'pass_to_analytics': True, 'log': f'location_log: {location_log}, industry_log: {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat }
                 else:
-                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, industry_log: {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat }
+                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, industry_log: {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data
             else:
-                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': None, 'location_name':None, 'from_gujarat': False }
+                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':None, 'from_gujarat': False } #change the latitude longitude value to latitude_longidute variable once have data
 
        
         def location_and_supply():
@@ -162,7 +163,7 @@ def vendor_validation(param):
             supplies_with_no_vendors = supply_check.get('supplies_with_no_vendors')
             if pass_to_analytics_supply:
                 location_check = location_info_check()
-                pass_to_analytics_location = location_check.get('pass_to_analytics')
+                pass_to_analytics_location = location_check.get('pass_to_analytics_module')
                 latitude_longitude = location_check.get('latitude_longitude')
                 from_gujarat = location_check.get('from_gujarat')
                 location_name = location_check.get('location_name')
@@ -170,27 +171,38 @@ def vendor_validation(param):
                 if pass_to_analytics_location:
                     return {'pass_to_analytics': True, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat }
                 else:
-                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat }
+                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data 
             else:
-                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': None, 'location_name':None, 'from_gujarat': False }
+                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':None, 'from_gujarat': False } #change the latitude longitude value to latitude_longidute variable once have data
 
         
         def geocode_check():
             '''this function will check if from_india is true ... if its false it will return and further location db queries will be avoided'''
-            geocode = get_geocode(location)
-            latitude_longitude = geocode['location_info']['latitude_longitude']
-            from_gujarat = geocode['location_info']['from_gujarat']
-            from_india = geocode['location_info']['from_india']
-            location_name = geocode['location_info']['location_name']
-
-            if latitude_longitude:
-                if from_india == False:
-                    return [False,'Location was outside of India']
+            try:
+                geocode = get_geocode(location)
+                with open("log2.txt", "a") as file:
+                    file.write(f"\n this is from vendor validation {geocode}, {location} {get_geocode(location)}")
+                latitude_longitude = geocode['location_info']['latitude_longitude']
+                with open("log2.txt", "a") as file:
+                    file.write(f"\n this is from vendor validation latlong {latitude_longitude}")
+                from_gujarat = geocode['location_info']['from_gujarat']
+                from_india = geocode['location_info']['from_india']
+                location_name = geocode['location_info']['location_name']
+                
+                if latitude_longitude:
+                    if from_india == False or not from_india:
+                        return [False,'Location was outside of India']
+                    else:
+                        return [True, latitude_longitude, from_gujarat,location_name]
                 else:
-                    return [True, latitude_longitude, from_gujarat,location_name]
-            else:
-                return [False,'Location function didnt returned any data']
-            
+                    return [False,'Location function didnt returned any data']
+            except Exception as e:
+                # Log the full traceback
+                with open("log2.txt", "a") as file:
+                    file.write(f"\n[ERROR] geocode_check failed: {str(e)}\n")
+                    file.write(traceback.format_exc())  # adds full traceback
+                return [False, "Location function didn't return any data due to an error."]
+                    
         
         def location_info_check():
             '''

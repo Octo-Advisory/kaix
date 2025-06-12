@@ -1,16 +1,16 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState,useRef } from 'react';
 import { AiOutlineClear, AiOutlineSend } from 'react-icons/ai'; // React Icons
 import { FiSend } from 'react-icons/fi';
 import { useDispatch, useSelector } from 'react-redux';
 import { addChatId, addMessage } from '../../Redux/Store/Featuresilces/chat';
-import botLogo1 from '../../assets/MarsAIX icon.png';
+import botLogo1 from '../../assets/New Symbol.png';
 import useChatScroll from '../Hooks/useChatScroll'; // Import the hook
 import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
 import '../Chatscreen/Chatscreen.css';
 import userIcon from '../../assets/MarsAIX person icon.png'
 import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
-import { FrappeContext, useFrappeAuth, useFrappeCreateDoc, useFrappeGetDoc, useFrappeUpdateDoc } from 'frappe-react-sdk'
+import { FrappeContext, useFrappeAuth, useFrappeCreateDoc, useFrappeGetDoc, useFrappeGetDocList, useFrappeUpdateDoc } from 'frappe-react-sdk'
 import { addAIresponse, clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
 import { addResult } from '../../Redux/Store/Featuresilces/validation'
 import { replace, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -18,6 +18,8 @@ import Details from '../Details/Details';
 import { BiSidebar } from "react-icons/bi";
 import { IoSearch } from "react-icons/io5";
 import SideBar from '../SideBar/SideBar';
+import { FaThumbsUp, FaThumbsDown } from "react-icons/fa6";
+import { resetForm, setFormData, setIsOpen } from '../../Redux/Store/Featuresilces/detailform';
 
 function Chatscreen() {
   const [showDetails, setShowDetails] = useState(false);
@@ -39,10 +41,24 @@ function Chatscreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const navigate = useNavigate();
-  const { sessionId } = useParams();
+  let { sessionId } = useParams();
   const location = useLocation();
   //Create frappe context to call apis
   const { call } = useContext(FrappeContext)
+
+  if (!sessionId && !currentUser) {
+    sessionId = sessionStorage.getItem("guest_session_id")
+  }
+
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      sessionStorage.removeItem("guest_session_id");
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
   console.log("sessoin id from url", sessionId);
 
   const suggestions = [
@@ -74,7 +90,6 @@ function Chatscreen() {
       throw err;  // Rethrow the error if you want to catch it in the caller function.
     }
   };
-
 
   const storeLatestChatInChildTable = async () => {
     const messageLength = messages.length;
@@ -227,7 +242,7 @@ function Chatscreen() {
 
     if (response == 'yes') {
       let currentSession = session
-      
+
       // STEP 1: Save user's message with idx
       const idx = chatHistory.length + 1;
       const chatEntry = await createDoc("Chat history", {
@@ -275,9 +290,9 @@ function Chatscreen() {
 
       mutate(); // Refresh UI to show user message
       setLoading(true);
-      
+
       // STEP 2: Get AI response
-      const resp = await fetchAIResponse("NOFROMUSER", confirmationMessage,session);
+      const resp = await fetchAIResponse("NOFROMUSER", confirmationMessage, session);
       const aiResponse = resp.Ai_response;
 
       if (resp.Is_confirmation) {
@@ -300,9 +315,9 @@ function Chatscreen() {
 
       mutate(); // Show updated AI message
       setLoading(false);
-
+      setDisabled(false)
       try {
-        await updateDoc("Session", chatId, {
+        await updateDoc("Session", sessionId, {
           user_intension: "",
         });
         console.log("Updated Successfully");
@@ -313,27 +328,46 @@ function Chatscreen() {
   };
   const [session, setSession] = useState(null)
   const { data, mutate } = useFrappeGetDoc('Session', session || '');
+  const { data: userintension, mutate: intensionMutate } = useFrappeGetDocList('Session', {
+    fields: ['user_intension', 'chat_json'],
+    filters: [['name', '=', session]]
+  })
+  const { data: hints } = useFrappeGetDocList("Session", {
+          fields: ['*'],
+          filters: [['user', '=', currentUser]],
+          limit:5,
+          orderBy: { field: 'creation', order: 'desc' },
+      });
   const chatHistory = data?.chat_history || [];
   console.log("data is", chatHistory);
 
-  const handleSendbtn = async () => {
-    if (!message.trim()) return;
+  const handleSendbtn = async (msg) => {
+    if (!message.trim() && !msg.trim()) return;
 
-    const userMessage = message.trim();
+    const userMessage = msg ? msg.trim() : message.trim();
     setMessage('');
-
     try {
+
       // Ensure session exists
       let currentSession = session;
+
       if (!currentSession) {
         const nowTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const sessionResp = await createDoc("Session", { time: nowTime, user: currentUser || '' });
-
         if (!sessionResp.name) throw new Error("Failed to create session");
         setSession(sessionResp.name);
         currentSession = sessionResp.name;
-        navigate(`/chat/${currentSession}`,{replace:true})
         mutate();
+        intensionMutate();
+
+        if (currentUser) {
+          setTimeout(() => {
+            navigate(`/chat/${currentSession}`, { replace: true })
+          }, 200);
+        } else {
+          sessionStorage.setItem("guest_session_id", currentSession);
+        }
+
       }
 
       // STEP 1: Save user's message with idx
@@ -349,6 +383,7 @@ function Chatscreen() {
       if (!chatEntry.name) throw new Error("Failed to save user message");
 
       mutate(); // Refresh UI to show user message
+      intensionMutate();
       setLoading(true);
 
       // STEP 2: Get AI response
@@ -361,6 +396,7 @@ function Chatscreen() {
         });
 
         mutate();
+        intensionMutate();
         setLoading(false);
         setConfirmationMessage(aiResponse);
         dispatch(addAIresponse(resp))
@@ -375,6 +411,7 @@ function Chatscreen() {
       });
 
       mutate(); // Show updated AI message
+      intensionMutate();
       setLoading(false);
 
     } catch (error) {
@@ -382,6 +419,103 @@ function Chatscreen() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const fetchTitle = async () => {
+      const intension = userintension?.[0]?.user_intension || '';
+      if (intension) {
+        const rawJson = userintension?.[0]?.chat_json;
+        let title = "";
+        try {
+          const parsedArray = JSON.parse(rawJson);
+          const title_to_update = getLastMeaningfulMessage(parsedArray);
+          title = intension === "Valueless queries"
+            ? "New Chat"
+            : title_to_update
+              ? await fetchHistoryTitle(title_to_update)
+              : 'New Chat';
+          console.log("Title:", title);
+        } catch (e) {
+          console.error("Invalid JSON format", e);
+        }
+        if (title) {
+          updateDoc('Session', session, {
+            title: title
+          }).then((updatedDoc) => {
+            console.log('Title updated:✔️', updatedDoc);
+          }).catch((err) => {
+            console.error('Error updating doc:', err);
+          });
+        }
+      }
+    };
+
+    if (session) {
+      fetchTitle();
+    }
+  }, [userintension]);
+
+  useEffect(()=>{
+    //Getting the past 5 sessions for Preparing Hints
+    if(hints){
+      const data = hints?.[0]
+    }
+  },[hints])
+
+  function getLastMeaningfulMessage(chatArray) {
+    if (!Array.isArray(chatArray)) return null;
+
+    const blacklist = ["yes", "no"];
+
+    for (let i = chatArray.length - 1; i >= 0; i--) {
+      const msg = chatArray[i];
+      if (msg?.type === "human") {
+        const content = msg.content?.trim().toLowerCase();
+        if (content && !blacklist.includes(content)) {
+          return msg.content; // ✅ return original content (not lowercased)
+        }
+      }
+    }
+
+    return null; // ❌ nothing meaningful found
+  }
+
+  const fetchHistoryTitle = async (intension) => {
+    try {
+      const result = await call.get("frontend_app.Management_Class.helpers.utility.generate_chat_title", {
+        'user_query': intension,
+      });
+      console.log("Got the statement title", result);
+      return result.message;
+    } catch (err) {
+      console.log("error occurred 😂", err);
+      throw err;  // Rethrow the error if you want to catch it in the caller function.
+    }
+  }
+
+  const fetchHints = async (queries) => {
+    try {
+      const result = await call.get("frontend_app.Management_Class.helpers.utility.generate_followups", {
+        'query_list': queries,
+      });
+      console.log("Got the Hint Statements", result);
+      return result.message;
+    } catch (err) {
+      console.log("error occurred in Hint Statment Function😂", err);
+      throw err;  // Rethrow the error if you want to catch it in the caller function.
+    }
+  }
+
+  useEffect(() => {
+    console.log("ascdsdd", currentUser, sessionId);
+
+    if (!currentUser && !session) {
+      const guestSessionId = sessionStorage.getItem("guest_session_id");
+      if (guestSessionId) {
+        setSession(guestSessionId);
+      }
+    }
+  }, [currentUser, session]);
 
   useEffect(() => {
     if (messages.length >= 2) {
@@ -419,7 +553,13 @@ function Chatscreen() {
   //   }
   // }, [charIndex, suggestionIndex, isDeleting]);
 
-  const ref = useChatScroll(messages);
+  // const ref = useChatScroll(messages);
+  const chatRef  = useRef(null)
+   useEffect(() => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
   const [sideBar, setSideBar] = useState(false)
 
   const renderUserAvatar = (sender) => {
@@ -464,55 +604,90 @@ function Chatscreen() {
 
   useEffect(() => {
     // Validate session ID if provided in URL
+    console.log("rveerv");
+
     if (sessionId) {
+      console.log("user", currentUser);
+
       validateSession(sessionId);
-    }else{
+    } else {
       setSession(null);
       setConfirmationMessage('');
       setConfirmationPending(false);
       setDisabled(false);
+      setLoading(false)
     }
-  }, [sessionId, session]);
+  }, [sessionId, currentUser]);
 
   const validateSession = async (sessionId) => {
+    console.log("comegere with", sessionId, currentUser);
+
+    if (sessionStorage.getItem("guest_session_id") && currentUser) {
+      // Not logged in, redirect to /chat
+      setSession(null);
+      navigate("/chat", { replace: true });
+      return;
+    }
+    if (!currentUser && sessionStorage.getItem("guest_session_id")) {
+      return;
+    }
+
     try {
       const res = await fetch(`/api/resource/Session/${sessionId}`);
+
       if (!res.ok) {
-        setSession(null)
-        navigate("/chat", { replace: true })
+        // Invalid session ID
+        setSession(null);
+        navigate("/chat", { replace: true });
+        return;
       }
+
       const sessionData = await res.json();
-      console.log("result is ", sessionData.data.name);
-      if (sessionData.data.name) {
-        setSession(sessionData.data.name)
+      const session = sessionData.data;
+      console.log("session", session);
+      console.log("current", currentUser);
+
+      // Check if session belongs to the logged-in user
+      if (currentUser) {
+        if (session.user === currentUser) {
+          setSession(session.name);
+          navigate(`/chat/${session.name}`, { replace: true });
+        } else {
+          setSession(null);
+          navigate("/chat", { replace: true });
+        }
       }
-      else {
-        navigate("/chat", { replace: true })
-      }
+
     } catch (error) {
-      if (!error.message.includes("404")) {
-      console.error("Unexpected error validating session:", error);
-      }
-      // setInvalidSession(true);
+      console.error("Error validating session:", error);
       setSession(null);
+      navigate("/chat", { replace: true });
     }
   };
 
+  useEffect(() => {
+    mutate(data)
+  }, [])
+
+  const handleOpenHelp = () => {
+    dispatch(setFormData({ description: "I need help with my invoice." }));
+    dispatch(setIsOpen(true));
+  };
 
   return (
     <div className='h-screen w-screen relative flex flex-row '>
       {currentUser && <SideBar setSideBar={setSideBar} sideBar={sideBar} />}
       <div className="h-screen flex flex-col items-center w-full transition-width duration-300 ease-in-out main-screen">
         <Navbar setSideBar={setSideBar} sideBar={sideBar} />
-        <div className="flex-1 overflow-y-auto p-4 flex justify-center w-full chatscreen" ref={ref}>
+        <div className="flex-1 overflow-y-auto p-4 flex justify-center w-full chatscreen" ref={chatRef}>
           {chatHistory.length > 0 ? (
-            <div className="chats flex flex-col space-y-5 w-[50%] mx-auto">
+            <div className="chats flex flex-col w-[50%] mx-auto">
               {[...chatHistory]
                 .sort((a, b) => a.idx - b.idx)
                 .map((msg, index) => (
                   <div key={`chat-${msg.name || index}`}>
                     {msg.user?.trim() && (
-                      <div className="flex gap-5 justify-start mb-2">
+                      <div className="flex gap-5 justify-start mb-3">
                         {renderUserAvatar("user")}
                         <div className="p-2 rounded-lg max-w-full break-words">
                           <ReactMarkdown>{msg.user}</ReactMarkdown>
@@ -520,43 +695,73 @@ function Chatscreen() {
                       </div>
                     )}
                     {msg.ai?.trim() && (
-                      <div className="flex gap-5 justify-start">
+                      <div className="flex gap-5 justify-start mb-3">
                         <img
                           src={botLogo1}
                           alt="AI"
-                          className="h-8 w-8 relative rounded-full"
+                          className="h-8 w-8 relative rounded-full top-1"
                         />
                         <div className="p-2 rounded-lg max-w-full break-words">
                           <ReactMarkdown>{msg.ai}</ReactMarkdown>
                         </div>
                       </div>
                     )}
+
                   </div>
                 ))
               }
 
-              {partialResponse && (
+              {/* {partialResponse && (
                 <div className="flex gap-5 justify-start">
                   <img src={botLogo1} alt="AI" className="h-8 w-8 relative rounded-full" />
                   <div className="p-2 rounded-lg max-w-full">
                     <ReactMarkdown>{partialResponse}</ReactMarkdown>
                   </div>
                 </div>
-              )}
+              )} */}
 
-              {loading && <Responseloader />}
+              {loading && session === sessionId && <Responseloader />}
+
+              {confirmationPending && (
+                <div className="m-0 p-2 rounded-lg w-full flex items-center justify-center">
+                  {/* <p className='text-[#242f6a]'>{confirmationMessage}</p> */}
+                  <div className="flex gap-4 flex-row justify-center items-center">
+                    <button
+                      className="bg-green-500 text-white px-4 py-2 rounded-md text-xs cursor-pointer font-semibold flex flex-row gap-2"
+                      onClick={() => handleConfirmation('yes')}
+                    >
+                      <FaThumbsUp size={16} /> Yes
+                    </button>
+                    <button
+                      className="bg-red-500 text-white px-4 py-2 rounded-md text-xs cursor-pointer font-semibold flex flex-row gap-2"
+                      onClick={() => handleConfirmation('no')}
+                    >
+                      <FaThumbsDown size={16} />  No
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="flex justify-center items-center">
-              <p className="text-5xl text-[#242f6a]">What can I help with?</p>
+            <div className="flex flex-col gap-2 items-center justify-center h-full w-full">
+              <p className="text-4xl text-[#242f6a]">What can I help with?</p>
+              <p className='text-md text-gray-700 italic font-semibold mb-4'>Not sure where to begin with? Try one of these</p>
+              <div className='relative p-4 flex flex-col h-fit w-fit gap-4 items-center'>
+                <div className='relative p-2 text-xs bg-blue-200 text-black   rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleSendbtn("I'm planning a 1 TPA cement manufacturing unit in Bharuch") }}>I'm planning a 1 TPA cement manufacturing unit in Bharuch</div>
+                <div className='relative flex flex-row gap-4 w-fit h-fit'>
+                  <div className='relative p-2 text-xs text-black bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleSendbtn("List approvals needed to start a food processing unit in Gujarat.") }}>List approvals needed to start a food processing unit in Gujarat.</div>
+                  <div className='relative p-2 text-xs text-black bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold ' onClick={() => { handleSendbtn("List all licenses required to start a textile unit in Vadodara.") }}>List all licenses required to start a textile unit in Vadodara.</div>
+                </div>
+                <div className='relative p-2 text-xs text-black  bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleSendbtn("What benefits does Gujarat offer for toy manufacturing startups?") }}>What benefits does Gujarat offer for toy manufacturing startups?</div>
+              </div>
             </div>
           )}
         </div>
 
 
-        {confirmationPending && (
+        {/* {confirmationPending && (
           <div className="confirmation-box  p-4 rounded-lg w-[45%] flex flex-col items-center">
-            <p className='text-[#242f6a]'>{confirmationMessage}</p>
+        
             <div className="flex space-x-4 mt-2">
               <button
                 className="bg-green-500 text-white px-4 py-2 rounded"
@@ -572,9 +777,9 @@ function Chatscreen() {
               </button>
             </div>
           </div>
-        )}
+        )} */}
 
-        <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#19a282] rounded-3xl p-2 bg-white shadow-lg">
+        <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#41b655] rounded-xl p-2 bg-white shadow-lg">
           <div className="flex-grow">
             <textarea
               placeholder={messages.length > 0 ? "Message Mars 2.0" : "Message Mars 2.0"}
@@ -601,27 +806,27 @@ function Chatscreen() {
           )}
 
           <div
-            className={`cursor-pointer p-3 rounded-full transition ${disabled ? "bg-gray-400 cursor-not-allowed" : "bg-[#19a282] hover:bg-[#217964]"
+            className={`cursor-pointer p-3 rounded-full flex items-center justify-center transition ${disabled ? "bg-gray-400 cursor-not-allowed" : "bg-[#41b655] hover:bg-[#217964]"
               }`}
-            onClick={!disabled ? handleSendbtn : null}
+            onClick={() => { if (!disabled) handleSendbtn() }}
           >
-            <FiSend size={28} className="text-white" />
+            <FiSend size={26} className="text-white" />
           </div>
         </div>
 
         <div className="alert-msg mb-5">
           <p className="text-xs text-[#242f6a]">
-            MarsInfraAIX is still learning and can make mistakes. Please contact us by filling the contact form{" "}
+            MarsAIX is still learning and can make mistakes. Please contact us by filling the contact form{" "}
             <span
               className="text-blue-500 underline cursor-pointer"
-              onClick={() => setShowDetails(true)}
+              onClick={handleOpenHelp}
             >
               here
             </span>{" "}
             to confirm data correctness.
           </p>
         </div>
-        <Details isOpen={showDetails} setIsOpen={setShowDetails} />
+        {/* <Details /> */}
       </div>
     </div>
   );

@@ -5,25 +5,32 @@ import pandas as pd
 from frontend_app.Analytics_module.vendor_search.vendor_search_query import fetch_supply_data,vendor_df,get_supply_scores
 import traceback
 from frontend_app.Management_Class.helpers.progress import insert_process,update_process
+from frontend_app.Management_Class.helpers.utility import randomSentences
 
 def call_vendor_query(aiResponse,chatId,validationResult):
     try:
         with open("log.txt", "a") as file:
-            file.write(f"\nvalidationResult1 {validationResult}")
+            file.write(f"\nvalidationResult1 {validationResult} for now the latitude and longitude value are set static for any false scenarios (can be changed in vendor_validation.py location_and_supply() and location_and_industry())")
         # Validation Result from validation
-        insert_process(chatId,"Analyzing Your Query","Analyzing Your query","Pending")
-        update_process(chatId,"Analyzing Your Query","Processing")
-        insert_process(chatId,"Fetching Data","Fetching Data Based On Your Query","Pending")
-        insert_process(chatId,"Analyzing Data","Analyzing Gathered Data","Pending")   
-        insert_process(chatId,"Preparing Result","Preparing Result","Pending")
+
+        analyse_query = randomSentences('vendors', 'Analyzing Your Query')
+        fetch_data = randomSentences('vendors', 'Fetching Data')
+        analyse_data = randomSentences('vendors', 'Analyzing Data')
+        prepare_result = randomSentences('vendors', 'Preparing Results')
+
+        insert_process(chatId,"Analyzing Your Query",analyse_query,"Pending")
+        update_process(chatId,"Analyzing Your Query","Processing",0)
+        insert_process(chatId,"Fetching Data",fetch_data,"Pending")
+        insert_process(chatId,"Analyzing Data",analyse_data,"Pending")   
+        insert_process(chatId,"Preparing Result",prepare_result,"Pending")
         time.sleep(3)
-        update_process(chatId,"Analyzing Your Query","Complete")
-        update_process(chatId,"Fetching Data","Processing")
+        update_process(chatId,"Analyzing Your Query","Complete",1)
+        update_process(chatId,"Fetching Data","Processing",0)
         time.sleep(4)
         validationResult = json.loads(validationResult)
         validationResult = validationResult[0][1]
         with open("log.txt", "a") as file:
-            file.write(f"\nvalidationResult2 {validationResult}")
+            file.write(f"\nvalidationResult2 {validationResult} for now the latitude and longitude value are set static for any false scenarios (can be changed in vendor_validation.py location_and_supply() and location_and_industry())")
         Validation_Data = aiResponse.get('Validation Data')
         Industry_info = Validation_Data.get('Industry_info')
         Location_info = Validation_Data.get('Location_info')
@@ -40,11 +47,11 @@ def call_vendor_query(aiResponse,chatId,validationResult):
         # location_check = validationResult.get('location_check')
         latitude_longitude = validationResult.get('latitude_longitude')
         latitude_longitude = [latitude_longitude]
-        update_process(chatId,"Fetching Data","Complete")
-        update_process(chatId,"Analyzing Data","Processing")
+        update_process(chatId,"Fetching Data","Complete",1)
+        update_process(chatId,"Analyzing Data","Processing",0)
         time.sleep(4)
         with open("log.txt", "a") as file:
-            file.write(f"\nlatitude_longitude {latitude_longitude}")
+            file.write(f"\nlatitude_longitude {latitude_longitude} for now the latitude and longitude value are set static for any false scenarios (can be changed in vendor_validation.py location_and_supply() and location_and_industry())")
         results = fetch_supply_data(main_industry,sub_sector,segment,Supplies)
 
         if results:
@@ -86,10 +93,10 @@ def call_vendor_query(aiResponse,chatId,validationResult):
                 "latitude_longitude" : latitude_longitude or []
             }
         time.sleep(1)
-        update_process(chatId,"Analyzing Data","Complete")
-        update_process(chatId,"Preparing Result","Processing")
+        update_process(chatId,"Analyzing Data","Complete",1)
+        update_process(chatId,"Preparing Result","Processing",0)
         time.sleep(5)
-        update_process(chatId,"Preparing Result","Complete")
+        update_process(chatId,"Preparing Result","Complete",1)
         return response
     except Exception as e:
         error_message = traceback.format_exc()
@@ -100,5 +107,5 @@ def call_vendor_query(aiResponse,chatId,validationResult):
                 "Is_Error" : True,
                 "latitude_longitude" : latitude_longitude or []
             }
-        update_process(chatId,"Analyzing Data","Fail")
+        update_process(chatId,"Analyzing Data","Fail",0)
         return response

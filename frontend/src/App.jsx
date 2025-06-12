@@ -13,6 +13,7 @@
   import { useFrappeAuth } from "frappe-react-sdk";
   import ForgotPassword from './components/ForgotPassword/ForgotPassword';
   import Temp from './components/Home/Temp';
+import Details from './components/Details/Details';
 
   const PrivateRoute = () => {
     const { currentUser, isValidating } = useFrappeAuth();
@@ -24,6 +25,7 @@
 
     const { currentUser } = useFrappeAuth();
     return (
+      <>
       <BrowserRouter basename="/frontend">
         <Routes>
           {/* Redirect root path to /login */}
@@ -48,6 +50,8 @@
           <Route path="/forgotpassword" element={<ForgotPassword />} />
         </Routes>
       </BrowserRouter>
+      <Details/>
+      </>
     );
   }
 
