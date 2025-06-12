@@ -1,6 +1,6 @@
 import frappe
 from langchain.prompts import PromptTemplate
-from frontend_app.Ai_module.Query_Classification_And_Analysis import classify_query,llm_70b_vers_creative,refine_query_with_history,llm_70b_vers,generate_fallback_message,respond_to_negative_query
+from frontend_app.Ai_module.Query_Classification_And_Analysis import classify_query,llm_70b_vers_creative,refine_query_with_history,llm_70b_vers,generate_fallback_message,respond_to_negative_query,detect_module_switch_intent
 from frontend_app.Ai_module.employement_query.Extraction_for_employement_search import call_handle_employment_query
 from frontend_app.Ai_module.build_from_scratch.Extraction_for_Building_from_Scratch import entry_build_from_scratch
 from frontend_app.Ai_module.incentive_query.Extraction_for_incentive_search import call_incentive_search
@@ -30,6 +30,26 @@ def ai_module_call(input,confirmationMessage,chatId):
 
         # Check if user intention is already determined
         user_intension = check_user_intension(chatId)
+
+        if user_intension not in ["Valueless queries","Other industry-related queries","Negatively Intended Query",None]:
+            chat_history = get_chat(f"chat_{chatId}") or []
+            Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-6:]]
+            # refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_70b_vers)
+            response = detect_module_switch_intent(
+                # refine_user_input,
+                input,
+                user_intension,
+                llm_70b_vers,
+                Chat_history_normal
+            )
+            temp_out = response["switch_module"]
+            log(chatId,'debug','response',f"ABCDEFG {temp_out}",'AI.py','ai')
+            if response["switch_module"]:
+                log(chatId,'debug','response',f"{user_intension} changed to None",'AI.py','ai')
+                user_intension = None
+                update_user_intension(user_intension,chatId)
+            else:
+                pass
 
         if user_intension in ["Valueless queries","Other industry-related queries","Negatively Intended Query",None]:
             chat_history = get_chat(f"chat_{chatId}") or []

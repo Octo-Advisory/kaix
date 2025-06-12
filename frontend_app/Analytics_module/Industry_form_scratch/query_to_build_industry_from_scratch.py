@@ -280,11 +280,14 @@ def calculate_land_requirements(user_cap, max_cap, min_cap, max_land, min_land, 
         """
         return (((capacity - min_cap) / (abs(max_cap - min_cap) + epsilon)) * abs(max_land - min_land)) + min_land
     
+    Land_size = recursive_land_calculation(user_cap)
+    Lower_limit_land_size = recursive_land_calculation(adj_user_cap_min)
+    Upper_limit_land_size = recursive_land_calculation(adj_user_cap_max)
     # Compute land sizes for user capacity and adjusted capacities
     return {
-        "Land_size": recursive_land_calculation(user_cap),
-        "Lower_limit_land_size": recursive_land_calculation(adj_user_cap_min),
-        "Upper_limit_land_size": recursive_land_calculation(adj_user_cap_max)
+        "Land_size": Land_size,
+        "Lower_limit_land_size": (Land_size) if (Lower_limit_land_size <= 0) else Lower_limit_land_size,
+        "Upper_limit_land_size": Upper_limit_land_size
     }
 
 def integrate_land_calculation(required_capacity_by_user, industry_id, sub_sector_id=None, segment_id=None):
@@ -421,7 +424,8 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
     FROM `tabSurvey No` p
     JOIN `tabEmployment City Mapping` e ON p.area = e.area
     WHERE (p.zone = '{zone_id}') 
-    AND (p.area IN ({area_id_str}));
+    AND (p.area IN ({area_id_str}))
+    AND p.status != "Sold";
     """
 
     # Call the function and assign results
@@ -1008,25 +1012,49 @@ def get_efficient_time_for_land(all_approval_included_df):
         "dependent_approval_ids": "Dependent Approval IDs",
         "online_or_offline":"Mode", 
     }
+
     testing_df1 = all_approval_included_df
     testing_df1 = testing_df1.rename(columns= name_change_mapping_for_approval)
     # Convert "Time Taken" to numeric, coercing errors to NaN (in case of invalid strings)
     testing_df1["Time Taken"] = pd.to_numeric(testing_df1["Time Taken"], errors='coerce')
+    testing_df1.fillna(0, inplace = True)
     if "Online" in list(testing_df1["Mode"].unique()):
         online_count = (testing_df1["Mode"].value_counts()["Online"] / len(testing_df1)) * 100
     else:
         online_count = 0
     approval_hierarchy = ["Pre-Requisite", "Pre-Establishment", "Pre-Operation", "Others"]
+    
     effecient_time = {
             "Pre-Requisite": [],
             "Pre-Establishment": [],
             "Pre-Operation": [],
             "Others": []
             }
+# Total effecient_time calculation for Approval (Stage-wise)
+
+    online_percentages = {}
+    
+# Total effecient_time calculation for Approval (Stage-wise)
 
     for current_approval_main_stage in approval_hierarchy:
         effecient_time_list = []
         temp_appr_rank_df = testing_df1[testing_df1["Stages"] == current_approval_main_stage]
+
+
+        #### Stage-wise online percentage:
+        # Count Online and Offline modes
+        mode_counts = temp_appr_rank_df['Mode'].value_counts().to_dict()
+        online_mode_count = mode_counts.get('Online', 0)
+        offline_count = mode_counts.get('Offline', 0)
+        total = online_mode_count + offline_count
+
+        # Calculate percentage
+        online_percentage = (online_mode_count / total * 100) if total > 0 else 0
+
+
+        # Append to result dict
+        online_percentages[current_approval_main_stage] = online_percentage
+
         if not temp_appr_rank_df.empty:
             for i,j in temp_appr_rank_df.iterrows():
                 current_approval_id_ind = j["Approval ID"]
@@ -1035,9 +1063,13 @@ def get_efficient_time_for_land(all_approval_included_df):
                     dependent_approval_time = []
                     for dep_approval in dependent_approval:
                         dep_final_time = get_dependent_approval_time(testing_df1=testing_df1,dep_approval=dep_approval, approval_hierarchy=approval_hierarchy,current_approval_main_stage=current_approval_main_stage, effecient_time=effecient_time, current_approval_id=current_approval_id_ind)
+                        # print(dep_final_time)
+                        print(dep_final_time) ###############################################################Change
                         dependent_approval_time.append(sum(dep_final_time))
                     if dependent_approval_time:
+                        print("==>", dependent_approval_time)
                         eff_time = j["Time Taken"] + max(dependent_approval_time)
+                        print(current_approval_id_ind,eff_time)
                         effecient_time_list.append(eff_time)
                 else:
                     effecient_time_list.append(j["Time Taken"])
@@ -1046,10 +1078,17 @@ def get_efficient_time_for_land(all_approval_included_df):
         effecient_time[current_approval_main_stage].extend(effecient_time_list)
 
     total_approval_time_for_given_land = max(max(effecient_time["Pre-Requisite"]) + max(effecient_time["Pre-Establishment"]) + max(effecient_time["Pre-Operation"]), max(effecient_time["Others"]))
-    return effecient_time, total_approval_time_for_given_land, online_count
+    # Pre_requisite_
+    # print("*"*100)
+    # print("total_approval_time_for_given_land:",total_approval_time_for_given_land)
+    # print("total_approval_count:",len(effecient_time["Pre-Requisite"])+len(effecient_time["Pre-Establishment"])+len(effecient_time["Pre-Operation"])+len(effecient_time["Others"]))
+    # print("*"*100)
+    return effecient_time, total_approval_time_for_given_land, online_count, online_percentages
 
 # Function to calculate property efficiency and rankings
 def calculate_property_efficiency(df):
+
+
     """
     Calculate the efficiency of property approvals by evaluating approval time and online processing percentage.
 
@@ -1072,7 +1111,7 @@ def calculate_property_efficiency(df):
                       - 'Final Score': Overall efficiency score based on weighted ranking.
     """
 
-    # Initialize a list to store efficiency results for each property
+
     property_results = []
 
     # Loop through each unique property_id
@@ -1080,25 +1119,36 @@ def calculate_property_efficiency(df):
         property_df = df[df['property_id'] == property_id]
         
         # Calculate efficient time and online percentage for this property
-        efficient_time, total_approval_time, online_percentage = get_efficient_time_for_land(property_df)
+        efficient_time, total_approval_time, online_percentage, online_percentages = get_efficient_time_for_land(property_df)
+        # print("Current Property: ",property_id,"\nEffecient time:\n",efficient_time, "\n\n")
         
         # Append the result for this property
         property_results.append({
             'Property ID': property_id,
             'Efficient Approval Time': total_approval_time,
-            'Online Percentage': online_percentage
+            'Online Percentage': online_percentage,
+            "Pre-Requisite": max(efficient_time["Pre-Requisite"]),
+            "Pre-Establishment": max(efficient_time["Pre-Establishment"]),
+            "Pre-Operation": max(efficient_time["Pre-Operation"]),
+            "Others": max(efficient_time["Others"]),
+            "Mode_Pre-Requisite": (online_percentages["Pre-Requisite"]),
+            "Mode_Pre-Establishment": (online_percentages["Pre-Establishment"]),
+            "Mode_Pre-Operation": (online_percentages["Pre-Operation"]),
+            "Mode_Others": (online_percentages["Others"]),
         })
+
+        # print("Hello :)\n", property_results)
 
     # Convert the results to a DataFrame for easy visualization
     result_df = pd.DataFrame(property_results)
 
-
+    # print("before:",result_df)
 
     result_df['Approval Time Rank'] = normalize_series(result_df['Efficient Approval Time'],highest_is_worst=True)
 
-
     # Rank properties based on Online Percentage
     result_df['Online Percentage Rank'] = normalize_series(result_df['Online Percentage'], highest_is_worst=False)
+    # print("after:",result_df)
 
     # Calculate Final Ranking using weighted formula
     result_df['Final Score'] = (
@@ -1552,6 +1602,7 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
 
         # Convert results to DataFrame
         final_df = pd.DataFrame(final_results)
+        # log_to_file("Vendors by us:::",f"{final_df["vendor_id"]}")
         if len(better_results) == 0:
             return final_df
         better_df = pd.DataFrame(better_results)

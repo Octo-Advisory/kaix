@@ -7,18 +7,24 @@ import numpy as np
 import traceback
 from datetime import datetime
 import json
+from frontend_app.Management_Class.helpers.utility import randomSentences
 
 @frappe.whitelist()
 def industry_from_scratch(aiResponse,chatId):
     try:
-        insert_process(chatId,"Analyzing Your Query","Analyzing Your query","Pending")
-        update_process(chatId,"Analyzing Your Query","Processing")
-        insert_process(chatId,"Fetching Data","Fetching Data Based On Your Query","Pending")
-        insert_process(chatId,"Analyzing Data","Analyzing Gathered Data","Pending")   
-        insert_process(chatId,"Preparing Result","Preparing Result","Pending")
+        analyse_query = randomSentences('industry', 'Analyzing Your Query')
+        fetch_data = randomSentences('industry', 'Fetching Data')
+        analyse_data = randomSentences('industry', 'Analyzing Data')
+        prepare_result = randomSentences('industry', 'Preparing Results')
+
+        insert_process(chatId,"Analyzing Your Query",analyse_query,"Pending")
+        update_process(chatId,"Analyzing Your Query","Processing",0)
+        insert_process(chatId,"Fetching Data",fetch_data,"Pending")
+        insert_process(chatId,"Analyzing Data",analyse_data,"Pending")   
+        insert_process(chatId,"Preparing Result",prepare_result,"Pending")
         time.sleep(3)
-        update_process(chatId,"Analyzing Your Query","Complete")
-        update_process(chatId,"Fetching Data","Processing")
+        update_process(chatId,"Analyzing Your Query","Complete",1)
+        update_process(chatId,"Fetching Data","Processing",0)
         time.sleep(4)
         found_property = True
         found_employment = True
@@ -32,9 +38,9 @@ def industry_from_scratch(aiResponse,chatId):
         capacity = aiResponse.get("Capacity")
         keyword_given_by_user = aiResponse.get("KEYWORDS")
         log_to_file("keyword_given_by_user",keyword_given_by_user)
-        update_process(chatId,"Fetching Data","Complete")
+        update_process(chatId,"Fetching Data","Complete",1)
 
-        update_process(chatId,"Analyzing Data","Processing")
+        update_process(chatId,"Analyzing Data","Processing",0)
         industry = get_industry(main_industry)
         sub_sector,zone_id = get_subsector(sub_sector)
         segment = get_segment(segment)
@@ -121,7 +127,7 @@ def industry_from_scratch(aiResponse,chatId):
             ~Solution_screen_approval_lookup_df["property_id"].isin(uncommon_property_ids_for_sol_approval)
         ]
 
-        Solution_screen_approval_lookup_df = pd.merge(Solution_screen_approval_lookup_df, df_with_property_wise_approval_score[["Property ID", "Efficient Approval Time"]], left_on="property_id", right_on="Property ID").drop(columns=["Property ID"])
+        Solution_screen_approval_lookup_df = pd.merge(Solution_screen_approval_lookup_df, df_with_property_wise_approval_score[["Property ID", "Efficient Approval Time","Online Percentage","Pre-Requisite","Pre-Establishment","Pre-Operation","Others","Mode_Pre-Requisite","Mode_Pre-Establishment","Mode_Pre-Operation","Mode_Others"]], left_on="property_id", right_on="Property ID").drop(columns=["Property ID"])
 
         final_property_ranking_for_decision = pd.merge(final_property_ranking_for_decision, df_with_property_wise_approval_score[["Property ID","Final Score"]], 
          left_on="Property_ID", right_on="Property ID", how='left').drop(columns=["Property ID"])
@@ -132,7 +138,6 @@ def industry_from_scratch(aiResponse,chatId):
 
         property_latlong_df = property_employment_df[["property_id", "latitude_longitude"]].drop_duplicates()
         test_return = get_supply_scores(property_latlong_df,supply_rules_df,vendor_df,prefered_range=(0,250), tolerable_range=(251,500))
-            
         if len(test_return) == 2:
             property_mapped_supply_individual_score, property_mapped_supply_alternate_sug= test_return[0], test_return[1]
         else:
@@ -141,7 +146,6 @@ def industry_from_scratch(aiResponse,chatId):
         df_with_property_wise_vendor_score = calculate_final_supply_mapped_property_scores_with_condition(property_mapped_supply_individual_score, property_latlong_df)
 
         Solution_screen_essential_supply_vendor_lookup_df, Solution_screen_non_essential_supply_vendor_lookup_df = process_supply_vendor_df_to_send_solution_screen(property_mapped_supply_individual_score)
-
         # Step 1: Identify Uncommon Property IDs
         uncommon_property_ids = list(set(final_property_ranking_for_decision["Property_ID"]) ^ set(df_with_property_wise_vendor_score["property_id"]))
         if (not Solution_screen_essential_supply_vendor_lookup_df.empty) and (not Solution_screen_non_essential_supply_vendor_lookup_df.empty):
@@ -164,7 +168,6 @@ def industry_from_scratch(aiResponse,chatId):
                 "property_id": list(final_property_ranking_for_decision["Property_ID"].unique()),
                 "No_of_vendors_found": [0,]*len(final_property_ranking_for_decision)
             })
-
 
 
         # Step 2: Filter out uncommon properties from final_property_ranking_for_decision
@@ -212,7 +215,6 @@ def industry_from_scratch(aiResponse,chatId):
         Solution_screen_approval_lookup_df = sort_by_scores(Solution_screen_approval_lookup_df, final_property_ranking_for_decision)
         Solution_screen_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_vendor_lookup_df, final_property_ranking_for_decision)
         Solution_screen_non_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_vendor_lookup_df, final_property_ranking_for_decision)
-
         if not keyword_given_by_user:
             Final_analytics_results_query_to_build_industry_from_scratch = {
                 # "Filtered_final_property_ranking_for_decision" : None,
@@ -238,13 +240,8 @@ def industry_from_scratch(aiResponse,chatId):
                 "Non_essential_supply_vendor_lookup_df": Solution_screen_non_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_non_essential_supply_vendor_lookup_df.empty else None
             }
         else:
-            log_to_file("Ushan:::::::",keyword_given_by_user)
             keyword_result = filter_df_by_keywords(keyword_given_by_user, propert_keyword_df)
-            # log_to_file("keyword_result",keyword_result)
             filtered_keyword_df, unfiltered_keyword_df = keyword_result[0], keyword_result[1]
-            # log_to_file("filtered_keyword_df",filtered_keyword_df)
-            # log_to_file("unfiltered_keyword_df",unfiltered_keyword_df)
-            # print(type(filtered_keyword_df), type(unfiltered_keyword_df))
             if len(filtered_keyword_df) != 0:
 
                 Filtered_final_property_ranking_for_decision = pd.merge(final_property_ranking_for_decision, filtered_keyword_df, left_on="Property_ID", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
@@ -277,7 +274,6 @@ def industry_from_scratch(aiResponse,chatId):
                 Solution_screen_approval_lookup_df = sort_by_scores(Solution_screen_approval_lookup_df, final_property_ranking_for_decision, for_final_return=True)
                 Solution_screen_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_vendor_lookup_df, final_property_ranking_for_decision, for_final_return=True)
                 Solution_screen_non_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_vendor_lookup_df, final_property_ranking_for_decision, for_final_return=True)
-                
                 # print(type(Filtererd_Solution_screen_employment_lookup_df))
                 Final_analytics_results_query_to_build_industry_from_scratch = {
 
@@ -319,7 +315,6 @@ def industry_from_scratch(aiResponse,chatId):
                 Solution_screen_approval_lookup_df = Unfiltered_Solution_screen_approval_lookup_df
                 Solution_screen_essential_supply_vendor_lookup_df = Unfiltered_Solution_screen_essential_supply_vendor_lookup_df
                 Solution_screen_non_essential_supply_vendor_lookup_df = Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df
-
                 Final_analytics_results_query_to_build_industry_from_scratch ={
                 # "Filtered_final_property_ranking_for_decision" : None,
                 # "Filtererd_Solution_screen_employment_lookup_df" : None,
@@ -349,14 +344,14 @@ def industry_from_scratch(aiResponse,chatId):
                 "Is_Error" : False
             }
         log_to_file("response",response)
-        update_process(chatId,"Analyzing Data","Complete")
-        update_process(chatId,"Preparing Result","Processing")
+        update_process(chatId,"Analyzing Data","Complete",1)
+        update_process(chatId,"Preparing Result","Processing",0)
         time.sleep(5)
-        update_process(chatId,"Preparing Result","Complete")
+        update_process(chatId,"Preparing Result","Complete",1)
         return response
     
     except Exception as e:
-        update_process(chatId,"Analyzing Data","Fail")
+        update_process(chatId,"Analyzing Data","Fail",0)
         error_details = traceback.format_exc()
         log_to_file("main error",str(error_details))
         response = {

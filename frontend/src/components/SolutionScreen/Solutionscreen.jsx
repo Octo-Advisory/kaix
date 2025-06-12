@@ -4,6 +4,7 @@ import Empresult from '../ResultScreens/Empresult';
 import Incentiveresult from '../ResultScreens/Incentiveresult';
 import Approvalresult from '../ResultScreens/Approvalresult';
 import Vendorresult from '../ResultScreens/Vendorresult';
+import IndustryResultScreen from '../ResultScreens/IndustryResultScreen';
 import { useSelector } from 'react-redux';
 import { useNavigate } from "react-router-dom";
 
@@ -28,15 +29,16 @@ function Solutionscreen() {
   return (
     <div className='h-screen flex w-full items-center'>
       {user_intension === "Query to build industry from Scratch" ? (
-        <Industryresult result={result[0]} />
+        // <Industryresult result={result[0]} />
+        <IndustryResultScreen result={result[0]} source="SolutionScreen"/>
       ) : user_intension === "Query to Get Employee Search" ? (
         <Empresult result={result[0]} />
       ) : user_intension === "Query to search Incentives" ? (
-        <Incentiveresult result={JSON.parse(Analytics_response["Incentive Data"])} />
+        <Incentiveresult result={JSON.parse(Analytics_response["Incentive Data"])} source="SolutionScreen" />
       ) : user_intension === "Query to Get Approvals" ? (
-        <Approvalresult result={Analytics_response} />
+        <Approvalresult result={Analytics_response} source="SolutionScreen" />
       ) : user_intension === "Query to search Vendors" ? (
-        <Vendorresult result={result[0]} />) : (
+        <Vendorresult result={result[0]} source="SolutionScreen" />) : (
         "Server Error"
       )}
 

@@ -19,7 +19,6 @@ function Empresult({ result }) {
         {result['is_error'] ? (<div className='text-black font-bold'>{result['Analytics_response']}</div>) : (<img src={`data:image/png;base64,${result['chart_base64']}`} alt="Generated Chart" className='w-[90%] h-[90%] relative object-contain' />)}
         </div>
       </div>
-      <Details />
     </div>
   )
 }

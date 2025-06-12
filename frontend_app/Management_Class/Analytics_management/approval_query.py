@@ -4,20 +4,28 @@ from frontend_app.Analytics_module.approval_query.approval_search_query import *
 from frontend_app.Management_Class.helpers.progress import insert_process,update_process
 import traceback
 import json
+from frontend_app.Management_Class.helpers.utility import randomSentences
 
 @frappe.whitelist()
 def call_approval_query(aiResponse,chatId):
     try:
         # with open("log2.txt", "a") as file:
         #     file.write(f"\naiResponse {aiResponse}")
-        insert_process(chatId,"Analyzing Your Query","Analyzing Your query","Pending")
-        update_process(chatId,"Analyzing Your Query","Processing")
-        insert_process(chatId,"Fetching Data","Fetching Data Based On Your Query","Pending")
-        insert_process(chatId,"Analyzing Data","Analyzing Gathered Data","Pending")   
-        insert_process(chatId,"Preparing Result","Preparing Result","Pending")
+        analyse_query = randomSentences('approval', 'Analyzing Your Query')
+        fetch_data = randomSentences('approval', 'Fetching Data')
+        analyse_data = randomSentences('approval', 'Analyzing Data')
+        prepare_result = randomSentences('approval', 'Preparing Results')
+
+        with open("log2.txt", "a") as file:
+            file.write(f"\nresults::::::::::::::::::::::::::::::::::::::: {analyse_query, fetch_data, analyse_data, prepare_result}")
+        insert_process(chatId,"Analyzing Your Query",analyse_query,"Pending")
+        update_process(chatId,"Analyzing Your Query","Processing",0)
+        insert_process(chatId,"Fetching Data",fetch_data,"Pending")
+        insert_process(chatId,"Analyzing Data",analyse_data,"Pending")   
+        insert_process(chatId,"Preparing Result",prepare_result,"Pending")
         time.sleep(3)
-        update_process(chatId,"Analyzing Your Query","Complete")
-        update_process(chatId,"Fetching Data","Processing")
+        update_process(chatId,"Analyzing Your Query","Complete",1)
+        update_process(chatId,"Fetching Data","Processing",0)
         time.sleep(4)
         
         Validation_Data = aiResponse.get('Validation Data')
@@ -29,8 +37,8 @@ def call_approval_query(aiResponse,chatId):
         given_state = location_info.get('State')
         given_main_industry = Industry_info.get('Main-Industry')
         given_sub_sector = Industry_info.get('Sub-Sector')
-        update_process(chatId,"Fetching Data","Complete")
-        update_process(chatId,"Analyzing Data","Processing")
+        update_process(chatId,"Fetching Data","Complete", 1)
+        update_process(chatId,"Analyzing Data","Processing",0)
         time.sleep(4)
         with open("log2.txt", "a") as file:
             file.write(f"\ninformations1 {Validation_Data,}")
@@ -66,10 +74,10 @@ def call_approval_query(aiResponse,chatId):
         approval_keyword_df["Cross_following"] = approval_keyword_df["Cross_following"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
         approval_keyword_df["online_or_offline"] = approval_keyword_df["online_or_offline"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
         approval_keyword_df["stages"] = approval_keyword_df["stages"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
-        update_process(chatId,"Analyzing Data","Complete")
-        update_process(chatId,"Preparing Result","Processing")
+        update_process(chatId,"Analyzing Data","Complete",1)
+        update_process(chatId,"Preparing Result","Processing",0)
         time.sleep(5)
-        update_process(chatId,"Preparing Result","Complete")
+        update_process(chatId,"Preparing Result","Complete",1)
 
         final_result = calculate_efficiency(app_df,area_id,city_id,state_id, keyword_given_by_user= Keywords, approval_keyword_df = approval_keyword_df)
         response = {
@@ -80,7 +88,7 @@ def call_approval_query(aiResponse,chatId):
     except Exception as e:
         error_details = traceback.format_exc()
         log_to_file("error details",error_details)
-        update_process(chatId,"Analyzing Data","Fail")
+        update_process(chatId,"Analyzing Data","Fail",0)
         response = {
                 "Analytics_response": f"Error From Analytics :- {e}",
                 "Is_Error" : True

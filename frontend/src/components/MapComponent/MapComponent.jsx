@@ -1,11 +1,14 @@
 import mapboxgl from "mapbox-gl";
 import React, { useEffect, useRef, useState } from "react";
-import '.././MapComponent/style.css'
+import './style.css'
 import { useSelector } from 'react-redux';
 import 'leaflet/dist/leaflet.css';
 import markerImage from '../../assets/markerImage.png'
 import Property from "../Property/Property";
 import Vendorcards from "../ResultScreens/Vendorcards";
+import IndustryResultScreen from "../ResultScreens/IndustryResultScreen";
+import Vendorresult from "../ResultScreens/Vendorresult";
+import { FaXmark } from "react-icons/fa6";
 
 function MapComponent({ solutions, toggleModal }) {
   console.log("solutons from map", solutions);
@@ -335,17 +338,24 @@ function MapComponent({ solutions, toggleModal }) {
     });
   }
 
+  useEffect(()=>{
+      console.log('this is the solution of selected')
+  },[solution])
+
   return (
-    <div className="main-map h-full w-full">
+    <div className="main-map h-screen w-screen flex items-center justify-center">
       <div
         id="map-container"
         ref={mapContainerRef} // Attach ref to this container
-        style={{ width: "100%", height: "90%" }} // Set width and height for the map container
+        style={{ width: "100%", height: "100%" }} // Set width and height for the map container
       />
       {isModalOpen && solution && (
-        <Modal key={solution.result_type} onClose={() => setIsModalOpen(false)}>
-          {solution.result_type === "Industry_Result" && <Property solution={solution} toggleModal={toggleModal} />}
-          {solution.result_type === "Vendor" && <Vendorcards supplier={solution} />}
+        <Modal key={solution.result_type} onClose={() => setIsModalOpen(false)} type={solution.result_type}>
+          {/* {solution.result_type === "Industry_Result" && <Property solution={solution} toggleModal={toggleModal} />} */}
+          {/* {solution.result_type === "Vendor" && <Vendorcards supplier={solution} />} */}
+          {solution.result_type === "Vendor" && <Vendorresult result={solution} source="MapComponent" />}
+          {solution.result_type==="Industry_Result" && <IndustryResultScreen result={solution} source="MapComponent"/>}
+         
         </Modal>
       )}
 
@@ -356,11 +366,13 @@ function MapComponent({ solutions, toggleModal }) {
 export default MapComponent;
 
 
-const Modal = ({ children, onClose }) => {
+const Modal = ({ children, onClose,type }) => {
   return (
-    <div className="modal-overlay">
-      <div className="modal-content overflow-auto">
-        <button className="close-button" onClick={onClose}>X</button>
+    <div className="fixed top-0 h-full w-full flex gap-4 items-center">
+      <div className={`${type==='Vendor' ? 'top-7 right-12' : type==="Industry_Result" ? 'top-5 right-5' : ''} absolute  z-[335] cursor-pointer h-8 w-8 rounded-full bg-white shadow-md flex items-center justify-center`}  onClick={onClose}>
+        <FaXmark size={20} />
+      </div>
+      <div className={`modal-content relative h-full w-full flex items-center justify-center ${type==="Industry_Result" ? 'overflow-y-auto' : ''}`}>
         {children}
       </div>
     </div>

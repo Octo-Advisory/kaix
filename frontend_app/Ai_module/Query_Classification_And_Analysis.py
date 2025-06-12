@@ -13,6 +13,7 @@ import frappe
 from frontend_app.Management_Class.helpers.utility import update_llm_token  
 from frontend_app.Management_Class.Redis_management.Redis_chat import get_chat,save_chat,get_state,save_state
 import configparser
+import frappe
 
 # from langchain_openai import ChatOpenAI
 config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
@@ -1812,6 +1813,20 @@ def extract_incentive_details_using_ai(description: str, llm=llm_70b_vers_creati
     response = chain.invoke({"description": description})
     update_llm_token(response)
     return response.content.strip()
+import ast
+@frappe.whitelist()
+def convert_string_json(input):
+    try:
+        # Try strict JSON parse first
+        return json.loads(input)
+    except json.JSONDecodeError:
+        try:
+            # Fallback: parse Python literal dict
+            parsed = ast.literal_eval(input)
+            # Convert to JSON-compatible dict string and then parse it to validate
+            return json.loads(json.dumps(parsed))
+        except (ValueError, SyntaxError) as e:
+            return {"error": f"Invalid input: {str(e)}"}
 
 def update_user_intension(user_intension,chatId):
     query = "UPDATE `tabSession` SET user_intension = %s WHERE name = %s"

@@ -5,6 +5,7 @@ import App from './App.jsx'
 import { FrappeProvider } from 'frappe-react-sdk'
 import { store } from './Redux/Store/store.js'
 import { Provider } from 'react-redux';
+import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary.jsx'
 
 
 const getSiteName = () => {
@@ -21,9 +22,11 @@ const getSiteName = () => {
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <FrappeProvider socketPort={import.meta.env.VITE_SOCKET_PORT} siteName={getSiteName()}>
-    <Provider store={store}>
-      <App />
-    </Provider>
+      <Provider store={store}>
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
+      </Provider>
     </FrappeProvider>
   </StrictMode>
 )

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FaEye, FaEyeSlash, FaArrowRight, FaSpinner } from 'react-icons/fa';
 import { FiUser, FiLock } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
-import illustration1 from '../../assets/AI-Powered Industrial Solutions.jpg';
+import illustration1 from '../../assets/AI-Powered Industrial Solutionss.jpg';
 import { useFrappeAuth } from 'frappe-react-sdk';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -59,10 +59,12 @@ function Login() {
             className="w-full h-full object-cover object-center"
             alt="AI-Powered Industrial Solutions"
           />
+          
           <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-            <h2 className="text-3xl font-bold mb-2">MarsInfraAIX Platform</h2>
+            <h2 className="text-3xl font-bold mb-2">MarsAIX Platform</h2> {/* Changed by Jenith on 15-5-25 9:49 */}
             <p className="text-gray-200">
-              Your gateway to intelligent industrial solutions
+              {/* Your gateway to intelligent industrial solutions */}
+              Establish your Industrial Project seamlessly with our AI-powered analysis{/* Changed by Jenith on 15-5-25 9:49 */}
             </p>
           </div>
         </div>
@@ -75,7 +77,7 @@ function Login() {
               <span className="text-3xl font-bold text-[#41b655]">AIX</span>
             </div>
             <h1 className="text-2xl font-semibold text-gray-800 mb-2">Welcome back</h1>
-            <p className="text-gray-600">Sign in to continue your industrial solution discovery</p>
+            <p className="text-gray-600">Sign in to continue building your industrial project</p>{/* Changed by Jenith on 15-5-25 9:50 */}
           </div>
 
           <form onSubmit={handleSubmit}>
@@ -171,14 +173,14 @@ function Login() {
             </p>
           </div>
 
-          <div className="mt-8 border-t border-gray-200 pt-6 text-center">
+           <div className="mt-8 border-t border-gray-200 pt-6 text-center">
             <button
               className="text-sm text-gray-500 hover:text-gray-700 transition"
               onClick={()=> navigate('/chat')}
             >
               Continue as guest
             </button>
-          </div>
+          </div> 
         </div>
       </div>
       <ToastContainer />

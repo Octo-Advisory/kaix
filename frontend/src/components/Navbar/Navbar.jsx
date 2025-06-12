@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useFrappeAuth, useFrappeGetDoc } from 'frappe-react-sdk';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../assets/MarsAIX Logo.png';
+import newlogo from '../../assets/New MarsAIX blue h.png'
 import { RiFlashlightFill } from 'react-icons/ri';
 import { FiUser, FiSettings, FiLogOut, FiChevronDown, FiMenu, FiX } from 'react-icons/fi';
 import Settings from '../Settings/Settings';
@@ -21,6 +22,7 @@ const Navbar = ({ setSideBar, sideBar }) => {
   const handleLogout = async () => {
     try {
       await logout();
+      sessionStorage.removeItem("guest_session_id")
       navigate('/login');
     } catch (error) {
       console.error("Logout failed:", error);
@@ -30,14 +32,14 @@ const Navbar = ({ setSideBar, sideBar }) => {
   return (
     <div className="navbar h-16 py-2 w-full flex flex-row items-center pl-2 pr-6 justify-between">
       <div className="relative flex flex-row gap-2 justify-center items-center py-2">
-        {!sideBar && (
+        {!sideBar && currentUser && (
           <BiSidebar onClick={() => setSideBar(true)} className="cursor-pointer" size={30} />
         )}
-        <img src={icon} className='relative object-contain h-10 w-10 mix-blend-multiply' />
-        <div className='flex relative flex-row '>
+        <img src={newlogo} className='relative object-contain h-[140px] w-[140px] mix-blend-multiply' />
+        {/* <div className='flex relative flex-row '>
           <span className='relative text-[#0e2044] text-2xl font-extrabold'>Mars</span>
           <span className='relative text-[#41b655] text-2xl font-extrabold'>AIX</span>
-        </div>
+        </div> */}
       </div>
 
       <div className="relative flex items-center gap-4">

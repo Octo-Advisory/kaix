@@ -21,7 +21,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer } from 'react-toastify';
 
 
-function Settings({onClose}) {
+function Settings({onClose}) {    
     const { currentUser } = useFrappeAuth();
     const { updateDoc } = useFrappeUpdateDoc();
     const { upload } = useFrappeFileUpload();

@@ -4,6 +4,7 @@ import chatReducer from '../Store/Featuresilces/chat'
 import aiReducer from '../Store/Featuresilces/aiResponse'
 import validateReducer from '../Store/Featuresilces/validation'
 import analyticsReducer from '../Store/Featuresilces/analyticsResult'
+import detailsReducer from '../Store/Featuresilces/detailform'
 
 export const store = configureStore({
   reducer: {
@@ -11,6 +12,7 @@ export const store = configureStore({
     chat : chatReducer,
     ai : aiReducer,
     validate : validateReducer,
-    analytics : analyticsReducer
+    analytics : analyticsReducer,
+    details : detailsReducer
   },
 });
