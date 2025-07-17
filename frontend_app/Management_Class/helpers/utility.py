@@ -3,7 +3,11 @@ from datetime import datetime
 import random #added by jenith on 22-5-25
 import subprocess
 import sys
+import json
+import time
 import gc
+import re
+import ast
 # from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers_creative
 
 from langchain_groq import ChatGroq
@@ -19,8 +23,44 @@ groq_api_key = config['Key']['groq_key']
 
 # Initialize LLM    
 llm_70b_vers_creative = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.7)
+llm_4_maverick = ChatGroq(groq_api_key=groq_api_key, model_name="meta-llama/llama-4-maverick-17b-128e-instruct", temperature=0.7) #Added by jenith for Query Hints Ai Responses
 
 
+
+@frappe.whitelist(allow_guest=True)
+def delete_user(user_id):
+    try:
+        frappe.delete_doc('User', user_id, ignore_permissions=True)
+        return {'status': 'success', 'message': 'User deleted'}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+    
+
+@frappe.whitelist()
+def get_docs_with_children(doctype, names):
+    """
+    Universal API to fetch multiple documents with their child tables.
+
+    Args:
+        doctype (str): Parent doctype name (e.g., "Vendor")
+        names (list): List of document names
+
+    Returns:
+        List of dicts representing each document, including child tables
+    """
+    try:
+        results = []
+        names = json.loads(names)
+        for name in names:
+            doc = frappe.get_doc(doctype, name)
+            results.append(doc)
+
+        return results
+
+    except Exception as e:
+        frappe.throw(f"Error fetching {doctype} data: {str(e)}")
+
+ 
 @frappe.whitelist()
 def checkApiThreshold(apiName):
     if apiName == "" or apiName == " " or apiName == None:
@@ -181,7 +221,7 @@ def randomSentences(module_name,process_name):
     selected_list = sentence_map[process_name][module_name]
     return random.choice(selected_list)
  
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def generate_chat_title(user_query):
    
     system_prompt = """
@@ -268,130 +308,207 @@ def generate_chat_title(user_query):
         # Fallback to first 6 meaningful words
         return " ".join([w for w in user_query.split() if w.lower() not in ["how", "what", "the"]][:6])
 
-def generate_followups(query_list):
-    prompt_template = """You are an intelligent assistant that helps users continue their inquiry by suggesting meaningful follow-up questions. Based on the user's current and previous questions (1 to 10), generate 4 thoughtful, relevant, and natural follow-up questions. These questions should reflect what an informed user might logically ask next.
+@frappe.whitelist(allow_guest=True)
+def generate_followups(query_list,industry_name):
+    prompt_template = """You are an intelligent assistant that helps users explore key factors involved in setting up an industry in a specific region in India.
 
-Use concise, clear language. The suggestions should feel like natural extensions of the user's curiosity or goals.
+Your task is to generate 4-5 compact, hint-style follow-up queries that the user might logically ask next.
 
-Here are a few examples:
+You will receive:
+• A list of 5 user query batches, each representing a past chat session  
+• A fallback industry name (used only in rare cases)
 
-Example 1  
-User Questions:  
-1. "How do I check if my business idea is practical?"
-2. "What things should I research before starting a factory?"
-3. "What if my supplier is too far away? How does that affect costs?"
-4. "How do I know if a vendor is trustworthy?"
-5. "How do I find workers for my new factory?"
-6. "Are there enough skilled people in [city] for my business?"
-7. "What's the average salary for factory workers in Gujarat?"
-8. "How long does it take to get factory approvals?"
-9. "Does the government give money to help start businesses?"
-10. "Who do I contact for pollution clearance for my plant?"
+📥 [User Query Sessions]:
+You will be given a list of 5 session-wise query lists:
+• Session 1 – Least recent (oldest)
+• Session 5 – Most recent (latest)
 
-Follow-up Suggestions: 
-1. "What are the most common mistakes people make when checking if their business will work?"
-2. "How can I negotiate better prices or contracts with suppliers once I find them?"
-3. "What training programs are available if local workers need skill upgrades?"
-4. "Can I start any construction or hiring while waiting for approvals?"
-
-Example 2  
-User Questions:  
-1. "Can you explain what a feasibility report does in simple terms?"
-2. "Will I need to train workers or can I hire ready-trained staff?"
-3. "Where can I buy raw materials for my product?"
-4. "How do I find reliable suppliers near my factory?"
-5. "What legal papers do I need to open a manufacturing unit?"
-
-Follow-up Suggestions:  
-1. "What's the difference between a feasibility report and a business plan - do I need both?"  
-2. "If I need to train workers, are there government programs that can help cover the costs?"
-3. "How do I balance quality versus cost when choosing between different suppliers?" 
-4. "What's the typical timeline from submitting paperwork to getting all approvals for a new factory?"
-
-Example 3  
-User Questions:  
-1. "What’s the most common reason for approval delays?"
-2. "Can I hire local workers, or will I need people from other cities?"
-3. "Are there tax benefits for new factories in Gujarat?"
-
-Follow-up Suggestions:  
-1. "What documents should I prepare in advance to avoid common approval bottlenecks?"
-2. "If I need to bring in workers from other cities, what housing or relocation support should I consider?"  
-3. "Do these tax benefits apply differently to foreign investors versus local businesses?" 
-4. "How do the tax benefits compare if I set up in Gujarat versus neighboring states?"
-
-Example 4  
-User Questions:
-1.what approvals should i get to build cement factory in bharuch city of gujarat state?
-
-Follow-up Suggestions:
-1. "What's the typical timeline to get all required approvals for a cement plant in Bharuch, from first application to final clearance?"                 
-2. "Which government departments in Gujarat handle cement factory approvals, and do I need to approach them separately or through a single window?"
-3. "Are there any special environmental or zoning regulations for cement plants near Bharuch's river/industrial zones that differ from other parts of Gujarat?"
-4. "After getting initial approvals, what ongoing compliance reports or renewals will my cement factory need to maintain operational legality?"
-
-Now generate 4 intelligent and useful follow-up questions based on the user's past questions below.
-
-User Questions:  
+Format:
+Session 1: [ ... list of 5–10 queries ... ]  
+Session 2: [ ... ]  
+Session 3: [ ... ]  
+Session 4: [ ... ]  
+Session 5: [ ... ]  
 {query_list}
 
-Follow-up Suggestions:"""
+📥 [Industry Name]:
+{industry_name}
+
+🎯 OBJECTIVE  
+Help the user dive deeper into realistic, decision-relevant aspects of industry setup — such as land availability, vendor options, workforce access, required approvals, and government incentives.
+
+---
+
+✅ GENERATION STRATEGY
+
+1. *RELEVANCE CHECK FIRST (MANDATORY):*
+   • Carefully evaluate each query in all five sessions.
+   • Determine which queries are relevant by checking whether they align with:
+     – Project scope and module capabilities (listed below)
+     – Structure and tone of good example queries
+     – Avoidance of bad example formats, topics, and phrasing
+
+2. *WEIGHTED RELEVANCE STRATEGY:*
+   • Prioritize relevant queries from more recent sessions (descending from Session 5 → 1).
+   • Output must reflect more influence from the *most recent session (Session 5)* than older ones.
+   • However, do *not ignore* earlier sessions entirely — include relevant industry-location pairs from older sessions if not already covered.
+
+3. *OUTPUT DIVERSITY REQUIREMENT:*
+   • Ensure that the generated 7-10 follow-up queries collectively *represent all distinct, relevant industries and locations* found in the query sessions.
+   • Avoid clustering all queries around just one industry or city, unless the user input does so.
+
+4. *FALLBACK MODE (RARE):*
+   • If *none* of the queries across all sessions are relevant, fallback to the provided industry_name.
+   • In this case:
+     – Use realistic city names from Gujarat (Ahmedabad, Surat, Vadodara, Rajkot, Bharuch, etc.)
+     – Each query must include both the fallback industry name and a Gujarat city
+     – Do not use vague location phrasing like “nearby” or “suitable areas”
+
+5. *KEYWORD AWARENESS (ONLY WHEN RELEVANT):*
+   If relevant queries include:
+   • Product quantity and unit (e.g., 100000 tablets)
+   • Specific raw materials
+   • Approval or incentive scheme names
+   • Specific industry types or city names  
+   → Include these meaningfully in output queries.
+
+---
+
+✅ FORMATTING & SCOPE RULES
+
+Each generated query must:
+• Be 10–15 words or fewer  
+• Be compact and non-repetitive  
+• Address one supported topic: land availability, labor access, vendor proximity, approvals, or incentives  
+• Include both *industry and location* (from input) or fallback values  
+• Output must reflect diversity across sessions, especially prioritizing newer sessions  
+
+🚫 STRICT BAD EXAMPLES BLOCKING
+
+DO NOT generate queries that involve:
+• Price or cost (e.g., labor cost)  
+• Raw material quality or checks  
+• Land allocation processes  
+• Workforce skill types (e.g., “engineers”)  
+• Vague location references (e.g., “nearby”, “suitable area”)
+
+🧠 INTERNAL PROJECT AND MODULE SCOPE (REFERENCE ONLY)
+
+— Project Capabilities:
+• Suggest land *availability* based on location and industry  
+• Recommend suppliers (raw materials, equipment) by proximity  
+• Provide labor availability by general skill type  
+• Identify necessary government approvals  
+• Suggest applicable government incentives  
+
+— Module Focus:
+• Build from Scratch: holistic industry setup  
+• Employment: workforce availability  
+• Vendor Search: raw material suppliers  
+• Incentives: industry-location schemes  
+• Approval: industry-level permissions  
+
+— GOOD QUERY STRUCTURE EXAMPLES:
+• What is the vendor availability for cement industry in Vadodara, Gujarat?  
+• Tell me all the incentives available for pharmaceutical industry in Surat city?  
+• What are the employment options around the Anand city?  
+• I want to build a toy factory with 100000 toys capacity?  
+• What are the approvals available for building electrochemical storage unit in Bharuch?
+
+---
+
+📤 OUTPUT FORMAT:
+
+Return only a clean, syntactically correct Python list of 4–5 questions.
+
+NO HEADINGS. NO EXTRA TEXT. NO MARKDOWN.
+
+Each must:
+• Be based on relevant queries across all sessions  
+• Prioritize content from *Session 5*, while ensuring coverage of key elements from Sessions 1–4  
+• Match tone and structure of good examples  
+• Avoid all bad example types and unsupported phrasing
+
+📤 OUTPUT EXAMPLE:
+
+```python
+[
+    "What are the vendor options for pharmaceutical industry in Anand city?",
+    "What land availability exists for cement industry in Ahmedabad?",
+    "Tell me the government incentives for pharmaceutical industry in Gujarat",
+    "What are the labor options for plastic industry in Surat?",
+    "What are the approvals needed for cement industry in Ahmedabad?"
+]
+"""
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", "You are a helpful assistant who suggests relevant follow-up questions."),
         ("human", prompt_template)
     ])
-    
+
     chain = prompt | llm_70b_vers_creative
-    
+
     try:
-        response = chain.invoke({"query_list": query_list})
+        response = chain.invoke({"query_list": query_list, "industry_name":industry_name})
         # return response.content.strip()
         final_response = response.content.strip()
-        # print(final_response)
+      
+        return final_response
     except Exception as e:
-        print(f"Error generating follow-ups: {e}")
         return "Could not generate follow-up questions at this time."
+
+@frappe.whitelist(allow_guest=True) 
+def formatting_input_query_list(raw_nested_list, input_industry_name):
+    # Format sessions as strings
+    user_query_1 = [f"Session {idx}: {session}" for idx, session in enumerate(raw_nested_list, start=1)]
+    query_list_text = "\n".join(user_query_1)
+
+    input_text = generate_followups(query_list=query_list_text, industry_name=input_industry_name)
+    # Extract list portion using regex
+    list_match = re.search(r"\[(.*?)\]", input_text, re.DOTALL)
+    if not list_match:
+        print("⚠ No valid list found in model output")
+        return []
+
+    list_str = "[" + list_match.group(1).strip() + "]"
+
+    # Parse result
+    try:
+        questions_list = ast.literal_eval(list_str)
+        return questions_list
+    except Exception as e:
+        return e
+
+def log_to_file(key,value):
+    """
+    Logs key-value data to a file with a timestamp.
     
-    def qwerty(input_string):
-
-        lines = input_string.split('\n')
-
-        questions = []
-
-        for line in lines:
-            # Checking if line starts with a number (for numbered questions)
-            if line.strip() and line.strip()[0].isdigit():
-                # to Find the opening and closing quotes
-                start = line.find('"') + 1  # +1 to skip the opening quote
-                end = line.rfind('"')       # to find the last quote
-                
-                # Extract the question between the quotes
-                if start != -1 and end != -1:
-                    question = line[start:end]
-                    questions.append(question)
-
-        return questions 
+    :param filename: Name of the log file.
+    :param data: Key-value pairs to log.
+    """
+    log_entry = {
+        "t": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        f"{key}" : value
+    }
     
-    return qwerty(final_response)
-
-user_query = ["what approvals should i get to build cement factory in bharuch city of gujarat state?"]
-no_user_query = []
-
-if len(user_query) > 0:
-    follow_ups = generate_followups(user_query)
-else:
-    no_user_query
-print("Suggested follow-up questions:\n", follow_ups)
-
+    with open("log2.txt", "a", encoding="utf-8") as file:
+        file.write(json.dumps(log_entry) + "\n")
 
 @frappe.whitelist()
-def excute_Property_Creation():
+def excute_Property_Creation(method_name=None,param=None,childBlockId=None):
     python_exe = "/home/mars/property_seg_env/bin/python"
     script_path = "/home/mars/frappe-bench/AeroShape/FinalCode.py"
+
+    # Build args safely
+    args = [python_exe, script_path, method_name]
+    if param is not None:
+        args.append(str(param))  # Ensure it's a string
+    if childBlockId is not None:
+        args.append(str(childBlockId))  # Ensure it's a string
+    
     try:
         result = subprocess.run(
-            [python_exe, script_path],
+            args,
             check=True,
             capture_output=True,
             text=True,
@@ -404,6 +521,10 @@ def excute_Property_Creation():
         return f"Error running script: {e.stderr}"
 
 @frappe.whitelist()
-def trigger_script():
-    frappe.enqueue('frontend_app.Management_Class.helpers.utility.excute_Property_Creation', queue='long', job_name="Property Creation Job")
+def trigger_script(method_name=None,param=None,childBlockId=None):    
+    frappe.enqueue('frontend_app.Management_Class.helpers.utility.excute_Property_Creation', queue='long', job_name="Property Creation Job",method_name=method_name,param=param,childBlockId=childBlockId)    
     return "excute_Property_Creation executed successfully"
+
+@frappe.whitelist()
+def UpdatePropertySegStatus(message):
+    frappe.publish_realtime('Property_Seg_Status_Update', {'message': message})

@@ -25,20 +25,20 @@ function Details() {
   const handleClose = () => {
     dispatch(setIsOpen(false));
     dispatch(resetForm());
-    setCharCount(0);
+    setCharCount(0);  
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await createDoc("Lead", {
-        first_name: formData.name,
-        email_id: formData.email,
-        mobile_no: formData.mobile,
+      await createDoc("AIX Diagnostics Hub", {
+        full_name: formData.name,
+        email: formData.email,
+        mobile: formData.mobile,
         status: 'Open',
-        custom_lead_category: formData.helpCategory,
-        description: formData.description // optional
+        type: formData.helpCategory,
+        note: formData.description // optional
       });
     } catch (err) {
       console.error("Error Creating User:", err);

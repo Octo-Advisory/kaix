@@ -7,7 +7,7 @@ import { clearAnalyticsResult } from '../../Redux/Store/Featuresilces/analyticsR
 import { useFrappeAuth, useFrappeDeleteDoc, useFrappeGetDocList, useFrappeUpdateDoc } from 'frappe-react-sdk';
 import { removeVendorResult } from '../../Redux/Store/Featuresilces/validation';
 
-function Backtochat() {
+function Backtochat({text}) {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const chatId = useSelector((state) => state.chat.chatID);
@@ -64,7 +64,7 @@ function Backtochat() {
         // } catch (err) {
         //     console.error("Error Updating:", err);
         // }
-       sessionStorage.removeItem("guest_session_id"); 
+       sessionStorage.removeItem("guest_session_id");
        if (latestChatId && currentUser) {
             await clearProgressAndIntention(latestChatId);
             setTimeout(() => {
@@ -83,7 +83,7 @@ function Backtochat() {
                     className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#0e2044] to-[#41b655] text-white rounded-lg shadow-md hover:bg-blue-600 transition"
                     onClick={handleClick}
                 >
-                    <FaArrowLeft /> Back to Chat
+                    <FaArrowLeft /> {text}
                 </button>
             </div></>
     )

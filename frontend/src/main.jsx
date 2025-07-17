@@ -23,9 +23,9 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <FrappeProvider socketPort={import.meta.env.VITE_SOCKET_PORT} siteName={getSiteName()}>
       <Provider store={store}>
-        <ErrorBoundary>
+        {/* <ErrorBoundary> */}
           <App />
-        </ErrorBoundary>
+        {/* </ErrorBoundary> */}
       </Provider>
     </FrappeProvider>
   </StrictMode>

@@ -739,7 +739,8 @@ def handle_employment_query(
             "Extracted Data": None,
             "Validation Data": None,
             "User Intention": user_intention,
-            "KEYWORDS": None
+            "KEYWORDS": None,
+            "options": None
         }
         return response
     else:
@@ -769,33 +770,49 @@ def handle_employment_query(
 
                 if area == "Not Available in List":
                     response = {
-                        "Ai_response": "Not Available In List",
+                        "Ai_response": "Not Available in List",
                         "Is_confirmation" : None,
                         "Extracted Data": classification_data_to_send,
                         "Validation Data": validated_data_to_send,
                         "User Intention": user_intention,
-                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                        "KEYWORDS": keyword_dict["KEYWORDS"],
+                        "options": None
                     }
                     return response
                 
                 elif area in city_to_area_mapping_val_list:
                     parent_city = next((key for key, value in city_to_area_mapping.items() if area in value), None)
                     parent_state = next((key for key, value in state_to_city_mapping.items() if parent_city in value), None)
-                    context = f"Employment status details are available for {parent_city}, which encompasses the area of {area}. Would you like to view the information for {parent_city}?"
-                    message = generate_dynamic_message(Chat_history_normal,context, refined_user_input,llm_70b_vers_creative,chatId=chatId)
+                    confirmation_message_employment_context_1 = (
+                        f"Employment insights are available for **{parent_city}**, which includes your area **{area}**. <br/><br/>"
+                        f"Would you like to view the employment data for **{parent_city}**?"
+                    )
+
+                    # Append AI message to chat history
+                    chat_history.append(AIMessage(content=f"{confirmation_message_employment_context_1}"))
+                    # logging.info(f"actual aarray3 {chat_history}")
+                    save_chat(chat_history,f"chat_{chatId}")
+                    # message = generate_dynamic_message(Chat_history_normal,context, refined_user_input,llm_70b_vers_creative,chatId=chatId)
                     classification_data_to_send["Area"] = []
                     classification_data_to_send["City"] = [parent_city,]
                     classification_data_to_send["State"] = [parent_state,]
                     validated_data_to_send["Area"] = []
                     validated_data_to_send["City"] = [parent_city,]
                     validated_data_to_send["State"] = [parent_state,]
+
+                    confirmation_buttons = [
+                        {"label": "Yes, show employment data", "value": user_intention},
+                        {"label": "No, this doesn’t apply to me", "value": None}
+                    ]
+
                     response = {
-                        "Ai_response": message,
+                        "Ai_response": confirmation_message_employment_context_1,
                         "Is_confirmation" : True,
                         "Extracted Data": classification_data_to_send,
                         "Validation Data": validated_data_to_send,
                         "User Intention": user_intention,
-                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                        "KEYWORDS": keyword_dict["KEYWORDS"],
+                        "options": confirmation_buttons,
                     }
                     return response
 
@@ -806,7 +823,8 @@ def handle_employment_query(
                         "Extracted Data": None,
                         "Validation Data": None,
                         "User Intention": user_intention,
-                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                        "KEYWORDS": keyword_dict["KEYWORDS"],
+                        "options": None
                     }
                     return response
 
@@ -822,7 +840,8 @@ def handle_employment_query(
                         "Extracted Data": classification_data_to_send,
                         "Validation Data": validated_data_to_send,
                         "User Intention": user_intention,
-                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                        "KEYWORDS": keyword_dict["KEYWORDS"],
+                        "options": None
                     }
                     return response
 
@@ -834,16 +853,25 @@ def handle_employment_query(
                     validated_data_to_send["Area"] = []
                     validated_data_to_send["City"] = [city,]
                     validated_data_to_send["State"] = [parent_state,]
-                    context = f"We have identified the city as {city} and the state as {parent_state} based on your query. Please confirm if this information is correct"
-                    message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
+                    confirmation_message_employment_context_2 = (
+                        f"Based on your query, we’ve identified the location as **{city}, {parent_state}**. <br/><br/>"
+                        f"Please confirm if this is correct so we can show you the relevant employment data."
+                    )
+
+                    # message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
                     # frappe.error_log(f"new generated message is {message}")
+                    confirmation_buttons = [
+                        {"label": "Yes, that’s correct", "value": user_intention},
+                        {"label": "No, I want to update the location", "value": None}
+                    ]
                     response = {
-                        "Ai_response": message,
+                        "Ai_response": confirmation_message_employment_context_2,
                         "Is_confirmation" : True,
                         "Extracted Data": classification_data_to_send,
                         "Validation Data": validated_data_to_send,
                         "User Intention": user_intention,
-                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                        "KEYWORDS": keyword_dict["KEYWORDS"], 
+                        "options": confirmation_buttons
                     }
                     return response
             
@@ -854,7 +882,8 @@ def handle_employment_query(
                         "Extracted Data": None,
                         "Validation Data": None,
                         "User Intention": user_intention,
-                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                        "KEYWORDS": keyword_dict["KEYWORDS"],
+                        "options": None
                     }
                     return response
 
@@ -868,20 +897,32 @@ def handle_employment_query(
                         "Extracted Data": classification_data_to_send,
                         "Validation Data": validated_data_to_send,
                         "User Intention": user_intention,
-                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                        "KEYWORDS": keyword_dict["KEYWORDS"],
+                        "options": None
                     }
                     return response
 
                 elif city == "None":
-                    context = f"We have identified the state as {state} based on your query. Please confirm if this information is correct"
-                    message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
+                    confirmation_message_employment_context_3 = (
+                        f"Based on your query, we’ve identified the state as **{state}**. <br/><br/>"
+                        f"Please confirm if this is correct so we can provide relevant employment insights."
+                    )
+
+                    # message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
+                    
+                    confirmation_buttons = [
+                        {"label": "Yes, that’s correct", "value": user_intention},
+                        {"label": "No, I want to update the location", "value": None}
+                    ]
+                    
                     response = {
-                        "Ai_response": message,
+                        "Ai_response": confirmation_message_employment_context_3,
                         "Is_confirmation" : True,
                         "Extracted Data": classification_data_to_send,
                         "Validation Data": validated_data_to_send,
                         "User Intention": user_intention,
-                        "KEYWORDS": keyword_dict["KEYWORDS"]
+                        "KEYWORDS": keyword_dict["KEYWORDS"],
+                        "options": confirmation_buttons
                     }
                     return response
 
@@ -896,7 +937,8 @@ def handle_employment_query(
                     "Extracted Data": None,
                     "Validation Data": None,
                     "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
+                    "KEYWORDS": keyword_dict["KEYWORDS"],
+                    "options": None
                 }
                 return response
             
@@ -918,7 +960,8 @@ def handle_employment_query(
                     "Extracted Data": None,
                     "Validation Data": None,
                     "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
+                    "KEYWORDS": keyword_dict["KEYWORDS"],
+                    "options": None
                 }
                 return response
             
@@ -941,15 +984,26 @@ def handle_employment_query(
                     locations_str = ', '.join(locations_list[:-1]) + f", and {locations_list[-1]}"
                 
                 # Construct the confirmation message
-                message = f"Kindly confirm if you are seeking to compare the employment status between {locations_str}."
-                confirmation_message = generate_dynamic_message(Chat_history_normal, message,refined_user_input, llm_70b_vers_creative,chatId=chatId)
+                confirmation_message_employment_context_4 = (
+                    f"You're looking to compare employment insights between the following locations: **{locations_str}**. <br/><br/>"
+                    f"Shall we proceed with the comparison?"
+                )
+
+                # confirmation_message = generate_dynamic_message(Chat_history_normal, message,refined_user_input, llm_70b_vers_creative,chatId=chatId)
+                
+                confirmation_buttons = [
+                    {"label": "Yes, proceed with the comparison", "value": user_intention},
+                    {"label": "No, I want to modify the locations", "value": None}
+                ]
+                
                 response = {
-                    "Ai_response": confirmation_message,
+                    "Ai_response": confirmation_message_employment_context_4,
                     "Is_confirmation" : True,
                     "Extracted Data": classification_data_to_send,
                     "Validation Data": validated_data_to_send,
                     "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
+                    "KEYWORDS": keyword_dict["KEYWORDS"],
+                    "options": confirmation_buttons
                 }
                 return response
         
@@ -962,7 +1016,8 @@ def handle_employment_query(
                     "Extracted Data": None,
                     "Validation Data": None,
                     "User Intention": user_intention,
-                    "KEYWORDS": keyword_dict["KEYWORDS"]
+                    "KEYWORDS": keyword_dict["KEYWORDS"],
+                    "options": None
                 }
             return response
     

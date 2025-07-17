@@ -78,3 +78,22 @@
   border-radius: 3px;
 }
 
+
+.map-container {
+  perspective: 1000px;
+}
+
+.map-3d {
+  transform: rotateX(30deg) rotateY(10deg) scale(1.05);
+  transform-origin: center;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform 0.5s ease, box-shadow 0.5s ease;
+}
+.map-3d:hover {
+  transform: rotateX(25deg) rotateY(15deg) scale(1.1);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+}
+
+

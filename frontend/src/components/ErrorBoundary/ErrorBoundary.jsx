@@ -2,6 +2,7 @@
 import React from 'react';
 import { useDispatch } from 'react-redux';
 import { setFormData, setIsOpen } from '../../Redux/Store/Featuresilces/detailform';
+import FailureScreen from '../Failure/FailureScreen';
 
 class ErrorBoundaryClass extends React.Component {
   constructor(props) {
@@ -18,7 +19,9 @@ class ErrorBoundaryClass extends React.Component {
   }
 
   render() {
-    return this.state.hasError ? null : this.props.children;
+
+    // return this.state.hasError ? null : this.props.children;
+    return this.state.hasError ? <FailureScreen /> : this.props.children;
   }
 }
 

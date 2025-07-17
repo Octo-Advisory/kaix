@@ -1,8 +1,8 @@
-import React, { useContext, useEffect, useState,useRef } from 'react';
-import { AiOutlineClear, AiOutlineSend } from 'react-icons/ai'; // React Icons
+import React, { useContext, useEffect, useState, useRef } from 'react';
+import { AiOutlineClear, AiOutlineConsoleSql, AiOutlineSend } from 'react-icons/ai'; // React Icons
 import { FiSend } from 'react-icons/fi';
 import { useDispatch, useSelector } from 'react-redux';
-import { addChatId, addMessage } from '../../Redux/Store/Featuresilces/chat';
+import { addChatId, addInputtext, addLastResultId, addMessage } from '../../Redux/Store/Featuresilces/chat';
 import botLogo1 from '../../assets/New Symbol.png';
 import useChatScroll from '../Hooks/useChatScroll'; // Import the hook
 import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
@@ -11,15 +11,45 @@ import userIcon from '../../assets/MarsAIX person icon.png'
 import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
 import { FrappeContext, useFrappeAuth, useFrappeCreateDoc, useFrappeGetDoc, useFrappeGetDocList, useFrappeUpdateDoc } from 'frappe-react-sdk'
-import { addAIresponse, clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
+import { addAIresponse, addSelectedoption, clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
 import { addResult } from '../../Redux/Store/Featuresilces/validation'
 import { replace, useLocation, useNavigate, useParams } from "react-router-dom";
 import Details from '../Details/Details';
 import { BiSidebar } from "react-icons/bi";
-import { IoSearch } from "react-icons/io5";
+import { IoEllipseSharp, IoSearch } from "react-icons/io5";
 import SideBar from '../SideBar/SideBar';
-import { FaThumbsUp, FaThumbsDown } from "react-icons/fa6";
+import { FaThumbsUp, FaThumbsDown, FaRegCopy, FaArrowsRotate } from "react-icons/fa6";
 import { resetForm, setFormData, setIsOpen } from '../../Redux/Store/Featuresilces/detailform';
+import { all } from 'axios';
+import rehypeRaw from 'rehype-raw';
+import { FaExternalLinkAlt } from 'react-icons/fa';
+import { PiCopyBold } from 'react-icons/pi';
+import { marked } from 'marked';
+
+
+// const TypewriterMarkdown = ({ text, speed = 20 }) => {
+//   const [displayed, setDisplayed] = useState('');
+//   const [index, setIndex] = useState(0);
+//   const html = marked.parse(text); // Convert markdown to HTML
+
+//   useEffect(() => {
+//     if (index < html.length) {
+//       const timeout = setTimeout(() => {
+//         setDisplayed(html.slice(0, index + 1));
+//         setIndex(index + 1);
+//       }, speed);
+//       return () => clearTimeout(timeout);
+//     }
+//   }, [index, html, speed]);
+
+//   return (
+//     <div
+//       className="prose prose-sm text-black" // Optional: Tailwind prose for better markdown look
+//       dangerouslySetInnerHTML={{ __html: displayed }}
+//     />
+//   );
+// };
+
 
 function Chatscreen() {
   const [showDetails, setShowDetails] = useState(false);
@@ -29,6 +59,7 @@ function Chatscreen() {
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.chat.messages);
   const chatId = useSelector((state) => state.chat.chatID);
+  const addInput = useSelector((state)=>state.chat.addInput)
   const [loading, setLoading] = useState(false);
   const [disabled, setDisabled] = useState(false);
   const { createDoc, isLoading, error } = useFrappeCreateDoc('');
@@ -40,6 +71,8 @@ function Chatscreen() {
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const [hintsArray, setHintsArray] = useState([])
+  const [tempButtons, setTempButtons] = useState(['Yes', 'No'])
   const navigate = useNavigate();
   let { sessionId } = useParams();
   const location = useLocation();
@@ -49,6 +82,12 @@ function Chatscreen() {
   if (!sessionId && !currentUser) {
     sessionId = sessionStorage.getItem("guest_session_id")
   }
+
+  useEffect(() => {
+    if(addInput){
+      setMessage(addInput)
+    }
+  }, [addInput])
 
   useEffect(() => {
     const handleBeforeUnload = (event) => {
@@ -121,63 +160,6 @@ function Chatscreen() {
     }
   };
 
-  const handleSendbtn1 = async () => {
-    if (message.trim()) {
-      const newUserMessage = {
-        sender: 'user',
-        text: message,
-        timestamp: new Date().toISOString(),
-      };
-
-      dispatch(addMessage(newUserMessage));
-      setMessage('');
-      setLoading(true)
-      setDisabled(true)
-
-      const resp = await fetchAIResponse(message, "", chatId);
-      console.log("ai response is", resp);
-      const aiResponse = resp.Ai_response
-      console.log("reponse is", aiResponse);
-
-      if (resp.Is_confirmation) {
-        setLoading(false)
-        const aiResponse1 = "Waiting For Confirmation"
-        const newAIMessage = {
-          sender: 'ai',
-          text: aiResponse1,
-          timestamp: new Date().toISOString(),
-        };
-        dispatch(addMessage(newAIMessage));
-        dispatch(addAIresponse(resp))
-        setConfirmationMessage(aiResponse);
-        setConfirmationPending(true);
-        setLoading(false);
-        setDisabled(true);
-        return;
-      }
-
-      let index = -1;
-      setLoading(false)
-      const typingInterval = setInterval(() => {
-        setPartialResponse((prev) => prev + aiResponse.charAt(index));
-        index++;
-        if (index >= aiResponse.length) {
-          clearInterval(typingInterval);
-          const newAIMessage = {
-            sender: 'ai',
-            text: aiResponse,
-            timestamp: new Date().toISOString(),
-          };
-          dispatch(addMessage(newAIMessage));
-          setPartialResponse(''); // Clear partial response
-          setDisabled(false);
-        }
-      }, 5);
-
-
-    }
-  };
-
   const validationCall = async (aiResponse, user_intension) => {
     try {
       const result = await call.get("frontend_app.Validations.validate.validation", {
@@ -188,7 +170,6 @@ function Chatscreen() {
       return result.message
     } catch (error) {
       console.log("error 🤣", error);
-
     }
   }
 
@@ -228,58 +209,87 @@ function Chatscreen() {
     }
   };
 
-
   const { updateDoc } = useFrappeUpdateDoc()
 
-  const handleConfirmation = async (response) => {
+  const  handleConfirmation = async (label,response) => {
+    console.log('response',response, 'label',label)
     setConfirmationPending(false);
     const confirmationMessages = {
       sender: 'user',
-      text: response === 'yes' ? 'Yes' : 'No',
+      // text: response === 'yes' ? 'Yes' : 'No',
+      text: response, //confirmation required
       timestamp: new Date().toISOString(),
     };
     dispatch(addMessage(confirmationMessages));
 
-    if (response == 'yes') {
+    if (label !== 'Refine Requirements' && !label?.startsWith('No') && label) {
       let currentSession = session
 
       // STEP 1: Save user's message with idx
       const idx = chatHistory.length + 1;
       const chatEntry = await createDoc("Chat history", {
-        user: 'Yes',
+        // user: 'Yes',
+        user: label,
         parent: currentSession,
         parentfield: "chat_history",
         parenttype: "Session",
         idx,
-      });
-
+      }); 
+      console.log(chatEntry,'this is the updated Doc chat history')
       if (!chatEntry.name) throw new Error("Failed to save user message");
 
+      await handleConfirmationHints()
       mutate(); // Refresh UI to show user message
       setLoading(true);
 
-      // STEP 2: Get AI response
-      const validationResult = await hanldeValidation()
-      console.log("validation result from chatscreen", validationResult);
-      const aiResp = validationResult && validationResult.length > 0
-        ? (validationResult[0] ? "Thank you for your response" : "We have your query, we will get back to you soon.")
-        : "We have your query, we will get back to you soon.";
+      const res = await hanldeValidation();
+      console.log("validation result from chatscreen", res);
+
+      let pass = false, log = null;
+
+      if (Array.isArray(res)) {
+        pass = res[0];
+        const second = res[1];
+        log = typeof second === 'string' ? second : second?.log;
+      } else if (res && typeof res === 'object') {
+        pass = res.pass_to_analytics;
+        log = res.log;
+      }
+
+      const aiResp = pass
+        ? "Thank you for your response"
+        : "We have your query, we will get back to you soon..";
+
+      if (!pass && log) {
+        // handleOpenHelp();
+        setDisabled(false);
+        await createDoc("AIX Diagnostics Hub", {
+          type: "Validation Error",
+          note: log,
+          session: sessionId,
+          chat_name: chatEntry.name || ''
+        });
+      }
+
+
 
       // STEP 3: Update that row with AI response
       await updateDoc("Chat history", chatEntry.name, {
         ai: aiResp
       });
-
-      mutate(); // Show updated AI message
+      mutate(); // Show updated AI message  
       setLoading(false);
       // if (validationResult[0]) {
+      dispatch(addSelectedoption(response))
       navigate(`/progress/${sessionId}`);
+    // }
     } else {
       let currentSession = session;
       // STEP 1: Save user's message with idx
       const idx = chatHistory.length + 1;
       const chatEntry = await createDoc("Chat history", {
-        user: "No",
+        // user: "No",
+        user: label,
         parent: currentSession,
         parentfield: "chat_history",
         parenttype: "Session",
@@ -300,6 +310,11 @@ function Chatscreen() {
           ai: aiResponse || "Waiting For Confirmation"
         });
 
+        if(resp.options && resp.options.length > 1) {
+          console.log(resp.options, 'this is in confirmation');
+          
+          setTempButtons(resp.options)
+        }
         mutate();
         setLoading(false);
         setConfirmationMessage(aiResponse);
@@ -332,16 +347,12 @@ function Chatscreen() {
     fields: ['user_intension', 'chat_json'],
     filters: [['name', '=', session]]
   })
-  const { data: hints } = useFrappeGetDocList("Session", {
-          fields: ['*'],
-          filters: [['user', '=', currentUser]],
-          limit:5,
-          orderBy: { field: 'creation', order: 'desc' },
-      });
+
   const chatHistory = data?.chat_history || [];
   console.log("data is", chatHistory);
 
   const handleSendbtn = async (msg) => {
+    // await CheckToCallHints()
     if (!message.trim() && !msg.trim()) return;
 
     const userMessage = msg ? msg.trim() : message.trim();
@@ -356,8 +367,10 @@ function Chatscreen() {
         const sessionResp = await createDoc("Session", { time: nowTime, user: currentUser || '' });
         if (!sessionResp.name) throw new Error("Failed to create session");
         setSession(sessionResp.name);
+        // dispatch(addChatId(sessionResp.name))
         currentSession = sessionResp.name;
         mutate();
+        hintsMutate()
         intensionMutate();
 
         if (currentUser) {
@@ -381,13 +394,17 @@ function Chatscreen() {
       });
 
       if (!chatEntry.name) throw new Error("Failed to save user message");
+      dispatch(addLastResultId(chatEntry.name))
 
       mutate(); // Refresh UI to show user message
       intensionMutate();
+      hintsMutate()
       setLoading(true);
+      setDisabled(true) //added now 
 
       // STEP 2: Get AI response
       const resp = await fetchAIResponse(userMessage, "", currentSession);
+      console.log("ai response",resp)
       const aiResponse = resp.Ai_response;
 
       if (resp.Is_confirmation) {
@@ -395,6 +412,10 @@ function Chatscreen() {
           ai: aiResponse || "Waiting For Confirmation"
         });
 
+        if(resp.options && resp.options.length > 1) {
+          console.log(resp.options, 'this is in handle')
+          setTempButtons(resp.options)
+        }
         mutate();
         intensionMutate();
         setLoading(false);
@@ -402,6 +423,7 @@ function Chatscreen() {
         dispatch(addAIresponse(resp))
         setConfirmationPending(true);
         setDisabled(true);
+        processChat()
         return;
       }
 
@@ -413,6 +435,11 @@ function Chatscreen() {
       mutate(); // Show updated AI message
       intensionMutate();
       setLoading(false);
+      processChat()
+      setDisabled(false) // added now
+      // await processChat()
+      
+
 
     } catch (error) {
       console.error("Error sending message:", error);
@@ -429,12 +456,13 @@ function Chatscreen() {
         try {
           const parsedArray = JSON.parse(rawJson);
           const title_to_update = getLastMeaningfulMessage(parsedArray);
-          title = intension === "Valueless queries"
+          const isInvalidIntention = !intension || intension === "Valueless queries";
+
+          title = isInvalidIntention
             ? "New Chat"
             : title_to_update
               ? await fetchHistoryTitle(title_to_update)
-              : 'New Chat';
-          console.log("Title:", title);
+              : "New Chat";
         } catch (e) {
           console.error("Invalid JSON format", e);
         }
@@ -455,12 +483,170 @@ function Chatscreen() {
     }
   }, [userintension]);
 
-  useEffect(()=>{
-    //Getting the past 5 sessions for Preparing Hints
-    if(hints){
-      const data = hints?.[0]
+  // The below will fetch the query hints
+  const { data: queryHints, isLoading: hintsLoading } = useFrappeGetDocList('Session', {
+    limit: 3,
+    filters: [['user', '=', currentUser]],
+    fields: ['query_hints', 'modified'],
+    orderBy: { field: 'modified', order: 'desc' },
+  })
+  //The below will be used to get previous sessions chats and update in current session
+  const { data: hints, isLoading: queriesLoading, mutate:hintsMutate } = useFrappeGetDocList("Session", {
+    fields: ['chat_json', 'modified', 'name'],
+    filters: [['user', '=', currentUser]],
+    limit: 5,
+    orderBy: { field: 'modified', order: 'desc' },
+  });
+   
+
+const processChat = async () => {
+  console.log('Got in the Process Chats.........')
+  let latestData = await mutate()
+  console.log(latestData, 'this are the chats ',session)
+  if (latestData && latestData.chat_json && session) {
+    const parsedChat = JSON.parse(latestData.chat_json);
+  // const refinedData = addMethodCalledIfHuman(parsedChat);
+  // console.log('This is our Refined Chat', parsedChat);
+  checkAndUpdateTriggerPoints(parsedChat, session);
+
+  }
+};
+
+const updateHints =async (from)=>{
+  let latestHints = await hintsMutate()
+  if(!latestHints) { return }
+  let allData = latestHints.map(session => {
+      const chatArray = JSON.parse(session.chat_json || '[]');
+      // Step 1: Start from end, collect last 10 human messages
+      const result = [];
+      for (let i = chatArray.length - 1; i >= 0 && result.length < 10; i--) {
+        const item = chatArray[i];
+        if (item.type === "human" && item.content) {
+          result.unshift(item.content);
+        }
+      }
+      return result;
+    }).reverse();
+  let industry = userDoc ? userDoc?.bio : 'Cement'
+  console.log('INPUT PASSED IN HINTS METHOD CALL', industry, allData)
+  let responseHints = await fetchHints(allData,industry)
+  
+  if (session && responseHints) {
+    try {
+      const res = await updateDoc("Session", session, {
+        query_hints: JSON.stringify(responseHints)
+      });
+      console.log(res, "Query Hints Updated for the Session .....✅");
+      if(from==='confirmation'){
+        const sessionDoc = await mutate();
+        let chatArray = JSON.parse(sessionDoc.chat_json || '[]');
+        // Reverse loop to find latest human message with method_called === 0 or missing
+        for (let i = chatArray.length - 1; i >= 0; i--) {
+          let msg = chatArray[i];
+          if (msg.type === "human" && (msg.method_called === 0 || msg.method_called === undefined)) {
+            chatArray[i].method_called = 1;
+            break; // only update the latest one
+          }
+        }
+
+        // Save updated chat_json
+        await updateDoc("Session", session, {
+          chat_json: JSON.stringify(chatArray)
+        });
+        return true
+      }
+      return true
+    } catch (error) {
+      console.error("❌ Error updating Session hints or method_called:", error);
+      return false
+    }   
+   
+  }
+}
+
+const handleConfirmationHints = async()=> {
+  let hintsUpdated = await updateHints('confirmation')
+  hintsUpdated ? console.log('QUERY HINTS UPDATED FOR COnFiRMATION....✅...') : console.log('Hints are Not Updated on Confirmation...❌')
+}
+
+  
+function addMethodCalledIfHuman(data, methodValue = 0) {
+  return data.map(item => {
+    if (item.type === "human" && !item.hasOwnProperty("method_called")) {
+      return { ...item, method_called: methodValue };
     }
-  },[hints])
+    return item;
+  });
+}
+
+const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
+  let consecutiveZeros = 0;
+  let zeroIndexes = [];
+
+  for (let i = chatArray.length - 1; i >= 0; i--) {
+    const msg = chatArray[i];
+
+    if (msg.type === "human") {
+      if (msg.method_called === 1) {
+        // Stop entirely if any 1 is found
+        break;
+      }
+
+      if (msg.method_called === 0) {
+        consecutiveZeros++;
+        zeroIndexes.unshift(i); // Keep index in original array order
+      }
+
+      if (consecutiveZeros === 3) {
+        console.log("🔁 Triggering update due to 3 consecutive method_called: 0 at indexes:", zeroIndexes);
+
+        const updatedIndex = zeroIndexes[2]; // The last (i.e., oldest) of the 3 zeroes
+
+        chatArray[updatedIndex].method_called = 1;
+
+        try {
+          console.log('Calling the update function for Chat Count')
+          const response = await updateHints('Chat');
+          if (response) {
+            const res = await updateDoc("Session", sessionName, {
+              chat_json: JSON.stringify(chatArray),
+            });
+            console.log(res, "✅ Chat JSON Updated for Hints (from message counts)");
+          }
+        } catch (error) {
+          console.error("❌ Failed to update chat_json in Session:", error);
+        }
+
+        break; // Stop after triggering update
+      }
+    }
+  }
+}
+
+
+
+  useEffect(() => {
+    //default hints
+    let temp = ["I'm planning a 1 MTPA cement manufacturing unit in Bharuch ", "List approvals needed to start a food processing unit in Gujarat", "List all licenses required to start a textile unit in Vadodara", "What benefits does Gujarat offer for toy manufacturing startups?"]
+    if (!hintsLoading) {
+      let foundHints = null;
+      // Go through each record and check for valid query_hints
+      for (const record of queryHints) {
+        try {
+          const parsed = JSON.parse(record.query_hints);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            foundHints = parsed;
+            break;
+          }
+        } catch (e) {
+          // Not valid JSON or empty — move to next
+          continue;
+        }
+      }
+      // Set hintsArray in state
+      setHintsArray(foundHints || temp);
+    }
+  }, [hintsLoading, queryHints])
 
   function getLastMeaningfulMessage(chatArray) {
     if (!Array.isArray(chatArray)) return null;
@@ -493,16 +679,16 @@ function Chatscreen() {
     }
   }
 
-  const fetchHints = async (queries) => {
+  const fetchHints = async (queries,industry) => {
     try {
-      const result = await call.get("frontend_app.Management_Class.helpers.utility.generate_followups", {
-        'query_list': queries,
+      const result = await call.get("frontend_app.Management_Class.helpers.utility.formatting_input_query_list", {
+        'raw_nested_list': queries,
+        'input_industry_name': industry
       });
       console.log("Got the Hint Statements", result);
       return result.message;
     } catch (err) {
       console.log("error occurred in Hint Statment Function😂", err);
-      throw err;  // Rethrow the error if you want to catch it in the caller function.
     }
   }
 
@@ -522,45 +708,14 @@ function Chatscreen() {
       storeLatestChatInChildTable();
     }
   }, [messages]);
-
-  // useEffect(() => {
-  //   if (messages.length === 0 && !chatId) {
-  //     createSessionid();
-  //     // return;    
-  //   }
-  // }, [])
-
-  // useEffect(() => {
-  //   const suggestion = suggestions[suggestionIndex];
-
-  //   if (!isDeleting && charIndex < suggestion.length) {
-  //     const timeout = setTimeout(() => {
-  //       setPlaceholder(suggestion.substring(0, charIndex + 1));
-  //       setCharIndex(charIndex + 1);
-  //     }, 50);
-  //     return () => clearTimeout(timeout);
-  //   } else if (isDeleting && charIndex > 0) {
-  //     const timeout = setTimeout(() => {
-  //       setPlaceholder(suggestion.substring(0, charIndex - 1));
-  //       setCharIndex(charIndex - 1);
-  //     }, 30);
-  //     return () => clearTimeout(timeout);
-  //   } else if (!isDeleting && charIndex === suggestion.length) {
-  //     setTimeout(() => setIsDeleting(true), 1000);
-  //   } else if (isDeleting && charIndex === 0) {
-  //     setIsDeleting(false);
-  //     setSuggestionIndex((prev) => (prev + 1) % suggestions.length);
-  //   }
-  // }, [charIndex, suggestionIndex, isDeleting]);
-
-  // const ref = useChatScroll(messages);
-  const chatRef  = useRef(null)
-   useEffect(() => {
+  
+  const chatRef = useRef(null)
+  useEffect(() => {
     if (chatRef.current) {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }
   }, [chatHistory]);
-  const [sideBar, setSideBar] = useState(false)
+  const [sideBar, setSideBar] = useState(true)
 
   const renderUserAvatar = (sender) => {
     const isCurrentUser = sender === 'user';
@@ -604,8 +759,6 @@ function Chatscreen() {
 
   useEffect(() => {
     // Validate session ID if provided in URL
-    console.log("rveerv");
-
     if (sessionId) {
       console.log("user", currentUser);
 
@@ -670,9 +823,18 @@ function Chatscreen() {
   }, [])
 
   const handleOpenHelp = () => {
-    dispatch(setFormData({ description: "I need help with my invoice." }));
+    dispatch(setFormData({ description: "I need help." }));
     dispatch(setIsOpen(true));
   };
+
+  const textAreaRef = useRef(null)
+  const handleHintClick = (hint) => {
+    setMessage(hint);            // 👈 set the message from hint
+    textAreaRef.current?.focus(); // 👈 move cursor to textarea
+  };
+  const handlerenderresult = (msg) => {
+    window.open(`/frontend/result?session=${sessionId}&name=${msg.name}`, '_blank')
+  }
 
   return (
     <div className='h-screen w-screen relative flex flex-row '>
@@ -680,6 +842,7 @@ function Chatscreen() {
       <div className="h-screen flex flex-col items-center w-full transition-width duration-300 ease-in-out main-screen">
         <Navbar setSideBar={setSideBar} sideBar={sideBar} />
         <div className="flex-1 overflow-y-auto p-4 flex justify-center w-full chatscreen" ref={chatRef}>
+
           {chatHistory.length > 0 ? (
             <div className="chats flex flex-col w-[50%] mx-auto">
               {[...chatHistory]
@@ -690,7 +853,14 @@ function Chatscreen() {
                       <div className="flex gap-5 justify-start mb-3">
                         {renderUserAvatar("user")}
                         <div className="p-2 rounded-lg max-w-full break-words">
-                          <ReactMarkdown>{msg.user}</ReactMarkdown>
+                          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{msg.user}</ReactMarkdown>
+                          <div
+                            onClick={()=>{setMessage(msg.user), textAreaRef.current?.focus();}}
+                            className=" flex flex-row items-center text-gray-700 w-fit bg-gray-200 gap-2 cursor-pointer text-xs p-2 transition-all duration-300  rounded-md hover:bg-gray-300"
+                            title="Copy & set to input"
+                          >
+                            <FaArrowsRotate />
+                          </div>
                         </div>
                       </div>
                     )}
@@ -702,8 +872,20 @@ function Chatscreen() {
                           className="h-8 w-8 relative rounded-full top-1"
                         />
                         <div className="p-2 rounded-lg max-w-full break-words">
-                          <ReactMarkdown>{msg.ai}</ReactMarkdown>
+                          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{msg.ai}</ReactMarkdown>
+                          {/* <TypewriterMarkdown text={msg.ai}/> */}
+                          {msg.result && (
+                            <button
+                              title="View Result"
+                              onClick={() => handlerenderresult(msg)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 border border-blue-100 rounded-md transition-colors duration-150"
+                            >
+                              <FaExternalLinkAlt className="w-3 h-3" />
+                              View Result
+                            </button>
+                          )}
                         </div>
+                        
                       </div>
                     )}
 
@@ -711,22 +893,23 @@ function Chatscreen() {
                 ))
               }
 
-              {/* {partialResponse && (
-                <div className="flex gap-5 justify-start">
-                  <img src={botLogo1} alt="AI" className="h-8 w-8 relative rounded-full" />
-                  <div className="p-2 rounded-lg max-w-full">
-                    <ReactMarkdown>{partialResponse}</ReactMarkdown>
-                  </div>
-                </div>
-              )} */}
-
               {loading && session === sessionId && <Responseloader />}
 
               {confirmationPending && (
                 <div className="m-0 p-2 rounded-lg w-full flex items-center justify-center">
                   {/* <p className='text-[#242f6a]'>{confirmationMessage}</p> */}
-                  <div className="flex gap-4 flex-row justify-center items-center">
+                  <div className="grid grid-cols-2 gap-4 min-w-[60%] max-w-[80%]">
+                    {tempButtons.map((button,index)=> (
                     <button
+                      key={index}
+                      className={`${(button.label=== 'Refine Requirements' || button.label.startsWith('No')) ? 'bg-red-500' : 'bg-green-500'} text-white px-4 py-2 rounded-full text-xs cursor-pointer justify-center w-full items-center font-semibold flex flex-row gap-2`}
+                      onClick={() => {handleConfirmation(button.label,button.value)}}
+                    >
+                      {(button.label=== 'Refine Requirements' || button.label.startsWith('No')) ? (<FaThumbsDown size={16} />) :(<FaThumbsUp size={16} />) }
+                       {button.label}
+                    </button>
+                  ))}
+                    {/* <button
                       className="bg-green-500 text-white px-4 py-2 rounded-md text-xs cursor-pointer font-semibold flex flex-row gap-2"
                       onClick={() => handleConfirmation('yes')}
                     >
@@ -737,7 +920,7 @@ function Chatscreen() {
                       onClick={() => handleConfirmation('no')}
                     >
                       <FaThumbsDown size={16} />  No
-                    </button>
+                    </button> */}
                   </div>
                 </div>
               )}
@@ -745,47 +928,27 @@ function Chatscreen() {
           ) : (
             <div className="flex flex-col gap-2 items-center justify-center h-full w-full">
               <p className="text-4xl text-[#242f6a]">What can I help with?</p>
-              <p className='text-md text-gray-700 italic font-semibold mb-4'>Not sure where to begin with? Try one of these</p>
-              <div className='relative p-4 flex flex-col h-fit w-fit gap-4 items-center'>
-                <div className='relative p-2 text-xs bg-blue-200 text-black   rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleSendbtn("I'm planning a 1 TPA cement manufacturing unit in Bharuch") }}>I'm planning a 1 TPA cement manufacturing unit in Bharuch</div>
-                <div className='relative flex flex-row gap-4 w-fit h-fit'>
-                  <div className='relative p-2 text-xs text-black bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleSendbtn("List approvals needed to start a food processing unit in Gujarat.") }}>List approvals needed to start a food processing unit in Gujarat.</div>
-                  <div className='relative p-2 text-xs text-black bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold ' onClick={() => { handleSendbtn("List all licenses required to start a textile unit in Vadodara.") }}>List all licenses required to start a textile unit in Vadodara.</div>
-                </div>
-                <div className='relative p-2 text-xs text-black  bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleSendbtn("What benefits does Gujarat offer for toy manufacturing startups?") }}>What benefits does Gujarat offer for toy manufacturing startups?</div>
-              </div>
+              {hintsArray && hintsArray.length > 3 && (<><p className='text-md text-gray-700 italic font-semibold mb-4'>Not sure where to begin with? Try one of these</p>
+                <div className='relative p-4 flex flex-col h-fit w-fit gap-4 items-center'>
+                  <div className='relative p-2 text-xs bg-blue-200 text-black   rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleHintClick(hintsArray?.[0]) }}>{hintsArray?.[0]}</div>
+                  <div className='relative flex flex-row gap-4 w-fit h-fit'>
+                    <div className='relative p-2 text-xs text-black bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleHintClick(hintsArray?.[1]) }}>{hintsArray?.[1]}</div>
+                    <div className='relative p-2 text-xs text-black bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold ' onClick={() => { handleHintClick(hintsArray?.[2]) }}>{hintsArray?.[2]}</div>
+                  </div>
+                  <div className='relative p-2 text-xs text-black  bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleHintClick(hintsArray?.[3]) }}>{hintsArray?.[3]}</div>
+                </div> </>)}
             </div>
           )}
         </div>
 
-
-        {/* {confirmationPending && (
-          <div className="confirmation-box  p-4 rounded-lg w-[45%] flex flex-col items-center">
-        
-            <div className="flex space-x-4 mt-2">
-              <button
-                className="bg-green-500 text-white px-4 py-2 rounded"
-                onClick={() => handleConfirmation('yes')}
-              >
-                Yes
-              </button>
-              <button
-                className="bg-red-500 text-white px-4 py-2 rounded"
-                onClick={() => handleConfirmation('no')}
-              >
-                No
-              </button>
-            </div>
-          </div>
-        )} */}
-
         <div className="w-[50%] flex items-center justify-center mt-5 mb-4 space-x-2 border-2 border-[#41b655] rounded-xl p-2 bg-white shadow-lg">
           <div className="flex-grow">
             <textarea
-              placeholder={messages.length > 0 ? "Message Mars 2.0" : "Message Mars 2.0"}
+              placeholder={messages.length > 0 ? "Message Mars AIX" : "Message Mars AIX"}
               className="w-full border-none outline-none bg-transparent text-black placeholder-[#242f6a] opacity-70 px-4 py-2 resize-none overflow-y-auto max-h-20 placeholder-opacity-75" // Adjusted classes
               value={message}
               maxLength={250}
+              ref={textAreaRef}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {

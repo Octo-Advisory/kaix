@@ -21,6 +21,30 @@ import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer } from 'react-toastify';
 
 
+const deleteUser = async (userId) => {
+  const url = `/api/resource/User/${userId}`; // Use the correct user ID or email
+
+  try {
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045', // Replace with your actual token
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      console.log('User deleted successfully');
+    } else {
+      console.error('Error deleting user:', response.statusText);
+    }
+  } catch (error) {
+    console.error('Error:', error);
+  }
+};
+
+
+
 function Settings({onClose}) {    
     const { currentUser } = useFrappeAuth();
     const { updateDoc } = useFrappeUpdateDoc();
@@ -143,10 +167,51 @@ function Settings({onClose}) {
         }
     };
     
+    const updateUser = async (userId) => {
+  const url = `https://marsinfraix.marsbazaar.com/api/resource/User/${userId}`;
+const updatedData = {
+    "enabled": 0
+}
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045', // Replace with your token
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        "enabled": 0
+      }), // Pass fields to update
+    });
 
-    const handleDeleteAccount = () => {
+    if (response) {
+      const result = await response.json();
+      console.log('User updated successfully:', result);
+      return true
+    } else {
+      const errorData = await response.json();
+      console.error('Failed to update user:', errorData.message);
+    }
+  } catch (error) {
+    console.error('Error updating user:', error);
+  }
+};
+
+
+    const handleDeleteAccount = async() => {
         // Account deletion logic
         alert('Account deletion initiated');
+        if(currentUser) {
+            let deleteStatus = await updateUser(currentUser)
+            if(deleteStatus) {
+                window.location.href = `/frontend/login`;
+            }
+        //    await updateDoc('User', currentUser, {
+        //             enabled:0
+        //     }).then(()=>{
+        //         console.log('Deleted Successfu;;lllyyy ..................')
+        //     })
+        }
         setShowDeleteConfirm(false);
     };
 
@@ -246,29 +311,29 @@ function Settings({onClose}) {
                                 <span>Profile</span>
                             </button>
 
-                            <button
+                            {/* <button
                                 onClick={() => setActiveTab('Security')}
                                 className={`w-full flex items-center space-x-2 p-3 rounded-lg text-left transition ${activeTab === 'Security' ? 'bg-[#41b655] text-white' : 'hover:bg-gray-100'}`}
                             >
                                 <IoMdLock />
                                 <span>Security</span>
-                            </button>
+                            </button> */}
 
-                            <button
+                            {/* <button
                                 onClick={() => setActiveTab('Notifications')}
                                 className={`w-full flex items-center space-x-2 p-3 rounded-lg text-left transition ${activeTab === 'Notifications' ? 'bg-[#41b655] text-white' : 'hover:bg-gray-100'}`}
                             >
                                 <IoMdNotificationsOutline />
                                 <span>Notifications</span>
-                            </button>
+                            </button> */}
 
-                            <button
+                            {/* <button
                                 onClick={() => setActiveTab('Preferences')}
                                 className={`w-full flex items-center space-x-2 p-3 rounded-lg text-left transition ${activeTab === 'Preferences' ? 'bg-[#41b655] text-white' : 'hover:bg-gray-100'}`}
                             >
                                 <IoMdColorPalette />
                                 <span>Preferences</span>
-                            </button>
+                            </button> */}
 
                             <button
                                 onClick={() => setActiveTab('DangerZone')}
@@ -686,7 +751,7 @@ function Settings({onClose}) {
                                         )}
                                     </div>
 
-                                    <div className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
+                                    {/* <div className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
                                         <div className="flex justify-between items-center">
                                             <div>
                                                 <h4 className="font-medium text-yellow-700">Export Data</h4>
@@ -696,9 +761,9 @@ function Settings({onClose}) {
                                                 Export
                                             </button>
                                         </div>
-                                    </div>
+                                    </div> */}
 
-                                    <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                                    {/* <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
                                         <div className="flex justify-between items-center">
                                             <div>
                                                 <h4 className="font-medium">Deactivate Account</h4>
@@ -708,7 +773,7 @@ function Settings({onClose}) {
                                                 Deactivate
                                             </button>
                                         </div>
-                                    </div>
+                                    </div> */}
                                 </div>
                             </div>
                         )}

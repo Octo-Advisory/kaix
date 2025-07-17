@@ -43,6 +43,7 @@ def ai_module_call(input,confirmationMessage,chatId):
                 Chat_history_normal
             )
             temp_out = response["switch_module"]
+            
             log(chatId,'debug','response',f"ABCDEFG {temp_out}",'AI.py','ai')
             if response["switch_module"]:
                 log(chatId,'debug','response',f"{user_intension} changed to None",'AI.py','ai')
@@ -68,7 +69,7 @@ def ai_module_call(input,confirmationMessage,chatId):
                 return response
             except Exception as e:
                 response = { 
-                    "Ai_response": "Something went wrong while processing your request. Please try again shortly 6.",
+                    "Ai_response": "Something went wrong while processing your request. Please try again shortly.",
                     "Is_confirmation" : None,
                     "Error":e,
                 }
@@ -184,6 +185,14 @@ def ai_module_call(input,confirmationMessage,chatId):
             "Is_confirmation" : None,
             "Error":error_details
         }
+        doc = frappe.get_doc({
+            'doctype': 'AIX Diagnostics Hub',
+            'type': 'Validation Error',
+            'note': f"Internal Server Error! {str(error_details)}",
+            'session': chatId,
+        })
+        doc.insert(ignore_permissions=True)  # ignore_permissions=True if creating from a server script
+        frappe.db.commit()
         log(chatId,'debug','response',f"{str(response)} error is {str(error_details)}",'AI.py','ai')
         return response
 
@@ -216,8 +225,7 @@ def generate_dynamic_message(user_message, user_intention, chatId,llm):
         str: A concise, professional, and context-aware response guiding the user appropriately.
     """
     chat_history = get_chat(f"chat_{chatId}") or []
-
-
+    
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-4:]]
     chat_history.append(HumanMessage(content=user_message))
     if user_intention == "Valueless queries":

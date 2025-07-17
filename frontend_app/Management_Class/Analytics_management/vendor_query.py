@@ -42,7 +42,6 @@ def call_vendor_query(aiResponse,chatId,validationResult):
         segment = Industry_info.get('Segment')
         sub_sector = Industry_info.get('Sub-Sector')
         property_id = Location_info.get('Location')
-
         # Fetch Lat_long  from validation result
         # location_check = validationResult.get('location_check')
         latitude_longitude = validationResult.get('latitude_longitude')
@@ -53,9 +52,10 @@ def call_vendor_query(aiResponse,chatId,validationResult):
         with open("log.txt", "a") as file:
             file.write(f"\nlatitude_longitude {latitude_longitude} for now the latitude and longitude value are set static for any false scenarios (can be changed in vendor_validation.py location_and_supply() and location_and_industry())")
         results = fetch_supply_data(main_industry,sub_sector,segment,Supplies)
-
+        with open("log.txt", "a") as file:
+            file.write(f"\n Checking New Error Results..... {results} {main_industry} {sub_sector} {segment} {Supplies}")
         if results:
-            supply_rules_df = pd.DataFrame(results, columns=['supply_id'])
+            supply_rules_df = pd.DataFrame(results, columns=['supply_id', 'essential_items'])
         else:
             None
 
@@ -63,7 +63,8 @@ def call_vendor_query(aiResponse,chatId,validationResult):
         supply_id_str = ', '.join(f"'{supply_id}'" for supply_id in all_supply_id_list)
 
         get_vendor_df = vendor_df(supply_id_str)
-
+        with open("log.txt", "a") as file:
+            file.write(f"\n Checking New Error DROP..... {supply_id_str} {get_vendor_df.columns}")
         columns_to_drop = [
             'supply_id', 'vendor_supply_capacity',
             'years_of_experience', 'no_of_locations', 'no_of_past_clients',

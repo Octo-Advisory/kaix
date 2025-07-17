@@ -4,9 +4,11 @@ import copy
 import frappe
 import json
 from datetime import datetime
-from geopy.point import Point
 # from frontend_app.frontend_app.Management_Class.helpers.utility import checkApiThreshold
 from frontend_app.Management_Class.helpers.utility import checkApiThreshold
+from geopy.point import Point
+from geopy.distance import geodesic
+from shapely.geometry import Polygon, mapping, Point
 #endregion
 
 #region Global Varialble Declaration
@@ -274,7 +276,41 @@ def CalculatePropVenDistance(data):
         with open("log3.txt", "a") as file:
                 file.write(f"\nException from here {e}")
         return {"IsError":True,"result":{},"InvalidProperty":invalidProperty,"InvalidVendor":invalidVendor,"error_message":str(e)}
+# Function to calculate new lat/lon given a start point and distance
+def move_point(lat, lon, dx_km, dy_km):
+    new_lat = geodesic(kilometers=dy_km).destination((lat, lon), 0).latitude   # Move North
+    new_lon = geodesic(kilometers=dx_km).destination((lat, lon), 90).longitude # Move East
+    return new_lat, new_lon
+@frappe.whitelist()
+def getBBoxData(center_lat, center_lon):
+        # Create 100 km x 100 km square polygon
+    half_side = 2.5  # 50 km in each direction
+    bottom_left = move_point(center_lat, center_lon, -half_side, -half_side)
+    bottom_right = move_point(center_lat, center_lon, half_side, -half_side)
+    top_right = move_point(center_lat, center_lon, half_side, half_side)
+    top_left = move_point(center_lat, center_lon, -half_side, half_side)
 
+    big_square = Polygon([bottom_left, bottom_right, top_right, top_left, bottom_left])
+
+    # Create 100 smaller squares (1 km x 1 km each)
+    small_squares = []
+    grid_size = 1  # Each small square is 1 km x 1 km
+
+    for i in range(5):  # 100 rows
+        for j in range(5):  # 100 columns
+            start_lat, start_lon = move_point(bottom_left[0], bottom_left[1], j * grid_size, i * grid_size)
+            end_lat, end_lon = move_point(start_lat, start_lon, grid_size, grid_size)
+
+            square = Polygon([
+                (start_lon, start_lat),
+                (end_lon, start_lat),
+                (end_lon, end_lat),
+                (start_lon, end_lat),
+                (start_lon, start_lat)  # Close the loop
+            ])
+            small_squares.append(square)
+
+    return {}
 
 # def get_geocode(address):
 #     isProcessFurther = checkApiThreshold("Goolge Geocoding Api")

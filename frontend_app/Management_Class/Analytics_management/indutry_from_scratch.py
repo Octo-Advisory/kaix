@@ -8,9 +8,11 @@ import traceback
 from datetime import datetime
 import json
 from frontend_app.Management_Class.helpers.utility import randomSentences
+import gc
+from frontend_app.Market_Trends.getting_market_trends import retrieving_market_trends
 
 @frappe.whitelist()
-def industry_from_scratch(aiResponse,chatId):
+def industry_from_scratch(aiResponse,chatId,selectedOption):
     try:
         analyse_query = randomSentences('industry', 'Analyzing Your Query')
         fetch_data = randomSentences('industry', 'Fetching Data')
@@ -50,7 +52,23 @@ def industry_from_scratch(aiResponse,chatId):
         area_list = get_list_of_area_id(zone_id)
         city_list = get_list_of_city_list(area_list)
         state_list = get_state_list(city_list)
-        property_employment_df,property_list = get_property_and_employement(zone_id,area_list,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user,found_property,found_employment)
+        property_employment_df,property_list = get_property_and_employement(zone_id,area_list,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user,found_property,found_employment,selectedOption = selectedOption)
+        r_insights = {}
+        for state in state_list:
+            _, r_insights_dict = retrieving_market_trends(industry, industry, industry, state, state, "pan_industry", "pan_state") 
+            filtered_data = {
+                "market_trends": r_insights_dict.get("market_trends", None),
+                "local_laws": r_insights_dict.get("local_laws", None),
+                "taxes": r_insights_dict.get("taxes", None)
+            }
+            r_insights[state] = filtered_data
+
+        # Convert dictionary to DataFrame for merging
+        market_info_df = pd.DataFrame.from_dict(r_insights, orient='index').reset_index()
+        market_info_df.rename(columns={'index': 'state'}, inplace=True)
+        # Merge on the 'state' column
+        property_employment_df = property_employment_df.merge(market_info_df, on='state', how='left')
+
         columns_to_drop = [
             'distance_from_nearest_railway_station',
             'distance_from_nearest_seaport', 'distance_from_power_source',
@@ -79,6 +97,9 @@ def industry_from_scratch(aiResponse,chatId):
         df_with_property_wise_individual_score = calculate_property_suitability(df_for_property_wise_individual_score,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user)
         df_with_property_wise_individual_score.sort_values(by=["property_suitability_score"], ascending=False)
         final_property_ranking_for_decision = pd.DataFrame({"Property_ID": list(property_employment_df["property_id"].unique())})
+        final_property_ranking_for_decision = pd.merge(final_property_ranking_for_decision, property_employment_df[["property_id","Network Connectivity", "taxes", "local_laws", "market_trends"]].drop_duplicates(), left_on="Property_ID", right_on="property_id", how='left').drop(columns=["property_id"])
+        with open("log2.txt", "a") as file:
+            file.write(f"\n DF WITH SCORES AND MARKET TRENDsssssssssssssssssssssssssssssssS {final_property_ranking_for_decision}")
         final_property_ranking_for_decision = pd.merge(final_property_ranking_for_decision, df_with_property_wise_individual_score[["property_id","property_suitability_score"]], left_on="Property_ID", right_on="property_id", how='left').drop(columns=["property_id"])
         
         df_with_property_wise_emp_score = calculate_employment_availability_score(df_for_property_wise_emp_score,sub_sector)
@@ -134,39 +155,101 @@ def industry_from_scratch(aiResponse,chatId):
         final_property_ranking_for_decision.rename(columns={'Final Score': 'Property_wise_approval_score'}, inplace=True)
 
         supply_rules_df = get_supply_rule(main_industry,sub_sector,segment,capacity)
+        with open("log2.txt", "a") as file:
+            file.write(f"\n Checking Supplies DF  {supply_rules_df}")
         vendor_df = get_vendor_df(supply_rules_df)
+        with open("log2.txt", "a") as file:
+            file.write(f"\n Checking Vendor DF  {vendor_df}")
+   
 
         property_latlong_df = property_employment_df[["property_id", "latitude_longitude"]].drop_duplicates()
         test_return = get_supply_scores(property_latlong_df,supply_rules_df,vendor_df,prefered_range=(0,250), tolerable_range=(251,500))
-        if len(test_return) == 2:
-            property_mapped_supply_individual_score, property_mapped_supply_alternate_sug= test_return[0], test_return[1]
-        else:
-            property_mapped_supply_individual_score, property_mapped_supply_alternate_sug = test_return, None
+        # if len(test_return) == 2:
+        #     property_mapped_supply_individual_score, property_mapped_supply_alternate_sug= test_return[0], test_return[1]
+        # else:
+        #     property_mapped_supply_individual_score, property_mapped_supply_alternate_sug = test_return, None
+
+        property_mapped_supply_individual_score, property_mapped_supply_alternate_sug, property_wise_all_vendor_df= test_return[0], test_return[1], test_return[2]
         
         df_with_property_wise_vendor_score = calculate_final_supply_mapped_property_scores_with_condition(property_mapped_supply_individual_score, property_latlong_df)
 
         Solution_screen_essential_supply_vendor_lookup_df, Solution_screen_non_essential_supply_vendor_lookup_df = process_supply_vendor_df_to_send_solution_screen(property_mapped_supply_individual_score)
+        Solution_screen_essential_supply_all_vendor_lookup_df, Solution_screen_non_essential_supply_all_vendor_lookup_df = process_supply_vendor_df_to_send_solution_screen(property_wise_all_vendor_df, all_vendor=True)
         # Step 1: Identify Uncommon Property IDs
         uncommon_property_ids = list(set(final_property_ranking_for_decision["Property_ID"]) ^ set(df_with_property_wise_vendor_score["property_id"]))
+        # if (not Solution_screen_essential_supply_vendor_lookup_df.empty) and (not Solution_screen_non_essential_supply_vendor_lookup_df.empty):
+        #     uncommon_property_ids_accross_essential_supply = list(set(Solution_screen_essential_supply_vendor_lookup_df["property_id"]) ^ set(df_with_property_wise_vendor_score["property_id"]))
+        #     uncommon_property_ids_accross_non_essential_supply = list(set(Solution_screen_non_essential_supply_vendor_lookup_df["property_id"]) ^ set(df_with_property_wise_vendor_score["property_id"]))
+        #             # Step 2: Filter out uncommon properties from final_property_ranking_for_decision
+        #     Solution_screen_essential_supply_vendor_lookup_df = Solution_screen_essential_supply_vendor_lookup_df[
+        #         ~Solution_screen_essential_supply_vendor_lookup_df["property_id"].isin(uncommon_property_ids_accross_essential_supply)
+        #     ]
+        #     # Step 2: Filter out uncommon properties from final_property_ranking_for_decision
+        #     Solution_screen_non_essential_supply_vendor_lookup_df = Solution_screen_non_essential_supply_vendor_lookup_df[
+        #         ~Solution_screen_non_essential_supply_vendor_lookup_df["property_id"].isin(uncommon_property_ids_accross_non_essential_supply)
+        #     ]
+        # else:
+        #     Solution_screen_essential_supply_vendor_lookup_df = pd.DataFrame({
+        #         "property_id": list(final_property_ranking_for_decision["Property_ID"].unique()),
+        #         "No_of_vendors_found": [0,]*len(final_property_ranking_for_decision)
+        #     })
+        #     Solution_screen_non_essential_supply_vendor_lookup_df = pd.DataFrame({
+        #         "property_id": list(final_property_ranking_for_decision["Property_ID"].unique()),
+        #         "No_of_vendors_found": [0,]*len(final_property_ranking_for_decision)
+        #     })
+
+        # Step 0: Get the reference property IDs
+        reference_property_ids = set(df_with_property_wise_vendor_score["property_id"])
+        final_property_ids = list(final_property_ranking_for_decision["Property_ID"].unique())
+
+        # Case 1: Both DataFrames are non-empty
         if (not Solution_screen_essential_supply_vendor_lookup_df.empty) and (not Solution_screen_non_essential_supply_vendor_lookup_df.empty):
-            uncommon_property_ids_accross_essential_supply = list(set(Solution_screen_essential_supply_vendor_lookup_df["property_id"]) ^ set(df_with_property_wise_vendor_score["property_id"]))
-            uncommon_property_ids_accross_non_essential_supply = list(set(Solution_screen_non_essential_supply_vendor_lookup_df["property_id"]) ^ set(df_with_property_wise_vendor_score["property_id"]))
-                    # Step 2: Filter out uncommon properties from final_property_ranking_for_decision
+            
+            uncommon_essential = list(set(Solution_screen_essential_supply_vendor_lookup_df["property_id"]) ^ reference_property_ids)
+            uncommon_non_essential = list(set(Solution_screen_non_essential_supply_vendor_lookup_df["property_id"]) ^ reference_property_ids)
+            
             Solution_screen_essential_supply_vendor_lookup_df = Solution_screen_essential_supply_vendor_lookup_df[
-                ~Solution_screen_essential_supply_vendor_lookup_df["property_id"].isin(uncommon_property_ids_accross_essential_supply)
+                ~Solution_screen_essential_supply_vendor_lookup_df["property_id"].isin(uncommon_essential)
             ]
-            # Step 2: Filter out uncommon properties from final_property_ranking_for_decision
             Solution_screen_non_essential_supply_vendor_lookup_df = Solution_screen_non_essential_supply_vendor_lookup_df[
-                ~Solution_screen_non_essential_supply_vendor_lookup_df["property_id"].isin(uncommon_property_ids_accross_non_essential_supply)
+                ~Solution_screen_non_essential_supply_vendor_lookup_df["property_id"].isin(uncommon_non_essential)
             ]
+
+        # Case 2: Essential is empty, Non-essential is not
+        elif Solution_screen_essential_supply_vendor_lookup_df.empty and not Solution_screen_non_essential_supply_vendor_lookup_df.empty:
+            
+            uncommon_non_essential = list(set(Solution_screen_non_essential_supply_vendor_lookup_df["property_id"]) ^ reference_property_ids)
+            Solution_screen_non_essential_supply_vendor_lookup_df = Solution_screen_non_essential_supply_vendor_lookup_df[
+                ~Solution_screen_non_essential_supply_vendor_lookup_df["property_id"].isin(uncommon_non_essential)
+            ]
+            
+            Solution_screen_essential_supply_vendor_lookup_df = pd.DataFrame({
+                "property_id": final_property_ids,
+                "No_of_vendors_found": [0] * len(final_property_ids)
+            })
+
+        # Case 3: Non-essential is empty, Essential is not
+        elif not Solution_screen_essential_supply_vendor_lookup_df.empty and Solution_screen_non_essential_supply_vendor_lookup_df.empty:
+            
+            uncommon_essential = list(set(Solution_screen_essential_supply_vendor_lookup_df["property_id"]) ^ reference_property_ids)
+            Solution_screen_essential_supply_vendor_lookup_df = Solution_screen_essential_supply_vendor_lookup_df[
+                ~Solution_screen_essential_supply_vendor_lookup_df["property_id"].isin(uncommon_essential)
+            ]
+            
+            Solution_screen_non_essential_supply_vendor_lookup_df = pd.DataFrame({
+                "property_id": final_property_ids,
+                "No_of_vendors_found": [0] * len(final_property_ids)
+            })
+
+        # Case 4: Both are empty
         else:
             Solution_screen_essential_supply_vendor_lookup_df = pd.DataFrame({
-                "property_id": list(final_property_ranking_for_decision["Property_ID"].unique()),
-                "No_of_vendors_found": [0,]*len(final_property_ranking_for_decision)
+                "property_id": final_property_ids,
+                "No_of_vendors_found": [0] * len(final_property_ids)
             })
             Solution_screen_non_essential_supply_vendor_lookup_df = pd.DataFrame({
-                "property_id": list(final_property_ranking_for_decision["Property_ID"].unique()),
-                "No_of_vendors_found": [0,]*len(final_property_ranking_for_decision)
+                "property_id": final_property_ids,
+                "No_of_vendors_found": [0] * len(final_property_ids)
             })
 
 
@@ -214,7 +297,9 @@ def industry_from_scratch(aiResponse,chatId):
         Solution_screen_incentive_lookup_df = sort_by_scores(Solution_screen_incentive_lookup_df, final_property_ranking_for_decision)
         Solution_screen_approval_lookup_df = sort_by_scores(Solution_screen_approval_lookup_df, final_property_ranking_for_decision)
         Solution_screen_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_vendor_lookup_df, final_property_ranking_for_decision)
+        Solution_screen_essential_supply_all_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_all_vendor_lookup_df, final_property_ranking_for_decision)
         Solution_screen_non_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_vendor_lookup_df, final_property_ranking_for_decision)
+        Solution_screen_non_essential_supply_all_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_all_vendor_lookup_df, final_property_ranking_for_decision)
         if not keyword_given_by_user:
             Final_analytics_results_query_to_build_industry_from_scratch = {
                 # "Filtered_final_property_ranking_for_decision" : None,
@@ -237,7 +322,9 @@ def industry_from_scratch(aiResponse,chatId):
                 "Solution_lookup_df": Solution_screen_incentive_lookup_df.to_json() if not Solution_screen_incentive_lookup_df.empty else None,
                 "Approval_lookup_df": Solution_screen_approval_lookup_df.to_json() if not Solution_screen_approval_lookup_df.empty else None,
                 "Essential_supply_vendor_lookup_df": Solution_screen_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_essential_supply_vendor_lookup_df.empty else None,
-                "Non_essential_supply_vendor_lookup_df": Solution_screen_non_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_non_essential_supply_vendor_lookup_df.empty else None
+                "Essential_supply_all_vendor_lookup_df": Solution_screen_essential_supply_all_vendor_lookup_df.to_json() if not Solution_screen_essential_supply_all_vendor_lookup_df.empty else None,
+                "Non_essential_supply_vendor_lookup_df": Solution_screen_non_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_non_essential_supply_vendor_lookup_df.empty else None,
+                "Non_essential_supply_all_vendor_lookup_df": Solution_screen_non_essential_supply_all_vendor_lookup_df.to_json() if not Solution_screen_non_essential_supply_all_vendor_lookup_df.empty else None
             }
         else:
             keyword_result = filter_df_by_keywords(keyword_given_by_user, propert_keyword_df)
@@ -254,26 +341,33 @@ def industry_from_scratch(aiResponse,chatId):
                 Filtererd_Solution_screen_incentive_lookup_df = sort_by_scores(Solution_screen_incentive_lookup_df, Filtered_final_property_ranking_for_decision, for_final_return=True)
                 Filtererd_Solution_screen_approval_lookup_df = sort_by_scores(Solution_screen_approval_lookup_df, Filtered_final_property_ranking_for_decision, for_final_return=True)
                 Filtererd_Solution_screen_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_vendor_lookup_df, Filtered_final_property_ranking_for_decision, for_final_return=True)
+                Filtererd_Solution_screen_essential_supply_all_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_all_vendor_lookup_df, Filtered_final_property_ranking_for_decision, for_final_return=True)
                 Filtererd_Solution_screen_non_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_vendor_lookup_df, Filtered_final_property_ranking_for_decision, for_final_return=True)
+                Filtererd_Solution_screen_non_essential_supply_all_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_all_vendor_lookup_df, Filtered_final_property_ranking_for_decision, for_final_return=True)
                 
                 Unfiltered_Solution_screen_employment_lookup_df = sort_by_scores(Solution_screen_employment_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
                 Unfiltered_Solution_screen_incentive_lookup_df = sort_by_scores(Solution_screen_incentive_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
                 Unfiltered_Solution_screen_approval_lookup_df = sort_by_scores(Solution_screen_approval_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
                 Unfiltered_Solution_screen_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_vendor_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
+                Unfiltered_Solution_screen_essential_supply_all_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_all_vendor_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
                 Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_vendor_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
-                # print(Filtered_final_property_ranking_for_decision.columns, Unfiltered_final_property_ranking_for_decision.columns)
+                Unfiltered_Solution_screen_non_essential_supply_all_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_all_vendor_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
                 
                 Solution_screen_employment_lookup_df = pd.concat([Filtererd_Solution_screen_employment_lookup_df,Unfiltered_Solution_screen_employment_lookup_df], axis = 0, ignore_index=True)
                 Solution_screen_incentive_lookup_df = pd.concat([Filtererd_Solution_screen_incentive_lookup_df,Unfiltered_Solution_screen_incentive_lookup_df], axis = 0, ignore_index=True)
                 Solution_screen_approval_lookup_df = pd.concat([Filtererd_Solution_screen_approval_lookup_df,Unfiltered_Solution_screen_approval_lookup_df], axis = 0, ignore_index=True)
                 Solution_screen_essential_supply_vendor_lookup_df = pd.concat([Filtererd_Solution_screen_essential_supply_vendor_lookup_df,Unfiltered_Solution_screen_essential_supply_vendor_lookup_df], axis = 0, ignore_index=True)
+                Solution_screen_essential_supply_all_vendor_lookup_df = pd.concat([Filtererd_Solution_screen_essential_supply_all_vendor_lookup_df,Unfiltered_Solution_screen_essential_supply_all_vendor_lookup_df], axis = 0, ignore_index=True)
                 Solution_screen_non_essential_supply_vendor_lookup_df = pd.concat([Filtererd_Solution_screen_non_essential_supply_vendor_lookup_df,Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df], axis = 0, ignore_index=True)
+                Solution_screen_non_essential_supply_all_vendor_lookup_df = pd.concat([Filtererd_Solution_screen_non_essential_supply_all_vendor_lookup_df,Unfiltered_Solution_screen_non_essential_supply_all_vendor_lookup_df], axis = 0, ignore_index=True)
                 
                 Solution_screen_employment_lookup_df = sort_by_scores(Solution_screen_employment_lookup_df, final_property_ranking_for_decision, for_final_return=True)
                 Solution_screen_incentive_lookup_df = sort_by_scores(Solution_screen_incentive_lookup_df, final_property_ranking_for_decision, for_final_return=True)
                 Solution_screen_approval_lookup_df = sort_by_scores(Solution_screen_approval_lookup_df, final_property_ranking_for_decision, for_final_return=True)
                 Solution_screen_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_vendor_lookup_df, final_property_ranking_for_decision, for_final_return=True)
+                Solution_screen_essential_supply_all_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_all_vendor_lookup_df, final_property_ranking_for_decision, for_final_return=True)
                 Solution_screen_non_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_vendor_lookup_df, final_property_ranking_for_decision, for_final_return=True)
+                Solution_screen_non_essential_supply_all_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_all_vendor_lookup_df, final_property_ranking_for_decision, for_final_return=True)
                 # print(type(Filtererd_Solution_screen_employment_lookup_df))
                 Final_analytics_results_query_to_build_industry_from_scratch = {
 
@@ -296,7 +390,9 @@ def industry_from_scratch(aiResponse,chatId):
                     "Solution_lookup_df": Solution_screen_incentive_lookup_df.to_json() if not Solution_screen_incentive_lookup_df.empty else None,
                     "Approval_lookup_df": Solution_screen_approval_lookup_df.to_json() if not Solution_screen_approval_lookup_df.empty else None,
                     "Essential_supply_vendor_lookup_df": Solution_screen_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_essential_supply_vendor_lookup_df.empty else None,
-                    "Non_essential_supply_vendor_lookup_df": Solution_screen_non_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_non_essential_supply_vendor_lookup_df.empty else None
+                    "Essential_supply_all_vendor_lookup_df": Solution_screen_essential_supply_all_vendor_lookup_df.to_json() if not Solution_screen_essential_supply_all_vendor_lookup_df.empty else None,
+                    "Non_essential_supply_vendor_lookup_df": Solution_screen_non_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_non_essential_supply_vendor_lookup_df.empty else None,
+                    "Non_essential_supply_all_vendor_lookup_df": Solution_screen_non_essential_supply_all_vendor_lookup_df.to_json() if not Solution_screen_non_essential_supply_all_vendor_lookup_df.empty else None
                 }
             else:
  
@@ -307,14 +403,18 @@ def industry_from_scratch(aiResponse,chatId):
                 Unfiltered_Solution_screen_incentive_lookup_df = sort_by_scores(Solution_screen_incentive_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
                 Unfiltered_Solution_screen_approval_lookup_df = sort_by_scores(Solution_screen_approval_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
                 Unfiltered_Solution_screen_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_vendor_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
+                Unfiltered_Solution_screen_essential_supply_all_vendor_lookup_df = sort_by_scores(Solution_screen_essential_supply_all_vendor_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
                 Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_vendor_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
+                Unfiltered_Solution_screen_non_essential_supply_all_vendor_lookup_df = sort_by_scores(Solution_screen_non_essential_supply_all_vendor_lookup_df, Unfiltered_final_property_ranking_for_decision, for_final_return=True)
                 
                 final_property_ranking_for_decision = Unfiltered_final_property_ranking_for_decision
                 Solution_screen_employment_lookup_df = Unfiltered_Solution_screen_employment_lookup_df
                 Solution_screen_incentive_lookup_df = Unfiltered_Solution_screen_incentive_lookup_df
                 Solution_screen_approval_lookup_df = Unfiltered_Solution_screen_approval_lookup_df
                 Solution_screen_essential_supply_vendor_lookup_df = Unfiltered_Solution_screen_essential_supply_vendor_lookup_df
+                Solution_screen_essential_supply_all_vendor_lookup_df = Unfiltered_Solution_screen_essential_supply_all_vendor_lookup_df
                 Solution_screen_non_essential_supply_vendor_lookup_df = Unfiltered_Solution_screen_non_essential_supply_vendor_lookup_df
+                Solution_screen_non_essential_supply_all_vendor_lookup_df = Unfiltered_Solution_screen_non_essential_supply_all_vendor_lookup_df
                 Final_analytics_results_query_to_build_industry_from_scratch ={
                 # "Filtered_final_property_ranking_for_decision" : None,
                 # "Filtererd_Solution_screen_employment_lookup_df" : None,
@@ -335,7 +435,9 @@ def industry_from_scratch(aiResponse,chatId):
                 "Solution_lookup_df": Solution_screen_incentive_lookup_df.to_json() if not Solution_screen_incentive_lookup_df.empty else None,
                 "Approval_lookup_df": Solution_screen_approval_lookup_df.to_json() if not Solution_screen_approval_lookup_df.empty else None,
                 "Essential_supply_vendor_lookup_df": Solution_screen_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_essential_supply_vendor_lookup_df.empty else None,
-                "Non_essential_supply_vendor_lookup_df": Solution_screen_non_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_non_essential_supply_vendor_lookup_df.empty else None
+                "Essential_supply_all_vendor_lookup_df": Solution_screen_essential_supply_all_vendor_lookup_df.to_json() if not Solution_screen_essential_supply_all_vendor_lookup_df.empty else None,
+                "Non_essential_supply_vendor_lookup_df": Solution_screen_non_essential_supply_vendor_lookup_df.to_json() if not Solution_screen_non_essential_supply_vendor_lookup_df.empty else None,
+                "Non_essential_supply_all_vendor_lookup_df": Solution_screen_non_essential_supply_all_vendor_lookup_df.to_json() if not Solution_screen_non_essential_supply_all_vendor_lookup_df.empty else None
 
                 }
 
@@ -348,7 +450,14 @@ def industry_from_scratch(aiResponse,chatId):
         update_process(chatId,"Preparing Result","Processing",0)
         time.sleep(5)
         update_process(chatId,"Preparing Result","Complete",1)
+        del aiResponse
+        del Final_analytics_results_query_to_build_industry_from_scratch
+        
+        locals().clear()
+        gc.collect()
+        
         return response
+        
     
     except Exception as e:
         update_process(chatId,"Analyzing Data","Fail",0)

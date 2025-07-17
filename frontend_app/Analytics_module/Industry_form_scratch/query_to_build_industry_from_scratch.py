@@ -9,6 +9,7 @@ import numpy as np
 import traceback
 import spacy
 from typing import List, Tuple
+
 nlp = spacy.load("en_core_web_lg")
 
 def fetch_query_results(query):
@@ -394,7 +395,7 @@ def get_state_list(city_id_list):
 #         found_employment = False
 #         return None,None
 
-def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_land_for_user, required_UpperMargin_land_for_user, found_property, found_employment):
+def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_land_for_user, required_UpperMargin_land_for_user, found_property, found_employment,selectedOption):
     """
     Fetch property and employment details based on a given zone and area list.
 
@@ -419,21 +420,61 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
     # convert list to string to use in query
     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
 
-    sql_query_for_property_and_employment = f"""
-    SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability
-    FROM `tabSurvey No` p
-    JOIN `tabEmployment City Mapping` e ON p.area = e.area
-    WHERE (p.zone = '{zone_id}') 
-    AND (p.area IN ({area_id_str}))
-    AND p.status != "Sold";
-    """
+    sql_query_for_property_and_employment = ""
 
+    if selectedOption == "Intent to Build Industry from Scratch":
+        sql_query_for_property_and_employment = f"""
+            SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
+            FROM `tabSurvey No` p
+            JOIN `tabEmployment City Mapping` e ON p.area = e.area
+            JOIN `tabArea` a on p.area = a.name
+            WHERE (p.zone = '{zone_id}') 
+            AND (p.area IN ({area_id_str}))
+            AND p.status != "Sold"
+            AND p.area_acre >0
+            AND (p.property_type is NOT Null)
+            AND p.property_type != ''
+            AND p.property_type != 'Warehouse'
+            AND p.property_type != 'Industrial Plant'
+            AND p.property_type != 'Auction Property';
+            """
+
+    elif selectedOption == "Intent to Acquire Existing Industrial Infrastructure":
+        sql_query_for_property_and_employment = f"""
+            SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
+            FROM `tabSurvey No` p
+            JOIN `tabEmployment City Mapping` e ON p.area = e.area
+            JOIN `tabArea` a on p.area = a.name  
+            WHERE (p.zone = '{zone_id}') 
+            AND (p.area IN ({area_id_str}))
+            AND p.status != "Sold"
+            AND p.area_acre >0
+            AND (p.property_type is NOT Null)
+            AND p.property_type != ''
+            AND p.property_type != 'Warehouse'
+            AND (p.property_type = 'Industrial Plant'
+            OR p.property_type = 'Auction Property');
+            """
+
+    elif selectedOption == "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure":
+        sql_query_for_property_and_employment = f"""
+            SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
+            FROM `tabSurvey No` p
+            JOIN `tabEmployment City Mapping` e ON p.area = e.area
+            JOIN `tabArea` a on p.area = a.name
+            WHERE (p.zone = '{zone_id}') 
+            AND (p.area IN ({area_id_str}))
+            AND p.status != "Sold"
+            AND p.area_acre >0
+            AND (p.property_type != 'Warehouse');
+            """
+    frappe.log_error("sql_query_for_property_and_employment",sql_query_for_property_and_employment)
     # Call the function and assign results
     results = fetch_query_results(sql_query_for_property_and_employment)
 
     if results:
         # Convert the fetched results into a pandas DataFrame
-        property_employment_df = pd.DataFrame(results, columns=['property_id', "land_size",'area', 'city', 'village', 'taluka', 'district', 'state', 'distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source', 'latitude_longitude', 'Property Type', "business_location_type", "land_type","pole_shifting", "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following", "road_connectivity", "distance_from_nearest_airport" ,'employment_area_id', 'employmenttype_id', 'availability'])
+        property_employment_df = pd.DataFrame(results, columns=['property_id', "land_size",'area', 'city', 'village', 'taluka', 'district', 'state', 'distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source', 'latitude_longitude', 'Property Type', "business_location_type", "land_type","pole_shifting", "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following", "road_connectivity", "distance_from_nearest_airport" ,'employment_area_id', 'employmenttype_id', 'availability', 'Network Connectivity'])
         return property_employment_df, property_employment_df.property_id.unique()
     else:
         print("No results found in the first query. Executing fallback query...")
@@ -491,29 +532,41 @@ def get_property_incentive_mapped(industry_id,sub_sector_id,area_id_list,city_id
     property_id_list_str = ', '.join(f"'{property_id}'" for property_id in property_id_list)
     today_date = datetime.now().strftime('%Y-%m-%d 00:00:00')
     sql_query = f"""
-    SELECT i.name, i.incentive_name, i.incentive_type, i.incentive_operation_start_date, i.incentive_operation_end_date, i.quantum_of_assistance, iim.sub_sector, iim.area, iim.city, iim.state, i.incentive_rank,
-       p.name, p.area AS property_area_id
+SELECT 
+    i.name, i.incentive_name, i.incentive_type, 
+    i.incentive_operation_start_date, i.incentive_operation_end_date, 
+    i.quantum_of_assistance, 
+    iim.sub_sector, iim.area, iim.city, iim.state, i.incentive_rank,
+    p.name, p.area AS property_area_id
 FROM `tabIncentive Industry Mapping` iim
 JOIN `tabIncentive` i
     ON i.name = iim.incentive
 JOIN `tabSurvey No` p
-    ON (iim.area = p.area)  -- Join on area_id
-    OR (iim.area IS NULL AND iim.city = p.city OR iim.city_level = 1)
-    OR (iim.area IS NULL AND iim.city IS NULL AND iim.state = p.state OR iim.state_level = 1)
-    OR (iim.country_level = 1)
+    ON (
+        (iim.area = p.area)
+        OR (iim.area IS NULL AND iim.city = p.city)
+        OR (iim.area IS NULL AND iim.city IS NULL AND iim.state = p.state)
+        OR (iim.country_level = 1)
+    )
 WHERE
-    (iim.sub_sector = '{sub_sector_id}')
-    OR (iim.sub_sector IS NULL AND iim.industry = '{industry_id}')
-    OR (iim.pan_industries = 1)
-  AND (
-      (iim.area IN ({area_id_str}))  
-      OR (iim.area IS NULL AND iim.city IN ({city_id_str}) OR iim.city_level = 1)
-      OR (iim.area IS NULL AND iim.city IS NULL AND iim.state IN ({state_id_str}) OR iim.state_level = 1)
-      OR (iim.country_level = 1)
-  )
-  AND (p.name IN ({property_id_list_str}))
-  AND '{today_date}' BETWEEN i.incentive_operation_start_date AND i.incentive_operation_end_date;
-    """
+    (
+        (iim.sub_sector = '{sub_sector_id}')
+        OR (iim.sub_sector IS NULL AND iim.industry = '{industry_id}')
+        OR (iim.pan_industries = 1)
+    )
+    AND (
+        (iim.area IN ({area_id_str}))
+        OR (iim.area IS NULL AND iim.city IN ({city_id_str}))
+        OR (iim.area IS NULL AND iim.city IS NULL AND iim.state IN ({state_id_str}))
+        OR (iim.country_level = 1)
+    )
+    AND (
+        p.name IN ({property_id_list_str})
+    )
+    AND (
+        '{today_date}' BETWEEN i.incentive_operation_start_date AND i.incentive_operation_end_date
+    );
+"""
 
     # Execute the query using the provided fetch_query_results function
     results = fetch_query_results(sql_query)
@@ -854,42 +907,59 @@ def get_property_approval_mapped(industry_id,sub_sector_id,area_id_list,city_id_
     state_id_str = ', '.join(f"'{state_id}'" for state_id in state_id_list)
     property_id_list_str = ', '.join(f"'{property_id}'" for property_id in property_id_list)
     query = f"""
-    SELECT a.name, a.license_approval, a.government_department, a.business_location_type as ABLT, a.land_type as ALT, a.vicinity_detail as AVD, a.cross_following_details as ACFD,a.road_cutting, a.delivery_schedule_in_working_days, a.mode_of_application, a.stage, a.is_dependent, a.depends_on, a.area, p.name,  p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following
+SELECT 
+    a.name, a.license_approval, a.government_department, 
+    a.business_location_type as ABLT, a.land_type as ALT, 
+    a.vicinity_detail as AVD, a.cross_following_details as ACFD,
+    a.road_cutting, a.delivery_schedule_in_working_days, 
+    a.mode_of_application, a.stage, a.is_dependent, a.depends_on, 
+    a.area, 
+    p.name,  p.business_location_type, p.land_type, 
+    p.require_shifting_of_any_electricity_line_or_pole, 
+    p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, 
+    p.will_your_industry_cross_the_following
 FROM `tabLicenses and Approvals Type` a
 JOIN `tabSurvey No` p
-    ON (a.area = p.area)  -- Join on area_id
-    OR (a.area IS NULL AND a.city = p.city OR a.city_level = 1)
-    OR (a.area IS NULL AND a.city IS NULL AND a.state = p.state OR a.state_level = 1)
-    OR (a.country_level = 1)
+    ON (
+        (a.area = p.area)
+        OR (a.area IS NULL AND a.city = p.city)
+        OR (a.area IS NULL AND a.city IS NULL AND a.state = p.state)
+        OR (a.country_level = 1)
+    )
 WHERE
-    (a.sub_sector = '{sub_sector_id}')
-    OR (a.sub_sector IS NULL AND a.industry = '{industry_id}')
-    OR (a.pan_industries = "Yes")
-  AND (
-      (a.area IN ({area_id_str}))  
-      OR (a.area IS NULL AND a.city IN ({city_id_str}) OR a.city_level = 1)
-      OR (a.area IS NULL AND a.city IS NULL AND a.state IN ({state_id_str}) OR a.state_level = 1)
-      OR (a.country_level = 1)
-  )
-  AND (
-      ((a.cross_following_details =  'None of the above')
-      AND (a.vicinity_detail = 'None of the above')
-      AND (a.road_cutting = "No")
-      AND (a.tree_cutting = "No")
-      AND (a.business_location_type IS NULL)
-      AND (a.land_type IS NULL)
-      AND (a.require_pole_shifting = "No")
-      )
-      OR (a.cross_following_details = p.will_your_industry_cross_the_following)
-      OR (a.vicinity_detail = p.vicinity_of)
-      OR (a.road_cutting = "Yes" and p.road_cutting_involved = "Yes")
-      OR (a.tree_cutting = "Yes" AND p.tree_cutting_involved = "Yes")
-      OR (a.business_location_type = p.business_location_type AND a.land_type = p.land_type)
-      OR ((a.business_location_type = p.business_location_type) AND (a.land_type IS NULL))
-      OR (a.require_pole_shifting = "Yes" AND p.require_shifting_of_any_electricity_line_or_pole = "Yes")
-  )
-  AND (p.name IN ({property_id_list_str}))
-    """
+    (
+        (a.sub_sector = '{sub_sector_id}')
+        OR (a.sub_sector IS NULL AND a.industry = '{industry_id}')
+        OR (a.pan_industries = "Yes")
+    )
+    AND (
+        (a.area IN ({area_id_str}))
+        OR (a.area IS NULL AND a.city IN ({city_id_str}))
+        OR (a.area IS NULL AND a.city IS NULL AND a.state IN ({state_id_str}))
+        OR (a.country_level = 1)
+    )
+    AND (
+        (
+            (a.cross_following_details = 'None of the above')
+            AND (a.vicinity_detail = 'None of the above')
+            AND (a.road_cutting = "No")
+            AND (a.tree_cutting = "No")
+            AND (a.business_location_type IS NULL)
+            AND (a.land_type IS NULL)
+            AND (a.require_pole_shifting = "No")
+        )
+        OR (a.cross_following_details = p.will_your_industry_cross_the_following)
+        OR (a.vicinity_detail = p.vicinity_of)
+        OR (a.road_cutting = "Yes" AND p.road_cutting_involved = "Yes")
+        OR (a.tree_cutting = "Yes" AND p.tree_cutting_involved = "Yes")
+        OR (a.business_location_type = p.business_location_type AND a.land_type = p.land_type)
+        OR ((a.business_location_type = p.business_location_type) AND (a.land_type IS NULL))
+        OR (a.require_pole_shifting = "Yes" AND p.require_shifting_of_any_electricity_line_or_pole = "Yes")
+    )
+    AND (
+        p.name IN ({property_id_list_str})
+    )
+"""
     # Call the fetch_query_results function to get the results from the query
     results = fetch_query_results(query)
     # Check if there are results
@@ -1459,6 +1529,26 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
     try:
         final_results = []  # Store results for all property-supply combinations
         better_results = []
+        columns = [
+            "property_id",
+            "supply_id",
+            "essential_items",
+            "minimum_supply_requirement",
+            "supply_score",
+            "vendor_id",
+            "vendor_supply_capacity",
+            "years_of_experience",
+            "no_of_locations",
+            "no_of_past_clients",
+            "no_of_servieces",
+            "no_of_employees",
+            "latitude_longitude",
+            "Distance",
+            "No_of_vendors_found"
+        ]
+
+        all_vendors_df = pd.DataFrame(columns=columns)
+
         ### Checking if vendor df is empty
         if not vendor_df.empty:
             vendor_latlong_df = vendor_df[["vendor_id", "latitude_longitude"]].drop_duplicates()
@@ -1516,6 +1606,19 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                             # Find the best vendor based on the logic provided
                             req_cap = minimum_supply_requirement
                             pref_r = prefered_range
+
+                            final_result_for_vendors_df = vendors_for_supply[["supply_id", "Final_Score_With_Features", "vendor_id", "vendor_supply_capacity", 'years_of_experience', 'no_of_locations', 'no_of_past_clients', 'no_of_servieces', 'no_of_employees', 'latitude_longitude', "Dist"]].sort_values(by =["Final_Score_With_Features"], ascending = False)
+                            final_result_for_vendors_df["essential_items"] = [essential,]*len(final_result_for_vendors_df)
+                            final_result_for_vendors_df["property_id"] = [property_id,]*len(final_result_for_vendors_df)
+                            final_result_for_vendors_df["No_of_vendors_found"] = [len(vendors_for_supply["vendor_id"].unique()),]*len(final_result_for_vendors_df)
+                            final_result_for_vendors_df["minimum_supply_requirement"] = [minimum_supply_requirement,]*len(final_result_for_vendors_df)
+                            final_result_for_vendors_df = final_result_for_vendors_df[[final_result_for_vendors_df.columns[0]] + ['minimum_supply_requirement'] + [col for col in final_result_for_vendors_df.columns if col not in [final_result_for_vendors_df.columns[0], 'minimum_supply_requirement']]]
+                            final_result_for_vendors_df = final_result_for_vendors_df[[final_result_for_vendors_df.columns[0]] + ['essential_items'] + [col for col in final_result_for_vendors_df.columns if col not in [final_result_for_vendors_df.columns[0], 'essential_items']]]
+                            final_result_for_vendors_df = final_result_for_vendors_df[['property_id'] + [col for col in final_result_for_vendors_df.columns if col not in ['property_id',]]]
+                            final_result_for_vendors_df.rename(columns={"Dist": "Distance", "Final_Score_With_Features":"supply_score"}, inplace=True)
+
+                            all_vendors_df = pd.concat([all_vendors_df, final_result_for_vendors_df], axis=0)
+
                             best_ranked_row = vendors_for_supply.loc[
                                 vendors_for_supply["Final_Score_With_Features"].idxmax()
                             ]
@@ -1524,7 +1627,7 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                 final_results.append({
                                 "property_id": property_id,
                                 "supply_id": supply_id,
-                                "essential": essential,
+                                "essential_items": essential,
                                 "minimum_supply_requirement": minimum_supply_requirement,
                                 "supply_score": best_ranked_row["Final_Score_With_Features"],
                                 "vendor_id": best_ranked_row["vendor_id"],
@@ -1549,7 +1652,7 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                         {
                                             "property_id": property_id,
                                             "supply_id": supply_id,
-                                            "essential": essential,
+                                            "essential_items": essential,
                                             "minimum_supply_requirement": minimum_supply_requirement,
                                             "supply_score": best_ranked_row["Final_Score_With_Features"],
                                             "vendor_id": best_ranked_row["vendor_id"],
@@ -1567,7 +1670,7 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                     final_results.append({
                                         "property_id": property_id,
                                         "supply_id": supply_id,
-                                        "essential": essential,
+                                        "essential_items": essential,
                                         "minimum_supply_requirement": minimum_supply_requirement,
                                         "supply_score": best_g_cap_row["Final_Score_With_Features"],
                                         "vendor_id": best_g_cap_row["vendor_id"],
@@ -1585,7 +1688,7 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                     final_results.append({
                                     "property_id": property_id,
                                     "supply_id": supply_id,
-                                    "essential": essential,
+                                    "essential_items": essential,
                                     "minimum_supply_requirement": minimum_supply_requirement,
                                     "supply_score": best_ranked_row["Final_Score_With_Features"],
                                     "vendor_id": best_ranked_row["vendor_id"],
@@ -1601,12 +1704,12 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                 })
 
         # Convert results to DataFrame
-        final_df = pd.DataFrame(final_results)
+        final_df = pd.DataFrame(final_results, columns=columns)
         # log_to_file("Vendors by us:::",f"{final_df["vendor_id"]}")
         if len(better_results) == 0:
-            return final_df
-        better_df = pd.DataFrame(better_results)
-        return final_df, better_df
+            return final_df, None, all_vendors_df
+        better_df = pd.DataFrame(better_results, columns=columns)
+        return final_df, better_df, all_vendors_df
     except Exception as e:
         error_details = traceback.format_exc()
         log_to_file("Execprion form anaytics",str(error_details))
@@ -1615,7 +1718,7 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
 def calculate_final_supply_mapped_property_scores_with_condition(property_mapped_supply_individual_score, property_latlong_df_for_no_supply, weight_distance=0.7, weight_capacity=0.3):
     """
     Function to calculate the final aggregated vendor scores for each property ID based on weighted distance and capacity scores,
-    with conditional weights based on the 'essential' column.
+    with conditional weights based on the 'essential_items' column.
 
     Parameters:
     - property_mapped_supply_individual_score (pd.DataFrame): The input DataFrame containing supply and property data.
@@ -1646,14 +1749,14 @@ def calculate_final_supply_mapped_property_scores_with_condition(property_mapped
                 temp_supply_all_property_df["vendor_supply_capacity"], highest_is_worst=False
             )
             
-            # Weighted scores based on 'essential' column
+            # Weighted scores based on 'essential_items' column
             temp_supply_all_property_df['weighted_distance_score'] = np.where(
-                temp_supply_all_property_df['essential'], 
+                temp_supply_all_property_df['essential_items'], 
                 0.8 * temp_supply_all_property_df["Distance_score"], 
                 (1 - 0.8) * temp_supply_all_property_df["Distance_score"]
             )
             temp_supply_all_property_df['weighted_capacity_score'] = np.where(
-                temp_supply_all_property_df['essential'], 
+                temp_supply_all_property_df['essential_items'], 
                 0.8 * temp_supply_all_property_df["Capacity_score"], 
                 (1 - 0.8) * temp_supply_all_property_df["Capacity_score"]
             )
@@ -1767,7 +1870,7 @@ def process_approval_df_to_send_solution_screen(df):
     )
     return grouped_df
 
-def process_supply_vendor_df_to_send_solution_screen(df):
+def process_supply_vendor_df_to_send_solution_screen(df, all_vendor = False):
     """
     Processes the supply-vendor DataFrame to group data by property_id and categorize supplies into essential and non-essential.
     
@@ -1785,51 +1888,140 @@ def process_supply_vendor_df_to_send_solution_screen(df):
         - First DataFrame contains essential supply information.
         - Second DataFrame contains non-essential supply information.
     """
+
     log_to_file("df is",str(df))
+    # with open('log.txt', 'a') as f:
+        # f.write(f"We are looking first starting, type: {type(df['essential_items'][0])}\n")
     if not df.empty:
-        essential_supply_df = df[df["essential"]]
-        non_essential_supply_df = df[~df["essential"]]
-        grouped_essential_df = (
-            essential_supply_df.sort_values(by=['property_id', 'No_of_vendors_found'], ascending=[True, False])
-            .groupby('property_id')
-            .agg({
-                'supply_id': lambda x: list(x),  # List of incentives
-                'vendor_id': lambda x: list(x),  # List of incentives
-                'minimum_supply_requirement': lambda x: list(x),
-                'vendor_supply_capacity': lambda x: list(x),
-                'years_of_experience': lambda x: list(x),
-                'no_of_locations': lambda x: list(x),
-                'no_of_past_clients': lambda x: list(x),
-                'no_of_servieces': lambda x: list(x),
-                'no_of_employees': lambda x: list(x),
-                'latitude_longitude': lambda x: list(x),
-                'Distance': lambda x: list(x),
-                'No_of_vendors_found': lambda x: list(x),
-            })
-            .reset_index()
-        )
-        grouped_non_essential_df = (
-            non_essential_supply_df.sort_values(by=['property_id', 'No_of_vendors_found'], ascending=[True, False])
-            .groupby('property_id')
-            .agg({
-                'supply_id': lambda x: list(x),  # List of incentives
-                'vendor_id': lambda x: list(x),  # List of incentives
-                'minimum_supply_requirement': lambda x: list(x),
-                'vendor_supply_capacity': lambda x: list(x),
-                'years_of_experience': lambda x: list(x),
-                'no_of_locations': lambda x: list(x),
-                'no_of_past_clients': lambda x: list(x),
-                'no_of_servieces': lambda x: list(x),
-                'no_of_employees': lambda x: list(x),
-                'latitude_longitude': lambda x: list(x),
-                'Distance': lambda x: list(x),
-                'No_of_vendors_found': lambda x: list(x),
-            })
-            .reset_index()
-        )
-        return grouped_essential_df, grouped_non_essential_df
+        if not all_vendor:
+            essential_supply_df = df[df["essential_items"]]
+            non_essential_supply_df = df[~df["essential_items"]]
+
+            print("essential_supply_df:",essential_supply_df,"\nnon_essential_supply_df:\n",non_essential_supply_df)
+
+            grouped_essential_df = (
+                essential_supply_df.sort_values(by=['property_id', 'No_of_vendors_found'], ascending=[True, False])
+                .groupby('property_id')
+                .agg({
+                    'supply_id': lambda x: list(x),  # List of incentives
+                    'vendor_id': lambda x: list(x),  # List of incentives
+                    'supply_score': lambda x: list(x),
+                    'essential_items': lambda x: list(x),   
+                    'minimum_supply_requirement': lambda x: list(x),
+                    'vendor_supply_capacity': lambda x: list(x),
+                    'years_of_experience': lambda x: list(x),
+                    'no_of_locations': lambda x: list(x),
+                    'no_of_past_clients': lambda x: list(x),
+                    'no_of_servieces': lambda x: list(x),
+                    'no_of_employees': lambda x: list(x),
+                    'latitude_longitude': lambda x: list(x),
+                    'Distance': lambda x: list(x),
+                    'No_of_vendors_found': lambda x: list(x),
+                })
+                .reset_index()
+            )
+            grouped_non_essential_df = (
+                non_essential_supply_df.sort_values(by=['property_id', 'No_of_vendors_found'], ascending=[True, False])
+                .groupby('property_id')
+                .agg({
+                    'supply_id': lambda x: list(x),  # List of incentives
+                    'vendor_id': lambda x: list(x),  # List of incentives
+                    'supply_score': lambda x: list(x),
+                    'essential_items': lambda x: list(x),
+                    'minimum_supply_requirement': lambda x: list(x),
+                    'vendor_supply_capacity': lambda x: list(x),
+                    'years_of_experience': lambda x: list(x),
+                    'no_of_locations': lambda x: list(x),
+                    'no_of_past_clients': lambda x: list(x),
+                    'no_of_servieces': lambda x: list(x),
+                    'no_of_employees': lambda x: list(x),
+                    'latitude_longitude': lambda x: list(x),
+                    'Distance': lambda x: list(x),
+                    'No_of_vendors_found': lambda x: list(x),
+                })
+                .reset_index()
+            )
+            return grouped_essential_df, grouped_non_essential_df
+        else:
+            def build_property_vendor_map(property_mapped_all_vendor_df: pd.DataFrame) -> pd.DataFrame:
+                """
+                Groups the vendor data by property and supply, aggregating all vendor-specific fields
+                into nested lists per supply, and then nesting these under each property.
+
+                Args:
+                    property_mapped_all_vendor_df (pd.DataFrame): DataFrame containing repeated rows for each
+                    property-supply-vendor combination.
+
+                Returns:
+                    pd.DataFrame: Transformed DataFrame with unique property entries and nested structure:
+                                - supply_id: list of supplies per property
+                                - vendor_id: list of lists of vendors per supply
+                                - other fields: list of lists per supply
+                """
+               
+                # Step 1: Group by property_id and supply_id to collect vendor-level data per supply
+                nested_group = (
+                    property_mapped_all_vendor_df
+                    .groupby(['property_id', 'supply_id', 'No_of_vendors_found', 'essential_items', 'minimum_supply_requirement'])
+                    .agg({
+                        'vendor_id': lambda x: list(x),
+                        'supply_score': lambda x: list(x),
+                        'vendor_supply_capacity': lambda x: list(x),
+                        'years_of_experience': lambda x: list(x),
+                        'no_of_locations': lambda x: list(x),
+                        'no_of_past_clients': lambda x: list(x),
+                        'no_of_servieces': lambda x: list(x),
+                        'no_of_employees': lambda x: list(x),
+                        'latitude_longitude': lambda x: list(x),
+                        'Distance': lambda x: list(x),
+                    })
+                    .reset_index()
+                )
+
+                # Step 2: Group by property_id to nest supply-wise data under each property
+                final_grouped_df = (
+                    nested_group
+                    .groupby('property_id')
+                    .agg({
+                        'supply_id': lambda x: list(x),
+                        'vendor_id': lambda x: list(x),
+                        'supply_score': lambda x: list(x),
+                        'essential_items': lambda x: list(x),
+                        'minimum_supply_requirement': lambda x: list(x),
+                        'vendor_supply_capacity': lambda x: list(x),
+                        'years_of_experience': lambda x: list(x),
+                        'no_of_locations': lambda x: list(x),
+                        'no_of_past_clients': lambda x: list(x),
+                        'no_of_servieces': lambda x: list(x),
+                        'no_of_employees': lambda x: list(x),
+                        'latitude_longitude': lambda x: list(x),
+                        'Distance': lambda x: list(x),
+                        'No_of_vendors_found': lambda x: list(x),
+                    })
+                    .reset_index()
+                )
+
+                return final_grouped_df
+            df["essential_items"] = (
+                df["essential_items"]
+                .astype(str)
+                .str.strip()
+                .str.lower()
+                .map({"true": True, "false": False})
+                .fillna(False)
+            )
+            # with open('log.txt', 'a') as f:
+                # f.write(f"We are looking first, type: {type(df['essential_items'][0])}\n")
+            essential_supply_df = df[df["essential_items"]]
+            non_essential_supply_df = df[~df["essential_items"]]
+
+            grouped_essential_df = build_property_vendor_map(essential_supply_df)
+            grouped_non_essential_df = build_property_vendor_map(non_essential_supply_df) 
+            
+            return grouped_essential_df, grouped_non_essential_df
     else:
         return pd.DataFrame(), pd.DataFrame()
+
 
 def sort_by_scores(df, scores_df, for_final_return = False):
     """

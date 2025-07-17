@@ -24,7 +24,7 @@ def call_approval_query(aiResponse,chatId):
         insert_process(chatId,"Analyzing Data",analyse_data,"Pending")   
         insert_process(chatId,"Preparing Result",prepare_result,"Pending")
         time.sleep(3)
-        update_process(chatId,"Analyzing Your Query","Complete",1)
+        update_process(chatId,"Analyzing Your Query","Complete",1) #To be changed here after Testing 
         update_process(chatId,"Fetching Data","Processing",0)
         time.sleep(4)
         

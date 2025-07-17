@@ -1,0 +1,25 @@
+import { useEffect, useState } from 'react';
+import { marked } from 'marked';
+
+const TypewriterMarkdown = ({ text, speed = 20 }) => {
+  const [displayed, setDisplayed] = useState('');
+  const [index, setIndex] = useState(0);
+  const html = marked.parse(text); // Convert markdown to HTML
+
+  useEffect(() => {
+    if (index < html.length) {
+      const timeout = setTimeout(() => {
+        setDisplayed(html.slice(0, index + 1));
+        setIndex(index + 1);
+      }, speed);
+      return () => clearTimeout(timeout);
+    }
+  }, [index, html, speed]);
+
+  return (
+    <div
+      className="prose prose-sm text-white" // Optional: Tailwind prose for better markdown look
+      dangerouslySetInnerHTML={{ __html: displayed }}
+    />
+  );
+};

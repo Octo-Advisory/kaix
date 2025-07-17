@@ -1,7 +1,8 @@
 import { createSlice } from '@reduxjs/toolkit'
 
 const initialState = {
-    aiReponse : []
+    aiReponse : [],
+    selectedOption : null
 }
 
 export const aiSlice = createSlice({
@@ -14,9 +15,12 @@ export const aiSlice = createSlice({
         },
         clearAiresponse: (state) =>{
             state.aiReponse = [];
+        },
+        addSelectedoption: (state,action) =>{
+            state.selectedOption = action.payload
         }
     }
 })
 
-export const { addAIresponse, clearAiresponse } = aiSlice.actions;
+export const { addAIresponse, clearAiresponse ,addSelectedoption} = aiSlice.actions;
 export default aiSlice.reducer;

@@ -26,6 +26,7 @@ llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-ver
 llm_70b_vers_creative = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.7)
 llm_8b_inst=ChatGroq(groq_api_key=groq_api_key,model_name="llama-3.3-8b-instant", temperature=0.0)
 llm_deepseek = ChatGroq(groq_api_key=groq_api_key, model_name="deepseek-r1-distill-llama-70b", temperature=0.0)
+llm_maverik = ChatGroq(groq_api_key=groq_api_key, model_name="meta-llama/llama-4-maverick-17b-128e-instruct", temperature=0.5)
 # llm_openai = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_mini = ChatOpenAI(model="gpt-4o-mini", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_4o = ChatOpenAI(model="gpt-4o", temperature=0.0, api_key=openai_key)
@@ -133,7 +134,10 @@ def classify_query(user_query: str) -> str:
     Categories & Their Definitions:
 
     1. Query to build industry from Scratch:  
-        - Example: I want to build a 1 TPA Cement Factory.  
+        - Examples: 
+            - I want to build a 1 TPA Cement Factory. 
+            - What are the land options for the chemical industry in Surat? 
+            - Tell me the land availability for the agricultural industry in Bharuch.
         - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
         - Assign this category if the user's query indicates any intent to establish, set up, construct, initiate, develop, or start a new industry or factory, regardless of the exact words used.  
         - The classification must be based on understanding the overall intent and context rather than focusing on specific words like "build" or "establish."  
@@ -154,7 +158,9 @@ def classify_query(user_query: str) -> str:
         - This category is used for queries about obtaining permits, licenses, or regulatory approvals for a business or industry.
 
     5. Query to Get Employee Search:  
-        - Example: What is the availability of employment in XYZ area for the Pharmaceutical industry?  
+        - Example: 
+            - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
+            - What are the labor options for agricultural industry in Vadodara?
         - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
 
     6. Negatively Intended Query:
@@ -1226,8 +1232,6 @@ def extract_important_words(text: str, module: str = "") -> List[str]:
     return list(set(filtered_terms))
 
 
-
-
 def extract_main_industry_and_product_universal(user_query: str, main_industries: List[str], llm) -> Dict[str, str]:
     """
     Extract the Main-Industry and Product mentioned in the user query.
@@ -1241,7 +1245,8 @@ def extract_main_industry_and_product_universal(user_query: str, main_industries
         Dict[str, str]: A dictionary containing the extracted Main-Industry and Product.
     """
     # Convert the list into a formatted string for the prompt
-    main_industries_str = ", ".join(main_industries)
+    main_industries_str = ", ".join([f'"{m}"' for m in main_industries])
+
     
     # Define the universal prompt
     prompt_template = """
@@ -1341,7 +1346,7 @@ def extract_main_industry_and_product_universal(user_query: str, main_industries
     # Validate against the provided list of Segments
     validated_data = copy.deepcopy(extracted_data)
     if main_industry not in main_industries and main_industry != "None":
-        validated_data["Main-Industry"] = "Not Available in list"
+        validated_data["Main-Industry"] = "Not Available in List"
 
     return extracted_data, validated_data
 
@@ -1367,11 +1372,11 @@ def extract_sub_sector_and_product_universal(
                         Forced-Mapping, and Product.
     """    
     # Convert the list into a formatted string for the prompt
-    sub_sectors_str = ", ".join(sub_sectors)
+    sub_sectors_str = ", ".join([f'"{s}"' for s in sub_sectors])
 
     # Define additional context for Main-Industry and Product if available
     context_lines = []
-    if main_industry and main_industry not in ["None", "Not Available in list"]:
+    if main_industry and main_industry not in ["None", "Not Available in List"]:
         context_lines.append(f"Inferred Main-Industry: {main_industry}")
     if product and product != "None":
         context_lines.append(f"Inferred Product: {product}")
@@ -1515,13 +1520,13 @@ def extract_segment_and_product_universal(
         Dict[str, Dict[str, str]]: A dictionary containing the extracted and validated Segment, Original-Inferred-Segment, Forced-Mapping, and Product.
     """
     # Convert the list into a formatted string for the prompt
-    segments_str = ", ".join(segments)
+    segments_str = ", ".join([f'"{s}"' for s in segments])
 
     # Define additional context for Main-Industry and Sub-Sector if available
     context_lines = []
-    if main_industry and main_industry not in ["None", "Not Available in list"]:
+    if main_industry and main_industry not in ["None", "Not Available in List"]:
         context_lines.append(f"Inferred Main-Industry: {main_industry}")
-    if sub_sector and sub_sector not in ["None", "Not Available in list"]:
+    if sub_sector and sub_sector not in ["None", "Not Available in List"]:
         context_lines.append(f"Inferred Sub-Sector: {sub_sector}")
     if product and product != "None":
         context_lines.append(f"Inferred Product: {product}")
@@ -1636,7 +1641,7 @@ def extract_segment_and_product_universal(
     # Validate against the provided list of Segments
     validated_data = copy.deepcopy(extracted_data)
     if segment not in segments and segment != "None":
-        validated_data["Segment"] = "Not Available in list"
+        validated_data["Segment"] = "Not Available in List"
 
     return extracted_data, validated_data
 
@@ -1961,8 +1966,7 @@ def detect_module_switch_intent(
     prompt_template = """
     You are a smart assistant that helps decide if a user wants to switch away from the current conversation topics (called "modules").
 
-    Based on the user's most recent message, the last few exchanges, and the list of current modules, determine whether the user is
-    trying to change the topic to something outside the current active modules.
+    Based on the user's most recent message, the last few exchanges, and the list of current modules, determine whether the user is trying to change the topic to something outside the current active modules.
 
     Only return "True" if it is very likely that the user wants to exit the current module(s) and move to another topic/module.
     If the user is continuing the same conversation (asking for more detail, clarification, or responding to the assistant), return "False".
@@ -1978,10 +1982,11 @@ def detect_module_switch_intent(
     1. If the user mentions any module that is not part of the current module list, treat it as intent to switch.
     2. If the user mentions multiple modules — whether or not current modules are included — it is a switch if any module lies outside the current ones.
     Example: If current modules are ["Query to search Incentives"], and the user says “I want to check vendors and incentives”, this should be "True".
-    3. If the user is replying to the last AI message in a way that continues the same topic (e.g., confirming, following up, or asking for details),
-    you should return "False" and NOT consider this as an intent switch.
-    4. If the user’s message is vague, complex, or indirectly worded, do not rely on specific keywords. Instead, analyze the overall meaning
-    of the message to determine whether they are continuing the current topic or shifting to a new one.
+    3. If the user is replying to the last AI message in a way that continues the same topic (e.g., confirming, following up, or asking for details), you should return "False" and NOT consider this as an intent switch.
+    4. If the user’s message is vague, complex, or indirectly worded, do not rely on specific keywords. Instead, analyze the overall meaning of the message to determine whether they are continuing the current topic or shifting to a new one.
+    5. If the user's new query discusses a completely different *type of information* about the same project, industry, or location (e.g., land availability after asking about manpower), treat it as a module switch. Shared project or location does NOT mean same intent.
+        - For example, a shift from "labor availability" to "land availability" means the user has moved from Employment to Build-from-Scratch — this should be considered a module switch.
+
 
     Additional Understanding Requirement:
     - Do not rely solely on specific keywords like “approvals,” “vendors,” “employment,” “incentives,” or “building industry from scratch.”

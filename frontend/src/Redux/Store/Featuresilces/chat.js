@@ -7,7 +7,9 @@ const initialState ={
     //     timestamp: new Date().toISOString(),
     //   }],
     messages : [],
-    chatID : null
+    chatID : null,
+    lastId: null,
+    addInput : null
 }
 
 export const chatSlice = createSlice({
@@ -19,9 +21,15 @@ export const chatSlice = createSlice({
         },
         addChatId: (state,action) => {
             state.chatID = action.payload
+        },
+        addLastResultId: (state,action) => {
+            state.lastId = action.payload
+        },
+        addInputtext: (state,action) => {
+            state.addInput = action.payload
         }
     }
 })
 
-export const { addMessage,addChatId } = chatSlice.actions;
+export const { addMessage,addChatId,addLastResultId,addInputtext } = chatSlice.actions;
 export default chatSlice.reducer;

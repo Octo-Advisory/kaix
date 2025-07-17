@@ -49,34 +49,108 @@ def _extract_session_id(key, marker):
         raise ValueError(f"Invalid key format: {key}")
     return parts[1]
 
-# Save chat to Session
+# Save chat to Session Original Method
+# def save_chat(chat_history, key):
+#     from langchain.schema import BaseMessage
+#     try:
+#         session_id = _extract_session_id(key, "chat_")
+
+#         # Convert only necessary fields
+#         chat_json = json.dumps([
+#             {"type": msg.type, "content": msg.content}
+#             for msg in chat_history if isinstance(msg, BaseMessage)
+#         ])
+
+#         with open("log3.txt", "a") as file:
+#             file.write(f"\n Details from redis chat {chat_history, key , session_id, chat_json}")
+#         frappe.db.set_value("Session", session_id, "chat_json", chat_json)
+#         frappe.db.commit()
+#     except Exception as e:
+#         frappe.log_error(f"Error saving chat for {key}: {e}")
+
+# Save Chat to Session 
 def save_chat(chat_history, key):
+    import json
     from langchain.schema import BaseMessage
+
     try:
         session_id = _extract_session_id(key, "chat_")
 
-        # Convert only necessary fields
-        chat_json = json.dumps([
-            {"type": msg.type, "content": msg.content}
-            for msg in chat_history if isinstance(msg, BaseMessage)
-        ])
+        final_msgs = []
 
-        frappe.db.set_value("Session", session_id, "chat_json", chat_json)
+        # Find the index of the last human message
+        last_human_index = None
+        for i in range(len(chat_history) - 1, -1, -1):
+            if isinstance(chat_history[i], BaseMessage) and chat_history[i].type == "human":
+                last_human_index = i
+                break
+
+        for idx, msg in enumerate(chat_history):
+            if isinstance(msg, BaseMessage):
+                msg_dict = {
+                    "type": msg.type,
+                    "content": msg.content,
+                    **(msg.additional_kwargs or {})
+                }
+
+                if idx == last_human_index:
+                    msg_dict["method_called"] = 0
+
+                final_msgs.append(msg_dict)
+
+        # with open("log3.txt", "a") as file:
+        #     file.write(f"\n📨 Final Save New for {session_id}: {json.dumps(final_msgs)}")
+
+        frappe.db.set_value("Session", session_id, "chat_json", json.dumps(final_msgs))
         frappe.db.commit()
+
     except Exception as e:
-        frappe.log_error(f"Error saving chat for {key}: {e}")
+        frappe.log_error(f"❌ Error saving chat for {key}: {e}")
+
+# The below is the original old methoid 
+# def get_chat(key):
+#     try:
+#         from langchain.schema import HumanMessage, AIMessage
+#         session_id = _extract_session_id(key, "chat_")
+#         raw = frappe.db.get_value("Session", session_id, "chat_json")
+#         if not raw:
+#             return []
+
+#         msg_map = {"human": HumanMessage, "ai": AIMessage}
+#         messages = json.loads(raw)
+#         # Debug log
+#         with open("log3.txt", "a") as file:
+#             file.write(f"\n📨 {session_id } Messages: {json.dumps(raw)}")
+#         return [msg_map[m["type"]](content=m["content"]) for m in messages if m["type"] in msg_map]
+#     except Exception as e:
+#         frappe.log_error(f"Error getting chat for {key}: {str(e)}")
+#         return []
 
 def get_chat(key):
+   
     try:
         from langchain.schema import HumanMessage, AIMessage
         session_id = _extract_session_id(key, "chat_")
         raw = frappe.db.get_value("Session", session_id, "chat_json")
+        # with open("log3.txt", "a") as file:
+        #     file.write(f"\n📨 Final Save New for NEWWWWWW {raw}")
         if not raw:
             return []
 
         msg_map = {"human": HumanMessage, "ai": AIMessage}
         messages = json.loads(raw)
-        return [msg_map[m["type"]](content=m["content"]) for m in messages if m["type"] in msg_map]
+
+        # with open("log3.txt", "a") as file:
+        #     file.write(f"\n📨OK OK  {session_id} New Messages (raw): {raw}")
+
+        return [
+            msg_map[m["type"]](
+                content=m["content"],
+                additional_kwargs={k: v for k, v in m.items() if k not in ["type", "content"]}
+            )
+            for m in messages if m["type"] in msg_map
+        ]
+
     except Exception as e:
         frappe.log_error(f"Error getting chat for {key}: {str(e)}")
         return []

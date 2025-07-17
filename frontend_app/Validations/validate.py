@@ -22,7 +22,7 @@ def validation(aiResponse,user_intension):
             }
             with open("log.txt", "a") as file:
                 file.write(f"\nparam {param}")
-        
+            
             return approval_validation(param)
         elif user_intension == "Query to build industry from Scratch":
              state = aiResponse['state']
@@ -41,26 +41,31 @@ def validation(aiResponse,user_intension):
             location_check = result.get('location_check',{})
             with open("log.txt", "a") as file:
                 file.write(f"\nlocation_check {location_check}")
-            supply_check = result.get('supply_check',{})
-            industry_check = result.get('industry_check',{})
-            pass_to_analytics_module1 = location_check.get('pass_to_analytics_module',None)
-            pass_to_analytics_module2 = supply_check.get('pass_to_analytics_module',None)
-            pass_to_analytics_module3 = industry_check.get('pass_to_analytics_module',None)
 
-            # Collect only values that are not None
-            values = [v for v in (pass_to_analytics_module1, pass_to_analytics_module2, pass_to_analytics_module3) if v is not None]
+            final_check = result.get('pass_to_analytics',False)
+            return (final_check, result)
+            # supply_check = result.get('supply_check',{})
+            # industry_check = result.get('industry_check',{})
+            # pass_to_analytics_module1 = location_check.get('pass_to_analytics_module',None)
+            # pass_to_analytics_module2 = supply_check.get('pass_to_analytics_module',None)
+            # pass_to_analytics_module3 = industry_check.get('pass_to_analytics_module',None)
+            # with open("log.txt", "a") as file:
+            #     file.write(f"\nlocation_check {pass_to_analytics_module1}, supply_check {pass_to_analytics_module2}, industry_check {pass_to_analytics_module3}, ")
 
-            with open("log.txt", "a") as file:
-                file.write(f"\nvalues {values}")
+            # # Collect only values that are not None
+            # values = [v for v in (pass_to_analytics_module1, pass_to_analytics_module2, pass_to_analytics_module3) if v is not None]
+
+            # with open("log.txt", "a") as file:
+            #     file.write(f"\nvalues {values}")
             
-            # if all none found then return False
-            if not values:
-                return (False, result)
+            # # if all none found then return False
+            # if not values:
+            #     return (True, result)
 
-            if all(value is True for value in values):
-                return (True, result)
-            else:
-                return (False, result)
+            # if all(value is True for value in values):
+            #     return (True, result)
+            # else:
+            #     return (False, result)
             
         elif user_intension == "Query to search Incentives":
             param = aiResponse['State']

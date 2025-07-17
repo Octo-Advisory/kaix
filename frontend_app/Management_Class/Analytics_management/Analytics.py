@@ -9,15 +9,19 @@ from frontend_app.Management_Class.Analytics_management.vendor_query import call
 from frontend_app.Log_management.createlog import log
 
 @frappe.whitelist(allow_guest=True)
-def analytics_module_call(aiResponse,chatId,validationResult):
+def analytics_module_call(aiResponse,chatId,validationResult,selectedOption):
     try:
         user_intension = check_user_intension(chatId)
         log(chatId,"debug","user_intension",str(user_intension),"Analytics.py",'analytics')
         aiResponse = json.loads(aiResponse)
+        with open("log2.txt", "a", encoding="utf-8") as file:
+            file.write(f"AI RESPONSE FOR TESTING LOG {json.dumps(aiResponse)} \n")
         log(chatId,"debug","aiResponse",str(aiResponse),"Analytics.py",'analytics')
         aiResponse = aiResponse[0]
         if user_intension == "Query to Get Employee Search":
             result = handle_employement_query(aiResponse,chatId)
+            with open("log.txt", "a", encoding="utf-8") as file:
+                file.write(f"AI RESPONSE FOR TESTING LOG employeee {str(result)} \n")
             response = {
                 **result,
                 "user_intension" : user_intension
@@ -25,7 +29,9 @@ def analytics_module_call(aiResponse,chatId,validationResult):
             log(chatId,"debug","response",str(response),"Analytics.py",'analytics')
             return response
         elif user_intension == "Query to build industry from Scratch":
-            result =  industry_from_scratch(aiResponse['state'],chatId)
+            if not selectedOption:
+                raise ValueError("selectedOption not found")
+            result =  industry_from_scratch(aiResponse['state'],chatId,selectedOption)
             response = {
                     **result,
                     "user_intension" : user_intension

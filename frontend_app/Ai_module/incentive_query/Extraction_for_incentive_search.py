@@ -437,7 +437,9 @@ def call_incentive_search(input,chatId):
         response = {
             "Ai_response": message,
             "Is_confirmation" : None,
-            "State" : state 
+            "State" : state,
+            "options": None,
+            "User Intention": query_intent
         }
         log_to_file("Negatively Intended Query:::::::::::::::::::::::::",response)
         return response
@@ -452,7 +454,9 @@ def call_incentive_search(input,chatId):
             response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
-                        "State" : state 
+                        "State" : state,
+                        "options": None,
+                        "User Intention": query_intent
                     }
             return response
         else:
@@ -483,7 +487,9 @@ def call_incentive_search(input,chatId):
                     response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
-                            "State" : state
+                            "State" : state,
+                            "options": None,
+                            "User Intention": query_intent
                         }
                     return response
                 else:
@@ -493,21 +499,62 @@ def call_incentive_search(input,chatId):
                         (state.get(key) for key in ['Product', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
                         ''
                         )
-                        message = f"We have identified, you are looking for incentives related to {selected_option} production in {state.get('Area')} under the city {state.get('City')} in {state.get('State')}. Is this information correct?"
-                        dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
-                        chat_history.append(AIMessage(content=f"{dynamic_confirmation_message}"))
+                        area = state.get("Area") 
+                        city = state.get("City")
+                        region = state.get("State")
+
+                        area = area if area != "None" else None
+                        city = city if city != "None" else None
+                        region = region if region != "None" else None
+
+                        # Build dynamic location phrase
+                        if area and city and region:
+                            location_str = f"production in **{area}**, within the city of **{city}**, **{region}**"
+                        elif not area and city and region:
+                            location_str = f"production in the city of **{city}**, **{region}**"
+                        elif not area and not city and region:
+                            location_str = f"production in the state of **{region}**"
+                        elif area and not city and region:
+                            location_str = f"production in **{area}**, **{region}**"
+                        elif area and city and not region:
+                            location_str = f"production in **{area}**, within the city of **{city}**"
+                        elif area and not city and not region:
+                            location_str = f"production in **{area}**"
+                        elif not area and city and not region:
+                            location_str = f"production in the city of **{city}**"
+                        else:
+                            location_str = f"production"
+
+                        # Final message using dynamic location
+                        confirmation_message_incentive_context_1 = (
+                            f"From your query, we’ve understood that you're exploring available **incentives** for **{selected_option}** {location_str}. <br/><br/>"
+                            f"Please confirm if this information is correct so we can show you the most relevant incentive schemes."
+                        )
+
+                        # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
+                        chat_history.append(AIMessage(content=f"{confirmation_message_incentive_context_1}"))
                         save_chat(chat_history,f"chat_{chatId}")
+
+                        confirmation_buttons = [
+                            {"label": "Yes, this is correct", "value": query_intent},
+                            {"label": "No, I want to update the details", "value": None}
+                        ]
+
                         response = {
-                            "Ai_response": dynamic_confirmation_message,
+                            "Ai_response": confirmation_message_incentive_context_1,
                             "Is_confirmation" : True,
-                            "State" : state
+                            "State" : state,
+                            "options": confirmation_buttons,
+                            "User Intention": query_intent
                         }
                         return response
                     elif location_follow_up == "Not Available in List":
                         response = {
                             "Ai_response": "Not Available in List",
                             "Is_confirmation" : False,
-                            "State" : state
+                            "State" : state,
+                            "options": None,
+                            "User Intention": query_intent
                         }
                         return response
                     else:
@@ -515,7 +562,9 @@ def call_incentive_search(input,chatId):
                         response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
-                                "State" : state
+                                "State" : state,
+                                "options": None,
+                                "User Intention": query_intent
                             }
                         return response
                 
@@ -527,7 +576,9 @@ def call_incentive_search(input,chatId):
                 response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
-                        "State" : state
+                        "State" : state,
+                        "options": None,
+                        "User Intention": query_intent
                     }
                 return response
 

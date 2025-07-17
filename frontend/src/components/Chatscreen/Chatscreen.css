@@ -42,4 +42,14 @@
     z-index: -1;
   }
   
-  
+  .placeholder-center::placeholder {
+    /* Vertical center using flexbox trick */
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  textarea {
+    position: relative;
+  }

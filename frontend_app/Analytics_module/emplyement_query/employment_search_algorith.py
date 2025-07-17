@@ -81,28 +81,33 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
     - dict: Response containing employment statistics, error flag, and visualization (if applicable).
     """
     try:
+        
+        with open("log.txt", "a") as file:
+            file.write(f"\n I am here at this scenario UP: -> city and state: uushvjuicfgtvjvcv  IF {intention} Check {intention == 'Individual employment status'}")
         insert_process(chatId,"Analyzing Your Query","Analyzing Your query","Pending")
         insert_process(chatId,"Fetching Data","Fetching Data Based On Your Query","Pending")
         insert_process(chatId,"Analyzing Data","Analyzing Gathered Data","Pending")   
         insert_process(chatId,"Preparing Result","Preparing Result","Pending")
         time.sleep(1)   
-        update_process(chatId,"Analyzing Your Query","Processing")
+        update_process(chatId,"Analyzing Your Query","Processing",0)
         time.sleep(3)
-        update_process(chatId,"Analyzing Your Query","Complete")
+        update_process(chatId,"Analyzing Your Query","Complete",1)
         #get Employement status
-        update_process(chatId,"Fetching Data","Processing")
+        update_process(chatId,"Fetching Data","Processing",0)
         Employment_Status = get_employment_status()
         time.sleep(3)
-        update_process(chatId,"Fetching Data","Complete")
-        update_process(chatId,"Analyzing Data","Processing")
+        update_process(chatId,"Fetching Data","Complete",1)
+        update_process(chatId,"Analyzing Data","Processing",0)
         time.sleep(3)
+        with open("log.txt", "a") as file:
+            file.write(f"\n I am here at this scenario DOWN: -> city and state: uushvjuicfgtvjvcv  IF {intention} Check {intention == 'Individual employment status'}")
         if intention == "Individual employment status":
             state = input_data.get("state")
             city = input_data.get("city_name")
             
             if not state and not city:
                 #print("Invalid Choice")
-                update_process(chatId,"Analyzing Data","Fail")
+                update_process(chatId,"Analyzing Data","Fail",0)
                 response = {
                     "Analytics_response": "Invalid Choice",
                     "Is_Error" : True,
@@ -115,7 +120,7 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                 state_data = Employment_Status[Employment_Status['state'] == state]
                 if state_data.empty:
                     #print(f"No data available for state: {state}")
-                    update_process(chatId,"Analyzing Data","Fail")
+                    update_process(chatId,"Analyzing Data","Fail",0)
                     response = {
                         "Analytics_response": "No data available for state",
                         "Is_Error" : True,
@@ -155,10 +160,10 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                             "intention" : intention
                         }
                 
-                update_process(chatId,"Analyzing Data","Complete")
-                update_process(chatId,"Preparing Result","Processing")
+                update_process(chatId,"Analyzing Data","Complete",1)
+                update_process(chatId,"Preparing Result","Processing",0)
                 time.sleep(3)
-                update_process(chatId,"Preparing Result","Complete")
+                update_process(chatId,"Preparing Result","Complete",1)
                 return response
             
             elif state and city:
@@ -174,7 +179,7 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                         "Is_Error" : True,
                         "intention" : intention
                     }
-                    update_process(chatId,"Analyzing Data","Fail")
+                    update_process(chatId,"Analyzing Data","Fail",0)
                     return response
                 
                  # Always generate the pie chart with all employment types
@@ -208,10 +213,10 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                         "chart_base64": img_base64,
                         "intention" : intention
                     }
-                update_process(chatId,"Analyzing Data","Complete")
-                update_process(chatId,"Preparing Result","Processing")
+                update_process(chatId,"Analyzing Data","Complete",1)
+                update_process(chatId,"Preparing Result","Processing",0)
                 time.sleep(5)
-                update_process(chatId,"Preparing Result","Complete")
+                update_process(chatId,"Preparing Result","Complete",1)
                 return response
             
         elif intention == "Comparison between cities, states, or areas":
@@ -223,7 +228,7 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                         "Is_Error" : True,
                         "intention" : intention
                     }
-                update_process(chatId,"Analyzing Data","Fail")
+                update_process(chatId,"Analyzing Data","Fail",0)
                 return response
             
             # Check if cities are in the same state
@@ -237,7 +242,7 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                         "Is_Error" : True,
                         "intention" : intention
                     }
-                update_process(chatId,"Analyzing Data","Fail")
+                update_process(chatId,"Analyzing Data","Fail",0)
                 return response
             
             if not keyword_given_by_user:
@@ -286,10 +291,10 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                 }
 
                 return response
-            update_process(chatId,"Analyzing Data","Complete")
-            update_process(chatId,"Preparing Result","Processing")
+            update_process(chatId,"Analyzing Data","Complete",1)
+            update_process(chatId,"Preparing Result","Processing",0)
             time.sleep(5)
-            update_process(chatId,"Preparing Result","Complete")
+            update_process(chatId,"Preparing Result","Complete",1)
             return response
         
         else:
@@ -299,7 +304,7 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                         "Is_Error" : True,
                         "intention" : intention
                     }
-            update_process(chatId,"Analyzing Data","Fail")
+            update_process(chatId,"Analyzing Data","Fail",0)
             return response
     except Exception as e:
         return e

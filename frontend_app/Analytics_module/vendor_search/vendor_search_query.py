@@ -39,7 +39,7 @@ def normalize_series(series, highest_is_worst=True):
     else:
         return 1 + (((series - min_val) / (max_val - min_val)) * 9)
 
-def fetch_supply_data(given_industry_by_user, given_sub_sector_by_user, given_segment_by_user,given_supplies_by_user):
+def fetch_supply_data(given_industry_by_user = None, given_sub_sector_by_user = None, given_segment_by_user = None,given_supplies_by_user = None):
     """
     Fetches supply data based on the provided industry, sub-sector, and segment.
     If no industry, sub-sector, or segment is given, it returns the supply_id provided by the user.
@@ -53,11 +53,10 @@ def fetch_supply_data(given_industry_by_user, given_sub_sector_by_user, given_se
     Returns:
     list or None: List of supplies if found, None if no results are available.
     """
-
     if given_industry_by_user is None and given_sub_sector_by_user is None and given_segment_by_user is None:
         # print("No industry, sub-sector, or segment provided. Returning supply_id_str.")
         supply_id = given_supplies_by_user
-        return supply_id  # Returns None since it was initialized
+        return [[i, "Individual_Supply"] for i in supply_id]  # Returns None since it was initialized
 
     else:
         industry_id = None
@@ -79,7 +78,7 @@ def fetch_supply_data(given_industry_by_user, given_sub_sector_by_user, given_se
             query = f"""
             SELECT name
             FROM `tabSub Sector`
-            WHERE sub_sector_name = '{given_sub_sector_by_user}'
+            WHERE sub_sector_name = '{given_sub_sector_by_user}' and industry_id = '{industry_id}'
             """
             results = fetch_query_results(query)
             sub_sector_id = results[0][0] if results else None
@@ -90,7 +89,7 @@ def fetch_supply_data(given_industry_by_user, given_sub_sector_by_user, given_se
             query = f"""
             SELECT name
             FROM `tabSegment`
-            WHERE segment = '{given_segment_by_user}'
+            WHERE segment = '{given_segment_by_user}' and sub_sector = '{sub_sector_id}' and industry = '{industry_id}'
             """
             results = fetch_query_results(query)
             segment_id = results[0][0] if results else None
@@ -100,7 +99,7 @@ def fetch_supply_data(given_industry_by_user, given_sub_sector_by_user, given_se
         supply_rules_query = None
         if industry_id and sub_sector_id and segment_id:
             supply_rules_query = f"""
-            SELECT supply
+            SELECT supply, essential_items
             FROM `tabSupply Rules`
             WHERE industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment = '{segment_id}'
             """
@@ -111,7 +110,7 @@ def fetch_supply_data(given_industry_by_user, given_sub_sector_by_user, given_se
             
         elif industry_id and sub_sector_id and segment_id is None:
             supply_rules_query = f"""
-            SELECT supply
+            SELECT supply, essential_items
             FROM `tabSupply Rules`
             WHERE industry = '{industry_id}' AND sub_sector = '{sub_sector_id}'
             """
@@ -122,7 +121,7 @@ def fetch_supply_data(given_industry_by_user, given_sub_sector_by_user, given_se
 
         elif industry_id and sub_sector_id is None and segment_id is None:
             supply_rules_query = f"""
-            SELECT supply
+            SELECT supply, essential_items
             FROM `tabSupply Rules`
             WHERE industry = '{industry_id}'
             """
@@ -169,7 +168,7 @@ def vendor_df(supply_id_str):
                                         'years_of_experience', 'no_of_locations', 'no_of_past_clients', 
                                         'no_of_servieces', 'no_of_employees', 'latitude_longitude', 'Certifications', 'Description'])
     else:
-        vendor_df = pd.DataFrame()
+        vendor_df = pd.DataFrame(columns=['vendor_id', 'vendor_name', 'supply_id', 'vendor_supply_capacity', 'years_of_experience', 'no_of_locations', 'no_of_past_clients', 'no_of_servieces', 'no_of_employees', 'latitude_longitude', 'Certifications', 'Description'])
     return vendor_df
 
 # Function to transform data
@@ -400,7 +399,23 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
             vendor_df = vendor_df[~vendor_df["vendor_id"].isin(missing_vendor_from_distance_dict)]
         final_results = []  # Store results for all property-supply combinations
         better_results = []
-        all_vendors_df = pd.DataFrame()
+        all_vendors_df = pd.DataFrame(columns=[
+            # "property_id",  # Uncomment if you want to include this
+            "supply_id",
+            "essential_items",
+            #"minimum_supply_requirement",  # Uncomment if needed
+            "supply_score",
+            "vendor_id",
+            "vendor_supply_capacity",
+            "years_of_experience",
+            "no_of_locations",
+            "no_of_past_clients",
+            "no_of_servieces",
+            "no_of_employees",
+            "latitude_longitude",
+            "Distance",
+            "No_of_vendors_found"
+        ])
         # Loop through all properties
         for _, property_row in property_latlong_df.iterrows():
             property_id = property_row['property_id']
@@ -409,7 +424,8 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                 for _, supply_row in supply_rules_df.iterrows():
                     supply_id = supply_row['supply_id']
                     minimum_supply_requirement = 0
-                    # essential = (supply_row['essentials_items']).lower() == "yes"
+
+                    essential = (supply_row['essential_items']).lower() if (supply_row['essential_items']).lower() == "individual_supply" else (supply_row['essential_items']).lower() == "yes"
                     
                     # Filter vendors for the current supply
                     vendors_for_supply = vendor_df[vendor_df['supply_id'] == supply_id].copy()
@@ -449,7 +465,14 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                         # Find the best vendor based on the logic provided
                         req_cap = minimum_supply_requirement
                         pref_r = prefered_range
-                        final_result_for_vendors_df = vendors_for_supply[["supply_id", "Final_Score_With_Features", "vendor_id"]].sort_values(by =["Final_Score_With_Features"], ascending = False) #, "vendor_supply_capacity", 'years_of_experience', 'no_of_locations', 'no_of_past_clients', 'no_of_servieces', 'no_of_employees', 'latitude_longitude', "Dist"
+
+                        final_result_for_vendors_df = vendors_for_supply[["supply_id", "Final_Score_With_Features", "vendor_id", "vendor_supply_capacity", 'years_of_experience', 'no_of_locations', 'no_of_past_clients', 'no_of_servieces', 'no_of_employees', 'latitude_longitude', "Dist"]].sort_values(by =["Final_Score_With_Features"], ascending = False)
+                        final_result_for_vendors_df["essential_items"] = [essential,]*len(final_result_for_vendors_df)
+                        final_result_for_vendors_df = final_result_for_vendors_df[[final_result_for_vendors_df.columns[0]] + ['essential_items'] + [col for col in final_result_for_vendors_df.columns if col not in [final_result_for_vendors_df.columns[0], 'essential_items']]]
+                        final_result_for_vendors_df["No_of_vendors_found"] = [len(vendors_for_supply["vendor_id"].unique()),]*len(final_result_for_vendors_df)
+                        final_result_for_vendors_df.rename(columns={"Dist": "Distance", "Final_Score_With_Features":"supply_score"}, inplace=True)
+
+                        # final_result_for_vendors_df = vendors_for_supply[["supply_id", "Final_Score_With_Features", "vendor_id","Dist"]].sort_values(by =["Final_Score_With_Features"], ascending = False) #, "vendor_supply_capacity", 'years_of_experience', 'no_of_locations', 'no_of_past_clients', 'no_of_servieces', 'no_of_employees', 'latitude_longitude', "Dist"
                         all_vendors_df = pd.concat([all_vendors_df, final_result_for_vendors_df], axis=0)
                         best_ranked_row = vendors_for_supply.loc[
                             vendors_for_supply["Final_Score_With_Features"].idxmax()
@@ -459,8 +482,9 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                             final_results.append({
                                 # "property_id": property_id,
                                 "supply_id": supply_id,
-                                "minimum_supply_requirement": minimum_supply_requirement,
-                                "Final_Score_With_Features": best_ranked_row["Final_Score_With_Features"],
+                                "essential_items": essential,
+                                # "minimum_supply_requirement": minimum_supply_requirement,
+                                "supply_score": best_ranked_row["Final_Score_With_Features"],
                                 "vendor_id": best_ranked_row["vendor_id"],
                                 "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
                                 "years_of_experience": best_ranked_row["years_of_experience"],
@@ -469,7 +493,7 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                 "no_of_servieces": best_ranked_row["no_of_servieces"],
                                 "no_of_employees": best_ranked_row["no_of_employees"],
                                 "latitude_longitude": best_ranked_row["latitude_longitude"],
-                                "Dist": best_ranked_row["Dist"],
+                                "Distance": best_ranked_row["Dist"],
                                 "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                 
                             })
@@ -482,11 +506,11 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                 best_g_cap_row = g_cap.loc[g_cap["Final_Score_With_Features"].idxmax()]
                                 better_results.append(
                                     {
-                                        "property_id": property_id,
+                                        # "property_id": property_id,
                                         "supply_id": supply_id,
-                                        # "essential": essential,
-                                        "minimum_supply_requirement": minimum_supply_requirement,
-                                        "Final_Score_With_Features": best_ranked_row["Final_Score_With_Features"],
+                                        "essential_items": essential,
+                                        # # "minimum_supply_requirement": minimum_supply_requirement,
+                                        "supply_score": best_ranked_row["Final_Score_With_Features"],
                                         "vendor_id": best_ranked_row["vendor_id"],
                                         "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
                                         "years_of_experience": best_ranked_row["years_of_experience"],
@@ -495,17 +519,17 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                         "no_of_servieces": best_ranked_row["no_of_servieces"],
                                         "no_of_employees": best_ranked_row["no_of_employees"],
                                         "latitude_longitude": best_ranked_row["latitude_longitude"],
-                                        "Dist": best_ranked_row["Dist"],
+                                        "Distance": best_ranked_row["Dist"],
                                         "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                         
                                     }
                                 )
                                 final_results.append({
-                                    "property_id": property_id,
+                                    # "property_id": property_id,
                                     "supply_id": supply_id,
-                                    # "essential": essential,
-                                    "minimum_supply_requirement": minimum_supply_requirement,
-                                    "Final_Score_With_Features": best_g_cap_row["Final_Score_With_Features"],
+                                    "essential_items": essential,
+                                    # # "minimum_supply_requirement": minimum_supply_requirement,
+                                    "supply_score": best_g_cap_row["Final_Score_With_Features"],
                                     "vendor_id": best_g_cap_row["vendor_id"],
                                     "vendor_supply_capacity": best_g_cap_row["vendor_supply_capacity"],
                                     "years_of_experience": best_g_cap_row["years_of_experience"],
@@ -514,17 +538,17 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                     "no_of_servieces": best_g_cap_row["no_of_servieces"],
                                     "no_of_employees": best_g_cap_row["no_of_employees"],
                                     "latitude_longitude": best_g_cap_row["latitude_longitude"],
-                                    "Dist": best_g_cap_row["Dist"],
+                                    "Distance": best_g_cap_row["Dist"],
                                     "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                     
                                     })
                             else:
                                 final_results.append({
-                                    "property_id": property_id,
+                                    # "property_id": property_id,
                                     "supply_id": supply_id,
-                                    # "essential": essential,
-                                    "minimum_supply_requirement": minimum_supply_requirement,
-                                    "Final_Score_With_Features": best_ranked_row["Final_Score_With_Features"],
+                                    "essential_items": essential,
+                                    # # "minimum_supply_requirement": minimum_supply_requirement,
+                                    "supply_score": best_ranked_row["Final_Score_With_Features"],
                                     "vendor_id": best_ranked_row["vendor_id"],
                                     "vendor_supply_capacity": best_ranked_row["vendor_supply_capacity"],
                                     "years_of_experience": best_ranked_row["years_of_experience"],
@@ -533,39 +557,167 @@ def get_supply_scores(property_latlong_df, supply_rules_df, vendor_df, prefered_
                                     "no_of_servieces": best_ranked_row["no_of_servieces"],
                                     "no_of_employees": best_ranked_row["no_of_employees"],
                                     "latitude_longitude": best_ranked_row["latitude_longitude"],
-                                    "Dist": best_ranked_row["Dist"],
+                                    "Distance": best_ranked_row["Dist"],
                                     "No_of_vendors_found": len(vendors_for_supply["vendor_id"].unique())
                                     
                                 })
-        final_df = pd.DataFrame(final_results)
-        better_df = pd.DataFrame(better_results)
+        final_df = pd.DataFrame(final_results, columns=[
+            # "property_id",  # Uncomment if you want to include this
+            "supply_id",
+            "essential_items",
+            #"minimum_supply_requirement",  # Uncomment if needed
+            "supply_score",
+            "vendor_id",
+            "vendor_supply_capacity",
+            "years_of_experience",
+            "no_of_locations",
+            "no_of_past_clients",
+            "no_of_servieces",
+            "no_of_employees",
+            "latitude_longitude",
+            "Distance",
+            "No_of_vendors_found"
+        ])
+        better_df = pd.DataFrame(better_results, columns=[
+            # "property_id",  # Uncomment if you want to include this
+            "supply_id",
+            "essential_items",
+            #"minimum_supply_requirement",  # Uncomment if needed
+            "supply_score",
+            "vendor_id",
+            "vendor_supply_capacity",
+            "years_of_experience",
+            "no_of_locations",
+            "no_of_past_clients",
+            "no_of_servieces",
+            "no_of_employees",
+            "latitude_longitude",
+            "Distance",
+            "No_of_vendors_found"
+        ])
+
         # return final_df.to_json, better_df.to_json, all_vendors_df.to_json
-        if not keyword_given_by_user :
-            return {"Best Supplier": final_df.to_json(),
-                    "Better Supplier": better_df.to_json(),
-                    "Filtered All Supplier" : None,
-                    "Unfiltered All Supplier" : all_vendors_df.to_json()}
-        else:
-            keyword_result = filter_df_by_keywords(keyword_given_by_user, vendor_keyword_df)
-            filtered_keyword_df, unfiltered_keyword_df = keyword_result[0], keyword_result[1]
-            if len(filtered_keyword_df) != 0:
-                filtered_result_df = pd.merge(all_vendors_df, filtered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
-                unfiltered_result_df = pd.merge(all_vendors_df, unfiltered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
-                unfiltered_result_df = pd.concat([filtered_result_df, unfiltered_result_df], axis= 0, ignore_index= True).sort_values(by = 'aggregated_score')
-                return {
-                        "Best Supplier": final_df.to_json(),
-                        "Better Supplier": better_df.to_json(),
-                        "Filtered All Supplier": filtered_result_df.to_json(),
-                        "Unfiltered All Supplier":unfiltered_result_df.to_json()
-                        }
+        if len(supply_rules_df["essential_items"].value_counts()) == 1 and supply_rules_df["essential_items"].value_counts().index[0] == "Individual_Supply":
+            if not keyword_given_by_user :
+                return {"Best IS Supplier": final_df.to_json() if not final_df.empty else None,
+                        "Better IS Supplier": better_df.to_json() if not better_df.empty else None,
+                        "Filtered All IS Supplier" : None,
+                        "Unfiltered All IS Supplier" : all_vendors_df.to_json() if not all_vendors_df.empty else None,
+                        "Best Essential Supplier": None,
+                        "Best Non-Essential Supplier": None,
+                        "Better Essential Supplier": None,
+                        "Better Non-Essential Supplier": None,
+                        "Filtered Essential Supplier" : None,
+                        "Filtered Non-Essential Supplier" : None,
+                        "Unfiltered Essential Supplier" : None,
+                        "Unfiltered Non-Essential Supplier" : None}
             else:
-                unfiltered_result_df = pd.merge(all_vendors_df, unfiltered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
-                return {
-                        "Best Supplier": final_df.to_json(),
-                        "Better Supplier": better_df.to_json(),
-                        "Filtered All Supplier": None,
-                        "Unfiltered All Supplier":unfiltered_result_df.to_json()
-                        }
+                keyword_result = filter_df_by_keywords(keyword_given_by_user, vendor_keyword_df)
+                print("keyword_result:",len(keyword_result),keyword_result)
+                print("\n\nFirst keyword_result:",len(keyword_result[0]), keyword_result[0], "\n\nSecond keyword_result:",len(keyword_result[1]), keyword_result[1])
+                filtered_keyword_df, unfiltered_keyword_df = keyword_result[0], keyword_result[1]
+                if len(filtered_keyword_df) != 0:
+                    filtered_result_df = pd.merge(all_vendors_df, filtered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
+                    unfiltered_result_df = pd.merge(all_vendors_df, unfiltered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["supply_score"], ascending=False)
+                    unfiltered_result_df = pd.concat([filtered_result_df, unfiltered_result_df], axis= 0, ignore_index= True).sort_values(by = 'aggregated_score')
+                    
+                    return {
+                            "Best IS Supplier": final_df.to_json() if not final_df.empty else None,
+                            "Better IS Supplier": better_df.to_json() if not better_df.empty else None,
+                            "Filtered All IS Supplier": filtered_result_df.to_json() if not filtered_result_df.empty else None,
+                            "Unfiltered All IS Supplier":unfiltered_result_df.to_json() if not unfiltered_keyword_df.empty else None,
+                            "Best Essential Supplier": None,
+                            "Best Non-Essential Supplier": None,
+                            "Better Essential Supplier": None,
+                            "Better Non-Essential Supplier": None,
+                            "Filtered Essential Supplier" : None,
+                            "Filtered Non-Essential Supplier" : None,
+                            "Unfiltered Essential Supplier" : None,
+                            "Unfiltered Non-Essential Supplier" : None
+                            }
+                else:
+                    unfiltered_result_df = pd.merge(all_vendors_df, unfiltered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
+                    return {
+                            "Best IS Supplier": final_df.to_json() if not final_df.empty else None,
+                            "Better IS Supplier": better_df.to_json() if not better_df.empty else None,
+                            "Filtered All IS Supplier": None,
+                            "Unfiltered All IS Supplier":unfiltered_result_df.to_json() if not unfiltered_keyword_df.empty else None,
+                            "Best Essential Supplier": None,
+                            "Best Non-Essential Supplier": None,
+                            "Better Essential Supplier": None,
+                            "Better Non-Essential Supplier": None,
+                            "Filtered Essential Supplier" : None,
+                            "Filtered Non-Essential Supplier" : None,
+                            "Unfiltered Essential Supplier" : None,
+                            "Unfiltered Non-Essential Supplier" : None
+                            }
+        else:
+            if not keyword_given_by_user :
+                return {"Best IS Supplier": None,
+                        "Better IS Supplier": None,
+                        "Filtered All IS Supplier" : None,
+                        "Unfiltered All IS Supplier" : None,
+                        "Best Essential Supplier": final_df[final_df["essential_items"]].to_json() if not final_df[final_df["essential_items"]].empty else None,
+                        "Best Non-Essential Supplier": final_df[~(final_df["essential_items"])].to_json() if not final_df[~(final_df["essential_items"])].empty else None,
+                        "Better Essential Supplier": better_df[better_df["essential_items"]].to_json() if not better_df[better_df["essential_items"]].empty else None,
+                        "Better Non-Essential Supplier": better_df[~(better_df["essential_items"])].to_json() if not better_df[~(better_df["essential_items"])].empty else None,
+                        "Filtered Essential Supplier" : None,
+                        "Filtered Non-Essential Supplier" : None,
+                        "Unfiltered Essential Supplier" : all_vendors_df[all_vendors_df["essential_items"]].to_json() if not all_vendors_df[all_vendors_df["essential_items"]].empty else None,
+                        "Unfiltered Non-Essential Supplier" : all_vendors_df[~(all_vendors_df["essential_items"])].to_json() if not all_vendors_df[~(all_vendors_df["essential_items"])].empty else None}
+            else:
+                keyword_result = filter_df_by_keywords(keyword_given_by_user, vendor_keyword_df)
+                print("keyword_result:",len(keyword_result),keyword_result)
+                print("\n\nFirst keyword_result:",len(keyword_result[0]), keyword_result[0], "\n\nSecond keyword_result:",len(keyword_result[1]), keyword_result[1])
+                filtered_keyword_df, unfiltered_keyword_df = keyword_result[0], keyword_result[1]
+                if len(filtered_keyword_df) != 0:
+                    filtered_result_df = pd.merge(all_vendors_df, filtered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
+                    unfiltered_result_df = pd.merge(all_vendors_df, unfiltered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["supply_score"], ascending=False)
+                    unfiltered_result_df = pd.concat([filtered_result_df, unfiltered_result_df], axis= 0, ignore_index= True).sort_values(by = 'aggregated_score')
+                    # DEBUG: Check essential_items column in all dataframes
+                    filtered_result_df["essential_items"] = filtered_result_df["essential_items"].astype(bool)
+                    unfiltered_result_df["essential_items"] = unfiltered_result_df["essential_items"].astype(bool)
+                    final_df["essential_items"] = final_df["essential_items"].astype(bool)
+                    better_df["essential_items"] = better_df["essential_items"].astype(bool)
+                    return {
+                            "Best IS Supplier": None,
+                            "Better IS Supplier": None,
+                            "Filtered All IS Supplier" : None,
+                            "Unfiltered All IS Supplier" : None,
+                            "Best Essential Supplier": final_df[final_df["essential_items"]].to_json() if not final_df[final_df["essential_items"]].empty else None,
+                            "Best Non-Essential Supplier": final_df[~(final_df["essential_items"])].to_json() if not final_df[~(final_df["essential_items"])].empty else None,
+                            "Better Essential Supplier":  better_df[better_df["essential_items"]].to_json() if not better_df[better_df["essential_items"]].empty else None,
+                            "Better Non-Essential Supplier": better_df[~(better_df["essential_items"])].to_json() if not better_df[~(better_df["essential_items"])].empty else None,
+                            "Filtered Essential Supplier" : filtered_result_df[filtered_result_df["essential_items"]].to_json() if not filtered_result_df[filtered_result_df["essential_items"]].empty else None,
+                            "Filtered Non-Essential Supplier" : filtered_result_df[~(filtered_result_df["essential_items"])].to_json() if not filtered_result_df[~(filtered_result_df["essential_items"])].empty else None,
+                            "Unfiltered Essential Supplier" : unfiltered_result_df[unfiltered_result_df["essential_items"]].to_json() if not unfiltered_result_df[unfiltered_result_df["essential_items"]].empty else None,
+                            "Unfiltered Non-Essential Supplier" : unfiltered_result_df[~(unfiltered_result_df["essential_items"])].to_json() if not unfiltered_result_df[~(unfiltered_result_df["essential_items"])].empty else None
+                            }
+                else:
+                    unfiltered_result_df = pd.merge(all_vendors_df, unfiltered_keyword_df, left_on="vendor_id", right_on="ID").drop("ID", axis=1).sort_values(by=["aggregated_score"], ascending=False)
+                    unfiltered_result_df["essential_items"] = unfiltered_result_df["essential_items"].astype(bool)
+                    final_df["essential_items"] = final_df["essential_items"].astype(bool)
+                    better_df["essential_items"] = better_df["essential_items"].astype(bool)
+                    # log_to_file("essential_items_values", unfiltered_result_df["essential_items"].head(5).tolist())
+                    # log_to_file("essential_items_dtype", str(unfiltered_result_df["essential_items"].dtype))
+                    # log_to_file("boolean_mask_result", (~(unfiltered_result_df["essential_items"])).head(5).tolist())
+                    
+                    # log_to_file("Merged_unfiltered_result_df.columns", unfiltered_result_df.columns.tolist())
+                    # log_to_file("Merged_unfiltered_result_df.head", unfiltered_result_df.head(2).to_dict())
+                    return {
+                            "Best IS Supplier": None,
+                            "Better IS Supplier": None,
+                            "Filtered All IS Supplier" : None,
+                            "Unfiltered All IS Supplier" : None,
+                            "Best Essential Supplier": final_df[final_df["essential_items"]].to_json() if not final_df[final_df["essential_items"]].empty else None,
+                            "Best Non-Essential Supplier": final_df[~(final_df["essential_items"])].to_json() if not final_df[~(final_df["essential_items"])].empty else None,
+                            "Better Essential Supplier":  better_df[better_df["essential_items"]].to_json() if not better_df[better_df["essential_items"]].empty else None,
+                            "Better Non-Essential Supplier": better_df[~(better_df["essential_items"])].to_json() if not better_df[~(better_df["essential_items"])].empty else None,
+                            "Filtered Essential Supplier" : None,
+                            "Filtered Non-Essential Supplier" : None,
+                            "Unfiltered Essential Supplier" : unfiltered_result_df[unfiltered_result_df["essential_items"]].to_json() if not unfiltered_result_df[unfiltered_result_df["essential_items"]].empty else None,
+                            "Unfiltered Non-Essential Supplier" : unfiltered_result_df[~(unfiltered_result_df["essential_items"])].to_json() if not unfiltered_result_df[~(unfiltered_result_df["essential_items"])].empty else None
+                            }
     except Exception as e:
         error_message = traceback.format_exc()
         with open("log.txt", "a") as file:
@@ -645,3 +797,19 @@ def filter_df_by_keywords(
     remaining_df = df.loc[~row_match].sort_values(by="aggregated_score", ascending=False)  # Sort by relevance
 
     return filtered_df[["ID", "aggregated_score"]], remaining_df[["ID", "aggregated_score"]]
+
+from datetime import datetime
+def log_to_file(key,value):
+    """
+    Logs key-value data to a file with a timestamp.
+    
+    :param filename: Name of the log file.
+    :param data: Key-value pairs to log.
+    """
+    log_entry = {
+        "t": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        f"{key}" : value
+    }
+    
+    with open("log.txt", "a", encoding="utf-8") as file:
+        file.write(json.dumps(log_entry) + "\n")

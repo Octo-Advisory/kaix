@@ -7,12 +7,13 @@ import Vendorresult from '../ResultScreens/Vendorresult';
 import IndustryResultScreen from '../ResultScreens/IndustryResultScreen';
 import { useSelector } from 'react-redux';
 import { useNavigate } from "react-router-dom";
+import FailureScreen from '../Failure/FailureScreen';
 
 
 function Solutionscreen() {
   const navigate = useNavigate();
   const result = useSelector((state) => state.analytics.analyticsResult);
-  // console.log("resultr",result);
+  console.log("resultr",result);
   
   useEffect(() => {
     if (result.length === 0) {
@@ -38,12 +39,13 @@ function Solutionscreen() {
       ) : user_intension === "Query to Get Approvals" ? (
         <Approvalresult result={Analytics_response} source="SolutionScreen" />
       ) : user_intension === "Query to search Vendors" ? (
-        <Vendorresult result={result[0]} source="SolutionScreen" />) : (
-        "Server Error"
+        <Vendorresult result={result[0]} source="SolutionScreen" rerender={0} />
+      ) : (
+        <FailureScreen />
       )}
 
     </div>
   )
 }
-
+ 
 export default Solutionscreen
