@@ -1,97 +1,105 @@
-import React, { useContext, useEffect, useState, useRef } from 'react';
-import { AiOutlineClear, AiOutlineConsoleSql, AiOutlineSend } from 'react-icons/ai'; // React Icons
+import { useContext, useEffect, useState, useRef } from 'react';
+import { AiOutlineClear } from 'react-icons/ai'; // React Icons
 import { FiSend } from 'react-icons/fi';
 import { useDispatch, useSelector } from 'react-redux';
-import { addChatId, addInputtext, addLastResultId, addMessage } from '../../Redux/Store/Featuresilces/chat';
+import { addInputtext, addLastResultId, addMessage } from '../../Redux/Store/Featuresilces/chat';
 import botLogo1 from '../../assets/New Symbol.png';
-import useChatScroll from '../Hooks/useChatScroll'; // Import the hook
 import ReactMarkdown from 'react-markdown'; // Import ReactMarkdown
 import '../Chatscreen/Chatscreen.css';
 import userIcon from '../../assets/MarsAIX person icon.png'
+import { BsShop } from "react-icons/bs";
+import { AiOutlineDollar } from "react-icons/ai";
+import { FaUserGroup } from "react-icons/fa6";
+import { RiBuilding2Line } from "react-icons/ri";
+import newlogo from '../../assets/New MarsAIX blue h - Edited.png'
 import Navbar from '../Navbar/Navbar';
 import Responseloader from '../Responseloader/Responseloader';
 import { FrappeContext, useFrappeAuth, useFrappeCreateDoc, useFrappeGetDoc, useFrappeGetDocList, useFrappeUpdateDoc } from 'frappe-react-sdk'
-import { addAIresponse, addSelectedoption, clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
+import { addAIresponse, addSelectedoption } from '../../Redux/Store/Featuresilces/aiResponse';
 import { addResult } from '../../Redux/Store/Featuresilces/validation'
-import { replace, useLocation, useNavigate, useParams } from "react-router-dom";
-import Details from '../Details/Details';
-import { BiSidebar } from "react-icons/bi";
-import { IoEllipseSharp, IoSearch } from "react-icons/io5";
+import { useNavigate, useParams } from "react-router-dom";
+import { HiOutlineClipboardDocumentCheck } from "react-icons/hi2";
 import SideBar from '../SideBar/SideBar';
-import { FaThumbsUp, FaThumbsDown, FaRegCopy, FaArrowsRotate } from "react-icons/fa6";
-import { resetForm, setFormData, setIsOpen } from '../../Redux/Store/Featuresilces/detailform';
-import { all } from 'axios';
+import { FaThumbsUp, FaThumbsDown,FaArrowsRotate } from "react-icons/fa6";
+import { setFormData, setIsOpen } from '../../Redux/Store/Featuresilces/detailform';
 import rehypeRaw from 'rehype-raw';
 import { FaExternalLinkAlt } from 'react-icons/fa';
-import { PiCopyBold } from 'react-icons/pi';
-import { marked } from 'marked';
-
-
-// const TypewriterMarkdown = ({ text, speed = 20 }) => {
-//   const [displayed, setDisplayed] = useState('');
-//   const [index, setIndex] = useState(0);
-//   const html = marked.parse(text); // Convert markdown to HTML
-
-//   useEffect(() => {
-//     if (index < html.length) {
-//       const timeout = setTimeout(() => {
-//         setDisplayed(html.slice(0, index + 1));
-//         setIndex(index + 1);
-//       }, speed);
-//       return () => clearTimeout(timeout);
-//     }
-//   }, [index, html, speed]);
-
-//   return (
-//     <div
-//       className="prose prose-sm text-black" // Optional: Tailwind prose for better markdown look
-//       dangerouslySetInnerHTML={{ __html: displayed }}
-//     />
-//   );
-// };
-
+import { BuildingIcon } from '../../Icons/icon';
+import usePersistedToggle from '../../PersistedState/useToggleState';
 
 function Chatscreen() {
-  const [showDetails, setShowDetails] = useState(false);
   const { currentUser } = useFrappeAuth();
   const { data: userDoc } = useFrappeGetDoc('User', currentUser || '');
   const [message, setMessage] = useState('');
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.chat.messages);
   const chatId = useSelector((state) => state.chat.chatID);
-  const addInput = useSelector((state)=>state.chat.addInput)
+  const addInput = useSelector((state) => state.chat.addInput)
+  const feasibilityId = useSelector((state) => state.feasibility.feasibility_id)
   const [loading, setLoading] = useState(false);
   const [disabled, setDisabled] = useState(false);
   const { createDoc, isLoading, error } = useFrappeCreateDoc('');
-  const [partialResponse, setPartialResponse] = useState('');
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const responseAi = useSelector((state) => state.ai.aiReponse)
-  const [placeholder, setPlaceholder] = useState("");
-  const [charIndex, setCharIndex] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [hintsArray, setHintsArray] = useState([])
   const [tempButtons, setTempButtons] = useState(['Yes', 'No'])
   const navigate = useNavigate();
   let { sessionId } = useParams();
-  const location = useLocation();
-  //Create frappe context to call apis
   const { call } = useContext(FrappeContext)
+
 
   if (!sessionId && !currentUser) {
     sessionId = sessionStorage.getItem("guest_session_id")
   }
 
   useEffect(() => {
-    if(addInput){
-      setMessage(addInput)
+  // First: send message & create session
+  if (addInput) {
+    handleSendbtn(addInput); // this will internally set the sessionId
+  }
+}, [addInput]);
+
+useEffect(() => {
+  // Second: once sessionId is available, add to child table if not already present
+  const handleFeasibilityChatLink = async () => {
+    console.log("datasasaescwev",feasibilityId,addInput,sessionId);
+    
+    if(!addInput) return;
+    if (!feasibilityId || !sessionId) return;
+
+    try {
+      const response = await call.get("frappe.client.get", {
+        doctype: "Feasibility Report",
+        name: feasibilityId,
+      });
+
+      const chats = response.message?.chats || [];
+
+      const alreadyExists = chats.some(chat => chat.session === sessionId);
+      console.log("raw feasibility id",feasibilityId,alreadyExists);
+
+      if (!alreadyExists) {
+        await createDoc("Linked Chats", {
+          session: sessionId,
+          parent: feasibilityId,
+          parenttype: "Feasibility Report",
+          parentfield: "chats",
+        });
+        console.log("Child row added successfully.");
+        dispatch(addInputtext(null))
+      }
+    } catch (err) {
+      console.error("Error adding to child table:", err);
     }
-  }, [addInput])
+  };
+
+  handleFeasibilityChatLink();
+}, [sessionId,feasibilityId,addInput]);
 
   useEffect(() => {
     const handleBeforeUnload = (event) => {
-      sessionStorage.removeItem("guest_session_id");
+      sessionStorage.removeItem("guest_session_id");  
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
@@ -100,20 +108,6 @@ function Chatscreen() {
   }, []);
   console.log("sessoin id from url", sessionId);
 
-  const suggestions = [
-    "I want to build 1 million tonnes per annum steel factory....",
-    "Show me incentives for cement factory in Vadodara....",
-    "Can I get a list of approvals needed to set up a pharma unit in Bharuch....",
-    "What is manpower availability in Anand....",
-    "I am looking for suppliers for cement industry in Ahmedabad...."
-  ]
-
-  const createSessionid = () => {
-    const nowTime = new Date();
-    const formattedTime = `${nowTime.getFullYear()}-${String(nowTime.getMonth() + 1).padStart(2, '0')}-${String(nowTime.getDate()).padStart(2, '0')} ${String(nowTime.getHours()).padStart(2, '0')}:${String(nowTime.getMinutes()).padStart(2, '0')}:${String(nowTime.getSeconds()).padStart(2, '0')}`;
-    const doc = { time: formattedTime };
-    createDoc("Session", doc).then((resp) => dispatch(addChatId(resp.name)));
-  }
 
   const fetchAIResponse = async (message, confirmationMessage, chatId) => {
     try {
@@ -211,12 +205,11 @@ function Chatscreen() {
 
   const { updateDoc } = useFrappeUpdateDoc()
 
-  const  handleConfirmation = async (label,response) => {
-    console.log('response',response, 'label',label)
+  const handleConfirmation = async (label, response) => {
+    console.log('response', response, 'label', label)
     setConfirmationPending(false);
     const confirmationMessages = {
       sender: 'user',
-      // text: response === 'yes' ? 'Yes' : 'No',
       text: response, //confirmation required
       timestamp: new Date().toISOString(),
     };
@@ -228,14 +221,12 @@ function Chatscreen() {
       // STEP 1: Save user's message with idx
       const idx = chatHistory.length + 1;
       const chatEntry = await createDoc("Chat history", {
-        // user: 'Yes',
         user: label,
         parent: currentSession,
         parentfield: "chat_history",
         parenttype: "Session",
         idx,
-      }); 
-      console.log(chatEntry,'this is the updated Doc chat history')
+      });
       if (!chatEntry.name) throw new Error("Failed to save user message");
 
       await handleConfirmationHints()
@@ -282,13 +273,12 @@ function Chatscreen() {
       // if (validationResult[0]) {
       dispatch(addSelectedoption(response))
       navigate(`/progress/${sessionId}`);
-    // }
+      // }
     } else {
       let currentSession = session;
       // STEP 1: Save user's message with idx
       const idx = chatHistory.length + 1;
       const chatEntry = await createDoc("Chat history", {
-        // user: "No",
         user: label,
         parent: currentSession,
         parentfield: "chat_history",
@@ -310,9 +300,9 @@ function Chatscreen() {
           ai: aiResponse || "Waiting For Confirmation"
         });
 
-        if(resp.options && resp.options.length > 1) {
+        if (resp.options && resp.options.length > 1) {
           console.log(resp.options, 'this is in confirmation');
-          
+
           setTempButtons(resp.options)
         }
         mutate();
@@ -347,12 +337,18 @@ function Chatscreen() {
     fields: ['user_intension', 'chat_json'],
     filters: [['name', '=', session]]
   })
-
+  
+  const [AiResponses, setAiResponses] = useState()
   const chatHistory = data?.chat_history || [];
-  console.log("data is", chatHistory);
+  console.log("data is", chatHistory,AiResponses);
+
+  useEffect(()=>{
+    console.log('This are the new AI Responses', AiResponses)
+  },[AiResponses])
+
 
   const handleSendbtn = async (msg) => {
-    // await CheckToCallHints()
+
     if (!message.trim() && !msg.trim()) return;
 
     const userMessage = msg ? msg.trim() : message.trim();
@@ -364,7 +360,7 @@ function Chatscreen() {
 
       if (!currentSession) {
         const nowTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        const sessionResp = await createDoc("Session", { time: nowTime, user: currentUser || '' });
+        const sessionResp = await createDoc("Session", { time: nowTime, user: currentUser || '', });
         if (!sessionResp.name) throw new Error("Failed to create session");
         setSession(sessionResp.name);
         // dispatch(addChatId(sessionResp.name))
@@ -404,7 +400,8 @@ function Chatscreen() {
 
       // STEP 2: Get AI response
       const resp = await fetchAIResponse(userMessage, "", currentSession);
-      console.log("ai response",resp)
+      setAiResponses(resp)
+      console.log("ai response", resp)
       const aiResponse = resp.Ai_response;
 
       if (resp.Is_confirmation) {
@@ -412,7 +409,7 @@ function Chatscreen() {
           ai: aiResponse || "Waiting For Confirmation"
         });
 
-        if(resp.options && resp.options.length > 1) {
+        if (resp.options && resp.options.length > 1) {
           console.log(resp.options, 'this is in handle')
           setTempButtons(resp.options)
         }
@@ -437,9 +434,6 @@ function Chatscreen() {
       setLoading(false);
       processChat()
       setDisabled(false) // added now
-      // await processChat()
-      
-
 
     } catch (error) {
       console.error("Error sending message:", error);
@@ -491,31 +485,26 @@ function Chatscreen() {
     orderBy: { field: 'modified', order: 'desc' },
   })
   //The below will be used to get previous sessions chats and update in current session
-  const { data: hints, isLoading: queriesLoading, mutate:hintsMutate } = useFrappeGetDocList("Session", {
+  const { data: hints, isLoading: queriesLoading, mutate: hintsMutate } = useFrappeGetDocList("Session", {
     fields: ['chat_json', 'modified', 'name'],
     filters: [['user', '=', currentUser]],
     limit: 5,
     orderBy: { field: 'modified', order: 'desc' },
   });
-   
 
-const processChat = async () => {
-  console.log('Got in the Process Chats.........')
-  let latestData = await mutate()
-  console.log(latestData, 'this are the chats ',session)
-  if (latestData && latestData.chat_json && session) {
-    const parsedChat = JSON.parse(latestData.chat_json);
-  // const refinedData = addMethodCalledIfHuman(parsedChat);
-  // console.log('This is our Refined Chat', parsedChat);
-  checkAndUpdateTriggerPoints(parsedChat, session);
 
-  }
-};
+  const processChat = async () => {
+    let latestData = await mutate()
+    if (latestData && latestData.chat_json && session) {
+      const parsedChat = JSON.parse(latestData.chat_json);
+      checkAndUpdateTriggerPoints(parsedChat, session);
+    }
+  };
 
-const updateHints =async (from)=>{
-  let latestHints = await hintsMutate()
-  if(!latestHints) { return }
-  let allData = latestHints.map(session => {
+  const updateHints = async (from) => {
+    let latestHints = await hintsMutate()
+    if (!latestHints) { return }
+    let allData = latestHints.map(session => {
       const chatArray = JSON.parse(session.chat_json || '[]');
       // Step 1: Start from end, collect last 10 human messages
       const result = [];
@@ -527,107 +516,94 @@ const updateHints =async (from)=>{
       }
       return result;
     }).reverse();
-  let industry = userDoc ? userDoc?.bio : 'Cement'
-  console.log('INPUT PASSED IN HINTS METHOD CALL', industry, allData)
-  let responseHints = await fetchHints(allData,industry)
-  
-  if (session && responseHints) {
-    try {
-      const res = await updateDoc("Session", session, {
-        query_hints: JSON.stringify(responseHints)
-      });
-      console.log(res, "Query Hints Updated for the Session .....✅");
-      if(from==='confirmation'){
-        const sessionDoc = await mutate();
-        let chatArray = JSON.parse(sessionDoc.chat_json || '[]');
-        // Reverse loop to find latest human message with method_called === 0 or missing
-        for (let i = chatArray.length - 1; i >= 0; i--) {
-          let msg = chatArray[i];
-          if (msg.type === "human" && (msg.method_called === 0 || msg.method_called === undefined)) {
-            chatArray[i].method_called = 1;
-            break; // only update the latest one
-          }
-        }
+    let industry = userDoc?.bio ? userDoc.bio : 'Cement'
+    console.log('INPUT PASSED IN HINTS METHOD CALL', industry, allData)
+    let responseHints = await fetchHints(allData, industry)
 
-        // Save updated chat_json
-        await updateDoc("Session", session, {
-          chat_json: JSON.stringify(chatArray)
+    if (session && responseHints) {
+      try {
+        const res = await updateDoc("Session", session, {
+          query_hints: JSON.stringify(responseHints)
         });
-        return true
-      }
-      return true
-    } catch (error) {
-      console.error("❌ Error updating Session hints or method_called:", error);
-      return false
-    }   
-   
-  }
-}
-
-const handleConfirmationHints = async()=> {
-  let hintsUpdated = await updateHints('confirmation')
-  hintsUpdated ? console.log('QUERY HINTS UPDATED FOR COnFiRMATION....✅...') : console.log('Hints are Not Updated on Confirmation...❌')
-}
-
-  
-function addMethodCalledIfHuman(data, methodValue = 0) {
-  return data.map(item => {
-    if (item.type === "human" && !item.hasOwnProperty("method_called")) {
-      return { ...item, method_called: methodValue };
-    }
-    return item;
-  });
-}
-
-const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
-  let consecutiveZeros = 0;
-  let zeroIndexes = [];
-
-  for (let i = chatArray.length - 1; i >= 0; i--) {
-    const msg = chatArray[i];
-
-    if (msg.type === "human") {
-      if (msg.method_called === 1) {
-        // Stop entirely if any 1 is found
-        break;
-      }
-
-      if (msg.method_called === 0) {
-        consecutiveZeros++;
-        zeroIndexes.unshift(i); // Keep index in original array order
-      }
-
-      if (consecutiveZeros === 3) {
-        console.log("🔁 Triggering update due to 3 consecutive method_called: 0 at indexes:", zeroIndexes);
-
-        const updatedIndex = zeroIndexes[2]; // The last (i.e., oldest) of the 3 zeroes
-
-        chatArray[updatedIndex].method_called = 1;
-
-        try {
-          console.log('Calling the update function for Chat Count')
-          const response = await updateHints('Chat');
-          if (response) {
-            const res = await updateDoc("Session", sessionName, {
-              chat_json: JSON.stringify(chatArray),
-            });
-            console.log(res, "✅ Chat JSON Updated for Hints (from message counts)");
+        console.log(res, "Query Hints Updated for the Session .....✅");
+        if (from === 'confirmation') {
+          const sessionDoc = await mutate();
+          let chatArray = JSON.parse(sessionDoc.chat_json || '[]');
+          // Reverse loop to find latest human message with method_called === 0 or missing
+          for (let i = chatArray.length - 1; i >= 0; i--) {
+            let msg = chatArray[i];
+            if (msg.type === "human" && (msg.method_called === 0 || msg.method_called === undefined)) {
+              chatArray[i].method_called = 1;
+              break;
+            }
           }
-        } catch (error) {
-          console.error("❌ Failed to update chat_json in Session:", error);
+
+          // Save updated chat_json
+          await updateDoc("Session", session, {
+            chat_json: JSON.stringify(chatArray)
+          });
+          return true
+        }
+        return true
+      } catch (error) {
+        console.error("❌ Error updating Session hints or method_called:", error);
+        return false
+      }
+
+    }
+  }
+
+  const handleConfirmationHints = async () => {
+    let hintsUpdated = await updateHints('confirmation')
+    hintsUpdated ? console.log('QUERY HINTS UPDATED FOR COnFiRMATION....✅...') : console.log('Hints are Not Updated on Confirmation...❌')
+  }
+
+  const checkAndUpdateTriggerPoints = async (chatArray, sessionName) => {
+    let consecutiveZeros = 0;
+    let zeroIndexes = [];
+
+    for (let i = chatArray.length - 1; i >= 0; i--) {
+      const msg = chatArray[i];
+
+      if (msg.type === "human") {
+        if (msg.method_called === 1) {
+          // Stop entirely if any 1 is found
+          break;
         }
 
-        break; // Stop after triggering update
+        if (msg.method_called === 0) {
+          consecutiveZeros++;
+          zeroIndexes.unshift(i); // Keep index in original array order
+        }
+
+        if (consecutiveZeros === 3) {
+          console.log("🔁 Triggering update due to 3 consecutive method_called: 0 at indexes:", zeroIndexes);
+
+          const updatedIndex = zeroIndexes[2]; // The last (i.e., oldest) of the 3 zeroes
+
+          chatArray[updatedIndex].method_called = 1;
+
+          try {
+            console.log('Calling the update function for Chat Count')
+            const response = await updateHints('Chat');
+            if (response) {
+              const res = await updateDoc("Session", sessionName, {
+                chat_json: JSON.stringify(chatArray),
+              });
+              console.log(res, "✅ Chat JSON Updated for Hints (from message counts)");
+            }
+          } catch (error) {
+            console.error("❌ Failed to update chat_json in Session:", error);
+          }
+
+          break; // Stop after triggering update
+        }
       }
     }
   }
-}
-
-
 
   useEffect(() => {
     //default hints
-    let temp = ["I'm planning a 1 MTPA cement manufacturing unit in Bharuch ", "List approvals needed to start a food processing unit in Gujarat", "List all licenses required to start a textile unit in Vadodara", "What benefits does Gujarat offer for toy manufacturing startups?"]
     if (!hintsLoading) {
       let foundHints = null;
       // Go through each record and check for valid query_hints
@@ -635,7 +611,8 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
         try {
           const parsed = JSON.parse(record.query_hints);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            foundHints = parsed;
+            let tryingHints = parsed?.['query'] ? parsed : iconHints
+            foundHints = tryingHints;
             break;
           }
         } catch (e) {
@@ -644,7 +621,8 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
         }
       }
       // Set hintsArray in state
-      setHintsArray(foundHints || temp);
+      console.log(foundHints,'oky this are the hints ')
+      setHintsArray(foundHints || iconHints);
     }
   }, [hintsLoading, queryHints])
 
@@ -671,7 +649,6 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
       const result = await call.get("frontend_app.Management_Class.helpers.utility.generate_chat_title", {
         'user_query': intension,
       });
-      console.log("Got the statement title", result);
       return result.message;
     } catch (err) {
       console.log("error occurred 😂", err);
@@ -679,14 +656,25 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
     }
   }
 
-  const fetchHints = async (queries,industry) => {
+  const fetchHints = async (queries, industry) => {
     try {
-      const result = await call.get("frontend_app.Management_Class.helpers.utility.formatting_input_query_list", {
-        'raw_nested_list': queries,
+      const result = await call.get("frontend_app.Management_Class.helpers.utility.generate_query_hints", {
+        'query_list': queries,
         'input_industry_name': industry
       });
-      console.log("Got the Hint Statements", result);
-      return result.message;
+
+      let hints = result.message || [];
+
+      let newHints = hints.map((hintObj, index) => {
+        let matchedHint = iconHints.find(iconHint => iconHint.type === hintObj.module) || {};
+
+        return {
+          ...matchedHint,
+          hint:hintObj.query,
+          ...hintObj
+        };
+      });
+      return newHints;
     } catch (err) {
       console.log("error occurred in Hint Statment Function😂", err);
     }
@@ -708,15 +696,15 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
       storeLatestChatInChildTable();
     }
   }, [messages]);
-  
+
   const chatRef = useRef(null)
   useEffect(() => {
     if (chatRef.current) {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }
   }, [chatHistory]);
-  const [sideBar, setSideBar] = useState(true)
-
+  const [sideBar, setSideBar] = usePersistedToggle('aix-nav-state','true')
+  
   const renderUserAvatar = (sender) => {
     const isCurrentUser = sender === 'user';
 
@@ -725,7 +713,7 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
         <img
           src={botLogo1}
           alt="Bot"
-          className="h-8 w-8 relative rounded-full"
+          className="h-8 w-8 relative rounded-full flex-shrink-0"
         />
       );
     }
@@ -736,12 +724,12 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
           <img
             src={userDoc.user_image}
             alt="User"
-            className="h-8 w-8 relative rounded-full object-cover"
+            className="h-8 w-8 relative rounded-full object-cover flex-shrink-0"
           />
         );
       } else {
         return (
-          <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">
+          <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold flex-shrink-0">
             {currentUser?.charAt(0).toUpperCase()}
           </div>
         );
@@ -752,7 +740,7 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
       <img
         src={userIcon}
         alt="User"
-        className="h-8 w-8 relative rounded-full"
+        className="h-8 w-8 relative rounded-full flex-shrink-0"
       />
     );
   };
@@ -802,7 +790,7 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
 
       // Check if session belongs to the logged-in user
       if (currentUser) {
-        if (session.user === currentUser) {
+        if (session.user === currentUser && !session.soft_delete) {
           setSession(session.name);
           navigate(`/chat/${session.name}`, { replace: true });
         } else {
@@ -827,6 +815,7 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
     dispatch(setIsOpen(true));
   };
 
+
   const textAreaRef = useRef(null)
   const handleHintClick = (hint) => {
     setMessage(hint);            // 👈 set the message from hint
@@ -836,18 +825,60 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
     window.open(`/frontend/result?session=${sessionId}&name=${msg.name}`, '_blank')
   }
 
+  const iconHints = [
+    {
+      title: "Government Grants",
+      subtitle: "Explore available subsidies",
+      hint: "Tell me the government incentives for cement industry in Gujarat",
+      type: "Incentives"
+    },
+    {
+      title: "Land Options",
+      subtitle: "Check availability by location",
+      hint: "What land availability exists for cement industry in Vadodara?",
+      type: "Build from Scratch"
+    },
+    {
+      title: "Labor Insights",
+      subtitle: "Analyze workforce distribution",
+      hint: "What are the labor options for cement industry in Bharuch?",
+      type: "Employment"
+    },
+    {
+      title: "Vendor Network",
+      subtitle: "Find reliable suppliers",
+      hint: "What are the vendor options for cement industry in Ahmedabad?",
+      type: "Vendor Search"
+    },
+    {
+      title: "Vendor Insights",
+      subtitle: "Trusted supplier options",
+      hint: "What are the vendor options for cement industry in Surat?",
+      type: "Vendor Search"
+    },
+    {
+      title: "Approval Status",
+      subtitle: "Licenses & permits overview",
+      hint: "What approvals are required for cement plant setup in Rajkot?",
+      type: "Approval"
+    }
+  ];
+
   return (
     <div className='h-screen w-screen relative flex flex-row '>
       {currentUser && <SideBar setSideBar={setSideBar} sideBar={sideBar} />}
       <div className="h-screen flex flex-col items-center w-full transition-width duration-300 ease-in-out main-screen">
-        <Navbar setSideBar={setSideBar} sideBar={sideBar} />
+        <Navbar />
         <div className="flex-1 overflow-y-auto p-4 flex justify-center w-full chatscreen" ref={chatRef}>
 
           {chatHistory.length > 0 ? (
             <div className="chats flex flex-col w-[50%] mx-auto">
               {[...chatHistory]
                 .sort((a, b) => a.idx - b.idx)
-                .map((msg, index) => (
+                .map((msg, index,arr) => {
+                  const isLast = index === arr.length - 1;
+                  const isCurrentAi = isLast && msg.ai === AiResponses?.Ai_response;
+                  return (
                   <div key={`chat-${msg.name || index}`}>
                     {msg.user?.trim() && (
                       <div className="flex gap-5 justify-start mb-3">
@@ -855,7 +886,7 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
                         <div className="p-2 rounded-lg max-w-full break-words">
                           <ReactMarkdown rehypePlugins={[rehypeRaw]}>{msg.user}</ReactMarkdown>
                           <div
-                            onClick={()=>{setMessage(msg.user), textAreaRef.current?.focus();}}
+                            onClick={() => { setMessage(msg.user), textAreaRef.current?.focus(); }}
                             className=" flex flex-row items-center text-gray-700 w-fit bg-gray-200 gap-2 cursor-pointer text-xs p-2 transition-all duration-300  rounded-md hover:bg-gray-300"
                             title="Copy & set to input"
                           >
@@ -872,8 +903,17 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
                           className="h-8 w-8 relative rounded-full top-1"
                         />
                         <div className="p-2 rounded-lg max-w-full break-words">
-                          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{msg.ai}</ReactMarkdown>
-                          {/* <TypewriterMarkdown text={msg.ai}/> */}
+                          {isCurrentAi ? (
+                            // <Typewriter text={msg.ai} />
+                            <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                              {msg.ai}
+                            </ReactMarkdown>
+                          ) : (
+                            <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                              {msg.ai}
+                            </ReactMarkdown>
+                          )}
+                          {/* <ReactMarkdown rehypePlugins={[rehypeRaw]}>{msg.ai}</ReactMarkdown> */}
                           {msg.result && (
                             <button
                               title="View Result"
@@ -885,58 +925,64 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
                             </button>
                           )}
                         </div>
-                        
+
                       </div>
                     )}
 
-                  </div>
-                ))
+                  </div>  
+                  )
+                })
               }
 
               {loading && session === sessionId && <Responseloader />}
 
               {confirmationPending && (
                 <div className="m-0 p-2 rounded-lg w-full flex items-center justify-center">
-                  {/* <p className='text-[#242f6a]'>{confirmationMessage}</p> */}
                   <div className="grid grid-cols-2 gap-4 min-w-[60%] max-w-[80%]">
-                    {tempButtons.map((button,index)=> (
-                    <button
-                      key={index}
-                      className={`${(button.label=== 'Refine Requirements' || button.label.startsWith('No')) ? 'bg-red-500' : 'bg-green-500'} text-white px-4 py-2 rounded-full text-xs cursor-pointer justify-center w-full items-center font-semibold flex flex-row gap-2`}
-                      onClick={() => {handleConfirmation(button.label,button.value)}}
-                    >
-                      {(button.label=== 'Refine Requirements' || button.label.startsWith('No')) ? (<FaThumbsDown size={16} />) :(<FaThumbsUp size={16} />) }
-                       {button.label}
-                    </button>
-                  ))}
-                    {/* <button
-                      className="bg-green-500 text-white px-4 py-2 rounded-md text-xs cursor-pointer font-semibold flex flex-row gap-2"
-                      onClick={() => handleConfirmation('yes')}
-                    >
-                      <FaThumbsUp size={16} /> Yes
-                    </button>
-                    <button
-                      className="bg-red-500 text-white px-4 py-2 rounded-md text-xs cursor-pointer font-semibold flex flex-row gap-2"
-                      onClick={() => handleConfirmation('no')}
-                    >
-                      <FaThumbsDown size={16} />  No
-                    </button> */}
+                    {tempButtons.map((button, index) => (
+                      <button
+                        key={index}
+                        className={`${(button.label === 'Refine Requirements' || button.label.startsWith('No')) ? 'bg-red-500' : 'bg-green-500'} text-white px-4 py-2 rounded-full text-xs cursor-pointer justify-center w-full items-center font-semibold flex flex-row gap-2`}
+                        onClick={() => { handleConfirmation(button.label, button.value) }}
+                      >
+                        {(button.label === 'Refine Requirements' || button.label.startsWith('No')) ? (<FaThumbsDown size={16} />) : (<FaThumbsUp size={16} />)}
+                        {button.label}
+                      </button>
+                    ))}
+                    
                   </div>
                 </div>
               )}
             </div>
           ) : (
             <div className="flex flex-col gap-2 items-center justify-center h-full w-full">
-              <p className="text-4xl text-[#242f6a]">What can I help with?</p>
-              {hintsArray && hintsArray.length > 3 && (<><p className='text-md text-gray-700 italic font-semibold mb-4'>Not sure where to begin with? Try one of these</p>
-                <div className='relative p-4 flex flex-col h-fit w-fit gap-4 items-center'>
-                  <div className='relative p-2 text-xs bg-blue-200 text-black   rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleHintClick(hintsArray?.[0]) }}>{hintsArray?.[0]}</div>
-                  <div className='relative flex flex-row gap-4 w-fit h-fit'>
-                    <div className='relative p-2 text-xs text-black bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleHintClick(hintsArray?.[1]) }}>{hintsArray?.[1]}</div>
-                    <div className='relative p-2 text-xs text-black bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold ' onClick={() => { handleHintClick(hintsArray?.[2]) }}>{hintsArray?.[2]}</div>
-                  </div>
-                  <div className='relative p-2 text-xs text-black  bg-blue-200  rounded-xl w-fit h-fit whitespace-nowrap cursor-pointer font-semibold' onClick={() => { handleHintClick(hintsArray?.[3]) }}>{hintsArray?.[3]}</div>
-                </div> </>)}
+              <div className='relative text-4xl flex flex-row gap-3 items-center'>
+                <p className=" text-[#242f6a]">Welcome to</p>
+                <img src={newlogo} className='relative object-contain h-[45px] w-[150px]' />
+                
+              </div>
+              {hintsArray && hintsArray.length > 3 && (<>
+                <p className='text-sm text-gray-600 italic tracking-wide font-normal mb-1 text-center'>I'm your AI assistant for industrial intelligence and data-driven decision making.<br></br> I can help with manufacturing, supply chain, site selection, and much more.</p>
+                <p className='text-sm text-gray-600 italic tracking-wide font-normal mb-4 text-center'>What industrial challenge can I help you tackle today?</p>
+                
+                <div className='relative p-4 grid grid-cols-3 h-fit w-fit gap-4 items-center'>
+                  {hintsArray.map((hints, index) => (
+                    <div key={index} onClick={() => { handleHintClick(hints.hint) }} className='relative transition-all duration-300 ease-in-out cursor-pointer bg-white  border-gray-200 hover:border-green-700 hover:-translate-y-0.5 h-full min-w-[150px] border rounded-md max-w-[260px] flex flex-col gap-1 p-3 '>
+                      <div className='relative flex flex-row items-center p-1 h-fit gap-2'>
+                        <div className='bg-gradient-to-br rounded-md from-[#2C53A3] to-[#70A1D9] relative h-9 w-9 flex items-center justify-center p-2'>
+                          {hints.type === "Approvals" ? (<HiOutlineClipboardDocumentCheck className='text-white text-lg' size={22} />) : hints.type === "Vendors" ? (<BsShop className='text-white text-lg' size={22} />) : hints.type === "Incentives" ? (<AiOutlineDollar className='text-white text-lg ' size={22} />) : hints.type === "Employment" ? (<FaUserGroup className='text-white text-lg' size={22} />) : hints.type === "Property" ? (<RiBuilding2Line className='text-white text-lg' size={22} />) : (<BuildingIcon className='text-white' size={22} />)}
+                        </div>
+                        <div className='relative flex flex-col items-start'>
+                          <p className='text-md font-medium text-black capitalize tracking-wide select-none'>{hints.title}</p>
+                          <p className='text-[10px] font-normal text-[#0B2152] capitalize tracking-wide select-none'>{hints.subtitle}</p>
+                        </div>
+                      </div>
+
+                      <p className='text-xs ml-1 font-normal text-gray-600 tracking-wide select-none leading-relaxed'>{hints.hint}</p>
+                    </div>
+                  ))}
+                </div>
+              </>)}
             </div>
           )}
         </div>
@@ -958,7 +1004,7 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
                   }
                 }
               }}
-              style={{ lineHeight: '1.5' }} //added line height to make it more readable.
+              style={{ lineHeight: '1.5' }} 
             />
           </div>
 
@@ -989,7 +1035,6 @@ const checkAndUpdateTriggerPoints = async(chatArray, sessionName)=> {
             to confirm data correctness.
           </p>
         </div>
-        {/* <Details /> */}
       </div>
     </div>
   );

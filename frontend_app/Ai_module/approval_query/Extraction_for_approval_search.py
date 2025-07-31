@@ -655,7 +655,8 @@ def handle_approval_query(
     extracted_state: Dict[str, Dict[str, Any]],
     state: Dict[str, Dict[str, Any]],
     llm,
-    chatId
+    chatId,
+    additional_class_response = None
 ) -> Union[Dict[str, Any], str]:
     """
     Processes user queries related to approval searches by extracting location 
@@ -751,6 +752,7 @@ def handle_approval_query(
     else:
         keyword_list = extract_important_words(refined_user_input, "Query to Get Approvals")
         state["KEYWORDS"] = keyword_list
+        state["Additional_class_response"] = additional_class_response or state.get("Additional_class_response")
         save_state(state,f"QAPP_state_{chatId}")
 
         if user_intention == "Approval Search for area, city, or state without industry":
@@ -833,6 +835,8 @@ def handle_approval_query(
                             f"We’ve understood that you are looking for **regulatory approvals** {location_str}.<br/><br/>"
                             f"Please confirm if this information is correct so we can guide you through the required approval processes."
                         )
+                        # response_validation = state.get("Additional_class_response")
+                        # confirmation_message_approval += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
 
                         # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                         chat_history.append(AIMessage(content=confirmation_message_approval))  # Log user query
@@ -842,6 +846,7 @@ def handle_approval_query(
                             {"label": "Yes, this is correct", "value": user_intention},
                             {"label": "No, I want to refine the details", "value": None}
                         ]
+
 
                         response = {
                             "Ai_response": confirmation_message_approval,
@@ -985,6 +990,8 @@ def handle_approval_query(
                                     f"Please confirm if this information is correct so we can guide you through the required approval processes."
                                 )
 
+                                # response_validation = state.get("Additional_class_response")
+                                # confirmation_message_approval += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
                                 # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                                 chat_history.append(AIMessage(content=confirmation_message_approval))  # Log user query
                                 save_chat(chat_history,f"chat_{chatId}")
@@ -993,6 +1000,7 @@ def handle_approval_query(
                                     {"label": "Yes, this is correct", "value": user_intention},
                                     {"label": "No, I want to refine the details", "value": None}
                                 ]
+
 
                                 response = {
                                     "Ai_response": confirmation_message_approval,
@@ -1239,6 +1247,8 @@ def handle_approval_query(
                         f"We’ve understood that you are looking for **regulatory approvals** {location_str}.<br/><br/>"
                         f"Please confirm if this information is correct so we can guide you through the required approval processes."
                     )
+                    # response_validation = state.get("Additional_class_response")
+                    # confirmation_message_approval += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
 
                     # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                     chat_history.append(AIMessage(content=confirmation_message_approval))  # Log user query
@@ -1247,6 +1257,8 @@ def handle_approval_query(
                         {"label": "Yes, this is correct", "value": user_intention},
                         {"label": "No, I want to refine the details", "value": None}
                     ]
+
+
                     response = {
                         "Ai_response": confirmation_message_approval,
                         "Is_confirmation" : True,
@@ -1392,7 +1404,7 @@ def handle_approval_query(
                     }
             return response
 
-def call_handle_approval_query(user_input,chatId):
+def call_handle_approval_query(user_input,chatId, additional_class_response = None):
     
     query = """
     select acmapped.area_name, acmapped.city_name, st.state_name
@@ -1412,7 +1424,10 @@ def call_handle_approval_query(user_input,chatId):
     columns = ["area_name", "city_name", "state_name"]
     df = pd.DataFrame(result_of_query, columns=columns)
     df = df.drop_duplicates()
-
+    df["area_name"] = df["area_name"].apply(lambda x: x.title() if isinstance(x, str) else x)
+    df["city_name"] = df["city_name"].apply(lambda x: x.title() if isinstance(x, str) else x)
+    df["state_name"] = df["state_name"].apply(lambda x: x.title() if isinstance(x, str) else x)
+    
     city_area_mapped_dict = df.groupby("city_name")["area_name"].apply(list).to_dict()
     state_city_mapped_dict = df.groupby("state_name")["city_name"].apply(lambda x: list(x.unique())).to_dict()
 
@@ -1471,12 +1486,13 @@ def call_handle_approval_query(user_input,chatId):
                 "Product": None,
             },
             "KEYWORDS": None,
-            "Only_State_Attempt_Count": 0
+            "Only_State_Attempt_Count": 0,
+            "Additional_class_response": None
         }
         save_state(state,f"QAPP_state_{chatId}")
     extracted_state = copy.deepcopy(state)
 
     
-    response_of_app_query = handle_approval_query(user_input, unique_area_list, unique_city_list, unique_state_list, Industry_data_for_approval, city_area_mapped_dict, state_city_mapped_dict, extracted_state, state, llm_70b_vers,chatId)
+    response_of_app_query = handle_approval_query(user_input, unique_area_list, unique_city_list, unique_state_list, Industry_data_for_approval, city_area_mapped_dict, state_city_mapped_dict, extracted_state, state, llm_70b_vers,chatId, additional_class_response = additional_class_response)
     return response_of_app_query
         

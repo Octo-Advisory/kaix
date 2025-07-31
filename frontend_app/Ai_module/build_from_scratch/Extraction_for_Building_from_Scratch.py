@@ -1151,7 +1151,7 @@ def generate_ai_message(state, history, missing_fields, attempt_count, llm):
     update_llm_token(result)
     return result.content.strip()
 
-def gather_industry_details(query, main_industries, llm,chatId):
+def gather_industry_details(query, main_industries, llm,chatId, additional_class_response = None):
     """
     Gathers industry details from the user query while maintaining a conversation history.
     
@@ -1166,7 +1166,7 @@ def gather_industry_details(query, main_industries, llm,chatId):
     state = get_state(f"QIND_state_{chatId}") or None
     if state is None:
         state = {'Main-Industry': 'None', 'Sub-Sector': 'None','Segment':'None', 'Capacity': 'None', 'Capacity Unit': 'None', 
-                 'Time Period': 'None', 'Product': 'None','product_attempt_count':0,'capacity_attempt_count':0, "KEYWORDS": None}
+                 'Time Period': 'None', 'Product': 'None','product_attempt_count':0,'capacity_attempt_count':0, "KEYWORDS": None, "Additional_class_response": None}
         save_state(state,f"QIND_state_{chatId}")
     chat_history = get_chat(f"chat_{chatId}") or []
 
@@ -1178,7 +1178,8 @@ def gather_industry_details(query, main_industries, llm,chatId):
     
     result = classify_industry_setup_query(refined_query, llm)
     user_intention = result["classification_category"]
-
+    with open("testlog.txt", "a") as file:
+        file.write(f"\nSUB CLASS {user_intention} for chatId {chatId}")
     if user_intention == "Negatively Intended Query":
         message = respond_to_negative_query(
             user_intention, 
@@ -1199,6 +1200,8 @@ def gather_industry_details(query, main_industries, llm,chatId):
     else:
         keyword_list = extract_important_words(refined_query, "Query to build industry from Scratch")
         state["KEYWORDS"] = keyword_list
+        state["Additional_class_response"] = additional_class_response or state.get("Additional_class_response")
+
         save_state(state,f"QIND_state_{chatId}")
         
         with open("log.txt", "a") as file:
@@ -1392,8 +1395,14 @@ def gather_industry_details(query, main_industries, llm,chatId):
                         },
                     }
 
-                    confirmation_message_static_dict = class_confirmation_message_mapping[user_intention]
+                    confirmation_message_static_dict = class_confirmation_message_mapping.get(
+                        user_intention,
+                        class_confirmation_message_mapping["Intent to Set Up Industry with Unspecified Build or Buy Intent"]
+                    )
+
                     confirmation_message_static = confirmation_message_static_dict["Message"]
+                    # response_validation = state.get("Additional_class_response")
+                    # confirmation_message_static += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
                     confirmation_message_options = confirmation_message_static_dict["Options"]
                     # dynamic_confirmation_message = generate_dynamic_confirmation_message(confirmation_message_static, llm_70b_vers_creative)
                     chat_history.append(AIMessage(content=f"{confirmation_message_static}"))
@@ -1839,10 +1848,10 @@ def split_unit_and_time_period(input_string, llm):
     update_llm_token(response)
     return extract_json_unit_split(response.content.strip())
  
-def entry_build_from_scratch(input,chatId):
+def entry_build_from_scratch(input,chatId, additional_class_response = None):
     final_json = get_json_for_industry()
     main_industry = get_main_industry(final_json)
-    k = gather_industry_details(input,main_industry,llm_70b_vers,chatId)
+    k = gather_industry_details(input,main_industry,llm_70b_vers,chatId, additional_class_response=additional_class_response)
 
     if k['Is_confirmation']:
         s = do_unit_conversion(k['state'])

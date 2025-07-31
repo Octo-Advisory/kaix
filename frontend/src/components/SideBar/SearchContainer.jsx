@@ -7,6 +7,22 @@ const SearchContainer = ({ onClose, data }) => {
     const [filteredData, setFilteredData] = useState([])
     const navigate = useNavigate()
 
+    
+const getDateFromDatetime = (datetime) => {
+  if (!datetime) return "";
+
+  const dateObj = new Date(datetime);
+
+  if (isNaN(dateObj)) return datetime; // Return as-is if invalid
+
+  // Format to MM-DD-YYYY
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0'); // getMonth() is 0-indexed
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const year = dateObj.getFullYear();
+
+  return `${month}-${day}-${year}`;
+};
+
     useEffect(() => {
         console.log(data,searchQuery)
     if (!searchQuery.trim()) {
@@ -30,7 +46,7 @@ const SearchContainer = ({ onClose, data }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 w-screen h-screen flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-[60%] h-[65vh] overflow-hidden flex flex-col">
+            <div className="bg-white rounded-xl shadow-xl w-[40%] h-[65vh] overflow-hidden flex flex-col">
                 <div className='relative flex flex-row bg-[#0e2044] h-20 items-center justify-between gap-2 p-4'>
                     <input 
                         placeholder='Search Chats...' 
@@ -52,17 +68,18 @@ const SearchContainer = ({ onClose, data }) => {
                             <div key={index} className='mb-6 last:mb-0'>
                                 <div className='flex items-center justify-between mb-2'>
                                     <div className='flex items-center ml-4 gap-2'>
-                                        <h2 className='text-xs font-semibold text-gray-700 tracking-wider'>
+                                        <h2 className='text-md font-semibold text-gray-700 tracking-wider'>
                                             {historyContent.time}
                                         </h2>
                                     </div>
                                 </div>
 
                                 <div className='ml-2 flex flex-col gap-2'>
-                                    {historyContent.messages.map((message, idx) => (
-                                        <div 
+                                    {historyContent.messages.map((message, idx) => {
+                                        let date = getDateFromDatetime(message.date)
+                                        return (<div 
                                             key={idx}
-                                            className='flex items-center justify-between p-2 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer'
+                                            className='p-3 border border-gray-200 flex flex-row justify-between rounded-lg hover:bg-gray-50 transition-colors cursor-pointer'
                                             onClick={() => {
                                                 navigate(`/chat/${message.text}`, { replace: true });
                                                 onClose();
@@ -71,8 +88,12 @@ const SearchContainer = ({ onClose, data }) => {
                                             <p className='text-sm text-gray-600 truncate pr-2' title={message.title}>
                                                 {message.title}
                                             </p>
-                                        </div>
-                                    ))}
+                                            
+                                            <div className='relative flex flex-row gap-2 items-center'>
+                                            <p className='relative text-xs text-gray-500 pr-2'>{date}</p>
+                                            </div>
+                                        </div>)
+                                })}
                                 </div>
                             </div>
                         ))

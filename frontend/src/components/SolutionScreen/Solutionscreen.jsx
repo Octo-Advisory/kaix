@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import Industryresult from '../ResultScreens/Industryresult';
 import Empresult from '../ResultScreens/Empresult';
 import Incentiveresult from '../ResultScreens/Incentiveresult';
 import Approvalresult from '../ResultScreens/Approvalresult';
@@ -30,7 +29,6 @@ function Solutionscreen() {
   return (
     <div className='h-screen flex w-full items-center'>
       {user_intension === "Query to build industry from Scratch" ? (
-        // <Industryresult result={result[0]} />
         <IndustryResultScreen result={result[0]} source="SolutionScreen"/>
       ) : user_intension === "Query to Get Employee Search" ? (
         <Empresult result={result[0]} />

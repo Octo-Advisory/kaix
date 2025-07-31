@@ -80,7 +80,6 @@ const FailureScreen = ({text}) => {
 
   return (
     <div className="relative w-screen h-screen flex flex-col gap-4 items-center justify-center">
-      {/* <p className="text-2xl md:text-3xl font-semibold text-center">{messages}</p> */}
       <div 
             className={`rounded-xl p-6 border border-red-200 text-center bg-red-50 shadow-sm`}
             style={{ animationDelay: '0.3s' }}

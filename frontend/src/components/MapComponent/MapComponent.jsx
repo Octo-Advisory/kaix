@@ -8,7 +8,7 @@ import Property from "../Property/Property";
 import Vendorcards from "../ResultScreens/Vendorcards";
 import IndustryResultScreen from "../ResultScreens/IndustryResultScreen";
 import Vendorresult from "../ResultScreens/Vendorresult";
-import { FaXmark } from "react-icons/fa6";
+import { FaRoad, FaXmark } from "react-icons/fa6";
 import { FaStore } from "react-icons/fa";
 import { createRoot } from 'react-dom/client';
 import downimage from './assets/caretdown.svg';
@@ -20,8 +20,22 @@ import { MdDirectionsRailwayFilled } from "react-icons/md"; // Railway station
 import { RiShip2Line } from "react-icons/ri"; //seaport
 import { getDataForSingleLayer } from "./service/apiservice";
 import { IoLayersOutline } from "react-icons/io5";
+import { getMidpointSimple, getDistance, getMidpointByLength } from "./utils";
+import { IoMdHome } from "react-icons/io";
+import { FaPlus } from "react-icons/fa";
+import { FaMinus } from "react-icons/fa";
+import { use } from "react";
+import { useFrappeGetDoc } from "frappe-react-sdk";
 
 function MapComponent({ solutions, toggleModal, source, intension }) {
+  //var copyiedSelectedProperty = null;
+  var allVendors = [];
+  var nearestAirportDetail = null;
+  var nearestSubstationDetail = null;
+  var nearestSeaportDetail = null;
+  var nearestRailwayStationDetail = null;
+  var highwayCoord = null;
+
   console.log("source in map component", source);
   console.log("intension in map component", intension);
   console.log("solutons from map", solutions);
@@ -32,43 +46,61 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   const [solution, setSolution] = useState({})
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMapoptionVisible, setMapOptionVisible] = useState(true);
+  const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
 
   const latLongArray = Object.values(solutions).map(item => [...item.latitude_longitude].reverse());
 
   var map = null;
   const mapContainerRef = useRef(null); // Create a ref for the map container
+  const mapRef = useRef(null); // Store map instance
+  const copyiedSelectedProperty = useRef(null); // Store the real solution object
   mapboxgl.accessToken = 'pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ';
-  const LAYERS = {
-    DEFAULT_LAYER: {
-      LABEL: "Default Layers",
-      VENDOR: "Default Vendors",
-      SUB_STATIONS: "Default Sub Stations",
-      RAILWAY_STATIONS: "Default Railway Stations",
-      AIRPORTS: "Default Airports",
-      SEAPORTS: "Default Seaports",
-      HIGHWAY: "Default Highways",
-    },
-    SUB_STATIONS: "SUB_STATIONS",
-    RAILWAY_STATIONS: "RAILWAY_STATIONS",
-    AIRPORTS: "AIRPORTS",
-    SEAPORTS: "SEAPORTS",
-    VENDOR: "VENDOR"
+  
+  const { data: uiData } = useFrappeGetDoc("UI Configuration", "Mapping")
+        const configurations = uiData?.configurations || [];
+        const uiConfig = configurations.reduce((acc, curr) => {
+          acc[curr.key] = curr.value;
+          return acc;
+        }, {});
+  
+    const LAYERS = {
+      DEFAULT_LAYER: {
+        LABEL: `${uiConfig?.['default_layers'] || 'Default Layers'}`,
+        VENDOR: `${uiConfig?.['default_vendors'] || 'Default Vendors'}`,
+        SUB_STATIONS: `${uiConfig?.['default_sub_stations'] || 'Default Sub Stations'}`,
+        RAILWAY_STATIONS: `${uiConfig?.['default_railway_stations'] || 'Default Railway Stations'}`,
+        AIRPORTS: `${uiConfig?.['default_airports'] || 'Default Airports'}`,
+        SEAPORTS: `${uiConfig?.['default_seaports'] || 'Default Seaports'}`,
+        HIGHWAY: `${uiConfig?.['default_highway'] || 'Default Highway'}`,
+      },
+      SUB_STATIONS: `${uiConfig?.['checkbox_sub_stations'] || 'Sub Stations'}`,
+      RAILWAY_STATIONS: `${uiConfig?.['checkbox_railway_stations'] || 'Railway Stations'}`,
+      AIRPORTS: `${uiConfig?.['checkbox_airports'] || 'Airports'}`,
+      SEAPORTS: `${uiConfig?.['checkbox_seaports'] || 'Seaports'}`,
+      HIGHWAY: `${uiConfig?.['checkbox_highway'] || 'Highway'}`,
+      VENDOR: `${uiConfig?.['checkbox_all_vendors'] || 'All Vendors'}`
+    }
+  const DIRECTIONS = {
+    LEFT: - 0.4,
+    RIGHT: 0.4
   }
   useEffect(() => {
     // Initialize the map after the component mounts
-    map = new mapboxgl.Map({
+    mapRef.current = new mapboxgl.Map({
       container: mapContainerRef.current, // Use the ref to attach the map
       style: "mapbox://styles/mapbox/streets-v12", // Map style URL
       center: [73.133661788180035, 22.308428225686328], // Starting position [lng, lat]
       zoom: 14, // Starting zoom
       attributionControl: false,
     });
-    map.on('style.load', () => {
+
+    map = mapRef.current; // Assign the map instance to the variable
+    mapRef.current.on('style.load', () => {
       draw();
-      //load deafult layers
-      // loadVendorlayer();
+      document.querySelector('.accordion-header').click();
+      document.querySelectorAll('.accordion-header')[1].click();
     });
-    return () => map.remove(); // Cleanup the map instance on unmount
+    return () => mapRef.current.remove(); // Cleanup the map instance on unmount
   }, []); // Empty dependency array to run only once
 
   useEffect(() => {
@@ -80,7 +112,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     // Define the handler once
     const handleCheckboxChange = (event) => {
       if (event.target.checked) {
-        debugger;
         asyncLoadDataForSingleLayer(event.target.name);
       } else {
         // Handle uncheck if needed
@@ -113,7 +144,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         // Define the handler once
         const handleCheckboxChange = (event) => {
           if (event.target.checked) {
-            debugger;
             asyncLoadDataForSingleLayer(event.target.name);
           } else {
             // Handle uncheck if needed
@@ -125,7 +155,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         allTrafficCheckbox.forEach((element) => {
           element.addEventListener("change", handleCheckboxChange);
         });
-        console.log("Rebind click event");
         // Cleanup function to remove listeners
         return () => {
           allTrafficCheckbox.forEach((element) => {
@@ -165,8 +194,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     console.log("intention is", intension);
     // Filter out invalid coordinates
     const validCoordinates = latLongArray.filter(isValidLatLng);
-    console.log(validCoordinates, latLongArray, 'Coordinates LAtLongArray');
-
+    console.log("validCoordinates", validCoordinates);
     const coordinates = validCoordinates;
 
     // Get the bounding box
@@ -183,11 +211,10 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       item.coordinates = coordinates;
       return item;
     });
-
     // Fit the map to the bounds
-    map.fitBounds(bounds, {
-      padding: 50,    // Adds padding around the points
-      maxZoom: 10,    // Prevents zooming in too much
+    mapRef.current.fitBounds(bounds, {
+      padding: 200,    // Adds padding around the points
+      // maxZoom: 10,    // Prevents zooming in too much
       duration: 1000  // Animation duration in milliseconds
     });
 
@@ -201,7 +228,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
           let parsedCoord = JSON.parse(item.boundary_coordinates);
           let sourceId = `Custom_Source_${crypto.randomUUID()}`;
 
-          map.addSource(sourceId, {
+          mapRef.current.addSource(sourceId, {
             type: "geojson",
             data: {
               type: "Feature",
@@ -216,7 +243,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
           let layerId1 = `Custom_polygon_fill_${crypto.randomUUID()}`;
           let layerId2 = `Custom_polygon_border_${crypto.randomUUID()}`;
 
-          map.addLayer({
+          mapRef.current.addLayer({
             id: layerId1,
             type: "fill",
             source: sourceId,
@@ -227,7 +254,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
             },
           });
 
-          map.addLayer({
+          mapRef.current.addLayer({
             id: layerId2,
             type: "line",
             source: sourceId,
@@ -246,12 +273,11 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
 
     //#region Draw connected lines with distance labels
     const hasVendorResult = solutions.some(item => item.result_type === "Vendor");
-    console.log(solution, solutions, hasVendorResult, 'Okay');
 
     if (hasVendorResult) {
       //if propertyCoord is not available, then it means it is for all vendor results
       if (!propertyCoord) {
-        let some = source === 'SolutionScreen' ? solution : solutions;
+        let some = source === 'SolutionScreen' ? solutions : ''
         propertyCoord = some
           .filter(item => Array.isArray(item?.user_lat_long) && item.user_lat_long.length > 0)
           .map(item => {
@@ -270,7 +296,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       // Add Property Marker - Simple red marker
       new mapboxgl.Marker({ color: '#ff0000' })
         .setLngLat(propertyCoord)
-        .addTo(map);
+        .addTo(mapRef.current);
 
       // Generate LineString Features
       let layerId = `Custom_property_vendor_lines_layer_${crypto.randomUUID()}`;
@@ -283,7 +309,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         properties: {}
       }));
 
-      map.addSource('property-vendor-lines', {
+      mapRef.current.addSource('property-vendor-lines', {
         type: 'geojson',
         data: {
           type: 'FeatureCollection',
@@ -292,7 +318,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         lineMetrics: true
       });
 
-      map.addLayer({
+      mapRef.current.addLayer({
         id: layerId,
         type: 'line',
         source: 'property-vendor-lines',
@@ -333,7 +359,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     // Define the handler once
     const handleCheckboxChange = (event) => {
       if (event.target.checked) {
-        debugger;
         asyncLoadDataForSingleLayer(event.target.name);
       } else {
         // Handle uncheck if needed
@@ -355,25 +380,89 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       [LAYERS.RAILWAY_STATIONS]: "Railway Station"
     };
 
-    const docTypeName = layerMapping[layerType];
-    if (!docTypeName) return;
-
     try {
-      const res = await getDataForSingleLayer(docTypeName);
-      bindDataOnMap(res.data, layerType);
+      if (layerType === LAYERS.VENDOR) {
+
+        console.log(copyiedSelectedProperty.current, 'copyiedSelectedProperty.current in asyncLoadDataForSingleLayer');
+        let data = [
+          ...copyiedSelectedProperty.current.essential_vendor_all_details,
+          ...copyiedSelectedProperty.current.non_essential_vendor_all_details
+        ];
+
+        if (data.length > 0) {
+          data.forEach((item) => {
+            if (item.latitude_longitude != null && item.latitude_longitude != "") {
+              item.coordinates = item.latitude_longitude;
+            }
+          });
+        }
+
+        let uniqueVendorNames = Array.from(
+          new Map(data.map(item => [item.name, item])).values()
+        );
+        console.log(uniqueVendorNames, 'uniqueVendorNames in asyncLoadDataForSingleLayer');
+
+        bindDataOnMap(uniqueVendorNames, LAYERS.VENDOR);
+      }
+      else {
+        const docTypeName = layerMapping[layerType];
+        if (!docTypeName) return;
+
+        const res = await getDataForSingleLayer(docTypeName);
+        bindDataOnMap(res.data, layerType);
+      }
     } catch (error) {
       console.error(`Failed to load data for ${layerType}:`, error);
     }
   };
 
   const removeMarker = (layerType) => {
-    debugger
     // let divs =  document.getElement("marker"+layerType);
     const element = document.querySelectorAll('[data-name="marker_' + layerType + '"]');
     element.forEach((div) => {
       div.remove();
     })
+    if (layerType === LAYERS.DEFAULT_LAYER.LABEL) {
+      let layerListToDelete = [
+        LAYERS.DEFAULT_LAYER.VENDOR,
+        LAYERS.DEFAULT_LAYER.SUB_STATIONS,
+        LAYERS.DEFAULT_LAYER.AIRPORTS,
+        LAYERS.DEFAULT_LAYER.SEAPORTS,
+        LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS,
+        LAYERS.DEFAULT_LAYER.HIGHWAY
+      ]
+      layerListToDelete.forEach(layerName => {
+        const element = document.querySelectorAll('[data-name="marker_' + layerName + '"]');
+        element.forEach((div) => {
+          div.remove();
+        });
+      });
+      //get the all layer from the map.
+      const filteredLayers = mapRef.current
+        .getStyle()
+        .layers.filter((item) => item.id.includes("Default"));
+      //remove layer as per layer id
+      for (let item of filteredLayers) {
+        mapRef.current.removeLayer(item.id);
+      }
+      //get all the layer source
+      let sources = Object.entries(mapRef.current.getStyle().sources);
+      const filteredSource = sources.filter(([key]) => key.includes("Default"));
 
+      for (let [key, value] of filteredSource) {
+        mapRef.current.removeSource(key);
+      }
+
+      //Remove all vendor distance divs
+      let allVendorDiv = document.querySelectorAll('[data-name="vendor_distance"]');
+      allVendorDiv.forEach((div) => {
+        div.remove();
+      });
+      let allDefaultConnectivityLabelDiv = document.querySelectorAll('[data-name="distance-label"]');
+      allDefaultConnectivityLabelDiv.forEach((div) => {
+        div.remove();
+      });
+    }
   }
 
   const bindDataOnMap = async (resultData, layer) => {
@@ -400,26 +489,108 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
           boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          marginTop: '20px'
         }}>
           {
             layer === LAYERS.SUB_STATIONS ? <SlEnergy size={24} color="#4A76D1" /> :
               layer === LAYERS.AIRPORTS ? <CiAirportSign1 size={24} color="#4A76D1" /> :
                 layer === LAYERS.SEAPORTS ? <RiShip2Line size={24} color="#4A76D1" /> :
-                  <MdDirectionsRailwayFilled size={24} color="#4A76D1" />
+                  (layer === LAYERS.RAILWAY_STATIONS || layer === LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS) ? <MdDirectionsRailwayFilled size={24} color="#5f2abb" /> :
+                    (layer === LAYERS.HIGHWAY || layer === LAYERS.DEFAULT_LAYER.HIGHWAY) ? <FaRoad size={24} color="#5f2abb" /> :
+                      (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) ? <FaStore size={24} color="#5b96d8" /> :
+                        ""
           }
         </div>
       );
       data.coordinates = data.coordinates.replace(" ", "");
       const [lat, lng] = data.coordinates.split(",").map(Number);
+
       const marker = new mapboxgl.Marker({
         element: storeIconEl,
         anchor: 'bottom' // This ensures the popup appears above the marker
       }).setLngLat([lng, lat])
-        .addTo(map);
+        .addTo(mapRef.current);
+      //If All vendor or Defualt layer is selected
+      if (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) {
+        //Show label on the marker
+        addInfoPoupp(marker, data.name);
+        //clicking on the vendor marker a vendor detail modal will open
+        marker.getElement().addEventListener('click', () => {
+          //set the vendor detail
+          data.result_type = "Vendor";
+          //Display the modal with vendor details          
+          setIsModalOpen(true);
+          setSolution(data);
+
+        });
+      }
+      if (layer != LAYERS.DEFAULT_LAYER.LABEL) {
+        let name = "";
+        switch (layer) {
+          case LAYERS.SUB_STATIONS:
+            name = data.name;
+            break;
+          case LAYERS.AIRPORTS:
+            name = data.title;
+            break;
+          case LAYERS.SEAPORTS:
+            name = data.title;
+            break;
+          case LAYERS.RAILWAY_STATIONS:
+            name = data.name1;
+            break;
+          default:
+            break;
+        }
+        if (name !== "") {
+          addInfoPoupp(marker, name);
+        }
+      }
     });
   }
+  const addInfoPoupp = (marker, name) => {
+    // Create a popup but don't add it yet
+    const popup = new mapboxgl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      offset: 25,
+      className: 'vendor-popup' // Add a class for custom styling if needed
+    }).setText(name);
 
+    // Mouse enter event
+    marker.getElement().addEventListener('mouseenter', () => {
+      marker.setPopup(popup); // Attach the popup to the marker
+      popup.addTo(mapRef.current); // Actually show the popup
+      mapRef.current.getCanvas().style.cursor = 'pointer';
+    });
+
+    // Mouse leave event
+    marker.getElement().addEventListener('mouseleave', () => {
+      popup.remove(); // Remove the popup
+      mapRef.current.getCanvas().style.cursor = '';
+    });
+  }
+  const increaseSelectedPropertyMarkerSize = (propertyId) => {
+    let propertyDivs = document.querySelectorAll('[data-name="Property-Marker"]');
+    propertyDivs.forEach(element => {
+      console.log("Current element for resize", element)
+      let dataId = element.getAttribute("data-id");
+      let idToCheck = "Property-marker-" + propertyId;
+      if (dataId == idToCheck) {
+        const svgElement = element.querySelector('svg');
+        svgElement.style.height = "55px";
+        svgElement.style.width = "55px";
+        element.classList.add("property-marker-margin");
+      }
+      else {
+        const svgElement = element.querySelector('svg');
+        svgElement.style.height = "41px";
+        svgElement.style.width = "27px";
+        element.classList.remove("property-marker-margin");
+      }
+    });
+  }
   // Modified marker adding function
   const addPointersToMap = async (elements, layerType) => {
     // Create lookups for vendor names and solutions
@@ -443,6 +614,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     const vendorCoords = [];
 
     elements.forEach(data => {
+      console.log("data in addPointersToMap", data);
       const coordsString = data.coordinates.toString();
       if (solutionLookup[coordsString]?.result_type === "Vendor") {
         vendorCoords.push(data);
@@ -455,14 +627,27 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     propertyCoords.forEach(data => {
       const marker = new mapboxgl.Marker({ color: '#ff0000' })
         .setLngLat(data.coordinates)
-        .addTo(map);
+        .addTo(mapRef.current);
+      const filtered = solutions.filter(item => {
+        return (
+          item.latitude_longitude[0] === data.coordinates[1] &&
+          item.latitude_longitude[1] === data.coordinates[0]
+        );
+      });
+      if (filtered.length > 0) {
+        marker.getElement().dataset.id = "Property-marker-" + filtered[0].property_id;
+        marker.getElement().dataset.name = "Property-Marker";
+      }
 
       marker.getElement().addEventListener('click', () => {
         const solution = solutionLookup[data.coordinates.toString()];
         if (solution) {
           setSolution(solution);
-          setIsModalOpen(true);
-          setMapOptionVisible(false);
+          setIsConfirmationModalOpen(true);
+          console.log("Solution is set", solution);
+          console.log("State is set");
+          // setIsModalOpen(true);
+          // setMapOptionVisible(false);
         }
       });
     });
@@ -500,7 +685,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         element: storeIconEl,
         anchor: 'bottom' // This ensures the popup appears above the marker
       }).setLngLat(data.coordinates)
-        .addTo(map);
+        .addTo(mapRef.current);
 
       // Get the vendor name
       const vendorName = vendorNameLookup[data.coordinates.toString()] || 'Vendor';
@@ -516,14 +701,14 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       // Mouse enter event
       marker.getElement().addEventListener('mouseenter', () => {
         marker.setPopup(popup); // Attach the popup to the marker
-        popup.addTo(map); // Actually show the popup
-        map.getCanvas().style.cursor = 'pointer';
+        popup.addTo(mapRef.current); // Actually show the popup
+        mapRef.current.getCanvas().style.cursor = 'pointer';
       });
 
       // Mouse leave event
       marker.getElement().addEventListener('mouseleave', () => {
         popup.remove(); // Remove the popup
-        map.getCanvas().style.cursor = '';
+        mapRef.current.getCanvas().style.cursor = '';
       });
 
       // Click event
@@ -540,7 +725,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     const sourceId = `polygon-${crypto.randomUUID()}`;
     const layerId = "Custom_" + layerType;
 
-    map.addSource(sourceId, {
+    mapRef.current.addSource(sourceId, {
       type: "geojson",
       data: {
         type: "FeatureCollection",
@@ -555,7 +740,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       },
     });
 
-    map.addLayer({
+    mapRef.current.addLayer({
       id: layerId,
       type: "symbol",
       source: sourceId,
@@ -566,7 +751,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       },
     });
 
-    map.on("click", layerId, (e) => {
+    mapRef.current.on("click", layerId, (e) => {
       if (e.features?.length > 0) {
         const coordsString = e.features[0].geometry.coordinates.toString();
         const solution = solutionLookup[coordsString];
@@ -580,16 +765,12 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
 
   const loadMapboxImage = (map, url) => {
     return new Promise((resolve, reject) => {
-      map.loadImage(url, (error, image) => {
+      mapRef.current.loadImage(url, (error, image) => {
         if (error) reject(error);
         else resolve(image);
       });
     });
   }
-
-  useEffect(() => {
-    console.log('this is the solution of selected', solution, solutions)
-  }, [solution, solutions])
 
   const toggleAccordion = (element) => {
     //save element reference
@@ -665,12 +846,54 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       });
     }
   }
-  const loadVendorlayer = async () => {
+  const loadDefaultLayer = async () => {
+    copyiedSelectedProperty.current = structuredClone(solution);
+    copyiedSelectedProperty.current.essential_vendors.forEach((item) => {
+      if (!item.vendor_name || !item.supply) return;
+
+      var filteredItem = copyiedSelectedProperty.current.essential_vendor_details.filter(
+        (detail) => detail.name?.trim() === item.vendor_name.trim()
+      );
+      filteredItem.forEach((detail) => {
+        if (typeof detail.supplyName !== 'undefined') {
+          detail.supplyName = "";
+        }
+      });
+      filteredItem.forEach((detail) => {
+        if (!detail.supplyName) {
+          detail.supplyName = item.supply;
+        } else {
+          detail.supplyName = `${detail.supplyName}, ${item.supply}`;
+        }
+      });
+    });
+
+
+    copyiedSelectedProperty.current.nonessential_vendors.forEach((item) => {
+      if (!item.vendor_name || !item.supply) return; // skip if missing
+
+      var filteredItem = copyiedSelectedProperty.current.non_essential_vendor_details.filter(
+        (detail) => detail.name?.trim() === item.vendor_name.trim()
+      );
+      filteredItem.forEach((detail) => {
+        if (typeof detail.supplyName !== 'undefined') {
+          detail.supplyName = "";
+        }
+      });
+      filteredItem.forEach((detail) => {
+        if (!detail.supplyName) {
+          detail.supplyName = item.supply;
+        } else {
+          detail.supplyName += ", " + item.supply;
+        }
+      });
+    });
+
     let data = [
-      ...selectedProperty.essential_vendor_details,
-      ...selectedProperty.non_essential_vendor_details
+      ...copyiedSelectedProperty.current.essential_vendor_details,
+      ...copyiedSelectedProperty.current.non_essential_vendor_details
     ];
-    console.log("data in loadVendorlayer", data);
+
     if (data.length > 0) {
       data.forEach((item) => {
         if (item.latitude_longitude != null && item.latitude_longitude != "") {
@@ -678,20 +901,369 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         }
       });
     }
-    bindDataOnMap(data, LAYERS.VENDOR);
-    document.querySelector('[name="' + LAYERS.VENDOR + '"]').checked = true; //Check the vendor layer checkbox by default
+    allVendors = structuredClone(data);
+    bindDataOnMap(data, LAYERS.DEFAULT_LAYER.VENDOR);
+    let lat = solution.latitude_longitude[0];
+    let lng = solution.latitude_longitude[1];
+    const propertyLatitude = copyiedSelectedProperty.current?.latitude_longitude[0];
+    const propertyLongitude = copyiedSelectedProperty.current?.latitude_longitude[1];
 
     if (data.length > 0) {
       let count = 0;
+      let direction = "right";
       data.forEach((item) => {
         if (item.latitude_longitude != null && item.latitude_longitude != "") {
           count++;
-          let vendorSourceId = 'line-string_' + count + "_" + LAYERS.VENDOR;
-          let vendorLineStringLayerId = 'line-string-layer_' + count + "_" + LAYERS.VENDOR;
+          let vendorSourceId = 'line-string_' + count + "_" + LAYERS.DEFAULT_LAYER.VENDOR;
+          let vendorLayerId = "default-layer_" + LAYERS.DEFAULT_LAYER.VENDOR + "_" + count;
           let coord = item.latitude_longitude.replace(" ", "").split(",").map(Number);
-          addSingleLineLayer(vendorSourceId, vendorLineStringLayerId, [coord[1], coord[0]], [lng, lat], '#5b96d8');
+          var [vendorLongitude, vendorLatitude] = item.coordinates.split(",").map(Number);
+          const distanceKm = getDistance([propertyLongitude, propertyLatitude], [vendorLatitude, vendorLongitude]).toFixed(2);
+          const labelText = `${item.supplyName} </br> ${distanceKm} km`;
+          let curvedDirectionValue = null;
+          if (direction == "right") {
+            direction = "left";
+            curvedDirectionValue = DIRECTIONS.LEFT;
+          }
+          else {
+            direction = "right";
+            curvedDirectionValue = DIRECTIONS.RIGHT;
+          }
+          generateCurveLine({ sourceId: vendorSourceId, layerId: vendorLayerId, from: [coord[1], coord[0]], to: [lng, lat], linecolor: '#5b96d8', labelText: labelText, curvature: curvedDirectionValue });
         }
       });
+    }
+
+    //#region Add Connectivity Layers
+    try {
+
+      if (copyiedSelectedProperty.current.nearest_airport_coord != null && copyiedSelectedProperty.current.nearest_airport_coord != "") {
+        nearestAirportDetail = await getDataForSingleLayer("Airport", { "name": copyiedSelectedProperty.current?.nearest_airport });
+        if (nearestAirportDetail.data.length > 0) {
+          const airportCoord = nearestAirportDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+          addConnectivityLayer(LAYERS.DEFAULT_LAYER.AIRPORTS, [airportCoord[1], airportCoord[0]], [lng, lat], nearestAirportDetail.data[0], DIRECTIONS.LEFT);
+        }
+
+      }
+
+      if (copyiedSelectedProperty.current.nearest_power_source != null && copyiedSelectedProperty.current.nearest_power_source != "") {
+        nearestSubstationDetail = await getDataForSingleLayer("Substation", { "name": copyiedSelectedProperty.current?.nearest_power_source });
+        if (nearestSubstationDetail.data.length > 0) {
+          const substationCoord = nearestSubstationDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+          addConnectivityLayer(LAYERS.DEFAULT_LAYER.SUB_STATIONS, [substationCoord[1], substationCoord[0]], [lng, lat], nearestSubstationDetail.data[0], DIRECTIONS.RIGHT);
+        }
+      }
+
+
+      if (copyiedSelectedProperty.current.nearest_seaport != null && copyiedSelectedProperty.current.nearest_seaport != "") {
+        nearestSeaportDetail = await getDataForSingleLayer("Seaport", { "name": copyiedSelectedProperty.current?.nearest_seaport });
+        if (nearestSeaportDetail.data.length > 0) {
+          const seaportCoord = nearestSeaportDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+          addConnectivityLayer(LAYERS.DEFAULT_LAYER.SEAPORTS, [seaportCoord[1], seaportCoord[0]], [lng, lat], nearestSeaportDetail.data[0], DIRECTIONS.LEFT);
+        }
+      }
+
+
+      if (copyiedSelectedProperty.current.nearest_railway_station != null && copyiedSelectedProperty.current.nearest_railway_station != "") {
+        nearestRailwayStationDetail = await getDataForSingleLayer("Railway Station", { "name": copyiedSelectedProperty.current?.nearest_railway_station });
+        if (nearestRailwayStationDetail.data.length > 0) {
+          const railwayCoord = nearestRailwayStationDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+          addConnectivityLayer(LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS, [railwayCoord[1], railwayCoord[0]], [lng, lat], nearestRailwayStationDetail.data[0], DIRECTIONS.RIGHT);
+        }
+      }
+
+      if (copyiedSelectedProperty.current.nearest_highway_coord != null && copyiedSelectedProperty.current.nearest_highway_coord != "") {
+        highwayCoord = copyiedSelectedProperty.current.nearest_highway_coord.replace(" ", "").split(",").map(Number);
+        addConnectivityLayer(LAYERS.DEFAULT_LAYER.HIGHWAY, [highwayCoord[1], highwayCoord[0]], [lng, lat], null, DIRECTIONS.LEFT);
+      }
+    } catch (error) {
+      console.error("Error in adding marker:", error);
+    }
+    //#endregion
+  }
+
+  const addConnectivityLayer = (layer, coord, propertyCoord, detail, direction = {}) => {
+    // Custom Marker with MdFactory
+    const el = document.createElement('div');
+    el.name = "marker_" + layer;
+    el.style.top = '12px';
+    el.style.width = '40px';
+    el.style.height = '40px';
+    el.style.display = 'flex';
+    el.style.alignItems = 'center';
+    el.style.justifyContent = 'center';
+    el.setAttribute("data-name", "marker_" + layer)
+
+    const root = createRoot(el);
+    root.render(
+      <div style={{
+        background: 'white',
+        borderRadius: '50%',
+        padding: '4px',
+        boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+      }}>
+        {
+          (layer === LAYERS.SUB_STATIONS || layer === LAYERS.DEFAULT_LAYER.SUB_STATIONS) ? <SlEnergy size={24} color="#5f2abb" /> :
+            (layer === LAYERS.AIRPORTS || layer === LAYERS.DEFAULT_LAYER.AIRPORTS) ? <CiAirportSign1 size={24} color="#5f2abb" /> :
+              (layer === LAYERS.SEAPORTS || layer === LAYERS.DEFAULT_LAYER.SEAPORTS) ? <RiShip2Line size={24} color="#5f2abb" /> :
+                (layer === LAYERS.RAILWAY_STATIONS || layer === LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS) ? <MdDirectionsRailwayFilled size={24} color="#5f2abb" /> :
+                  (layer === LAYERS.HIGHWAY || layer === LAYERS.DEFAULT_LAYER.HIGHWAY) ? <FaRoad size={24} color="#5f2abb" /> :
+                    (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) ? <FaStore size={24} color="#5b96d8" /> :
+                      ""
+        }
+
+
+      </div>
+    );
+
+    const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat(coord)
+      .addTo(mapRef.current);
+    let sourceId = 'line-string' + "_" + layer;
+    let lineStringLayerId = 'default-layer' + "_" + layer;
+    let name = "";
+    if (detail != undefined && detail != null) {
+      switch (layer) {
+        case LAYERS.DEFAULT_LAYER.SUB_STATIONS:
+          name = detail.name + " Sub Station";
+          break;
+        case LAYERS.DEFAULT_LAYER.AIRPORTS:
+          name = detail.title + " Airport";
+          break;
+        case LAYERS.DEFAULT_LAYER.SEAPORTS:
+          name = detail.title + " Seaport";
+          break;
+        case LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS:
+          name = detail.name1 + " Railway Station";
+          break;
+        default:
+          break;
+      }
+
+      if (name !== "") {
+        addInfoPoupp(marker, name);
+      }
+    }
+    const distanceKm = getDistance([propertyCoord[0], propertyCoord[1]], [coord[0], coord[1]]).toFixed(2);
+    const labelText = name !== "" ? `${name} </br> ${distanceKm} km` : `${distanceKm} km`;
+    generateCurveLine({ sourceId: sourceId, layerId: lineStringLayerId, from: coord, to: propertyCoord, linecolor: '#5f2abb', curvature: direction, labelText: labelText });
+  }
+
+  const addDistanceLabel = (coord, text, id) => {
+    const supplyNameEl = document.createElement('div');
+    supplyNameEl.style.background = 'rgba(0, 0, 0, 0.75)';
+    supplyNameEl.style.color = '#fff';
+    supplyNameEl.style.padding = '4px 8px';
+    supplyNameEl.style.borderRadius = '6px';
+    supplyNameEl.style.fontSize = '12px';
+    supplyNameEl.style.fontWeight = 'bold';
+    supplyNameEl.setAttribute("data-name", "distance-label");
+    supplyNameEl.innerHTML = `${text}`;
+    supplyNameEl.style.border = '2px solid grey';
+    supplyNameEl.style.zIndex = 2;
+    new mapboxgl.Marker({
+      element: supplyNameEl,
+      anchor: 'center'
+    })
+      .setLngLat(coord)
+      .addTo(mapRef.current);
+  };
+  const resetZoomlevel = async () => {
+    // Calculate the bounding box from your coordinates
+    const bounds = new mapboxgl.LngLatBounds();
+    allVendors.forEach(item => {
+      let coord = item.latitude_longitude.replace(" ", "").split(",").map(Number);
+      coord = [coord[1], coord[0]]; // Ensure coordinates are in [lng, lat] format
+      bounds.extend(coord);
+    });
+
+    let propertyCoord = solution.latitude_longitude;
+    propertyCoord = [propertyCoord[1], propertyCoord[0]]; // Ensure coordinates are in [lng, lat] format
+    bounds.extend(propertyCoord);
+
+    if (
+      nearestAirportDetail?.data?.length > 0 &&
+      nearestAirportDetail.data[0].coordinates
+    ) {
+      let airportCoord = nearestAirportDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+      airportCoord = [airportCoord[1], airportCoord[0]]
+      bounds.extend(airportCoord);
+    }
+
+    if (
+      nearestSubstationDetail?.data?.length > 0 &&
+      nearestSubstationDetail.data[0].coordinates
+    ) {
+      let substationCoord = nearestSubstationDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+      substationCoord = [substationCoord[1], substationCoord[0]]
+      bounds.extend(substationCoord);
+    }
+
+    if (
+      nearestSeaportDetail?.data?.length > 0 &&
+      nearestSeaportDetail.data[0].coordinates
+    ) {
+      let seaportCoord = nearestSeaportDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+      seaportCoord = [seaportCoord[1], seaportCoord[0]]
+      bounds.extend(seaportCoord);
+    }
+
+    if (nearestRailwayStationDetail?.data?.length > 0 &&
+      nearestRailwayStationDetail.data[0].coordinates
+    ) {
+      let railwayCoord = nearestRailwayStationDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+      railwayCoord = [railwayCoord[1], railwayCoord[0]]
+      bounds.extend(railwayCoord);
+    }
+
+    if (highwayCoord != null && highwayCoord != "") {
+      highwayCoord = [highwayCoord[1], highwayCoord[0]]
+      bounds.extend(highwayCoord);
+    }
+
+    // Fit the map to these bounds with some optional padding
+    mapRef.current.fitBounds(bounds, {
+      padding: 200,   // Adjusts space around the edges (optional)
+      duration: 1000 // Optional: smooth animation
+    });
+  };
+  const changeMarkerOpacity = () => {
+    let proeprtyMarkers = document.querySelectorAll("[data-name='Property-Marker']");
+    proeprtyMarkers.forEach(element => {
+      let idToBeChecked = element.getAttribute("data-id");
+      let currentId = "Property-marker-" + solution.property_id;
+      if (idToBeChecked != currentId) {
+        element.classList.add("property-marker-opacity");
+      }
+      else {
+        let currentMarker = document.querySelector("[data-id=" + currentId + "]");
+        currentMarker.classList.remove("property-marker-opacity");
+      }
+    });
+  }
+  const showNearestConnectivity = async (e) => {
+    setIsConfirmationModalOpen(false);
+    removeMarker(LAYERS.DEFAULT_LAYER.LABEL);
+    await loadDefaultLayer();
+    resetZoomlevel();
+    document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.display = "flex"; //Disable the vendor layer checkbox
+    changeMarkerOpacity();
+    increaseSelectedPropertyMarkerSize(solution.property_id);
+
+  };
+  const showPropertyDetails = async (e) => {
+    // setMapOptionVisible(false);
+    setIsConfirmationModalOpen(false);
+    removeMarker(LAYERS.DEFAULT_LAYER.LABEL);
+    await loadDefaultLayer();
+    resetZoomlevel();
+    document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.display = "flex"; //Disable the vendor layer checkbox
+    changeMarkerOpacity();
+    setIsModalOpen(true);
+    increaseSelectedPropertyMarkerSize(solution.property_id);
+  };
+
+  //Sets the default map location
+  const setDefaultMapPosition = () => {
+    // Fly the map to the default location
+    mapRef.current.flyTo({
+      //center: "", //fetches default coordinates
+      essential: true, // this animation is considered essential with respect to prefers-reduced-motion
+      zoom: 7, //sets default zoom level
+    });
+  };
+  //zoom in the map
+  const zoomInMap = () => {
+    //get current zoom level
+    let currentZoom = mapRef.current.getZoom();
+    //increases zoom level by 0.5
+    let newZoom = currentZoom + 0.5;
+    //sets zoom level
+    mapRef.current.zoomTo(newZoom);
+  };
+
+  //zoom out the map
+  const zoomOutMap = () => {
+    //get current zoom level
+    let currentZoom = mapRef.current.getZoom();
+    //zoom out form current zoom level
+    let newZoom = currentZoom === 0 ? currentZoom : currentZoom - 0.5;
+    //sets zoom level
+    mapRef.current.zoomTo(newZoom);
+  };
+
+  //close confirmation box
+  const closeConfirmPoup = () => {
+    setIsConfirmationModalOpen(false);
+    // let proeprtyMarkers = document.querySelectorAll("[data-name='Property-Marker']");
+    // proeprtyMarkers.forEach(element => {
+    //   element.classList.remove("property-marker-opacity");
+    // });
+  }
+
+  // Function to generate curved (Bézier) coordinates
+  const getCurvedLine = (start, end, curvature = 0.4, numPoints = 150) => {
+    const [x0, y0] = start;
+    const [x2, y2] = end;
+
+    // Midpoint between start and end
+    const mx = (x0 + x2) / 2;
+    const my = (y0 + y2) / 2;
+
+    // Direction vector from start to end
+    const dx = x2 - x0;
+    const dy = y2 - y0;
+
+    // ✅ These two lines define the direction and strength of the curve
+    //    Change the sign of `curvature` to bend left or right
+    const offsetX = -dy * curvature; // Perpendicular to the line (left/right deviation)
+    const offsetY = dx * curvature;  // Perpendicular to the line (left/right deviation)
+
+    // Control point: the "pull" of the curve
+    const cx = mx + offsetX;
+    const cy = my + offsetY;
+
+    // Generate points along a quadratic Bézier curve
+    const curve = [];
+    for (let t = 0; t <= 1; t += 1 / numPoints) {
+      const x = (1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * x2;
+      const y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * cy + t * t * y2;
+      curve.push([x, y]);
+    }
+
+    return curve;
+  }
+
+
+  const generateCurveLine = ({ sourceId = "", layerId = "", from = "", to = "", linecolor = "", curvature = 0.4, labelText = "" } = {}) => {
+    let getCurvedLineCoord = getCurvedLine(from, to, curvature);
+    getCurvedLineCoord.push(to);
+    console.log("curved line for ", layerId, getCurvedLineCoord, from, to)
+    mapRef.current.addSource(sourceId, {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: getCurvedLineCoord,
+        }
+      }
+    });
+
+    mapRef.current.addLayer({
+      id: layerId,
+      type: 'line',
+      source: sourceId,
+      paint: {
+        'line-color': linecolor,
+        'line-width': 1.5,
+        'line-dasharray': [1, 1] // very short "dot", longer gap
+      }
+    });
+    if (labelText != "") {
+      let midPoinnt = getMidpointByLength(getCurvedLineCoord);
+      addDistanceLabel(midPoinnt, labelText, layerId + " lable");
+
     }
   }
 
@@ -792,7 +1364,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                           {/* <a href="#">Select: All</a> | <a href="#">None</a> */}
                         </div>
                         <ul>
-                          {intension === "For Property to Vendor" && (
+                          {/* {intension === "For Property to Vendor" && (
                             <li className="li-container">
                               <label className="custom-checkbox">
                                 <input
@@ -808,7 +1380,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                                 {LAYERS.DEFAULT_LAYER.LABEL}
                               </span>
                             </li>
-                          )}
+                          )} */}
                           <li className="li-container">
 
                             <label className="custom-checkbox">
@@ -895,8 +1467,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                               {LAYERS.RAILWAY_STATIONS}
                             </span>
                           </li>
-                          <li className="li-container">
-
+                          <li className="li-container" style={{ display: "none" }} data-name={"checkbox-container-" + LAYERS.VENDOR}>
                             <label className="custom-checkbox">
                               <input
                                 type="checkbox"
@@ -920,8 +1491,45 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
               </div>
             </div>
           </div>
+          <div className={`location-btn-container map-component-zoom-control`}>
+            <div id="zoomBtn" className="right-bottom-buttons">
+              <span className="save-btn flex-d-column zoom-btn">
+                <FaPlus
+                  size={13}
+                  onClick={() => zoomInMap()}
+                />
+                <IoMdHome
+                  size={16}
+                  onClick={() => setDefaultMapPosition()}
+                />
+                <FaMinus
+                  size={13}
+                  onClick={() => zoomOutMap()}
+                />
+              </span>
+
+            </div>
+
+          </div>
         </div>
       </div>)}
+      {isConfirmationModalOpen && (
+        <div className='h-screen w-screen fixed inset-0 z-[444] flex items-center justify-center bg-black bg-opacity-20'>
+
+
+          <div className='relative h-fit w-[30%] flex flex-col items-center gap-4 bg-white rounded-md border py-6 px-8'>
+            <div className={`absolute top-2 right-2 z-[335] cursor-pointer h-8 w-8 rounded-full bg-white flex self-end items-center justify-center`} onClick={() => { closeConfirmPoup() }}>
+              <FaXmark size={20} />
+            </div>
+            <h2 className="relative  tracking-wide text-lg text-center ">Do you want to see nearest connectivity or property details?</h2>
+
+            <div className="relative flex flex-row gap-3">
+              <button className="relative py-1 px-4 text-sm transition-all duration-200 hover:-translate-y-0.5 flex items-center text-white justify-center bg-gradient-to-br rounded-md from-[#2C53A3] to-[#70A1D9]" onClick={(e) => { showNearestConnectivity() }}>Nearest Connectivity</button>
+              <button className="relative py-1 px-4 text-sm transition-all duration-200 hover:-translate-y-0.5 flex items-center text-white justify-center bg-gradient-to-br rounded-md from-[#2C53A3] to-[#70A1D9]" onClick={(e) => { showPropertyDetails() }}>Property Detail</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,10 +3,12 @@ import re
 import json 
 from typing import List, Dict, Tuple, Union, Any
 import copy
+import ast
 # from dotenv import load_dotenv
 import spacy
 from langchain.prompts import PromptTemplate
 from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from rapidfuzz import fuzz, process
 from langchain.schema import HumanMessage, AIMessage
 import frappe
@@ -14,12 +16,14 @@ from frontend_app.Management_Class.helpers.utility import update_llm_token
 from frontend_app.Management_Class.Redis_management.Redis_chat import get_chat,save_chat,get_state,save_state
 import configparser
 import frappe
+import random
 
 # from langchain_openai import ChatOpenAI
 config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 config = configparser.ConfigParser()
 config.read(config_file)
 groq_api_key = config['Key']['groq_key']
+openai_key = config['Key']['OPENAI_API_KEY']
 
 # Initialize LLM    
 llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.0)
@@ -32,6 +36,35 @@ llm_maverik = ChatGroq(groq_api_key=groq_api_key, model_name="meta-llama/llama-4
 # llm_openai_inf_4o = ChatOpenAI(model="gpt-4o", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_4 = ChatOpenAI(model="gpt-4", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_3_5 = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0.0, api_key=openai_key)
+
+RESPONDER_LLM = ChatGroq(
+    groq_api_key=groq_api_key,
+    model_name="llama-3.3-70b-versatile",
+    temperature=0.7,                        # was 0.5 → tighter, still natural
+    model_kwargs={
+        "top_p": 0.9,                      # was 0.9 → fewer side-asks
+    },
+)
+with open("testlog.txt", "a") as file:
+    file.write(f"\n%%%%%%%% Model: llama-3.3-70b-versatile")
+
+# RESPONDER_LLM = ChatOpenAI(
+#     model="gpt-4o-mini", 
+#     temperature=0.7, 
+#     api_key=openai_key,
+#     top_p = 0.9
+# )
+# with open("testlog.txt", "a") as file:
+#     file.write(f"\n%%%%%%%% Model: gpt-4o-mini")
+
+# RESPONDER_LLM = ChatOpenAI(
+#     model="gpt-4o", 
+#     temperature=0.7, 
+#     api_key=openai_key,
+#     top_p = 0.9
+# )
+# with open("testlog.txt", "a") as file:
+#     file.write(f"\n%%%%%%%% Model: gpt-4o")
 
 # Load the SpaCy model for better entity recognition
 nlp = spacy.load("en_core_web_lg")
@@ -94,9 +127,146 @@ def refine_query_with_history(history, latest_query, llm):
     # Fallback to the entire response if no match is found
     return refined_text
 
-# Define the function
+# # Define the function
+# @frappe.whitelist()
+# # Define the function
+# def classify_query(user_query: str) -> str:
+#     """
+#     Classifies a business-related query into one of eight predefined categories based on its intent and context.
+
+#     Parameters:
+#     -----------
+#     user_query : str
+#         A user-submitted query related to industry or business.
+
+#     Returns:
+#     --------
+#     str
+#         A single category name from the following list that best matches the user's query:
+        
+#         - "Query to build industry from Scratch"
+#         - "Query to search Vendors"
+#         - "Query to search Incentives"
+#         - "Query to Get Approvals"
+#         - "Query to Get Employee Search"
+#         - "Negatively Intended Query"
+#         - "Other industry-related queries"
+#         - "Valueless queries"
+
+#     Notes:
+#     ------
+#     - The classification is powered by a language model and follows strict rules for interpreting the query’s intent.
+#     - Only one category is returned per query.
+#     - The function does not provide explanations or return multiple categories.
+#     """
+
+#     prompt_template = """
+#     You are an expert in understanding business-related queries and classifying them into a single most relevant category.
+#     Your task is to strictly assign the query to only one category, even if multiple classes seem applicable.  
+#     Analyze the context carefully and ensure that you return only one category that best fits the query.  
+
+#     Categories & Their Definitions:
+
+#     1. Query to build industry from Scratch:  
+#         - Example: I want to build a 1 TPA Cement Factory.  
+#         - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
+#         - Assign this category if the user's query indicates any intent to establish, set up, construct, initiate, develop, or start a new industry or factory, regardless of the exact words used.  
+#         - The classification must be based on understanding the overall intent and context rather than focusing on specific words like "build" or "establish."  
+#         - Queries about buying property for building an industry may fall under this category only if the intent to use that property for setting up an industry is clearly indicated.  
+#         - Queries about selling property, renting land, or general property transactions that do not involve setting up an industry should not be classified under this category.  
+#         - If the intent to build is unclear, vague, or mixed with other topics, classify it under "Other industry-related queries."
+
+#     2. Query to search Vendors:  
+#         - Example: I am searching for a vendor who supplies pharmaceutical-grade raw chemicals for drug manufacturing.  
+#         - This category is used for queries about finding suppliers, manufacturers, or vendors for raw materials, equipment, or services.
+
+#     3. Query to search Incentives:  
+#         - Example: What benefits are available for setting up a cement manufacturing plant in XYZ area?  
+#         - This category is used for queries asking about government incentives, grants, or subsidies related to setting up or expanding an industry.
+
+#     4. Query to Get Approvals:  
+#         - Example: I want to get approval for my Cement Factory.  
+#         - This category is used for queries about obtaining permits, licenses, or regulatory approvals for a business or industry.
+
+#     5. Query to Get Employee Search:  
+#         - Example: What is the availability of employment in XYZ area for the Pharmaceutical industry?  
+#         - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
+
+#     6. Negatively Intended Query:
+#         - Example: I don't want to search for incentives for the cement industry in Ahmedabad.  
+#         - This category is used for queries where the user clearly expresses that they do not want to proceed with a specific industry-related topic (such as incentives, approvals, vendors, land, or employment).  
+#         - This includes statements where the user rejects, declines, or expresses disinterest, such as "I don't want to...", "No need to...", or "I'm not looking for...".  
+#         - Classify here only if the overall intent is negative toward one or more categories and there is no indication that the user still wants to proceed within the same topic under different parameters (e.g., different city or industry).  
+#         - Do not classify vague queries or neutral statements under this category unless the negative intent is explicit or clearly implied in context.
+
+#     If None of the Above Apply, Use These Two Categories:
+
+#     7. Other industry-related queries:  
+#         - Example: What is the role of AI in manufacturing?  
+#         - This refers to general industry discussions, trends, or innovations that do not fit into the above categories.
+#         - Queries about selling property, renting facilities, or unrelated infrastructure transactions should be classified here.
+
+#     8. Valueless queries:  
+#         - Example: Who is Donald Trump?  
+#         - This refers to queries that are irrelevant to business, industry setup, or supply chains.  
+#         - If the query contains industry-related words but the intent is not meaningful, classify it here.  
+#         - Example: I'm going to buy a new bike, for that which approvals do I need? (Not relevant to industry-building)
+
+#     Strict Classification Rules:
+
+#     1. Return Only One Class:  
+#         - If the query seems to match multiple categories, analyze the overall intent and assign it to the single most appropriate category.  
+
+#     2. Assign "Query to build industry from Scratch" ONLY if Confident:  
+#         - Assign this category only if the query's overall context and intent clearly suggest setting up or establishing an industry, using any terminology (like initiate, develop, set up, start, construct, etc.).  
+#         - Do not classify queries about selling, renting, or unrelated property dealings under this category.  
+#         - Queries that simply mention "property for an industry" but do not clearly indicate an intent to build should be classified under "Other industry-related queries."  
+#         - The classification should be based on a thorough understanding of the full query, not on the presence of single words.
+
+#     3. Do Not Assign "Query to build industry from Scratch" If the Query Contains Only Approvals, Incentives, Vendors, or Employee Searches:  
+#         - If the user is asking about any combination of these categories (Approvals, Incentives, Vendors, or Employee Searches) but does not explicitly or contextually mention setting up a new industry, assign the most relevant category among them.  
+#         - Example: "I need vendors for raw materials and want to know about required approvals and incentives." → Correct classification: Either "Query to search Vendors" or "Query to Get Approvals" based on context.  
+#         - Example: "I want to search vendors, approvals, and also check employment availability in my city." → Correct classification: Choose the most dominant category based on intent.  
+
+#     4. Prioritize Meaningful Context, Not Just Keywords:  
+#         - Do not assign a category just because it contains words like "approval," "vendor," or "incentive."  
+#         - Analyze the full context of the query before assigning a category.  
+
+#     Final Output Instructions:
+#     - Strictly return only the category name from the list above.  
+#     - Do not include multiple categories.  
+#     - Do not provide explanations, justifications, or extra details.  
+
+#     Query:  
+#     {query}
+
+#     Output:  
+#     (Return only one category name from the list)
+#     """
+
+
+#     # Initialize the LLM
+#     # Create the prompt
+#     prompt = PromptTemplate(
+#         input_variables=["query"],
+#         template=prompt_template
+#     )
+
+#     # Create the LLM chain
+#     chain = prompt | llm_70b_vers
+
+#     # Run the query through the chain
+#     category = chain.invoke({"query": user_query})
+
+#     return category.content.strip()
+
 @frappe.whitelist()
-def classify_query(user_query: str) -> str:
+# Define the function
+def classify_query(
+        user_query: str,
+        llm: Any,
+        chatId: str,
+) -> str:
     """
     Classifies a business-related query into one of eight predefined categories based on its intent and context.
 
@@ -125,111 +295,1471 @@ def classify_query(user_query: str) -> str:
     - Only one category is returned per query.
     - The function does not provide explanations or return multiple categories.
     """
-    
-    prompt_template = """
-    You are an expert in understanding business-related queries and classifying them into a single most relevant category.
-    Your task is to strictly assign the query to only one category, even if multiple classes seem applicable.  
-    Analyze the context carefully and ensure that you return only one category that best fits the query.  
+    chat_history = get_chat(f"chat_{chatId}") or []
+    Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
 
-    Categories & Their Definitions:
-
-    1. Query to build industry from Scratch:  
-        - Examples: 
-            - I want to build a 1 TPA Cement Factory. 
-            - What are the land options for the chemical industry in Surat? 
-            - Tell me the land availability for the agricultural industry in Bharuch.
-        - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
-        - Assign this category if the user's query indicates any intent to establish, set up, construct, initiate, develop, or start a new industry or factory, regardless of the exact words used.  
-        - The classification must be based on understanding the overall intent and context rather than focusing on specific words like "build" or "establish."  
-        - Queries about buying property for building an industry may fall under this category only if the intent to use that property for setting up an industry is clearly indicated.  
-        - Queries about selling property, renting land, or general property transactions that do not involve setting up an industry should not be classified under this category.  
-        - If the intent to build is unclear, vague, or mixed with other topics, classify it under "Other industry-related queries."
-
-    2. Query to search Vendors:  
-        - Example: I am searching for a vendor who supplies pharmaceutical-grade raw chemicals for drug manufacturing.  
-        - This category is used for queries about finding suppliers, manufacturers, or vendors for raw materials, equipment, or services.
-
-    3. Query to search Incentives:  
-        - Example: What benefits are available for setting up a cement manufacturing plant in XYZ area?  
-        - This category is used for queries asking about government incentives, grants, or subsidies related to setting up or expanding an industry.
-
-    4. Query to Get Approvals:  
-        - Example: I want to get approval for my Cement Factory.  
-        - This category is used for queries about obtaining permits, licenses, or regulatory approvals for a business or industry.
-
-    5. Query to Get Employee Search:  
-        - Example: 
-            - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
-            - What are the labor options for agricultural industry in Vadodara?
-        - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
-
-    6. Negatively Intended Query:
-        - Example: I don't want to search for incentives for the cement industry in Ahmedabad.  
-        - This category is used for queries where the user clearly expresses that they do not want to proceed with a specific industry-related topic (such as incentives, approvals, vendors, land, or employment).  
-        - This includes statements where the user rejects, declines, or expresses disinterest, such as "I don't want to...", "No need to...", or "I'm not looking for...".  
-        - Classify here only if the overall intent is negative toward one or more categories and there is no indication that the user still wants to proceed within the same topic under different parameters (e.g., different city or industry).  
-        - Do not classify vague queries or neutral statements under this category unless the negative intent is explicit or clearly implied in context.
-
-    If None of the Above Apply, Use These Two Categories:
-
-    7. Other industry-related queries:  
-        - Example: What is the role of AI in manufacturing?  
-        - This refers to general industry discussions, trends, or innovations that do not fit into the above categories.
-        - Queries about selling property, renting facilities, or unrelated infrastructure transactions should be classified here.
-
-    8. Valueless queries:  
-        - Example: Who is Donald Trump?  
-        - This refers to queries that are irrelevant to business, industry setup, or supply chains.  
-        - If the query contains industry-related words but the intent is not meaningful, classify it here.  
-        - Example: I'm going to buy a new bike, for that which approvals do I need? (Not relevant to industry-building)
-
-    Strict Classification Rules:
-
-    1. Return Only One Class:  
-        - If the query seems to match multiple categories, analyze the overall intent and assign it to the single most appropriate category.  
-
-    2. Assign "Query to build industry from Scratch" ONLY if Confident:  
-        - Assign this category only if the query's overall context and intent clearly suggest setting up or establishing an industry, using any terminology (like initiate, develop, set up, start, construct, etc.).  
-        - Do not classify queries about selling, renting, or unrelated property dealings under this category.  
-        - Queries that simply mention "property for an industry" but do not clearly indicate an intent to build should be classified under "Other industry-related queries."  
-        - The classification should be based on a thorough understanding of the full query, not on the presence of single words.
-
-    3. Do Not Assign "Query to build industry from Scratch" If the Query Contains Only Approvals, Incentives, Vendors, or Employee Searches:  
-        - If the user is asking about any combination of these categories (Approvals, Incentives, Vendors, or Employee Searches) but does not explicitly or contextually mention setting up a new industry, assign the most relevant category among them.  
-        - Example: "I need vendors for raw materials and want to know about required approvals and incentives." → Correct classification: Either "Query to search Vendors" or "Query to Get Approvals" based on context.  
-        - Example: "I want to search vendors, approvals, and also check employment availability in my city." → Correct classification: Choose the most dominant category based on intent.  
-
-    4. Prioritize Meaningful Context, Not Just Keywords:  
-        - Do not assign a category just because it contains words like "approval," "vendor," or "incentive."  
-        - Analyze the full context of the query before assigning a category.  
-
-    Final Output Instructions:
-    - Strictly return only the category name from the list above.  
-    - Do not include multiple categories.  
-    - Do not provide explanations, justifications, or extra details.  
-
-    Query:  
-    {query}
-
-    Output:  
-    (Return only one category name from the list)
+    query = f"""
+    SELECT 1
+    FROM `tabSession` AS s
+    JOIN `tabChat history` AS ch
+    ON s.name = ch.parent
+    WHERE s.name = '{chatId}'
+    AND ch.result IS NOT NULL
+    AND TRIM(ch.result) != ''
+    LIMIT 1
     """
 
+    result = frappe.db.sql(query)
+
+    is_result_shown = bool(result)
+
+    if is_result_shown:
+        # Post Result
+        prompt_template = """
+You are an expert in understanding business-related queries and classifying them into a single most relevant category.
+
+You will be given:
+1. The user’s current query.
+2. The last few messages exchanged between the user and the AI (chat_history_normal), which may contain clues to what the user has seen or asked earlier.
+
+If the current query seems to build upon or refer to a previous topic from the chat history, classify it as a “Follow-up Query”.
+
+Your task is to strictly assign the query to only one category, even if multiple classes seem applicable.  
+
+Analyze the context carefully and ensure that you return only one category that best fits the query.  
+
+Pay special attention to whether the current query could be referring back to a previously answered module.
+
+Ask yourself:
+- Did the user recently ask for approvals, incentives, vendors, or build-from-scratch info?
+- Does the current query mention or rely on a detail that could only be known from a previous result?
+
+If so, the current query is not standalone — it is a **Follow-up Query**.
+
+Categories & Their Definitions:
+
+1. Query to build industry from Scratch:  
+    - Examples: 
+        - I want to build a 1 TPA Cement Factory. 
+        - What are the land options for the chemical industry in Surat? 
+        - Tell me the land availability for the agricultural industry in Bharuch.
+    - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
+    - Assign this category if the user's query indicates any intent to establish, set up, construct, initiate, develop, or start a new industry or factory, regardless of the exact words used.  
+    - The classification must be based on understanding the overall intent and context rather than focusing on specific words like "build" or "establish."  
+    - Queries about buying property for building an industry may fall under this category only if the intent to use that property for setting up an industry is clearly indicated.  
+    - Queries about selling property, renting land, or general property transactions that do not involve setting up an industry should not be classified under this category.  
+    - If the intent to build is unclear, vague, or mixed with other topics, classify it under "Other industry-related queries."
+
+2. Query to search Vendors:  
+    - Example: I am searching for a vendor who supplies pharmaceutical-grade raw chemicals for drug manufacturing.  
+    - This category is used for queries about finding suppliers, manufacturers, or vendors for raw materials, equipment, or services.
+
+3. Query to search Incentives:  
+    - Example: What benefits are available for setting up a cement manufacturing plant in XYZ area?  
+    - This category is used for queries asking about government incentives, grants, or subsidies related to setting up or expanding an industry.
+
+4. Query to Get Approvals:  
+    - Example: I want to get approval for my Cement Factory.  
+    - This category is used for queries about obtaining permits, licenses, or regulatory approvals for a business or industry.
+
+5. Query to Get Employee Search:  
+    - Example: 
+        - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
+        - What are the labor options for agricultural industry in Vadodara?
+    - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
+
+6. Negatively Intended Query:
+    - Example: I don't want to search for incentives for the cement industry in Ahmedabad.  
+    - This category is used for queries where the user clearly expresses that they do not want to proceed with a specific industry-related topic (such as incentives, approvals, vendors, land, or employment).  
+    - This includes statements where the user rejects, declines, or expresses disinterest, such as "I don't want to...", "No need to...", or "I'm not looking for...".  
+    - Classify here only if the overall intent is negative toward one or more categories and there is no indication that the user still wants to proceed within the same topic under different parameters (e.g., different city or industry).  
+    - Do not classify vague queries or neutral statements under this category unless the negative intent is explicit or clearly implied in context.
+
+If None of the Above Apply, Use These Two Categories:
+
+7. Other industry-related queries:  
+    - Example: What is the role of AI in manufacturing?  
+    - This refers to general industry discussions, trends, or innovations that do not fit into the above categories.
+    - Queries about selling property, renting facilities, or unrelated infrastructure transactions should be classified here.
+
+8. Valueless queries:  
+    - Example: Who is Donald Trump?  
+    - This refers to queries that are irrelevant to business, industry setup, or supply chains.  
+    - If the query contains industry-related words but the intent is not meaningful, classify it here.  
+    - Example: I'm going to buy a new bike, for that which approvals do I need? (Not relevant to industry-building)
+
+9. Follow-up Query:
+    - This refers to queries that build upon or refer to a solution the user was shown earlier in the flow.
+    - You do NOT have access to the actual solution content, but you will be given the `chat_history_normal`, which helps infer what module the user previously queried.
+    - If the current query appears to rely on or continue a past result, classify it as a Follow-up Query.
+    When in doubt, lean toward "Follow-up Query" if the chat history contains a module-triggering query and the current query references or depends on details that are only available through that module's results.
+
+    Common signs of a Follow-up Query:
+        - The query refers to specific content that would have been shown in a result (e.g., vendors, approvals, incentives, employment, properties, etc.)
+        - The query is vague or incomplete on its own, but makes sense when seen as a continuation of a previous query
+        - The chat history shows a module was recently used, and the user is now referring to something shown in that module
+
+    Very likely Follow-up Queries (if they follow a module-based response):
+        - Query asking for **number of vendors for a specific supply item**
+        - Query asking for **more details about a vendor previously shown**
+        - Query asking for **number of total approvals, or stage-wise counts (e.g., how many pre-operational approvals?)**
+        - Query asking about a **specific approval or incentive name** (e.g., CGTMSE, Fire NOC)
+        - Query asking for **number of incentives shown**
+        - Query referring to **employment availability** or **skill level counts**
+        - Query asking about **infrastructure, seaport/power/rail connectivity** for a known property
+        - Query referring to a **specific property** already discussed
+
+    Follow-up Query Examples by Module:
+
+    Build from Scratch:
+        - Earlier: "Show me land options for chemical industry in Dahej"
+        - Now: "What is the power connectivity there?"
+        - Now: "Which is the nearest port to the Halol plot you showed?"
+        - Now: "Tell me the number of vendors who supply clay"
+        - Now: "How many approvals are needed in total?"
+        - Now: "How many are pre-establishment approvals?"
+        → These are follow-ups because Build-from-Scratch results include full property-wise information: land infrastructure, supply chain, employment stats, approvals, and incentives.
+
+    Incentives:
+        - Earlier: "What are the incentives for textile units in Bharuch?"
+        - Now: "Tell me more about the CGTMSE scheme"
+        - Now: "Can I get capital subsidy under this?"
+        - Now: "How many incentives are shown in total?"
+        - Now: "What all schemes exist under Gujarat Industrial Policy 2020?"
+        - Now: "What is the eligibility for Assistance for Dormitories?"
+        - Now: "What is the incentive period or status for Gujarat Industrial Policy?"
+        - Now: "What is the procedure to take incentives for toy manufacturing?"
+        → These refer to specific incentives from the previous result.
+
+    Approvals:
+        - Earlier: "Which approvals are needed in Vadodara for pharma units?"
+        - Now: "Do I need GPCB clearance too?"
+        - Now: "What’s the timeline for Fire Department NOC?"
+        - Now: "How many pre-operational approvals were shown?"
+        - Now: "From which department is the Factory Plan Application taken?"
+        - Now: "What is the mode of application for Factory License?"
+        - Now: "can you brief me about the scheme development for green estate"
+        → These are continuations based on previous approval breakdown.
+
+    Vendors:
+        - Earlier: "Show vendors of Polypropylene in Dahej"
+        - Now: "Can you show one that is within 50 km?"
+        - Now: "Are there more vendors for Styrene?"
+        - Now: "How many vendors were shown in total?"
+        - Now: "Can Maniratna Metal Industries supply Silver?"
+        - Now: "What is the company Statistics for Maniratna Metal Industries?"
+        - Now: "Where does Maniratna Metal Industries operate?"
+
+        → These refer back to the vendor list shown earlier.
+
+    Employment:
+        - Earlier: "What is the employment availability in Halol?"
+        - Now: "How many unskilled workers are there?"
+        - Now: "What about skilled labor for textile?"
+        → These build upon the employment result shared earlier.
+
+    Important: If the user has recently seen a module-based result (especially Build-from-Scratch), and now asks about a specific part of that result (e.g., vendor count, approval name, incentive details, employment count, power status, etc.), classify the query as “Follow-up Query”.
+
+    Do NOT classify a query as Follow-up if it is independently meaningful and can be understood without any prior context.
+
+    Important Exception:
+    If the current query uses similar or same keywords (e.g., industry, factor, or module) as a previous query, but introduces a different location, scale, or sub-sector, and the query is independently meaningful on its own (e.g., “incentive for cement in Vadodara” after “incentive for cement in Anand”), then it should be classified as a new search intent, not a Follow-up Query.
+
+    For example:
+
+    Earlier: “Incentives for cement in Anand”
+
+    Now: “Incentives for cement in Vadodara”
+    → This is not a Follow-up Query, but a new search, and should be classified as: ["Query to search Incentives"].
+
+    This applies across all modules — including vendors, approvals, employment, etc. — whenever the new query introduces a distinct search condition, especially a new location or a redefined scope.
+
+    If the current query asks about a **different module** than the previous query — such as switching from incentives to approvals, or from vendors to employment — and the query is clear and complete on its own, then treat it as a **new search intent**, not a Follow-up Query.  
+    This holds true even if the industry and location remain the same.
+
+    For example:  
+    Earlier: "I want incentives for cement in Bharuch."  
+    Now: "I want approvals for cement in Bharuch."  
+    → This is a new module with full context, so it should be classified as: ["Query to Get Approvals"], not a Follow-up.
+
+    If the query introduces a new location or different business condition (e.g., industry type, scale, or region), even if it uses similar keywords as a previous one, treat it as a new main category query, not a Follow-up.
+
+Strict Classification Rules:
+
+1. Return Only One Class:  
+    - If the query seems to match multiple categories, analyze the overall intent and assign it to the single most appropriate category.  
+
+2. Assign "Query to build industry from Scratch" ONLY if Confident:  
+    - Assign this category only if the query's overall context and intent clearly suggest setting up or establishing an industry, using any terminology (like initiate, develop, set up, start, construct, etc.).  
+    - Do not classify queries about selling, renting, or unrelated property dealings under this category.  
+    - Queries that simply mention "property for an industry" but do not clearly indicate an intent to build should be classified under "Other industry-related queries."  
+    - The classification should be based on a thorough understanding of the full query, not on the presence of single words.
+
+3. Do Not Assign "Query to build industry from Scratch" If the Query Contains Only Approvals, Incentives, Vendors, or Employee Searches:  
+    - If the user is asking about any combination of these categories (Approvals, Incentives, Vendors, or Employee Searches) but does not explicitly or contextually mention setting up a new industry, assign the most relevant category among them.  
+    - Example: "I need vendors for raw materials and want to know about required approvals and incentives." → Correct classification: Either "Query to search Vendors" or "Query to Get Approvals" based on context.  
+    - Example: "I want to search vendors, approvals, and also check employment availability in my city." → Correct classification: Choose the most dominant category based on intent.  
+
+4. Prioritize Meaningful Context, Not Just Keywords:  
+    - Do not assign a category just because it contains words like "approval," "vendor," or "incentive."  
+    - Analyze the full context of the query before assigning a category.  
+
+5. Identify and classify Follow-up Queries precisely:
+    - Look for references to previously shown properties, areas, vendors, incentives, approvals, or employment results.
+    - Use the chat history to determine if the user is continuing a query based on a module already discussed.
+    - Strong follow-up signals include queries about: vendor counts for a supply, employment figures, specific incentive or approval names, stage-wise approvals, infrastructure distances, or land-specific questions.
+    - Especially for Build-from-Scratch results, where all modules (land, supply, approval, employment, incentives) are shown together, queries targeting any of these components are likely follow-up.
+    - Do not assign this category if the query is standalone and makes no reference to prior context.
+    - Queries that reference a specific company, vendor, approval department, or policy clause — when the same topic was discussed recently — are very strong indicators of a Follow-up Query.
+
+
+---
+
+Your job is to:
+1. Review the `Chat_history_normal` carefully.
+2. Review the current query.
+3. Choose only ONE best-fitting category from the list.
+
+Return just one category name from:
+- "Query to build industry from Scratch"
+- "Query to search Vendors"
+- "Query to search Incentives"
+- "Query to Get Approvals"
+- "Query to Get Employee Search"
+- "Negatively Intended Query"
+- "Other industry-related queries"
+- "Valueless queries"
+- "Follow-up Query"
+
+---
+
+Final Output Instructions:
+- Strictly return only the category name from the list above.  
+- Do not include multiple categories.  
+- Do not provide explanations, justifications, or extra details.  
+
+Chat History:
+{chat_history_normal}
+
+Query:  
+{query}
+
+Output:  
+(Return only one category name from the list)
+        """
+    
+    else:
+        # Pre-Result
+        prompt_template = """
+You are an expert in understanding business-related queries and classifying them into a single most relevant category.
+
+You will be given:
+1. The user's current query.
+2. The last few messages exchanged between the user and the AI (chat_history_normal), which may contain clues about what the user has previously asked.
+
+The user has **not been shown any result yet**. Therefore, if the query refers to a specific vendor, approval, or incentive — such as asking about a vendor's capability, incentive eligibility, incentive program period, application procedure, approval source department, etc. — but **does not explicitly request a search**, it should be classified as **“Other industry-related queries”**.
+
+These types of queries often become **Follow-up Queries** once a result is shown (e.g., after a vendor list or incentive list is displayed). However, at this stage — before any result — they lack proper context and must be treated as vague or general.
+
+Your task is to strictly assign the query to only one category, even if multiple classes seem applicable.  
+Analyze the query **and** the chat history carefully and ensure that you return only one category that best fits the query.
+
+Note:
+If the query appears vague, generic, or refers to a specific vendor, policy, or scheme — but does NOT ask to act on it (e.g., search, get, list, or retrieve) — and the user has not seen any related results yet — then treat it as “Other industry-related queries”.
+
+Categories & Their Definitions:
+
+1. Query to build industry from Scratch:  
+    - Examples: 
+        - I want to build a 1 TPA Cement Factory. 
+        - What are the land options for the chemical industry in Surat? 
+        - Tell me the land availability for the agricultural industry in Bharuch.
+        - I want to buy a 1 tpa cement industry
+    - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
+    - Assign this category if the user's query indicates any intent to establish, set up, construct, initiate, develop, or start a new industry or factory, regardless of the exact words used.  
+    - The classification must be based on understanding the overall intent and context rather than focusing on specific words like "build" or "establish."  
+    - Queries about buying property for building an industry may fall under this category only if the intent to use that property for setting up an industry is clearly indicated.  
+    - Queries about selling property, renting land, or general property transactions that do not involve setting up an industry should not be classified under this category.  
+    - If the intent to build is unclear, vague, or mixed with other topics, classify it under "Other industry-related queries."
+
+2. "Query to search Vendors"  
+    - Example: I am searching for a vendor who supplies pharmaceutical-grade raw chemicals.  
+    - For queries where the user is clearly searching for or requesting vendor/supplier/manufacturer options for materials, components, or services.
+
+    - Include this category only if the query expresses a clear intent to search, such as:
+        - “Show me vendors who supply X”
+        - “Find suppliers for copper wiring”
+        - “Search for manufacturers of solar panels in Gujarat”
+        - “List vendors for plastic injection machines”
+
+    - DO NOT classify under this category if the user is simply asking about a specific vendor’s features, capabilities, product types, or company information — without asking to retrieve or explore multiple vendor options.
+
+        - These should be classified as “Other industry-related queries” instead.
+
+
+3. "Query to search Incentives"  
+    - Example: What benefits are available for setting up a cement plant in XYZ area?  
+    - For queries explicitly asking to search, list, retrieve, or view government incentives, grants, subsidies, or financial schemes.
+
+    - Include only if the user’s intent is clearly action-oriented, using phrases like:
+        - “Show me incentive schemes…”
+        - “List the available incentives…”
+        - “Search for schemes applicable to...”
+        - “Retrieve incentives under XYZ policy...”
+
+    - Do NOT classify as “Query to search Incentives” if the user simply asks for general information, definitions, program status, eligibility, or names of schemes — without any explicit search intent.
+        - These should be classified under “Other industry-related queries” instead.
+
+
+4. "Query to Get Approvals"  
+    - Example: I want to get approval for my cement plant.  
+    - For queries where the user is clearly seeking to search, find, or retrieve approval requirements, processes, or documents needed for setting up or running a business or industry.
+
+    - Include only if the query expresses action-oriented search intent, such as:
+        - “What approvals are needed to start a cement factory?”
+        - “List required clearances for food processing industry”
+        - “Which licenses are needed in Surat for pharma manufacturing?”
+
+    - DO NOT include this category if the user is only asking for:
+        - Approval definitions
+        - Names of departments
+        - Application mode or status
+        - Specific approval name without search context
+
+        - These should be classified as “Other industry-related queries” instead.
+
+5. Query to Get Employee Search:  
+    - Example: 
+        - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
+        - What are the labor options for agricultural industry in Vadodara?
+    - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
+
+6. "Negatively Intended Query"  
+    IMPORTANT RULE: If the user mentions one or more factors negatively, but also clearly mentions any one factor positively,  
+    you MUST NOT return "Negatively Intended Query". Only return the categories that reflect the user’s positive interest.  
+    This rule takes priority — a single positively intended factor invalidates the negative classification.
+
+    - Example: I don’t want to search incentives for my project in Gujarat.  
+    → Classify as: ["Negatively Intended Query"]
+
+    - Example: I want to build industry but I don’t want incentives.  
+    → Classify as: ["Query to build industry from Scratch"]
+
+    - This category applies when the user clearly rejects or expresses disinterest in one or more key business-related factors.
+
+    The 5 core factors to consider are:
+        - Approvals
+        - Incentives
+        - Employment
+        - Vendors
+        - Building industry from scratch
+
+    Include this category ONLY if:
+        a) The query mentions exactly one of these 5 factors, and the user clearly expresses that they do not want information about it.  
+        b) The query mentions multiple of these factors, and the user explicitly rejects all of them.
+
+    DO NOT include this category if:
+        - Even one of the 5 core factors is positively intended or affirmed in the query.
+        - The user is asking a neutral or exploratory question without explicitly rejecting a factor.
+        - The rejection is vague or ambiguous (e.g., “not sure about incentives” should not trigger this).
+        - The query also includes any valid main category — in such cases, classify only the positive categories.
+
+If None of the Above Apply, Use These Two Categories:
+
+7. "Other industry-related queries"  
+    - Example: What is the role of AI in manufacturing?  
+    - For industry-related questions that don’t fit into the specific categories above (e.g., trends, innovation, non-supply chain topics).
+
+    Use this category when the query refers vaguely to a specific vendor, incentive, approval, or scheme — but lacks a clear action-oriented intent such as “search”, “get”, “find”, “show me”, or “retrieve”.
+
+    Examples that should be classified as "Other industry-related queries":
+    - “Can Maniratna Metal Industries supply Silver?”
+    - “What is the incentive program period of the Gujarat Industrial Policy?”
+    - “From which department is the Factory Plan application taken?”
+    - “What is the eligibility for Assistance for Dormitories?”
+
+    - Use this category if the user passively refers to a specific vendor, scheme, policy, or approval — but does not express clear intent to search, retrieve, or explore options.
+    - This includes:
+        - Inquiries about individual schemes (e.g., “What is CGTMSE?”)
+        - General descriptions or feature questions (e.g., “What assistance is available under startup innovation?”)
+        - Organizational questions (e.g., “From which department is Factory Plan approval taken?”)
+        - Company-level questions (e.g., “What does Maniratna Metal Industries supply?”)
+
+    - Such queries often reflect curiosity or conceptual understanding rather than an intent to use the system to search.
+
+    - Classify these only as “Other industry-related queries”.
+
+    Important:
+    - If none of the main 5 categories (Vendor, Approval, Incentive, Employee Search, Build from Scratch) are **clearly and positively intended**, include only "Other industry-related queries".
+    - If even one valid main category is clearly intended, do not include "Other industry-related queries".
+
+    This ensures consistency with how these queries are handled in the single-label prompt before any results are shown.
+
+    Examples that are **"Other industry-related queries"**:
+    - What assistance is available for startup innovation schemes?
+    - What is the status of Gujarat Industrial Policy 2020?
+    - Who provides subsidy for toy manufacturers?
+    - What are the eligibility criteria under CGTMSE?
+    - What is the role of MIDC in Maharashtra?
+    - Which department handles Factory License?
+    - What does Maniratna Metal Industries supply?
+    - Can Maniratna Cement supply white cement?
+    - What are the company statistics for Galaxy Pipes?
+    - What is the eligibility under the Startup India scheme?
+    - Which department handles Factory License?
+    - From where do I apply for the Environment Clearance?
+
+    Examples that are **"Query to search Incentives"**:
+    - Show me all schemes applicable for toy manufacturing in Gujarat.
+    - List incentives under Gujarat Industrial Policy 2020.
+    - Search for subsidy schemes for setting up a plastic unit.
+
+    Examples that are **"Query to search Vendors"**:
+    - Show me vendors for steel rods in Ahmedabad.
+    - Search for suppliers of plastic granules in Vapi.
+    - List manufacturers who produce glass bottles near Surat.
+
+    Examples that are **"Query to Get Approvals"**:
+    - What approvals are required to start a dairy in Gujarat?
+    - Search approvals for textile manufacturing in Valsad.
+    - What licenses do I need for food processing in Vadodara?
+
+8. "Valueless queries"  
+    - Example: Who is Donald Trump?  
+    - For queries that are completely irrelevant to business, industry setup, or supply chains.  
+    - This includes:
+        - General knowledge or political questions unrelated to industry
+        - Personal queries, unrelated product buying decisions, or entertainment topics
+        - Queries where industry-related keywords are present but the **intent** is not relevant to industry-building or supply chains
+
+    - Use this category ONLY if:
+        - None of the main 5 classes are relevant or positively intended (i.e., Build from Scratch, Vendor, Incentive, Approval, Employee Search)
+        - The query contains no actionable business or industry-specific context
+        - The user is clearly not looking for information connected to business workflows
+
+    - DO NOT include this category if:
+        - The query includes any valid industry intent (even alongside irrelevant elements)
+        - The query could be interpreted as loosely connected to industry setup, supply chain, approvals, etc.
+
+    Additional Example:
+    - I’m going to buy a new bike, for that which approvals do I need? → Not relevant to industry-building
+
+    Classify only if the query is irrelevant in both content **and** intent.
+
+
+Strict Classification Rules:
+
+1. Return Only One Class:  
+    - If the query seems to match multiple categories, analyze the overall intent and assign it to the single most appropriate category.  
+
+2. Assign "Query to build industry from Scratch" ONLY if Confident:  
+    - Assign this category only if the query's overall context and intent clearly suggest setting up or establishing an industry, using any terminology (like initiate, develop, set up, start, construct, etc.).  
+    - Do not classify queries about selling, renting, or unrelated property dealings under this category.  
+    - Queries that simply mention "property for an industry" but do not clearly indicate an intent to build should be classified under "Other industry-related queries."  
+    - The classification should be based on a thorough understanding of the full query, not on the presence of single words.
+
+3. Do Not Assign "Query to build industry from Scratch" If the Query Contains Only Approvals, Incentives, Vendors, or Employee Searches:  
+    - If the user is asking about any combination of these categories (Approvals, Incentives, Vendors, or Employee Searches) but does not explicitly or contextually mention setting up a new industry, assign the most relevant category among them.  
+    - Example: "I need vendors for raw materials and want to know about required approvals and incentives." → Correct classification: Either "Query to search Vendors" or "Query to Get Approvals" based on context.  
+    - Example: "I want to search vendors, approvals, and also check employment availability in my city." → Correct classification: Choose the most dominant category based on intent.  
+
+4. Prioritize Meaningful Context, Not Just Keywords:  
+    - Do not assign a category just because it contains words like "approval," "vendor," or "incentive."  
+    - Analyze the full context of the query before assigning a category.  
+
+5. Do Not Assign Module Categories for Vague or Ungrounded Queries:
+    - If the query mentions a specific vendor, approval, or incentive but does NOT clearly request to search, get, retrieve, or list — classify it under “Other industry-related queries”.
+    - This is especially true if the user has not yet seen any results — such queries are not grounded in action, and the system cannot know what they refer to.
+    - Example: “What is the incentive program period of the Gujarat Industrial Policy?” → NOT a search query, hence “Other industry-related queries”
+    - Example: “Where does Maniratna Metal Industries operate?” → NOT a vendor search, hence “Other industry-related queries”
+
+Final Output Instructions:
+- Strictly return only the category name from the list above.  
+- Do not include multiple categories.  
+- Do not provide explanations, justifications, or extra details.  
+
+Chat History:
+{chat_history_normal}
+
+Query:  
+{query}
+
+Output:  
+(Return only one category name from the list)
+        """
 
     # Initialize the LLM
     # Create the prompt
     prompt = PromptTemplate(
-        input_variables=["query"],
+        input_variables=["query", "chat_history_normal"],
         template=prompt_template
     )
 
     # Create the LLM chain
-    chain = prompt | llm_70b_vers
+    chain = prompt | llm
 
     # Run the query through the chain
-    category = chain.invoke({"query": user_query})
+    category = chain.invoke({"query": user_query, "chat_history_normal": Chat_history_normal})
 
     return category.content.strip()
+
+def extract_json_object(text: str) -> str:
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not match:
+        raise ValueError("No JSON object found in model output")
+    return match.group(0)
+
+def generate_sub_queries(user_query: str, intent_classes: List[str], llm: Any) -> Dict[str, str]:
+    """
+    Generates one refined sub-query per classified intent from a multi-intent business query.
+
+    Parameters:
+    -----------
+    user_query : str
+        The original query submitted by the user.
+
+    intent_classes : List[str]
+        A list of classified intents (e.g., "Query to search Incentives", etc.).
+
+    llm : Any
+        A language model instance compatible with LangChain (e.g., LLMChain, PromptTemplate | LLM).
+
+    Returns:
+    --------
+    Dict[str, str]
+        A dictionary where keys are intent class names and values are individual rewritten sub-queries.
+    """
+
+    prompt_template = """
+You are a conservative rewriter that decomposes a multi-intent query into one sub-query per provided class,
+WITHOUT changing the user’s original meaning.
+
+STRICT INVARIANTS — NEVER CHANGE THESE:
+1) Action & intent verbs: keep words like buy/sell/build/lease/expand/apply/explore/compare exactly.
+2) Negations & modality: keep “not”, “don’t”, “must”, “need”, “can”, “cannot”, “should”, “only”, etc.
+3) Quantities & units: keep numbers, magnitudes, and units verbatim (e.g., 1 TPA ≠ 1 MTPA; do not convert or round).
+4) Named entities & nouns: keep industry/product/company/brand/site names, SKUs, model names, and locations verbatim.
+5) Time references: keep dates, months, quarters, and relative periods (“this year”, “in 2026”) verbatim.
+6) Constraints: keep budget caps, capacity limits, exclusions, and any “without/except” clauses verbatim.
+7) Language & formatting: preserve number/currency formatting (e.g., Indian commas), capitalization within names, and spelling present in the original text.
+
+ATTRIBUTE SHARING RULE:
+- If the original query clearly applies ONE industry/location/timeframe to multiple intents, replicate those attributes as-is across all relevant sub-queries.
+- If attributes differ across parts (e.g., “incentives for cement AND approvals for chemical”), DO NOT merge or cross-share. Keep each sub-query scoped to its own subject.
+- If an attribute is missing for a class, do NOT invent or infer; simply omit it for that class.
+
+CLASS-SEMANTICS RULE:
+- Do NOT coerce the wording to match a class. If the class is “Build from Scratch” but the user said “buy”, keep “buy”. Your job is to isolate the request per class while preserving the original phrasing and facts.
+
+OUTPUT RULES:
+- Produce a JSON object whose keys are EXACTLY the provided class names in the given list and whose values are single-sentence sub-queries.
+- Each sub-query must be: (a) grammatical, (b) self-contained, (c) faithful to the original content for that class.
+- If the original text has no details for a given class, return a minimal, neutral request for that class using ONLY unambiguously shared attributes (if any). Never invent new facts.
+- No explanations, no extra keys, no comments — JSON only.
+
+EXAMPLES (pay close attention to preserving verbs, units, and per-class subjects):
+
+Example A
+User: I want to see incentives for cement in Gujarat and take approvals for chemical in Maharashtra.
+Classes: ["Query to search Incentives", "Query to Get Approvals"]
+Output:
+{{
+  "Query to search Incentives": "I want to see incentives for a cement factory in Gujarat.",
+  "Query to Get Approvals": "I want to take approvals for a chemical unit in Maharashtra."
+}}
+
+Example B (do NOT coerce “buy” into “build”)
+User: I want to buy a 1 TPA cement factory.
+Classes: ["Query to build industry from Scratch"]
+Output:
+{{
+  "Query to build industry from Scratch": "I want to buy a 1 TPA cement factory."
+}}
+
+Example C (share unambiguous attributes; omit unknowns)
+User: Can I get vendors and employment options for a dairy plant in Pune?
+Classes: ["Query to search Vendors", "Query to Get Employee Search", "Query to search Incentives"]
+Output:
+{{
+  "Query to search Vendors": "Can I get vendors for a dairy plant in Pune?",
+  "Query to Get Employee Search": "Can I get employment options for a dairy plant in Pune?",
+  "Query to search Incentives": "I want to know about incentives for a dairy plant in Pune."
+}}
+
+Now process the following:
+
+User Query:
+{user_query}
+
+Classes:
+{intent_classes}
+
+Output:
+    """
+
+
+    prompt = PromptTemplate(
+        input_variables=["user_query", "intent_classes"],
+        template=prompt_template.strip()
+    )
+
+    chain = prompt | llm
+
+    response = chain.invoke({
+        "user_query": user_query,
+        "intent_classes": intent_classes
+    })
+
+    try:
+        raw_json = extract_json_object(response.content.strip())
+        sub_queries = json.loads(raw_json)
+
+        if not isinstance(sub_queries, dict):
+            raise ValueError("Output is not a dictionary")
+
+        # Validate that all intents have corresponding sub-queries
+        missing = [cls for cls in intent_classes if cls not in sub_queries]
+        if missing:
+            raise ValueError(f"Missing sub-queries for: {missing}")
+
+        return sub_queries
+
+    except Exception as e:
+        raise ValueError(f"Failed to parse sub-query output: {e}")
+
+def decompose_multi_intent_query_into_sub_queries(user_query: str, intent_classes: List[str], llm: Any) -> Dict[str, Any]:
+    """
+    Decomposes a multi-intent industry-related query into:
+    1. Classified intent classes (as-is)
+    2. Sub-queries for each intent class
+
+    Parameters:
+    -----------
+    user_query : str
+        The original user query.
+
+    intent_classes : List[str]
+        The list of classified intent categories for this query.
+
+    llm : Any
+        The language model instance to use (LangChain-compatible).
+
+    Returns:
+    --------
+    Dict[str, Any]
+        {
+            "classified_intents": [<class_1>, <class_2>, ...],
+            "sub_queries": {
+                <class_1>: <rewritten query>,
+                ...
+            }
+        }
+    """
+
+    sub_queries = generate_sub_queries(user_query, intent_classes, llm)
+
+    return {
+        "classified_intents": intent_classes,
+        "sub_queries": sub_queries
+    }
+
+def safe_parse_output(output_str: str) -> list:
+    """
+    Attempt to parse the output string into a valid list of categories.
+    Supports malformed JSON, Python lists, or raw string labels.
+    Returns an empty list if parsing fails.
+    """
+    MAIN_CATEGORIES = {
+        "Query to build industry from Scratch",
+        "Query to search Vendors",
+        "Query to search Incentives",
+        "Query to Get Approvals",
+        "Query to Get Employee Search"
+    }
+
+    FALLBACK_CATEGORIES = {
+        "Negatively Intended Query",
+        "Other industry-related queries",
+        "Valueless queries",
+        "Follow-up Query"
+    }
+    output_str = output_str.strip()
+
+    # Case 1: Try strict JSON
+    try:
+        result = json.loads(output_str)
+        if isinstance(result, list):
+            return result
+        elif isinstance(result, str):
+            # Handle raw string like '"Query to Get Approvals"'
+            return [result.strip('"')]
+    except json.JSONDecodeError:
+        pass
+
+    # Case 2: Try evaluating as a Python literal list
+    try:
+        result = ast.literal_eval(output_str)
+        if isinstance(result, list):
+            return [str(cat) for cat in result]
+    except (ValueError, SyntaxError):
+        pass
+
+    # Case 3: Match bracketed content manually
+    bracket_match = re.search(r"\[.*?\]", output_str)
+    if bracket_match:
+        try:
+            result = ast.literal_eval(bracket_match.group(0))
+            if isinstance(result, list):
+                return [str(cat) for cat in result]
+        except (ValueError, SyntaxError):
+            pass
+
+    # Case 4: If it's a plain string with category name
+    for known_cat in MAIN_CATEGORIES.union(FALLBACK_CATEGORIES):
+        if known_cat in output_str:
+            return [known_cat]
+
+    return []  # Final fallback
+
+
+def classify_query_multilabel(
+        user_query: str, 
+        llm: Any,
+        chatId: str
+) -> list:
+    """
+    Classifies a business-related query into one or more predefined categories based on its intent and context.
+
+    Parameters:
+    -----------
+    user_query : str
+        A user-submitted query related to industry or business.
+
+    llm : Any
+        The language model to be used for classification.
+
+    Returns:
+    --------
+    list
+        A list of category names from the following predefined categories:
+        - "Query to build industry from Scratch"
+        - "Query to search Vendors"
+        - "Query to search Incentives"
+        - "Query to Get Approvals"
+        - "Query to Get Employee Search"
+        - "Negatively Intended Query"
+        - "Other industry-related queries"
+        - "Valueless queries"
+
+    Notes:
+    ------
+    - The model may return one or multiple categories based on the user query.
+    - The returned list is validated to include only recognized categories.
+    """
+
+    chat_history = get_chat(f"chat_{chatId}") or []
+    Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+
+    query = f"""
+    SELECT 1
+    FROM `tabSession` AS s
+    JOIN `tabChat history` AS ch
+    ON s.name = ch.parent
+    WHERE s.name = '{chatId}'
+    AND ch.result IS NOT NULL
+    AND TRIM(ch.result) != ''
+    LIMIT 1
+    """
+
+    result = frappe.db.sql(query)
+
+    is_result_shown = bool(result)
+
+
+    MAIN_CATEGORIES = {
+        "Query to build industry from Scratch",
+        "Query to search Vendors",
+        "Query to search Incentives",
+        "Query to Get Approvals",
+        "Query to Get Employee Search"
+    }
+
+    FALLBACK_CATEGORIES = {
+        "Negatively Intended Query",
+        "Other industry-related queries",
+        "Valueless queries",
+        "Follow-up Query"
+    }
+
+    def clean_categories(predicted_categories: list) -> list:
+        """
+        Remove fallback categories if any main category is present.
+        """
+        has_main = any(cat in MAIN_CATEGORIES for cat in predicted_categories)
+        if has_main:
+            return [cat for cat in predicted_categories if cat in MAIN_CATEGORIES]
+        return predicted_categories
+
+    if is_result_shown:
+        # Post-Result prompt
+        prompt_template = """
+You are an expert in analyzing business-related queries and classifying them into one or more relevant categories from a predefined list.
+
+Your task is to analyze the user's full query and return a JSON list of all categories that apply based on the user's intent and context.
+
+You will also be given the `chat_history_normal`, which includes recent conversation history with the user.
+
+The current query is being issued **after the user has already seen one or more results**. Therefore, if the query seems to **refer to, build upon, or depend on previously shown information** (like vendor counts, property details, approval names, incentive eligibility, employment stats, etc.), then include the category `"Follow-up Query"`.
+
+This includes vague queries that would be ambiguous without prior context but make sense as continuations (e.g., “What is the power supply?”, “How many approvals are there?”, “Is CGTMSE applicable?”).
+
+Categories & Their Definitions:
+
+1. "Query to build industry from Scratch"  
+    - Example: 
+        - I want to build a 1 TPA Cement Factory. 
+        - What are the land options for the chemical industry in Surat? 
+        - Tell me the land availability for the agricultural industry in Bharuch.  
+        - I want to buy a 1 mtpa cement industry
+    - Used for queries about establishing a new industry or factory from scratch — includes infrastructure, land, setup, and capacity planning.
+
+2. "Query to search Vendors"  
+    - Example: I am searching for a vendor who supplies pharmaceutical-grade raw chemicals.  
+    - For queries about finding suppliers, manufacturers, or vendors for materials, equipment, or services.
+    - IMPORTANT: If the query refers to a specific vendor or supplier (e.g., "Maniratna Metal Industries") that appears to be part of a previous result (as seen in `chat_history_normal`), do NOT classify it under "Query to search Vendors" — instead, classify only as "Follow-up Query".
+
+3. "Query to search Incentives"  
+    - Example: What benefits are available for setting up a cement plant in XYZ area?  
+    - For queries asking about government incentives, grants, subsidies, or financial schemes.
+
+4. "Query to Get Approvals"  
+    - Example: I want to get approval for my cement plant.  
+    - For queries about permits, licenses, clearances, or any required regulatory approvals.
+
+5. "Query to Get Employee Search"  
+    - Example: What is the workforce availability in XYZ region for my industry?  
+    - For queries about recruitment, employment availability, or manpower.
+
+6. "Negatively Intended Query"  
+    IMPORTANT RULE: If the user mentions one or more factors negatively, but also clearly mentions any one factor positively,  
+    you MUST NOT return "Negatively Intended Query". Only return the categories that reflect the user’s positive interest.  
+    This rule takes priority — a single positively intended factor invalidates the negative classification.
+
+    - Example: I don’t want to search incentives for my project in Gujarat.  
+    → Classify as: ["Negatively Intended Query"]
+
+    - Example: I want to build industry but I don’t want incentives.  
+    → Classify as: ["Query to build industry from Scratch"]
+
+    - This category applies when the user clearly rejects or expresses disinterest in one or more key business-related factors.
+
+    The 5 core factors to consider are:
+        - Approvals
+        - Incentives
+        - Employment
+        - Vendors
+        - Building industry from scratch
+
+    Include this category ONLY if:
+        a) The query mentions exactly one of these 5 factors, and the user clearly expresses that they do not want information about it.  
+        b) The query mentions multiple of these factors, and the user explicitly rejects all of them.
+
+    DO NOT include this category if:
+        - Even one of the 5 core factors is positively intended or affirmed in the query.
+        - The user is asking a neutral or exploratory question without explicitly rejecting a factor.
+        - The rejection is vague or ambiguous (e.g., “not sure about incentives” should not trigger this).
+        - The query also includes any valid main category — in such cases, classify only the positive categories.
+
+7. "Other industry-related queries"  
+    - Example: What is the role of AI in manufacturing?  
+    - For industry-related questions that don’t fit into the specific categories above (e.g., trends, innovation, non-supply chain topics).
+
+    Use this category ONLY when none of the main factor categories are applicable.
+    DO NOT include this category if the query also contains a valid main category such as approvals, incentives, vendors, employment, or industry setup.
+
+8. "Valueless queries"  
+    - Example: Who is Donald Trump?  
+    - For queries that are completely irrelevant to business, industry setup, or supply chains.  
+    - Use this category ONLY if none of the main classes are relevant or positively intended.  
+    - If the user mentions any valid factor (e.g., industry setup, approvals, vendors, etc.), even alongside irrelevant topics, DO NOT include "Valueless queries".
+
+9. Follow-up Query:
+    - This refers to queries that build upon or refer to a solution the user was shown earlier in the flow.
+    - You do NOT have access to the actual solution content, but you will be given the `chat_history_normal`, which helps infer what module the user previously queried.
+    - If the current query appears to rely on or continue a past result, classify it as a Follow-up Query.
+    When in doubt, lean toward "Follow-up Query" if the chat history contains a module-triggering query and the current query references or depends on details that are only available through that module's results.
+
+    Common signs of a Follow-up Query:
+        - The query refers to specific content that would have been shown in a result (e.g., vendors, approvals, incentives, employment, properties, etc.)
+        - The query is vague or incomplete on its own, but makes sense when seen as a continuation of a previous query
+        - The chat history shows a module was recently used, and the user is now referring to something shown in that module
+
+    Very likely Follow-up Queries (if they follow a module-based response):
+        - Query asking for **number of vendors for a specific supply item**
+        - Query asking for **more details about a vendor previously shown**
+        - Query asking for **number of total approvals, or stage-wise counts (e.g., how many pre-operational approvals?)**
+        - Query asking about a **specific approval or incentive name** (e.g., CGTMSE, Fire NOC)
+        - Query asking for **number of incentives shown**
+        - Query referring to **employment availability** or **skill level counts**
+        - Query asking about **infrastructure, seaport/power/rail connectivity** for a known property
+        - Query referring to a **specific property** already discussed
+        - Queries asking for **company stats, locations, or capabilities of a previously shown vendor** (e.g., "Maniratna Metal Industries") should only be classified as "Follow-up Query", not "Query to search Vendors".
+
+    Follow-up Query Examples by Module:
+
+    Build from Scratch:
+        - Earlier: "Show me land options for chemical industry in Dahej"
+        - Now: "What is the power connectivity there?"
+        - Now: "Which is the nearest port to the Halol plot you showed?"
+        - Now: "Tell me the number of vendors who supply clay"
+        - Now: "How many approvals are needed in total?"
+        - Now: "How many are pre-establishment approvals?"
+        → These are follow-ups because Build-from-Scratch results include full property-wise information: land infrastructure, supply chain, employment stats, approvals, and incentives.
+
+    Incentives:
+        - Earlier: "What are the incentives for textile units in Bharuch?"
+        - Now: "Tell me more about the CGTMSE scheme"
+        - Now: "Can I get capital subsidy under this?"
+        - Now: "How many incentives are shown in total?"
+        - Now: "What all schemes exist under Gujarat Industrial Policy 2020?"
+        - Now: "What is the eligibility for Assistance for Dormitories?"
+        - Now: "What is the incentive period or status for Gujarat Industrial Policy?"
+        - Now: "What is the procedure to take incentives for toy manufacturing?"
+        → These refer to specific incentives from the previous result.
+
+    Approvals:
+        - Earlier: "Which approvals are needed in Vadodara for pharma units?"
+        - Now: "Do I need GPCB clearance too?"
+        - Now: "What’s the timeline for Fire Department NOC?"
+        - Now: "How many pre-operational approvals were shown?"
+        - Now: "From which department is the Factory Plan Application taken?"
+        - Now: "What is the mode of application for Factory License?"
+        - Now: "can you brief me about the scheme development for green estate"
+        → These are continuations based on previous approval breakdown.
+
+    Vendors:
+        - Earlier: "Show vendors of Polypropylene in Dahej"
+        - Now: "Can you show one that is within 50 km?"
+        - Now: "Are there more vendors for Styrene?"
+        - Now: "How many vendors were shown in total?"
+        - Now: "Can Maniratna Metal Industries supply Silver?"
+        - Now: "What is the company Statistics for Maniratna Metal Industries?"
+        - Now: "Where does Maniratna Metal Industries operate?"
+
+        → These refer back to the vendor list shown earlier.
+
+    Employment:
+        - Earlier: "What is the employment availability in Halol?"
+        - Now: "How many unskilled workers are there?"
+        - Now: "What about skilled labor for textile?"
+        → These build upon the employment result shared earlier.
+
+    Important: If the user has recently seen a module-based result (especially Build-from-Scratch), and now asks about a specific part of that result (e.g., vendor count, approval name, incentive details, employment count, power status, etc.), classify the query as “Follow-up Query”.
+
+    Do NOT classify a query as Follow-up if it is independently meaningful and can be understood without any prior context.
+
+    Important Exception:
+    If the current query uses similar or same keywords (e.g., industry, factor, or module) as a previous query, but introduces a different location, scale, or sub-sector, and the query is independently meaningful on its own (e.g., “incentive for cement in Vadodara” after “incentive for cement in Anand”), then it should be classified as a new search intent, not a Follow-up Query.
+
+    For example:
+
+    Earlier: “Incentives for cement in Anand”
+
+    Now: “Incentives for cement in Vadodara”
+    → This is not a Follow-up Query, but a new search, and should be classified as: ["Query to search Incentives"].
+
+    This applies across all modules — including vendors, approvals, employment, etc. — whenever the new query introduces a distinct search condition, especially a new location or a redefined scope.
+
+    If the query introduces a new location or different business condition (e.g., industry type, scale, or region), even if it uses similar keywords as a previous one, treat it as a new main category query, not a Follow-up.
+
+Instructions:
+
+- Return a list of all applicable categories that match the user's query.  
+- If the query expresses multiple relevant intents, include all of them in the output.  
+- Return "Negatively Intended Query" ONLY if:
+    - All mentioned factors are rejected, OR
+    - A single factor is mentioned and it is clearly rejected.
+- If the user affirms even one valid factor, do NOT include "Negatively Intended Query".
+- If the query includes any of the 5 main factors (Approvals, Incentives, Employment, Vendors, Building from Scratch),
+then DO NOT include "Other industry-related queries" or "Valueless queries" — only return the actual main category(ies).
+- If none of the categories clearly apply, use either "Other industry-related queries" or "Valueless queries" as appropriate — but never in addition to a main class.
+- If the user’s query contains mixed or vague language, evaluate the overall meaning carefully and return all categories that are clearly present.  
+- DO NOT include a category just because a word appears — understand the context.  
+- DO NOT include explanations or anything other than the JSON list.
+
+IMPORTANT SUPPRESSION RULE:
+
+You must suppress "Negatively Intended Query", "Other industry-related queries", and "Valueless queries"  
+if the query includes any valid and positively intended main factors from the following list:
+- "Query to build industry from Scratch"
+- "Query to search Vendors"
+- "Query to search Incentives"
+- "Query to Get Approvals"
+- "Query to Get Employee Search"
+
+If any of these valid categories apply, DO NOT return any fallback category — even if the query also contains unrelated, rejected, or vague side content.
+
+Only return "Negatively Intended Query", "Other industry-related queries", or "Valueless queries" if none of the valid main categories apply — unless the query clearly refers to an earlier shown result (in which case, include "Follow-up Query").
+
+However, if the query is a continuation (e.g., referencing a shown vendor, approval, incentive, employment stat, etc.), you must **suppress all main categories** and include only "Follow-up Query", even if the query contains vendor-like or approval-like wording.
+
+This rule overrides all other instructions.
+
+Examples of Output:
+["Query to search Incentives"]
+["Follow-up Query"]
+["Query to build industry from Scratch", "Query to Get Approvals", "Follow-up Query"]
+["Other industry-related queries"]
+["Negatively Intended Query"]
+["Valueless queries"]
+
+
+Chat History:
+{chat_history_normal}
+
+Query:
+{query}
+
+Output:
+        """
+
+    else:
+        # No result shown
+        prompt_template = """
+You are an expert in analyzing business-related queries and classifying them into one or more relevant categories from a predefined list.
+
+You will be given:
+1. The user's current query.
+2. The last few messages exchanged between the user and the AI (chat_history_normal), which may provide clues about what the user has asked previously.
+
+Your task is to return a JSON list of all applicable categories based on the query and chat context.
+
+Important:
+if the query refers to a specific vendor, approval, or incentive (e.g., vendor capability, approval department, company statistics, incentive eligibility...) — but does **not clearly request a search, retrieval, or listing** — you must classify it as **"Other industry-related queries"**.
+
+These queries may become **Follow-up Queries** in later stages once the user sees a result, but at this stage, they lack grounding and are considered general or exploratory in nature.
+
+Categories & Their Definitions:
+
+1. Query to build industry from Scratch:  
+    - Examples: 
+        - I want to build a 1 TPA Cement Factory. 
+        - What are the land options for the chemical industry in Surat? 
+        - Tell me the land availability for the agricultural industry in Bharuch.
+    - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
+    - Assign this category if the user's query indicates any intent to establish, set up, construct, initiate, develop, or start a new industry or factory, regardless of the exact words used.  
+    - The classification must be based on understanding the overall intent and context rather than focusing on specific words like "build" or "establish."  
+    - Queries about buying property for building an industry may fall under this category only if the intent to use that property for setting up an industry is clearly indicated.  
+    - Queries about selling property, renting land, or general property transactions that do not involve setting up an industry should not be classified under this category.  
+    - If the intent to build is unclear, vague, or mixed with other topics, classify it under "Other industry-related queries."
+
+2. "Query to search Vendors"  
+    - Example: I am searching for a vendor who supplies pharmaceutical-grade raw chemicals.  
+    - For queries where the user is clearly searching for or requesting vendor/supplier/manufacturer options for materials, components, or services.
+
+    - Include this category only if the query expresses a clear intent to search, such as:
+        - “Show me vendors who supply X”
+        - “Find suppliers for copper wiring”
+        - “Search for manufacturers of solar panels in Gujarat”
+        - “List vendors for plastic injection machines”
+
+    - DO NOT classify under this category if the user is simply asking about a specific vendor’s features, capabilities, product types, or company information — without asking to retrieve or explore multiple vendor options.
+
+        - These should be classified as “Other industry-related queries” instead.
+
+
+3. "Query to search Incentives"  
+    - Example: What benefits are available for setting up a cement plant in XYZ area?  
+    - For queries explicitly asking to search, list, retrieve, or view government incentives, grants, subsidies, or financial schemes.
+
+    - Include only if the user’s intent is clearly action-oriented, using phrases like:
+        - “Show me incentive schemes…”
+        - “List the available incentives…”
+        - “Search for schemes applicable to...”
+        - “Retrieve incentives under XYZ policy...”
+
+    - Do NOT classify as “Query to search Incentives” if the user simply asks for general information, definitions, program status, eligibility, or names of schemes — without any explicit search intent.
+        - These should be classified under “Other industry-related queries” instead.
+
+
+4. "Query to Get Approvals"  
+    - Example: I want to get approval for my cement plant.  
+    - For queries where the user is clearly seeking to search, find, or retrieve approval requirements, processes, or documents needed for setting up or running a business or industry.
+
+    - Include only if the query expresses action-oriented search intent, such as:
+        - “What approvals are needed to start a cement factory?”
+        - “List required clearances for food processing industry”
+        - “Which licenses are needed in Surat for pharma manufacturing?”
+
+    - DO NOT include this category if the user is only asking for:
+        - Approval definitions
+        - Names of departments
+        - Application mode or status
+        - Specific approval name without search context
+
+        - These should be classified as “Other industry-related queries” instead.
+
+5. Query to Get Employee Search:  
+    - Example: 
+        - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
+        - What are the labor options for agricultural industry in Vadodara?
+    - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
+
+6. "Negatively Intended Query"  
+    IMPORTANT RULE: If the user mentions one or more factors negatively, but also clearly mentions any one factor positively,  
+    you MUST NOT return "Negatively Intended Query". Only return the categories that reflect the user’s positive interest.  
+    This rule takes priority — a single positively intended factor invalidates the negative classification.
+
+    - Example: I don’t want to search incentives for my project in Gujarat.  
+    → Classify as: ["Negatively Intended Query"]
+
+    - Example: I want to build industry but I don’t want incentives.  
+    → Classify as: ["Query to build industry from Scratch"]
+
+    - This category applies when the user clearly rejects or expresses disinterest in one or more key business-related factors.
+
+    The 5 core factors to consider are:
+        - Approvals
+        - Incentives
+        - Employment
+        - Vendors
+        - Building industry from scratch
+
+    Include this category ONLY if:
+        a) The query mentions exactly one of these 5 factors, and the user clearly expresses that they do not want information about it.  
+        b) The query mentions multiple of these factors, and the user explicitly rejects all of them.
+
+    DO NOT include this category if:
+        - Even one of the 5 core factors is positively intended or affirmed in the query.
+        - The user is asking a neutral or exploratory question without explicitly rejecting a factor.
+        - The rejection is vague or ambiguous (e.g., “not sure about incentives” should not trigger this).
+        - The query also includes any valid main category — in such cases, classify only the positive categories.
+
+7. "Other industry-related queries"  
+    - Example: What is the role of AI in manufacturing?  
+    - For industry-related questions that don’t fit into the specific categories above (e.g., trends, innovation, non-supply chain topics).
+
+    Use this category when the query refers vaguely to a specific vendor, incentive, approval, or scheme — but lacks a clear action-oriented intent such as “search”, “get”, “find”, “show me”, or “retrieve”.
+
+    Examples that should be classified as "Other industry-related queries":
+    - “Can Maniratna Metal Industries supply Silver?”
+    - “What is the incentive program period of the Gujarat Industrial Policy?”
+    - “From which department is the Factory Plan application taken?”
+    - “What is the eligibility for Assistance for Dormitories?”
+
+    - Use this category if the user passively refers to a specific vendor, scheme, policy, or approval — but does not express clear intent to search, retrieve, or explore options.
+    - This includes:
+        - Inquiries about individual schemes (e.g., “What is CGTMSE?”)
+        - General descriptions or feature questions (e.g., “What assistance is available under startup innovation?”)
+        - Organizational questions (e.g., “From which department is Factory Plan approval taken?”)
+        - Company-level questions (e.g., “What does Maniratna Metal Industries supply?”)
+
+    - Such queries often reflect curiosity or conceptual understanding rather than an intent to use the system to search.
+
+    - Classify these only as “Other industry-related queries”.
+
+    Important:
+    - If none of the main 5 categories (Vendor, Approval, Incentive, Employee Search, Build from Scratch) are **clearly and positively intended**, include only "Other industry-related queries".
+    - If even one valid main category is clearly intended, do not include "Other industry-related queries".
+
+    This ensures consistency with how these queries are handled in the single-label prompt before any results are shown.
+
+    Examples that are **"Other industry-related queries"**:
+    - What assistance is available for startup innovation schemes?
+    - What is the status of Gujarat Industrial Policy 2020?
+    - Who provides subsidy for toy manufacturers?
+    - What are the eligibility criteria under CGTMSE?
+    - What is the role of MIDC in Maharashtra?
+    - Which department handles Factory License?
+    - What does Maniratna Metal Industries supply?
+    - Can Maniratna Cement supply white cement?
+    - What are the company statistics for Galaxy Pipes?
+    - What is the eligibility under the Startup India scheme?
+    - Which department handles Factory License?
+    - From where do I apply for the Environment Clearance?
+
+    Examples that are **"Query to search Incentives"**:
+    - Show me all schemes applicable for toy manufacturing in Gujarat.
+    - List incentives under Gujarat Industrial Policy 2020.
+    - Search for subsidy schemes for setting up a plastic unit.
+
+    Examples that are **"Query to search Vendors"**:
+    - Show me vendors for steel rods in Ahmedabad.
+    - Search for suppliers of plastic granules in Vapi.
+    - List manufacturers who produce glass bottles near Surat.
+
+    Examples that are **"Query to Get Approvals"**:
+    - What approvals are required to start a dairy in Gujarat?
+    - Search approvals for textile manufacturing in Valsad.
+    - What licenses do I need for food processing in Vadodara?
+
+
+8. "Valueless queries"  
+    - Example: Who is Donald Trump?  
+    - For queries that are completely irrelevant to business, industry setup, or supply chains.  
+    - This includes:
+        - General knowledge or political questions unrelated to industry
+        - Personal queries, unrelated product buying decisions, or entertainment topics
+        - Queries where industry-related keywords are present but the **intent** is not relevant to industry-building or supply chains
+
+    - Use this category ONLY if:
+        - None of the main 5 classes are relevant or positively intended (i.e., Build from Scratch, Vendor, Incentive, Approval, Employee Search)
+        - The query contains no actionable business or industry-specific context
+        - The user is clearly not looking for information connected to business workflows
+
+    - DO NOT include this category if:
+        - The query includes any valid industry intent (even alongside irrelevant elements)
+        - The query could be interpreted as loosely connected to industry setup, supply chain, approvals, etc.
+
+    Additional Example:
+    - I’m going to buy a new bike, for that which approvals do I need? → Not relevant to industry-building
+
+    Classify only if the query is irrelevant in both content **and** intent.
+
+Instructions:
+
+    - Return a list of all applicable categories that match the user's query.  
+    - If the query expresses multiple relevant intents, include all of them in the output.  
+    - Return "Negatively Intended Query" ONLY if:
+        - All mentioned factors are rejected, OR
+        - A single factor is mentioned and it is clearly rejected.
+    - If the user affirms even one valid factor, do NOT include "Negatively Intended Query".
+    - If the query includes any of the 5 main factors (Approvals, Incentives, Employment, Vendors, Building from Scratch),
+    then DO NOT include "Other industry-related queries" or "Valueless queries" — only return the actual main category(ies).
+    - If none of the categories clearly apply, use either "Other industry-related queries" or "Valueless queries" as appropriate — but never in addition to a main class.
+    - If the user’s query contains mixed or vague language, evaluate the overall meaning carefully and return all categories that are clearly present.  
+    - DO NOT include a category just because a word appears — understand the context.  
+    - DO NOT include explanations or anything other than the JSON list.
+
+IMPORTANT SUPPRESSION RULE:
+
+You must suppress "Negatively Intended Query", "Other industry-related queries", and "Valueless queries"  
+if the query includes any valid and positively intended main factors from the following list:
+- "Query to build industry from Scratch"
+- "Query to search Vendors"
+- "Query to search Incentives"
+- "Query to Get Approvals"
+- "Query to Get Employee Search"
+
+If any of these valid categories apply, DO NOT return any fallback category — even if the query also contains unrelated, rejected, or vague side content.
+
+Only return "Other industry-related queries" if:
+- None of the valid main categories clearly apply, AND
+- The query refers to a vendor, incentive, or approval in a vague, referential way without asking to search, retrieve, or list results.
+
+This prevents misclassification of passive or vague queries as actual search intents.
+
+This rule overrides all other instructions.
+
+Examples of Output:
+["Query to search Vendors"]
+["Query to search Incentives", "Query to Get Approvals"]
+["Negatively Intended Query"]
+["Valueless queries"]
+
+Chat History:
+{chat_history_normal}
+
+Query:
+{query}
+
+Output:
+        """
+        
+    prompt = PromptTemplate(
+        input_variables=["query", "chat_history_normal"],
+        template=prompt_template
+    )
+
+    chain = prompt | llm
+    result = chain.invoke({"query": user_query, "chat_history_normal":Chat_history_normal})
+    print(result.content.strip())
+    parsed_categories = safe_parse_output(result.content.strip())
+
+    if parsed_categories:
+        cleaned_categories = clean_categories(parsed_categories)
+        
+        fallback_detected = [cat for cat in FALLBACK_CATEGORIES if cat in cleaned_categories]
+        if fallback_detected:
+            fallback_class = fallback_detected[0]
+            return {
+                "classified_intents": [fallback_class],
+                "sub_queries": {
+                    fallback_class: user_query
+                }
+            }
+
+        final_json_with_sub_queries = decompose_multi_intent_query_into_sub_queries(
+            user_query=user_query,
+            intent_classes=cleaned_categories,
+            llm=llm
+        )
+        return final_json_with_sub_queries
+
+    # Fallback — return "Other industry-related queries"
+    return {
+        "classified_intents": ["Other industry-related queries",],
+        "sub_queries": {"Other industry-related queries": user_query}
+    }
+
+def classify_user_intent(user_query, llm, chat_id):
+    """
+    Classifies the main and additional user intents, and generates a refined instructional response
+    using varied formal endings.
+
+    Args:
+        user_query (str): The user's input query.
+        llm (object): A language model or LLM reference needed by classify_query_multilabel.
+
+    Returns:
+        dict: {
+            'main_class': str,
+            'additional_classes': list of str,
+            'sub_queries': dict of {intent: sub_query},
+            'additional_response': str
+        }
+    """
+
+    # Step 1: Main and multilabel classification
+    main_intent = classify_query(user_query, llm, chat_id)
+    multilabel_result = classify_query_multilabel(user_query, llm, chat_id)
+    classified_intents = multilabel_result.get('classified_intents', [])
+    sub_queries = multilabel_result.get('sub_queries', {})
+
+    # Step 2: Identify additional classes
+    additional_classes = [intent for intent in classified_intents if intent != main_intent]
+
+    # Step 3: Mapping for clean, human-friendly intent labels
+    intent_labels = {
+        "Query to build industry from Scratch": "industry creation",
+        "Query to search Vendors": "vendors",
+        "Query to search Incentives": "incentive information",
+        "Query to Get Approvals": "approvals",
+        "Query to Get Employee Search": "employee search"
+    }
+
+    # Step 4: List of formal/instructional endings
+    formal_endings = [
+    "in future steps.",
+    "at a later time.",
+    "in a separate step.",
+    "as a follow-up task.",
+    "through a separate query later.",
+    "in a subsequent session.",
+    "whenever you revisit this module.",
+    "by initiating another check later.",
+    "during a later exploration.",
+    "via a new query at any time.",
+    "in an upcoming step of the process.",
+    "through a dedicated follow-up.",
+    "by exploring it independently later.",
+    "in a later interaction.",
+    "as part of a future check."
+    ]
+
+    selected_ending = random.choice(formal_endings)
+
+    # Step 5: Extract readable labels for additional classes
+    labels = [intent_labels[c] for c in additional_classes if c in intent_labels]
+
+    # Step 6: Construct single-sentence formal response
+    if not labels:
+        additional_response = ""
+    elif len(labels) == 1:
+        additional_response = f"You can check for {labels[0]} {selected_ending}"
+    elif len(labels) == 2:
+        additional_response = f"You can check for {labels[0]} and {labels[1]} {selected_ending}"
+    else:
+        additional_response = (
+            f"You can check for {', '.join(labels[:-1])}, and {labels[-1]} {selected_ending}"
+        )
+
+    return {
+        'main_class': main_intent,
+        'additional_classes': additional_classes,
+        'sub_queries': sub_queries,
+        'additional_response': additional_response
+    }
+
+
+def generate_followup_response(
+    user_query: str,
+    llm,
+    chatId
+) -> str:
+    """
+    Generates a follow-up response message for the user based on their latest query
+    and recent chat history using an LLM.
+
+    Parameters:
+    - chat_history: list of past HumanMessage and AIMessage objects
+    - user_query: latest user message (string)
+    - llm: a LangChain-compatible chat model (e.g., ChatOpenAI or ChatGroq)
+
+    Returns:
+    - A context-aware string message to show the user
+    """
+
+    chat_history = get_chat(f"chat_{chatId}") or []
+    Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+
+    chat_history.append(HumanMessage(content=user_query))
+
+    # Step 2: Create prompt
+    prompt_template = """
+You are an intelligent assistant that helps determine what kind of follow-up message to show to the user based on their most recent query and the last few messages from their chat history.
+
+The function is called only when the system has already classified the latest user message as a "Follow-up Query".
+
+Now, your job is to decide whether this follow-up is:
+1. An exact repeat or nearly same query as a previously asked question (either in wording or meaning), OR
+2. A true follow-up, meaning the user is building upon a previously shown result but asking something new or related.
+
+Use the last few messages from chat history — including both the user's and the assistant's messages — to make your judgment.
+
+If the latest user message is similar to an earlier user query, and the AI’s response to that earlier query was already a follow-up redirect message (e.g., "go to result screen to ask"), then:
+→ Assume that this is another attempt at follow-up in the same thread.
+→ Respond again with a similar guidance message to direct the user to the result screen. You may paraphrase the redirection politely to avoid repetition.
+
+Only if the latest message is similar to an earlier query and the AI had responded with a result, then say that the result already exists and can be viewed again.
+
+Do not rely only on the user's messages — also analyze the AI messages to understand what has already been said.
+
+Guidelines:
+- If the user query is exactly the same or very similar to a past query:
+    - Respond with:
+      `"This query seems very similar to one you've already asked. You can revisit the result by clicking on 'View Result' to see the details again."`
+
+- If the user query is a genuine follow-up, such as asking for additional info based on the result:
+    - Respond with:
+      `"It seems like your question is a follow-up to something you've already seen. For a better experience, you can go to the specific result screen and ask your question there so I can guide you more precisely."`
+
+Inputs:
+
+Chat history (last few turns):
+{Chat_history_normal}
+
+Latest user query:
+{user_query}
+
+Output:
+Return ONLY the appropriate message (based on the 2 cases above). Do NOT include explanations or reasoning.
+"""
+
+    prompt = PromptTemplate(
+        input_variables=["Chat_history_normal","user_query"],
+        template=prompt_template
+    )
+
+    chain = prompt | llm
+    # Step 3: Call LLM
+    response = chain.invoke({"user_query": user_query, "Chat_history_normal":Chat_history_normal})
+    message_from_ai = response.content.strip()
+    chat_history.append(AIMessage(content=message_from_ai))
+    save_chat(chat_history,f"chat_{chatId}")
+
+    return message_from_ai
+
 
 def extract_location_from_query(user_input: str, available_areas: List[str], available_cities: List[str], available_states: List[str], llm) -> Dict[str, Dict[str, str]]:
     """
@@ -307,6 +1837,8 @@ def extract_location_from_query(user_input: str, available_areas: List[str], ava
 
     # Run the LLM chain
     response = chain.invoke({"query": user_input})
+    with open("testlog.txt", "a") as file:
+                file.write(f"\nIn the extraction fun for emp...::: {response.content.strip()} for EMPLOYMENT :) ")
     update_llm_token(response)
 
     # Extract location from the model response
@@ -341,7 +1873,9 @@ def extract_location_from_query(user_input: str, available_areas: List[str], ava
 
         # Extract the best match (handle None case)
         result = process.extractOne(location_lower, choices_lower, scorer=fuzz.ratio)
-        print("="*100,"\nFuzz Result: \n",result, "\n","="*100)
+        with open("testlog.txt", "a") as file:
+                file.write(f"\nChecking result.....::::: {result} for EMPLOYMENT :) ")
+        # print("="*100,"\nFuzz Result: \n",result, "\n","="*100)
         # If no match is found, return "Not Available in List"
         if result is None:
             return "Not Available in List"
@@ -1711,7 +3245,7 @@ def generate_fallback_message(chat_history_for_context: List[dict], confirmation
     Returns:
         str: The dynamically generated fallback message.
     """
-
+    
     # Prepare the conversation history context
     recent_history = "\n".join(chat_history_for_context)
 
@@ -1818,6 +3352,7 @@ def extract_incentive_details_using_ai(description: str, llm=llm_70b_vers_creati
     response = chain.invoke({"description": description})
     update_llm_token(response)
     return response.content.strip()
+
 import ast
 @frappe.whitelist()
 def convert_string_json(input):

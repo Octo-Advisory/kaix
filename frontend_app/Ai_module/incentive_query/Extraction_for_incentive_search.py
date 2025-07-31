@@ -394,7 +394,9 @@ def get_available_area_city_state():
     columns = ["area_name", "city_name", "state_name"]
     df_area_for_incentive_extraction = pd.DataFrame(result_of_query, columns=columns) 
     df_area_for_incentive_extraction = df_area_for_incentive_extraction.drop_duplicates()
-
+    df_area_for_incentive_extraction["area_name"] = df_area_for_incentive_extraction["area_name"].apply(lambda x: x.title() if isinstance(x, str) else x)
+    df_area_for_incentive_extraction["city_name"] = df_area_for_incentive_extraction["city_name"].apply(lambda x: x.title() if isinstance(x, str) else x)
+    df_area_for_incentive_extraction["state_name"] = df_area_for_incentive_extraction["state_name"].apply(lambda x: x.title() if isinstance(x, str) else x)
     city_area_mapped_dict =  df_area_for_incentive_extraction.groupby("city_name")["area_name"].apply(list).to_dict()
     state_city_mapped_dict =  df_area_for_incentive_extraction.groupby("state_name")["city_name"].apply(lambda x: list(x.unique())).to_dict()
 
@@ -407,7 +409,7 @@ def get_available_area_city_state():
     return unique_area_list,unique_city_list,unique_state_list,city_area_mapped_dict,state_city_mapped_dict
 
 # Entry point of Incentive search
-def call_incentive_search(input,chatId):
+def call_incentive_search(input,chatId, additional_class_response = None):
     log_to_file("----","--------------")
     chat_history = get_chat(f"chat_{chatId}") or []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
@@ -416,7 +418,7 @@ def call_incentive_search(input,chatId):
     save_chat(chat_history,f"chat_{chatId}")
     state = get_state(f"QINC_state_{chatId}") or None
     if not state:
-        state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None', "KEYWORDS": None, "Only_State_Attempt_Count": 1}
+        state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None', "KEYWORDS": None, "Only_State_Attempt_Count": 1, "Additional_class_response": None}
         save_state(state,f"QINC_state_{chatId}")
     log_to_file("state1",state)
     query_intent = classify_incentive_query(refine_user_input,llm=llm_70b_vers)
@@ -446,6 +448,8 @@ def call_incentive_search(input,chatId):
     else:
         keyword_list = extract_important_words(refine_user_input, "Query to search Incentives")
         state["KEYWORDS"] = keyword_list
+
+        state["Additional_class_response"] = additional_class_response or state.get("Additional_class_response")
         save_state(state,f"QINC_state_{chatId}")
 
         if query_intent == 'Other Intent':
@@ -530,6 +534,9 @@ def call_incentive_search(input,chatId):
                             f"From your query, we’ve understood that you're exploring available **incentives** for **{selected_option}** {location_str}. <br/><br/>"
                             f"Please confirm if this information is correct so we can show you the most relevant incentive schemes."
                         )
+
+                        # response_validation = state.get("Additional_class_response")
+                        # confirmation_message_incentive_context_1 += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
 
                         # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                         chat_history.append(AIMessage(content=f"{confirmation_message_incentive_context_1}"))

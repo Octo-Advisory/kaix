@@ -52,27 +52,9 @@ const NoResultsFound = () => {
   }
   };
 
-//    const [position, setPosition] = useState({ x: 0, y: 0 });
-
-//   useEffect(() => {
-//     const handleMouseMove = (e) => {
-//       setPosition({ x: e.clientX, y: e.clientY });
-//     };
-
-//     window.addEventListener('mousemove', handleMouseMove);
-
-//     return () => {
-//       window.removeEventListener('mousemove', handleMouseMove);
-//     };
-//   }, []);
-
   return (
     <section className="design-section active bg-white flex items-center justify-center relative overflow-hidden w-screen h-screen">
-        {/* <div className={`h-5 w-5 rounded-full bg-green-500 absolute mix-blend-difference z-[333]`} style={{
-        top: `${position.y - 5}px`,
-        left: `${position.x - 5}px`,
-        transition: 'transform 0.2s ease-in'
-      }}></div> */}
+
       {/* Animated geometric shapes - more subtle */}
       <motion.div 
         className="absolute w-64 h-64 bg-[#0e2044] opacity-[80] rounded-full -right-24 -top-24"

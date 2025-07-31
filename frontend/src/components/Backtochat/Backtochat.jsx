@@ -4,18 +4,18 @@ import { FaArrowLeft } from "react-icons/fa";
 import { useDispatch, useSelector } from 'react-redux';
 import { clearAiresponse } from '../../Redux/Store/Featuresilces/aiResponse';
 import { clearAnalyticsResult } from '../../Redux/Store/Featuresilces/analyticsResult'
-import { useFrappeAuth, useFrappeDeleteDoc, useFrappeGetDocList, useFrappeUpdateDoc } from 'frappe-react-sdk';
+import { useFrappeAuth,useFrappeGetDocList, useFrappeUpdateDoc } from 'frappe-react-sdk';
 import { removeVendorResult } from '../../Redux/Store/Featuresilces/validation';
 
 function Backtochat({text}) {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const chatId = useSelector((state) => state.chat.chatID);
-    const { updateDoc, loading, error } = useFrappeUpdateDoc("Session");
+    const { updateDoc } = useFrappeUpdateDoc("Session");
      const { currentUser } = useFrappeAuth();
      const [latestChatId, setLatestChatId] = useState(null);
 
-     const { data: sessions, isLoading } = useFrappeGetDocList('Session', {
+     const { data: sessions } = useFrappeGetDocList('Session', {
         fields: ['name'],
         filters: currentUser ? [['owner', '=', currentUser]] : [],
         orderBy: {
@@ -55,15 +55,15 @@ function Backtochat({text}) {
         dispatch(clearAiresponse())
         dispatch(clearAnalyticsResult())
         dispatch(removeVendorResult()) 
-        // deleteAllProgressRecords(chatId)
-        // try {
-        //     await updateDoc("Session", chatId, {
-        //         user_intension: "",
-        //     });
-        //     console.log("Updated Successfully");
-        // } catch (err) {
-        //     console.error("Error Updating:", err);
-        // }
+        deleteAllProgressRecords(chatId)
+        try {
+            await updateDoc("Session", chatId, {
+                user_intension: "",
+            });
+            console.log("Updated Successfully");
+        } catch (err) {
+            console.error("Error Updating:", err);
+        }
        sessionStorage.removeItem("guest_session_id");
        if (latestChatId && currentUser) {
             await clearProgressAndIntention(latestChatId);

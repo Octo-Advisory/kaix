@@ -74,7 +74,6 @@ const SignUp = () => {
     fields:['name']
   })
   
-
   const getIndustries = async ()=>{
 
     if(industries && industries.length>0) {
@@ -88,9 +87,6 @@ const SignUp = () => {
     getIndustries()
   },[industries])
 
- 
-
-  console.log(industries, 'This is outside')
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -305,9 +301,7 @@ const SignUp = () => {
                                     {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
                                 </button>
                             </div>
-                        </div>
-
-                       
+                        </div>     
 
                         <div className="mb-4">
   <label htmlFor="industry" className="block text-sm font-medium text-gray-700 mb-1">
@@ -364,7 +358,7 @@ const SignUp = () => {
       )}
     </div>
   </div>
-</div>
+                        </div>
 
                         <div className="flex gap-4 mb-4">
                             {/* Company Name */}

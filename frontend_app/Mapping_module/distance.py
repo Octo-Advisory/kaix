@@ -437,7 +437,7 @@ def get_geocode(address):
                         actualAddress = copy.deepcopy(address)
                         address = str(address).upper()
                         #API request
-                        url = f"https://maps.googleapis.com/maps/api/geocode/json?address={address}&key=AIzaSyCgESPN3REByWpiQYiRKGpDWwBZLwQEnVA"
+                        url = f"https://maps.googleapis.com/maps/api/geocode/json?address={address}&key=AIzaSyBw2Zjd854U9LZ7StEZ6Ocl1ByZq7QXg7s"
                         data = callApi(url)
                         
                         if data['status'] == 'OK' and len(data['results']) > 0:

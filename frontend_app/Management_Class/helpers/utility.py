@@ -308,176 +308,216 @@ def generate_chat_title(user_query):
         # Fallback to first 6 meaningful words
         return " ".join([w for w in user_query.split() if w.lower() not in ["how", "what", "the"]][:6])
 
+
 @frappe.whitelist(allow_guest=True)
-def generate_followups(query_list,industry_name):
-    prompt_template = """You are an intelligent assistant that helps users explore key factors involved in setting up an industry in a specific region in India.
+def generate_query_hints(query_list, input_industry_name):
 
-Your task is to generate 4-5 compact, hint-style follow-up queries that the user might logically ask next.
+   # this function generates queries based on chat_history provided to it and then classifies them in to their repsective module names
 
-You will receive:
-• A list of 5 user query batches, each representing a past chat session  
-• A fallback industry name (used only in rare cases)
+    prompt_template =  """
+   You are an intelligent assistant that helps users explore and plan key aspects of setting up an industry in India.
 
-📥 [User Query Sessions]:
-You will be given a list of 5 session-wise query lists:
-• Session 1 – Least recent (oldest)
-• Session 5 – Most recent (latest)
+   Your task is to:
+   1. Generate 5–6 compact and properly framed follow-up questions based on the user's chat history  
+   2. Classify each question into the correct industrial planning module
 
-Format:
-Session 1: [ ... list of 5–10 queries ... ]  
-Session 2: [ ... ]  
-Session 3: [ ... ]  
-Session 4: [ ... ]  
-Session 5: [ ... ]  
-{query_list}
+   ---
 
-📥 [Industry Name]:
-{industry_name}
+   📥 [User Query Sessions]:
+   You will be given a list of 5 session-wise query lists:
+   • Session 1 – Least recent (oldest)
+   • Session 5 – Most recent (latest)
 
-🎯 OBJECTIVE  
-Help the user dive deeper into realistic, decision-relevant aspects of industry setup — such as land availability, vendor options, workforce access, required approvals, and government incentives.
+   Format:
+   Session 1: [ ... list of 5–10 queries ... ]  
+   Session 2: [ ... ]  
+   Session 3: [ ... ]  
+   Session 4: [ ... ]  
+   Session 5: [ ... ]  
+   {chat_history}
 
----
+   📥 [Fallback Industry Name]:
+   Used only when **all five sessions are empty**  
+   {industry_name}
 
-✅ GENERATION STRATEGY
+   ---
 
-1. *RELEVANCE CHECK FIRST (MANDATORY):*
-   • Carefully evaluate each query in all five sessions.
-   • Determine which queries are relevant by checking whether they align with:
-     – Project scope and module capabilities (listed below)
-     – Structure and tone of good example queries
-     – Avoidance of bad example formats, topics, and phrasing
+   🎯 OBJECTIVE
 
-2. *WEIGHTED RELEVANCE STRATEGY:*
-   • Prioritize relevant queries from more recent sessions (descending from Session 5 → 1).
-   • Output must reflect more influence from the *most recent session (Session 5)* than older ones.
-   • However, do *not ignore* earlier sessions entirely — include relevant industry-location pairs from older sessions if not already covered.
+   Help the user explore realistic, decision-relevant aspects of setting up an industry such as:
+   • Land availability  
+   • Vendor access  
+   • Workforce presence  
+   • Government incentives  
+   • Regulatory approvals  
 
-3. *OUTPUT DIVERSITY REQUIREMENT:*
-   • Ensure that the generated 7-10 follow-up queries collectively *represent all distinct, relevant industries and locations* found in the query sessions.
-   • Avoid clustering all queries around just one industry or city, unless the user input does so.
+   ---
 
-4. *FALLBACK MODE (RARE):*
-   • If *none* of the queries across all sessions are relevant, fallback to the provided industry_name.
-   • In this case:
-     – Use realistic city names from Gujarat (Ahmedabad, Surat, Vadodara, Rajkot, Bharuch, etc.)
-     – Each query must include both the fallback industry name and a Gujarat city
-     – Do not use vague location phrasing like “nearby” or “suitable areas”
+   ✅ PHASE 1: QUERY GENERATION STRATEGY
 
-5. *KEYWORD AWARENESS (ONLY WHEN RELEVANT):*
-   If relevant queries include:
-   • Product quantity and unit (e.g., 100000 tablets)
-   • Specific raw materials
-   • Approval or incentive scheme names
-   • Specific industry types or city names  
-   → Include these meaningfully in output queries.
+   1. *RELEVANCE CHECK FIRST (MANDATORY):*
+      • Carefully evaluate each query across all five sessions.
+      • Only include queries relevant to the platform’s supported scope:
+      – Land availability, Vendor proximity, Workforce access, Government incentives, Regulatory approvals
 
----
+   2. *WEIGHTED RELEVANCE STRATEGY:*
+      • Prioritize more recent sessions — Session 5 has the highest influence, Session 1 the least.
+      • However, do not ignore earlier sessions entirely — bring in industry-location combinations from older sessions if not already reflected.
 
-✅ FORMATTING & SCOPE RULES
+   3. *OUTPUT DIVERSITY REQUIREMENT:*
+      • Ensure generated queries span multiple modules and industries.
+      • Do not concentrate all queries on a single module or industry unless that pattern is clearly reflected in the input.
 
-Each generated query must:
-• Be 10–15 words or fewer  
-• Be compact and non-repetitive  
-• Address one supported topic: land availability, labor access, vendor proximity, approvals, or incentives  
-• Include both *industry and location* (from input) or fallback values  
-• Output must reflect diversity across sessions, especially prioritizing newer sessions  
+   4. *LOCATION RESTRICTION ENFORCEMENT (MANDATORY):*
+      • Only use **those city names explicitly mentioned in the chat history** as valid locations for output queries.
+      • Do **not** introduce new cities, even common ones like Ahmedabad, Surat, Bharuch, Rajkot, etc., unless they appear in the user’s prior queries.
+      • This applies to both normal generation and fallback.
 
-🚫 STRICT BAD EXAMPLES BLOCKING
+   5. *FALLBACK MODE (STRICT TRIGGER):*
+      • If all five sessions are empty, switch to fallback generation using the provided `industry_name`.
+      • In fallback mode:
+      – Use realistic city names from Gujarat (Ahmedabad, Surat, Vadodara, Rajkot, Bharuch)
+      – Generate 4–5 queries
+      – Each query must include:
+         ▸ The fallback `industry_name`
+         ▸ A specific Gujarat city from the list above
+         ▸ Exactly one supported module
+      – Avoid vague phrases like “nearby” or “suitable area”
 
-DO NOT generate queries that involve:
-• Price or cost (e.g., labor cost)  
-• Raw material quality or checks  
-• Land allocation processes  
-• Workforce skill types (e.g., “engineers”)  
-• Vague location references (e.g., “nearby”, “suitable area”)
+   6. *KEYWORD AWARENESS (WHEN APPLICABLE):*
+      • If relevant queries include:
+      – Product capacity (e.g., “100000 tablets”)
+      – Specific raw materials or product names
+      – Named schemes or policy references
+      → Include and reflect these meaningfully in generated queries.
 
-🧠 INTERNAL PROJECT AND MODULE SCOPE (REFERENCE ONLY)
+   7. *GRAMMATICAL FRAMING REQUIREMENT:*
+      • Each generated query **must be a well-formed, natural-sounding question**.
+      • Do **not** return fragment-style queries (e.g., “Vendor access for pharma in Vadodara”).
+      • Examples of valid queries:
+      – “What is the vendor availability for pharmaceutical industry in Vadodara?”
+      – “What are the government incentives for textile units in Rajkot?”
+      – “What labor options exist for toy manufacturing in Anand?”
 
-— Project Capabilities:
-• Suggest land *availability* based on location and industry  
-• Recommend suppliers (raw materials, equipment) by proximity  
-• Provide labor availability by general skill type  
-• Identify necessary government approvals  
-• Suggest applicable government incentives  
+   ---
 
-— Module Focus:
-• Build from Scratch: holistic industry setup  
-• Employment: workforce availability  
-• Vendor Search: raw material suppliers  
-• Incentives: industry-location schemes  
-• Approval: industry-level permissions  
+   📏 FORMATTING RULES FOR GENERATED QUERIES
 
-— GOOD QUERY STRUCTURE EXAMPLES:
-• What is the vendor availability for cement industry in Vadodara, Gujarat?  
-• Tell me all the incentives available for pharmaceutical industry in Surat city?  
-• What are the employment options around the Anand city?  
-• I want to build a toy factory with 100000 toys capacity?  
-• What are the approvals available for building electrochemical storage unit in Bharuch?
+   • Each query must be 10–15 words or fewer  
+   • Be compact, clear, and grammatically well-formed  
+   • Each query must include both an industry and a location  
+   • Allowed topics: land, vendor, labor, incentives, or approvals only  
 
----
+   🚫 DO NOT generate queries that involve:
+   • Price or cost (e.g., land cost, labor cost)  
+   • Land allocation process or policy  
+   • Raw material quality checks  
+   • Specific skill levels (e.g., "engineers", "MBAs")  
+   • Vague location phrases like "nearby", "in suitable areas"
 
-📤 OUTPUT FORMAT:
+   ---
 
-Return only a clean, syntactically correct Python list of 4–5 questions.
+   📦 MODULE DEFINITIONS FOR CLASSIFICATION
 
-NO HEADINGS. NO EXTRA TEXT. NO MARKDOWN.
+   Each generated query must be classified into **exactly one** of the following five modules:
 
-Each must:
-• Be based on relevant queries across all sessions  
-• Prioritize content from *Session 5*, while ensuring coverage of key elements from Sessions 1–4  
-• Match tone and structure of good examples  
-• Avoid all bad example types and unsupported phrasing
+   1. **Build from Scratch**  
+      • About starting a new industry unit  
+      • Keywords: build, start, location, setup, timeline, capacity  
 
-📤 OUTPUT EXAMPLE:
+   2. **Employment**  
+      • About workforce or labor availability  
+      • Keywords: labor, employment, workforce, workers  
 
-```python
-[
-    "What are the vendor options for pharmaceutical industry in Anand city?",
-    "What land availability exists for cement industry in Ahmedabad?",
-    "Tell me the government incentives for pharmaceutical industry in Gujarat",
-    "What are the labor options for plastic industry in Surat?",
-    "What are the approvals needed for cement industry in Ahmedabad?"
-]
-"""
+   3. **Vendor Search**  
+      • About supplier or equipment sourcing  
+      • Keywords: vendor, supplier, equipment, raw material  
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful assistant who suggests relevant follow-up questions."),
-        ("human", prompt_template)
-    ])
+   4. **Incentives**  
+      • About government support or subsidies  
+      • Keywords: incentive, scheme, subsidy, grant, support  
 
-    chain = prompt | llm_70b_vers_creative
+   5. **Approval**  
+      • About regulatory requirements or licenses  
+      • Keywords: approval, permission, license, clearance  
 
-    try:
-        response = chain.invoke({"query_list": query_list, "industry_name":industry_name})
-        # return response.content.strip()
-        final_response = response.content.strip()
-      
-        return final_response
-    except Exception as e:
-        return "Could not generate follow-up questions at this time."
+   ---
 
-@frappe.whitelist(allow_guest=True) 
-def formatting_input_query_list(raw_nested_list, input_industry_name):
-    # Format sessions as strings
-    user_query_1 = [f"Session {idx}: {session}" for idx, session in enumerate(raw_nested_list, start=1)]
-    query_list_text = "\n".join(user_query_1)
+   📘 MODULE KEYWORDS (reference only – do not rely solely on these):
 
-    input_text = generate_followups(query_list=query_list_text, industry_name=input_industry_name)
-    # Extract list portion using regex
-    list_match = re.search(r"\[(.*?)\]", input_text, re.DOTALL)
-    if not list_match:
-        print("⚠ No valid list found in model output")
-        return []
+   • **Build from Scratch**: build, location, start  
+   • **Incentives**: incentive, benefit, subsidy, grant  
+   • **Approval**: approval, permission, license, clearance  
+   • **Employment**: labor, employment, workforce  
+   • **Vendor Search**: vendor, supplier, equipment, raw materials  
 
-    list_str = "[" + list_match.group(1).strip() + "]"
+   ---
 
-    # Parse result
-    try:
-        questions_list = ast.literal_eval(list_str)
-        return questions_list
-    except Exception as e:
-        return e
+   🧠 INTERNAL PROJECT AND MODULE SCOPE (REFERENCE ONLY)
+
+   — Project Capabilities:
+   • Suggest land *availability* based on location and industry  
+   • Recommend suppliers (raw materials, equipment) by proximity  
+   • Provide labor availability by general skill type  
+   • Identify necessary government approvals  
+   • Suggest applicable government incentives  
+
+   — Module Focus:
+   • **Build from Scratch** – holistic setup (land, labor, vendor, approvals, incentives)  
+   • **Employment** – availability of workers by skill and geography  
+   • **Vendor Search** – proximity and relevance of raw material suppliers  
+   • **Incentives** – government schemes based on location and industry  
+   • **Approval** – regulatory requirements and permits required for setup  
+
+   — GOOD QUERY STRUCTURE EXAMPLES:
+   • What is the vendor availability for cement industry in Vadodara, Gujarat?  
+   • Tell me all the incentives available for pharmaceutical industry in Surat city?  
+   • What are the employment options around the Anand city?  
+   • I want to build a toy factory with 100000 toys capacity  
+   • What are the approvals required for building electrochemical storage unit in Bharuch?
+
+   ---
+
+   🎯 FINAL OUTPUT FORMAT
+
+   Return only a valid Python list of dictionaries:
+   [
+      {{"query": "<generated_question_1>", "module": "<classified_module>"}},
+      {{"query": "<generated_question_2>", "module": "<classified_module>"}},
+      ...
+   ]
+   """
+
+    formatted_prompt = prompt_template.format(
+                chat_history=query_list,
+                industry_name = input_industry_name
+            )
+
+    response = llm_70b_vers_creative.invoke(formatted_prompt)
+    input_text = response.content
+    results = extract_query_list(input_text) # FINAL OUTPUT TO BE SHOW(will return a list of queries along with their module names)
+    return results
+
+
+
+def extract_query_list(text: str):
+    """
+    Extract the first list of dictionaries (queries + modules) from raw text.
+    """
+    # Match a list of dictionaries like: [ { "query": ..., "module": ... }, {...} ]
+    pattern = r"\[\s*\{[\s\S]*?\}\s*\]"
+
+    match = re.search(pattern, text, re.DOTALL)
+    if match:
+        try:
+            return ast.literal_eval(match.group(0))  # safely evaluate list of dicts
+        except Exception as e:
+            print("⚠️ Error evaluating list:", e)
+    else:
+        print("❌ No list of queries found in input text.")
+    return []
+
+
 
 def log_to_file(key,value):
     """
@@ -493,6 +533,58 @@ def log_to_file(key,value):
     
     with open("log2.txt", "a", encoding="utf-8") as file:
         file.write(json.dumps(log_entry) + "\n")
+@frappe.whitelist(allow_guest=True)
+def insert_solution_result():
+
+    try:
+        child_row_id = frappe.form_dict.get("child_row_id")
+        updated_solutions = frappe.form_dict.get("updated_solutions")
+        intension = frappe.form_dict.get("intension")
+
+        if  child_row_id == None or updated_solutions == None or intension == None:
+            return {
+                "status": "fail",
+                "message": "The data is NONE"
+            }
+        # STEP 1: Always parse string to dict if possible
+        if isinstance(updated_solutions, str):
+            try:
+                updated_solutions = json.loads(updated_solutions)
+            except json.JSONDecodeError:
+                # If it's not a JSON string, keep as is
+                log_to_file("data", "updated_solutions is not JSON — using as plain string.")
+        
+        # STEP 2: Now convert any dict/list to JSON string for SQL
+        if isinstance(updated_solutions, (dict, list)):
+            # updated_solutions = json.dumps({"result": {"Analytics_response": updated_solutions}})
+            updated_solutions = json.dumps({"result": updated_solutions})
+
+        # STEP 3: Ensure final value is string — required for SQL
+        if not isinstance(updated_solutions, str):
+            updated_solutions = str(updated_solutions)
+
+        # STEP 4: Safe SQL update
+        frappe.db.sql("""
+            UPDATE `tabChat history`
+            SET result = %s,
+                intension = %s,
+                modified = NOW()
+            WHERE name = %s
+        """, (
+            updated_solutions,
+            intension,
+            child_row_id
+        ))
+
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "Chat history updated successfully."
+        }
+
+    except Exception as e:
+        frappe.throw(f"Server error: {str(e)}")
 
 @frappe.whitelist()
 def excute_Property_Creation(method_name=None,param=None,childBlockId=None):
@@ -528,3 +620,19 @@ def trigger_script(method_name=None,param=None,childBlockId=None):
 @frappe.whitelist()
 def UpdatePropertySegStatus(message):
     frappe.publish_realtime('Property_Seg_Status_Update', {'message': message})
+
+
+@frappe.whitelist()
+def send_realtime_update(doc,method=None):
+    # Get the currently logged-in user (who is updating the document)
+    current_user = frappe.session.user
+    if current_user == doc.owner:
+        frappe.publish_realtime(
+            event="feasibility_update",
+            message={
+                "docname": doc.name,
+                "status": doc.status,
+                "user": current_user
+            },
+            user=current_user  # Send only to that user
+        )

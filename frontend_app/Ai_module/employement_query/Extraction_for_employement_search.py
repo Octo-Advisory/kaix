@@ -702,7 +702,9 @@ def handle_employment_query(
     available_states,
     city_to_area_mapping: Dict[str, str],
     state_to_city_mapping: Dict[str, str],
-    llm,chatId
+    llm,
+    chatId,
+    additional_class_response = None
 ) -> Union[Dict[str, Union[str, List[str]]], str]:
     """
     Handles user queries about employment data with dynamic follow-up questions.
@@ -746,8 +748,12 @@ def handle_employment_query(
     else:
         keyword_dict = extract_employment_keywords_from_query(refined_user_input, llm)
         if user_intention == "Individual employment status":
+            with open("testlog.txt", "a") as file:
+                file.write(f"\nChecking Area City State .....::::: \n\t\tavailable_areas:{available_areas} \n\t\tavailable_cities:{available_cities} \n\t\tavailable_states:{available_states} for chatId {chatId}")
             classification_data, validated_data = extract_location_from_query(refined_user_input, available_areas= available_areas, available_cities= available_cities, available_states= available_states, llm=llm_70b_vers)
-        
+            with open("testlog.txt", "a") as file:
+                file.write(f"\nChecking classification_data, validated_data .....::::: \n\t\tclassification_data:{classification_data} \n\t\tvalidated_data:{validated_data} for chatId {chatId}")
+                    
             # Extract validated details
             area = validated_data["Area"]
             city = validated_data["City"]
@@ -787,6 +793,7 @@ def handle_employment_query(
                         f"Employment insights are available for **{parent_city}**, which includes your area **{area}**. <br/><br/>"
                         f"Would you like to view the employment data for **{parent_city}**?"
                     )
+                    # confirmation_message_employment_context_1 += f"<br/><br/>Note: {additional_class_response}" if additional_class_response else ""
 
                     # Append AI message to chat history
                     chat_history.append(AIMessage(content=f"{confirmation_message_employment_context_1}"))
@@ -818,7 +825,7 @@ def handle_employment_query(
 
                 else:
                     response = {
-                        "Ai_response": "Not Available",
+                        "Ai_response": "Not Available in List",
                         "Is_confirmation" : None,
                         "Extracted Data": None,
                         "Validation Data": None,
@@ -832,6 +839,8 @@ def handle_employment_query(
             if city != "None":
                 # logging.info(f"here city is {city}")
                 state_to_city_mapping_val_list = [i for lst in list(state_to_city_mapping.values()) for i in lst]
+                with open("testlog.txt", "a") as file:
+                    file.write(f"\nstate_to_city_mapping_val_list----------->>>>>>>>> {state_to_city_mapping_val_list} for chatId {chatId}")
                 # logging.info(f"state_to_city_mapping_val_list {state_to_city_mapping_val_list} and city {city}")
                 if city == "Not Available in List":
                     response = {
@@ -857,6 +866,12 @@ def handle_employment_query(
                         f"Based on your query, we’ve identified the location as **{city}, {parent_state}**. <br/><br/>"
                         f"Please confirm if this is correct so we can show you the relevant employment data."
                     )
+                    # confirmation_message_employment_context_2 += f"<br/><br/>Note: {additional_class_response}" if additional_class_response else ""
+
+                    # Append AI message to chat history
+                    chat_history.append(AIMessage(content=f"{confirmation_message_employment_context_2}"))
+                    # logging.info(f"actual aarray3 {chat_history}")
+                    save_chat(chat_history,f"chat_{chatId}")
 
                     # message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
                     # frappe.error_log(f"new generated message is {message}")
@@ -877,7 +892,7 @@ def handle_employment_query(
             
                 else:
                     response = {
-                        "Ai_response": "Not Available",
+                        "Ai_response": "Not Available in List",
                         "Is_confirmation" : None,
                         "Extracted Data": None,
                         "Validation Data": None,
@@ -907,6 +922,12 @@ def handle_employment_query(
                         f"Based on your query, we’ve identified the state as **{state}**. <br/><br/>"
                         f"Please confirm if this is correct so we can provide relevant employment insights."
                     )
+                    # confirmation_message_employment_context_3 += f"<br/><br/>Note: {additional_class_response}" if additional_class_response else ""
+                    
+                    # Append AI message to chat history
+                    chat_history.append(AIMessage(content=f"{confirmation_message_employment_context_3}"))
+                    # logging.info(f"actual aarray3 {chat_history}")
+                    save_chat(chat_history,f"chat_{chatId}")
 
                     # message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
                     
@@ -988,6 +1009,12 @@ def handle_employment_query(
                     f"You're looking to compare employment insights between the following locations: **{locations_str}**. <br/><br/>"
                     f"Shall we proceed with the comparison?"
                 )
+                # confirmation_message_employment_context_4 += f"<br/><br/>Note: {additional_class_response}" if additional_class_response else ""
+
+                # Append AI message to chat history
+                chat_history.append(AIMessage(content=f"{confirmation_message_employment_context_4}"))
+                # logging.info(f"actual aarray3 {chat_history}")
+                save_chat(chat_history,f"chat_{chatId}")
 
                 # confirmation_message = generate_dynamic_message(Chat_history_normal, message,refined_user_input, llm_70b_vers_creative,chatId=chatId)
                 
@@ -1022,7 +1049,7 @@ def handle_employment_query(
             return response
     
 
-def call_handle_employment_query(input,chatId):
+def call_handle_employment_query(input,chatId, additional_class_response=None):
 
     query = """
         select acmapped.area_name, acmapped.city_name, st.state_name
@@ -1043,6 +1070,9 @@ def call_handle_employment_query(input,chatId):
     columns = ["area_name", "city_name", "state_name"]
     df = pd.DataFrame(result_of_query, columns=columns)
     df = df.drop_duplicates()
+    df["area_name"] = df["area_name"].apply(lambda x: x.title() if isinstance(x, str) else x)
+    df["city_name"] = df["city_name"].apply(lambda x: x.title() if isinstance(x, str) else x)
+    df["state_name"] = df["state_name"].apply(lambda x: x.title() if isinstance(x, str) else x)
 
     city_area_mapped_dict = df.groupby("city_name")["area_name"].apply(list).to_dict()
     state_city_mapped_dict = df.groupby("state_name")["city_name"].apply(lambda x: list(x.unique())).to_dict()
@@ -1054,7 +1084,7 @@ def call_handle_employment_query(input,chatId):
    
     result_for_d_area = fetch_query_results(query)
 
-    unique_area_list = [row[0] for row in result_for_d_area]
+    unique_area_list = [row[0].title() for row in result_for_d_area]
 
     query = """
     select distinct city_name
@@ -1063,7 +1093,7 @@ def call_handle_employment_query(input,chatId):
 
     result_for_d_city = fetch_query_results(query)
 
-    unique_city_list = [row[0] for row in result_for_d_city]
+    unique_city_list = [row[0].title() for row in result_for_d_city]
 
     query = """
     select distinct state_name
@@ -1071,8 +1101,8 @@ def call_handle_employment_query(input,chatId):
     """
     result_for_d_state = fetch_query_results(query)
 
-    unique_state_list = [row[0] for row in result_for_d_state]
+    unique_state_list = [row[0].title() for row in result_for_d_state]
 
-    response = handle_employment_query(input,unique_area_list, unique_city_list, unique_state_list, city_area_mapped_dict, state_city_mapped_dict, llm_70b_vers,chatId)
+    response = handle_employment_query(input,unique_area_list, unique_city_list, unique_state_list, city_area_mapped_dict, state_city_mapped_dict, llm_70b_vers,chatId, additional_class_response)
 
     return response

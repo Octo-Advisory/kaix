@@ -5,6 +5,7 @@ import aiReducer from '../Store/Featuresilces/aiResponse'
 import validateReducer from '../Store/Featuresilces/validation'
 import analyticsReducer from '../Store/Featuresilces/analyticsResult'
 import detailsReducer from '../Store/Featuresilces/detailform'
+import feasibilityReducer from '../Store/Featuresilces/Feasibility'
 
 export const store = configureStore({
   reducer: {
@@ -13,6 +14,7 @@ export const store = configureStore({
     ai : aiReducer,
     validate : validateReducer,
     analytics : analyticsReducer,
-    details : detailsReducer
+    details : detailsReducer,
+    feasibility : feasibilityReducer
   },
 });

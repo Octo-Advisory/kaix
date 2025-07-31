@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import Details from '../Details/Details';
 import Backtochat from '../Backtochat/Backtochat';
 import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
@@ -13,9 +12,6 @@ function Empresult({ result, rerender }) {
   const lastChatId = useSelector((state) => state.chat.lastId);
   const { updateDoc } = useFrappeUpdateDoc()
   const [employment, setEmployment] = useState({});
-
-  // const employment = JSON.parse(result?.Analytics_response?.city_summary || '{}');
-  // console.log("Parsed Employment Data:", employment);
 
   useEffect(() => {
     const handleEmpData = async () => {

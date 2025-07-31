@@ -5,3 +5,7 @@
 tags
 node_modules
 __pycache__
+frontend_app/Log_management/analytics.txt
+frontend_app/Log_management/ai.txt
+frontend_app/Log_management/mapping.txt
+frontend_app/Log_management/validation.txt

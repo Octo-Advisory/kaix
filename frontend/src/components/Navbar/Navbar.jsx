@@ -1,31 +1,19 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { FrappeContext, useFrappeAuth, useFrappeEventListener, useFrappeGetDoc } from 'frappe-react-sdk';
 import { useNavigate } from 'react-router-dom';
-import logo from '../../assets/MarsAIX Logo.png';
 import newlogo from '../../assets/New MarsAIX blue h - Edited.png'
-import newlogoedited from '../../assets/New MarsAIX blue h-Photoroom.png'
-import { RiFlashlightFill } from 'react-icons/ri';
-import { FiUser, FiSettings, FiLogOut, FiX, FiUploadCloud, FiCheckCircle, FiAlertCircle, FiLoader } from 'react-icons/fi';
+import {FiSettings, FiLogOut } from 'react-icons/fi';
 import Settings from '../Settings/Settings';
-import icon from '../../assets/MarsAIX icon.png'
-import { BiSidebar } from "react-icons/bi";
-import { FaFilePdf, FaRegLightbulb } from 'react-icons/fa';
-import Maintanance from '../Maintanance/Maintanance';
+import { FaRegLightbulb } from 'react-icons/fa';
 import "../Navbar/Navbar.css"
 import FeasibilityStudy from '../Feasibilitystudy/FeasibilityStudy';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { IoMenu } from 'react-icons/io5';
 
-const Navbar = ({ setSideBar, sideBar }) => {
+const Navbar = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showFeasibilityModal, setShowFeasibilityModal] = useState(false);
-  const [showFeasibilityDropdown, setShowFeasibilityDropdown] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
   const [isOpenSettings, setIsOpenSettings] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
   const [hasUnseenReport, setHasUnseenReport] = useState(false);
 
   const navigate = useNavigate();
@@ -85,6 +73,7 @@ const Navbar = ({ setSideBar, sideBar }) => {
 
   useFrappeEventListener("feasibility_analysis_done", (data) => {
     console.log("📡 Received event data:", data);
+    if(showFeasibilityModal) return;
 
     const toastId = toast.success("Feasibility Process is Completed! Check result.", {
       position: "top-center",
@@ -105,20 +94,7 @@ const Navbar = ({ setSideBar, sideBar }) => {
     <>
       <div className="navbar h-16 py-2 w-full flex flex-row items-center pl-1 pr-6 justify-between">
         <div className="relative flex flex-row gap-2 justify-center items-center py-2">
-          {/* {!sideBar && currentUser && (
-            <IoMenu onClick={() => setSideBar(true)} title='Chat History' className="cursor-pointer" size={30} />
-          )} */}
-          {/* {sideBar ? ( */}
             <img src={newlogo} className='relative object-contain h-[120px] w-[120px] -top-2 mix-blend-multiply'  />
-            
-          {/* ) : ( */}
-            {/* <img src={newlogo} className='relative object-contain h-[140px] w-[140px] mix-blend-multiply'  /> */}
-
-          {/* )} */}
-          {/* <div className='flex relative flex-row '>
-            <span className='relative text-[#0e2044] text-2xl font-extrabold'>Mars</span>
-            <span className='relative text-[#41b655] text-2xl font-extrabold'>AIX</span>
-          </div> */}
         </div>
 
         <div className="relative flex items-center gap-4">

@@ -1,15 +1,12 @@
-import React, {useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import completed from '../../assets/Screenshot 2025-01-07 171330.png'; // Assuming the completed image is imported
-import Solutionscreen from '../SolutionScreen/Solutionscreen';
 import { useNavigate } from "react-router-dom";
 
 const ConfirmationBox = ({result}) => {
-  // console.log("result in confirmation",result);
   const navigate = useNavigate();
   const imageRef = useRef(null);
   const textRef = useRef(null);
-  // const [showResults, setShowresults] = useState(false)
 
   useEffect(() => {
     // Animation for image
@@ -43,10 +40,6 @@ const ConfirmationBox = ({result}) => {
       >
         {/* Container for the rectangles */}
         <div className="Rectangle-Container relative h-[60%]  w-[100%]  self-center flex justify-center items-center">
-          {/* <video className="ConfirmationVideo relative object-cover h-[100%] w-[100%]" height="100%" width="100%" ref={ConfirmationVideo}  autoPlay muted >
-            <source src={sampleVideo} type="video/mp4" />
-            Your browser does not support the video tag.
-          </video> */}
           <img
             ref={imageRef}
             src={completed}
@@ -61,7 +54,6 @@ const ConfirmationBox = ({result}) => {
         >
           All the pieces are in place – here are the results!
         </div></div>
-        {/* </div></div>): (<Solutionscreen result={result}/>)} */}
     </>
   );
 };

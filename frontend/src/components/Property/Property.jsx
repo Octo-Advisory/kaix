@@ -1,15 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef} from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import markerIconPng from "leaflet/dist/images/marker-icon.png";
-import { FaCheckCircle, FaTimesCircle, FaMapMarkerAlt, FaIndustry, FaRuler, FaShip, FaTrain, FaCity, FaBus, FaRoad, FaUsers, FaBoxes, FaTag, FaShieldAlt, FaCheck, FaExclamationTriangle, FaChevronRight, FaRegCheckCircle, FaRegDotCircle } from 'react-icons/fa';
-import { GiFactory, GiCommercialAirplane, GiPowerGenerator } from 'react-icons/gi';
+import { FaCheckCircle, FaTimesCircle, FaMapMarkerAlt, FaIndustry, FaRuler, FaShip, FaTrain, FaCity, FaBus, FaRoad, FaUsers, FaBoxes, FaCheck, FaExclamationTriangle, FaChevronRight, FaRegCheckCircle, FaRegDotCircle } from 'react-icons/fa';
 import { PiPolygonBold } from "react-icons/pi";
 import { MdApartment, MdLocalShipping, MdConstruction, MdApproval } from 'react-icons/md';
 import { RiGovernmentLine ,RiRoadMapLine} from 'react-icons/ri';
 import { GoAlertFill } from "react-icons/go";
-import Model from '../ResultScreens/Model';
 
 function Property({ solution, toggleModal }) {
     console.log("pt",solution);

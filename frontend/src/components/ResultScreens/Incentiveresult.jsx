@@ -1,28 +1,35 @@
-import React, { act, useEffect, useRef, useState } from "react";
-import { FaIndustry, FaSearch, FaBuilding, FaChartLine, FaCalendarAlt, FaFileAlt, FaInfoCircle, FaTag, FaLayerGroup, FaStar, FaPlayCircle, FaStopCircle, FaArrowRight, FaClock, FaSync, FaCheckCircle, FaRunning, FaAward, } from 'react-icons/fa';
+import React, { useContext, useEffect, useRef, useState } from "react";
+import {  FaPlayCircle, FaStopCircle, FaArrowRight, FaClock, FaSync, FaCheckCircle, FaRunning } from 'react-icons/fa';
 import Details from "../Details/Details";
-import { FaListCheck, FaDollarSign } from "react-icons/fa6";
 import { HiMiniArrowPath } from "react-icons/hi2";
 import Backtochat from "../Backtochat/Backtochat";
 import DOMPurify from 'dompurify';
 import "../ResultScreens/incentives.css"
 import LogoLoader from "../Responseloader/LogoLoader";
 import { useSelector } from "react-redux";
-import { useFrappeGetDoc, useFrappeUpdateDoc } from "frappe-react-sdk";
+import { FrappeContext, useFrappeGetDoc, useFrappeUpdateDoc } from "frappe-react-sdk";
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
-import { MdOutlineLibraryBooks } from "react-icons/md";
 import NoResultsFound from "../Failure/NoResultsFound";
 import FailureScreen from "../Failure/FailureScreen";
+import { AdditionalDetailIcon, BuildingIcon, ClipboardCheckIcon, DollarIcon, EligibilityIcon, FinancialSummaryIcon, IncentiveNameIcon, IncentiveTitleIcon, InfoIcon, ListCheckIcon, ScheduleIcon, SearchIcon, TriangleDownIcon, TriangleUpIcon } from "../../Icons/icon";
 
 function Incentiveresult({ result, source, rerender }) {
+  const { data: uiData } = useFrappeGetDoc("UI Configuration", "Incentive")
+  const configurations = uiData?.configurations || [];
+  const uiConfig = configurations.reduce((acc, curr) => {
+    acc[curr.key] = curr.value;
+    return acc;
+  }, {}); 
+
+  const { call } = useContext(FrappeContext)
   const [tempFailure, setTempFailure] = useState(false)
   const [someError, setSomeError] = useState(false)
   console.log("result is", result);
    if (typeof result === 'object' && result !== null) {
-  // const essential = analytics_response["Unfiltered Essential Supplier"];
+ 
     console.log('All good')
   // safely use `essential` here
   } else {
@@ -37,8 +44,6 @@ function Incentiveresult({ result, source, rerender }) {
   const [incentives, setIncentives] = useState([]);
   const [loading, setLoading] = useState(true);
   const { updateDoc } = useFrappeUpdateDoc()
-  const {data:uiData} = useFrappeGetDoc("UI Configuration","UI Configuration")
-  console.log("datata from ui doctype ",uiData);
 
   const getLocationLevel = (city, state, country) => {
     if (city === 1) {
@@ -54,7 +59,6 @@ function Incentiveresult({ result, source, rerender }) {
   const fetchIncentivesDetails = async () => {
 
     try {
-      console.log("refretiching heppenig.........")
       if (!result || !result["Incentive ID"]) {
         setIncentives([]);
         setTempFailure(true)
@@ -112,8 +116,6 @@ function Incentiveresult({ result, source, rerender }) {
           const data = await response.json();
           if (data.data && data.data.length > 0) {
             const incentive = data.data[0];
-            // console.log(incentive, 'Thisss /......')
-            // let tempLevel = getLocationLevel(incentive.city_level, incentive.state_level, incentive.country_level)
             fetchedIncentives.push({
               id: incentive.name,
               name: incentive.incentive_name,
@@ -154,15 +156,12 @@ function Incentiveresult({ result, source, rerender }) {
       setLoading(false);
 
       if (lastChatId) {
-        if (source != "FromScratch") {
+        if (source !== "FromScratch") {
           const updatedResult = {
             ...fetchedIncentives,
             "no_of_incentives": fetchedIncentives?.length
           }
-          await updateDoc("Chat history", lastChatId, {
-            result: JSON.stringify(fetchedIncentives),
-            intension: "Query to search Incentives"
-          });
+          await storeResultData(lastChatId, fetchedIncentives, 'Query to search Incentives')
         } 
       }
 
@@ -173,11 +172,32 @@ function Incentiveresult({ result, source, rerender }) {
     }
   };
 
+  const storeResultData = async (lastChat,solutions,intension) => {
+  if(!lastChat || !solutions) return 
+
+  try {
+      const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
+      child_row_id: lastChat,
+      updated_solutions: solutions,
+      intension: intension
+      },
+    {
+    headers: {
+      'Expect': '' // 👈 Clear problematic header
+    }
+  });
+      console.log('This is the result we want ot store.... ', result.message)
+      return result.message || [];
+    } catch (err) {
+      console.error("Error Storing Result json:", err);
+      return []; // Return empty for this batch on error
+    }
+}
   useEffect(() => {
     if (rerender === 1 || source==='FromScratch') {
       console.log(result, 'Got this from BfsM')
       setIncentives(result)
-      setSelectedIncentive(result[0])
+      setSelectedIncentive(result?.[0])
       setLoading(false);
     }
     else {
@@ -198,8 +218,6 @@ function Incentiveresult({ result, source, rerender }) {
     "Small": "## Incentives under Gujarat Industrial Policy 2020 for Small Businesses\n### Core Benefit Overview\nThe incentive provides assistance to Micro, Small, and Medium Enterprises (MSEs) for sheds developed by private developers. It offers a proportional benefit of **15%** of the total cost of land, building, other infrastructure facilities, Technical Consultancy fees, and TPQA charges.\n\n### Illustrative Financial Details\nAssuming a total investment of **\u20b95,00,00,000**, the benefit calculation is as follows:\n- Total Investment: **\u20b95,00,00,000**\n- Benefit: **15%** of **\u20b95,00,00,000** = **\u20b975,00,000**\n- Net Cost: **\u20b95,00,00,000** - **\u20b975,00,000** = **\u20b94,25,00,000**\n\n### Key Financial Insights\n- The benefit is calculated as **15%** of the total investment in eligible costs.\n- There is no explicit cap mentioned for this benefit.\n- This incentive is particularly beneficial for small businesses as it provides significant support for infrastructure development, reducing the net investment burden.\n\n### Conclusion\nThis incentive is highly beneficial for small businesses under the Gujarat Industrial Policy 2020, as it provides substantial financial assistance for infrastructure development, thereby reducing the overall investment burden and fostering business growth.",
     "Medium": "## Incentives under Gujarat Industrial Policy 2020 - Medium Scale\n### Core Benefit Overview\nThe incentive provides assistance to Medium Scale Enterprises (MSEs) for infrastructure development, specifically supporting costs related to land, building, other infrastructure facilities, technical consultancy fees, and TPQA charges. The support is structured as a proportional benefit, offering up to **15%** of the total investment in these areas.\n\n### Illustrative Financial Details\nFor a medium-scale investment of **\u20b930,00,00,000**, the benefit calculation is as follows:\n- Total Investment: **\u20b930,00,00,000**\n- Benefit: **15%** of **\u20b930,00,00,000** = **\u20b94,50,00,000**\n- Net Cost: **\u20b930,00,00,000** - **\u20b94,50,00,000** = **\u20b925,50,00,000**\n\nThis results in a significant reduction in the net cost of the project, making the investment more feasible for MSEs.\n\n### Key Financial Insights\n* The benefit is capped at **15%** of the total investment, ensuring alignment with the scale of the project.\n* The incentive is particularly advantageous for medium-scale businesses, as it provides a substantial proportion of the total investment cost, thereby reducing the financial burden on the enterprise.\n\n### Conclusion\nThe incentive under the Gujarat Industrial Policy 2020 is highly beneficial for medium-scale enterprises, offering significant financial support for infrastructure development. This makes it an attractive option for businesses looking to expand or establish their operations in the state."
   })
-
-
 
   const displayedIncentives = incentives.filter(
     (incentive) =>
@@ -296,21 +314,17 @@ function Incentiveresult({ result, source, rerender }) {
   const getIconForCategory = (category) => {
     switch (category) {
       case 'Eligibility':
-        return <FaCheckCircle className="text-blue-700" />;
+        return <EligibilityIcon strokeWidth={2} size={24} className="text-blue-700" />;
       case 'Benefits':
-        return <FaDollarSign className="text-blue-700" />;
+        return <DollarIcon strokeWidth={2} size={24} className="text-blue-700" />;
       case 'Process':
         return <HiMiniArrowPath className="text-blue-700" />;
       case 'Requirements':
-        return <FaListCheck className="text-blue-700" />;
+        return <ListCheckIcon className="text-blue-700" />;
       default:
-        return <FaInfoCircle className="text-blue-700" />;
+        return <InfoIcon strokeWidth={1} className="text-blue-700" />;
     }
   };
-
-
-
-
 
   return (
     <div className="flex flex-col items-center justify-center w-full h-screen bg-gradient-to-br from-[#0e2044] to-[#41b655]">
@@ -318,12 +332,12 @@ function Incentiveresult({ result, source, rerender }) {
         {/* Header */}
         <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#B8D1F3]">
           <div className="flex items-center">
-            <div className="p-3 mr-4 rounded-lg bg-gradient-to-r from-[#FF80AB] to-[#9575CD] text-white">
-              <FaIndustry className="text-xl" />
+            <div className="p-3 mr-4 rounded-lg h-12 w-12 flex items-center justify-center bg-gradient-to-r from-[#FF80AB] to-[#9575CD] text-white">
+              <IncentiveTitleIcon className="h-full w-full relative" />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold text-[#2C53A3]">{uiData?.incentive_main_title || "Incentives Catalog"}</h1>
-              <p className="text-[#5A7EC7]">{uiData?.incentive_sub_title || "Browse available incentive programs"}</p>
+              <h1 className="text-2xl font-semibold text-[#2C53A3]">{uiConfig?.['main_title'] || "Incentives Catalog"}</h1>
+              <p className="text-[#5A7EC7]">{uiConfig?.['sub_title'] || "Browse available incentive programs"}</p>
             </div>
           </div>
 
@@ -334,7 +348,7 @@ function Incentiveresult({ result, source, rerender }) {
 
         {/* Search Bar */}
         <div className="relative mb-2">
-          <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#5A7EC7]" />
+          <SearchIcon strokeWidth={2} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#5A7EC7]" />
           <input
             type="text"
             placeholder="Search by program name or type..."
@@ -367,7 +381,7 @@ function Incentiveresult({ result, source, rerender }) {
                         </h3>
                       </div>
                       <div className="flex items-center mt-2 text-sm text-[#5A7EC7]">
-                        <FaBuilding className="mr-2" />
+                        <BuildingIcon size={18} className="mr-2 text-[#5A7EC7]" />
                         <span>{incentive.name}</span>
                       </div>
                     </div>
@@ -376,9 +390,9 @@ function Incentiveresult({ result, source, rerender }) {
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6">
                   <div className="p-4 rounded-full mb-3 bg-gradient-to-r from-[#FF80AB] to-[#9575CD] text-white">
-                    <FaSearch className="text-2xl" />
+                    <SearchIcon strokeWidth={2} className="text-2xl" />
                   </div>
-                  <h3 className="text-lg font-medium text-[#2C53A3]">{uiData?.no_programs_found || "No programs found"}</h3>
+                  <h3 className="text-lg font-medium text-[#2C53A3]">{uiConfig?.['no_program_found'] || "No programs found"}</h3>
                   <p className="text-[#5A7EC7]">Try a different search term</p>
                 </div>
               )}
@@ -391,8 +405,8 @@ function Incentiveresult({ result, source, rerender }) {
               <div ref={containerRef} className="overflow-y-auto flex-1 p-6">
                 <div className="mb-8">
                   <div className="flex items-center mb-4">
-                    <div className="p-3 mr-3 rounded-lg bg-blue-100">
-                      <FaChartLine className="text-blue-800" size={20} />
+                           <div className="p-2 mr-3 h-12 w-12 flex items-center justify-center rounded-lg bg-blue-100">
+                      <IncentiveNameIcon className="h-full w-full relative" />
                     </div>
                     <h2 className="text-2xl font-semibold text-[#2C53A3]">{selectedIncentive.type}</h2>
                   </div>
@@ -417,8 +431,8 @@ function Incentiveresult({ result, source, rerender }) {
                     <div>
                       {/* text-[#2C53A3] */}
                       <h3 className="text-lg font-semibold mb-3 flex items-center  text-black">
-                        <FaCalendarAlt className="mr-2 text-blue-700" />
-                       {uiData?.incenitve_program_period || "Program Period"}
+                        <ScheduleIcon strokeWidth={2} className="mr-2 text-blue-700" />
+                       {uiConfig?.['program_period'] || "Program Period"}
                       </h3>
                       <div className="p-4 rounded-lg border border-[#B8D1F3]" style={{
                         background: 'linear-gradient(to right, rgba(184, 209, 243, 0.1), rgba(255, 255, 255, 0.9))'
@@ -441,8 +455,8 @@ function Incentiveresult({ result, source, rerender }) {
 
                     <div>
                       <h3 className="text-lg font-semibold mb-3 flex items-center text-black">
-                        <FaFileAlt className="mr-2 text-blue-700" />
-                        {uiData?.incenitve_program_status || "Program Status"}
+                        <ClipboardCheckIcon strokeWidth={2} className="mr-2 text-blue-700" />
+                        {uiConfig?.['program_status'] || "Program Status"}
                       </h3>
                       <div className="p-4 rounded-lg border border-[#B8D1F3]" style={{
                         background: 'linear-gradient(to right, rgba(255, 128, 171, 0.08), rgba(255, 255, 255, 0.9))'
@@ -466,8 +480,8 @@ function Incentiveresult({ result, source, rerender }) {
                 {selectedIncentive.quantum_of_assistance !== "N/A" && (
                   <div className="mb-8">
                     <h3 className="text-lg font-semibold mb-3 flex items-center text-black">
-                      <FaFileAlt className="mr-2 text-blue-700" />
-                      {uiData?.incenitve_additional_details || "Additional Details"}
+                      <AdditionalDetailIcon strokeWidth={2} size={24} className="mr-2 text-blue-700" />
+                      {uiConfig?.['additional_details'] || "Additional Details"}
                     </h3>
                     <div className="p-4 rounded-lg border border-[#B8D1F3]" style={{
                       background: 'linear-gradient(to right, rgba(129, 199, 132, 0.1), rgba(255, 255, 255, 0.9))'
@@ -485,8 +499,8 @@ function Incentiveresult({ result, source, rerender }) {
                 {/* Features Grid */}
                 <div className="mb-8">
                   <h3 className="text-lg font-semibold mb-4 flex items-center text-black">
-                    <FaInfoCircle className="mr-2 text-blue-700" />
-                    {uiData?.incenitve_program_details || "Program Details"}
+                    <InfoIcon strokeWidth={1} className="mr-2 text-blue-700" />
+                    {uiConfig?.['program_details'] || "Program Details"}
                   </h3>
 
                   {selectedIncentive.category_description && Object.keys(selectedIncentive.category_description).length > 0 ? (
@@ -502,8 +516,8 @@ function Incentiveresult({ result, source, rerender }) {
                           {Array.isArray(value) ? (
                             <ul className="space-y-2">
                               {value.map((item, index) => (
-                                <li key={index} className="flex flex-row gap-2 items-center justify-start text-md">
-                                  <span className=" rounded-full h-2 w-2 bg-blue-700 flex-shrink-0"></span>
+                                <li key={index} className="flex flex-row gap-2 items-start justify-start text-md">
+                                  <span className=" rounded-full h-2 w-2  relative top-2 bg-blue-700 flex-shrink-0"></span>
                                   <span className="text-[#2C53A3]">{item}</span>
                                 </li>
                               ))}
@@ -518,8 +532,8 @@ function Incentiveresult({ result, source, rerender }) {
                     <div className="p-4 rounded-lg border border-[#B8D1F3] flex items-center text-[#5A7EC7]" style={{
                       background: 'linear-gradient(to right, rgba(184, 209, 243, 0.1), rgba(255, 255, 255, 0.9))'
                     }}>
-                      <FaInfoCircle className="mr-2" />
-                      {uiData?.no_additional_details_available || "No additional details available"}
+                      <InfoIcon strokeWidth={1} className="mr-2" />
+                      {uiConfig?.['no_additional_details_available'] || "No additional details available"}
                     </div>
                   )}
                 </div>
@@ -528,13 +542,13 @@ function Incentiveresult({ result, source, rerender }) {
 
                   {/* Sticky Header */}
                   <div className="sticky top-0 z-10 bg-white p-4 border-b border-gray-200 shadow-sm h-[120px] flex-shrink-0">
-                    <h2 className="text-lg font-semibold text-black mb-2 flex flex-row items-center"> <MdOutlineLibraryBooks className='text-blue-700 mr-2' />{uiData?.incenitve_financial_benefit_summary || "Financial Benefit Summary"}</h2>
+                    <h2 className="text-lg font-semibold text-black mb-2 gap-2 flex flex-row items-center"> <span className="relative h-7 w-7 flex"><FinancialSummaryIcon className='text-blue-700 mr-2 h-full w-full' /></span>{uiConfig?.['financial_benefit_summary'] || "Financial Benefit Summary"}</h2>
 
                     <div className="flex gap-4 overflow-x-auto pb-2">
                       {testJson && Object.entries(testJson).map(([key]) => (
                         <div key={key} className="flex flex-col items-center min-w-fit">
                           <button
-                            className={`text-lg font-medium ${activeContext === key ? 'text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
+                            className={`text-base font-medium ${activeContext === key ? 'text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
                             onClick={() => setActiveContext(key)}
                           >
                             {key}
@@ -555,13 +569,13 @@ function Incentiveresult({ result, source, rerender }) {
                             rehypePlugins={[rehypeRaw]}
                             remarkPlugins={[remarkBreaks, remarkGfm]}
                             components={{
-                              h2: ({ node, ...props }) => <h2 className="text-xl font-bold text-gray-800 mt-6 mb-4 pb-2" {...props} />,
-                              h3: ({ node, ...props }) => <h3 className="text-lg font-semibold text-gray-700 mt-5 mb-3" {...props} />,
-                              p: ({ node, ...props }) => <p className="text-gray-700 mb-3 leading-relaxed" {...props} />,
-                              strong: ({ node, ...props }) => <strong className="font-semibold text-gray-900" {...props} />,
-                              ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4 space-y-1" {...props} />,
-                              ol: ({ node, ...props }) => <ol className="list-decimal pl-5 mb-4 space-y-1" {...props} />,
-                              li: ({ node, ...props }) => <li className="text-gray-700 mb-1" {...props} />,
+                              h2: ({node, ...props}) => <h2 className="text-base font-bold text-gray-800 mt-3 mb-2 pb-1" {...props} />,
+                              h3: ({node, ...props}) => <h3 className="text-md font-semibold text-gray-700 mt-3 mb-2" {...props} />,
+                              p: ({node, ...props}) => <p className="text-gray-700 mb-2 text-sm" {...props} />,
+                              strong: ({node, ...props}) => <strong className="font-semibold text-sm text-gray-900" {...props} />,
+                              ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-1" {...props} />,
+                              ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-1" {...props} />,
+                              li: ({node, ...props}) => <li className="text-gray-700 text-sm mb-1" {...props} />,
                             }}
                           >
                             {value}
@@ -574,9 +588,9 @@ function Incentiveresult({ result, source, rerender }) {
                   <div className="sticky bottom-0 bg-white border-t border-gray-200 p-3 flex justify-center h-[60px] flex-shrink-0">
                     <button
                       onClick={() => setShowFull(!showFull)}
-                      className="flex items-center gap-1 text-blue-600 font-medium hover:text-blue-800 transition-colors px-4 py-1 rounded-full hover:bg-blue-50"
+                      className="flex flex-row items-center gap-2 text-blue-600 font-medium hover:text-blue-800 transition-colors px-4 py-1 rounded-full hover:bg-blue-50"
                     >
-                      {showFull ? 'Show Less ▲' : 'Show More ▼'}
+                      {showFull ? 'Show Less' : 'Show More '} {showFull ? (<TriangleUpIcon size={8} />) : (<TriangleDownIcon size={8} />)}
                     </button>
                   </div>
                 </div>

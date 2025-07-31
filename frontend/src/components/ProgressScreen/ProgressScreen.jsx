@@ -2,20 +2,13 @@ import React, { useState, useEffect, useContext } from 'react';
 import { IoSearch } from "react-icons/io5";
 import { PiCardsThreeBold } from "react-icons/pi";
 import { FiDownload } from "react-icons/fi";
-import { FaMicrochip } from "react-icons/fa6";
 import { FaRegCircleCheck } from "react-icons/fa6";
-import { progress } from 'framer-motion';
-import { AiOutlineClear, AiOutlineSend } from 'react-icons/ai';
 import '../ProgressScreen/ProgressScreen.css';
-import check from '../../assets/check.png';
-import Confirmation from '../Confirmation/Confirmation';
-import Failure from '../Failure/Failure';
-import { FrappeContext, useFrappeCreateDoc, useFrappeEventListener, useFrappeGetDocList } from 'frappe-react-sdk';
+import { FrappeContext, useFrappeEventListener, useFrappeGetDocList } from 'frappe-react-sdk';
 import { useSelector, useDispatch } from 'react-redux';
 import { addAnalyticsResult } from '../../Redux/Store/Featuresilces/analyticsResult';
 import { useNavigate, useParams } from "react-router-dom";
 import LogoLoader from '../Responseloader/LogoLoader';
-import { setFormData, setIsOpen } from '../../Redux/Store/Featuresilces/detailform';
 import FailureScreen from '../Failure/FailureScreen';
 
 const ProgressScreen = () => {
@@ -82,13 +75,11 @@ const ProgressScreen = () => {
   const { call } = useContext(FrappeContext);
   const aiResponse = useSelector((state) => state.ai.aiReponse);
   const confirmationMsg = useSelector((state)=> state.chat?.messages?.[state.chat.messages.length-1]?.text)
-  const chatId = useSelector((state) => state.chat.chatID);
   const [messages, setMessages] = useState([]);
   const [showfailure, setShowfailure] = useState(false);
   const [allsuccess, setAllsuccess] = useState(false);
   const [result, setresult] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [intervalId, setIntervalId] = useState(null);
   const [failure, setFailure] = useState(false);
   const validationResult = useSelector((state) => state.validate.validation_result)
   const selectedOption = useSelector((state)=>state.ai.selectedOption)
@@ -98,8 +89,7 @@ const ProgressScreen = () => {
   const dispatch = useDispatch();
   const { sessionId } = useParams();
   const [isMounted, setIsMounted] = useState(false);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const {createDoc} = useFrappeCreateDoc();
+  
   useEffect(() => {
     if (aiResponse.length === 0) {
       navigate("/");
@@ -115,7 +105,6 @@ const ProgressScreen = () => {
   ...item,
   "User Intention": index === aiResponse.length - 1 ? confirmationMsg ?? item["User Intention"] : item["User Intention"]
 }));
-console.log('This isthe updatedAI Response ', updatedAiResponse)
 
   const fetchAnalyticsResponse = async () => {
     try {
@@ -124,7 +113,6 @@ console.log('This isthe updatedAI Response ', updatedAiResponse)
       console.log("analytics message result", result);
       setresult(result.message)
       dispatch(addAnalyticsResult(result.message))
-      // return result.message;  // Return the result so that the calling function gets it.
     } catch (err) {
       console.log("error occurred 😂", err);
       throw err;  // Rethrow the error if you want to catch it in the caller function.
@@ -159,24 +147,6 @@ console.log('This isthe updatedAI Response ', updatedAiResponse)
     }
   }
 
-
-  // useEffect(() => {
-  //   // Start the interval only if no failures and not all are complete
-  //   if (!showfailure && !allsuccess) {
-  //     const interval = setInterval(() => {
-  //       fetchData(); // Fetch data every second
-  //     }, 1000);
-
-  //     // Cleanup the interval when conditions change or component unmounts
-  //     return () => clearInterval(interval);
-  //   }
-  // }, [showfailure, allsuccess, messages]);
-
-  // useEffect(() => {
-  //   console.log("new use effect call");
-  //   fetchData()
-  // }, [])
-
   useEffect(() => {
     console.log("ai response is in progress", aiResponse);
     if (aiResponse && aiResponse.length > 0) {
@@ -203,40 +173,11 @@ console.log('This isthe updatedAI Response ', updatedAiResponse)
     }
   }, [messages])
 
-//   useEffect(() => {
-//   const handleFailure = async () => {
-//     if (showfailure) {
-//       dispatch(setFormData("Process Failure occurs!"));
-//       dispatch(setIsOpen(true));
-//       if(failure) {
-//         await createDoc("AIX Diagnostics Hub", {
-//           type: "Technical Error",
-//           note: "Progress Screen TimedOut",
-//           session: sessionId,
-//         });
-//       }
-//       else {
-//         await createDoc("AIX Diagnostics Hub", {
-//           type: "Validation Error",
-//           note: "Progress Failure occurred",
-//           session: sessionId,
-//         });
-//       }
-//     }
-//   };
-
-//   handleFailure();
-// }, [showfailure]);
-
   useEffect(() => {
     let timer;
 
     if (allsuccess) {
-
-      // setShowConfirmation(false);
-
       timer = setTimeout(() => {
-        // setShowConfirmation(true);
         navigate('/solution')
       }, 2000);
     }
@@ -269,17 +210,10 @@ console.log('This isthe updatedAI Response ', updatedAiResponse)
   }
 });
 
-  // useFrappeEventListener("progress_update", async (eventData) => {
-  //   console.log("Event triggered, event data:", eventData);
-  //   await mutate()
-  //   console.log("Data refetched after event trigger.");
-  // });
-
   useEffect(() => {
     console.log('now the data is called', data)
     if(failure) return;
     if (data) {
-      // const newData = data.filter(d=> d.is_completed===0)
       setMessages(data)
       console.log("Updated data after mutate:", data);
     }
@@ -305,29 +239,6 @@ console.log('This isthe updatedAI Response ', updatedAiResponse)
     });
     setSteps(mergedSteps);
   }, [messages])
-
-  const updateChildCheckbox = async (childRowName) => {
-    try {
-      const res = await fetch('/api/method/frappe.client.set_value', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          doctype: 'Session',
-          name: childRowName,
-          fieldname: {
-            is_completed: 1
-          }
-        })
-      });
-
-      const result = await res.json();
-      console.log("Checkbox updated for:", childRowName, result.message);
-    } catch (err) {
-      console.error('Error updating checkbox in DB:', err);
-    }
-  };
 
   // CSS animations
   const styles = `
@@ -489,9 +400,7 @@ console.log('This isthe updatedAI Response ', updatedAiResponse)
       <div className="p-4 bg-white flex items-center justify-center h-screen w-screen">
         {loading ? (
           <LogoLoader text='Curating the Smart Sequence' />
-          // <div className="loading-indicator">Loading...</div> // Add a loading indicator here
         ) : showfailure ? (
-          // <Failure /> // Render the Failure component if a message has a status of 'Fail'
           <FailureScreen /> // Render the Failure component if a message has a status of 'Fail'
         ) : (
           <div className="container relative p-8 w-[50%]">

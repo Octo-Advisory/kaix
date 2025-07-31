@@ -1069,7 +1069,8 @@ def handle_vendor_query(
     extracted_state: Dict[str, Dict[str, Any]],
     state: Dict[str, Dict[str, Any]],
     llm: Any,
-    chatId
+    chatId,
+    additional_class_response =None
 ) -> Union[Dict[str, Any], str]:
     """
     Handles vendor queries by analyzing user input, extracting relevant data, and responding accordingly.
@@ -1130,6 +1131,7 @@ def handle_vendor_query(
     else:
         keyword_list = extract_important_words(refined_user_input, "Query to search Vendors")
         state["KEYWORDS"] = keyword_list
+        state["Additional_class_response"] = additional_class_response or state.get("Additional_class_response")
         save_state(state,f"QVND_state_{chatId}")
         
         if user_intention == "Vendor Search for location without industry and supply details":
@@ -1172,8 +1174,11 @@ def handle_vendor_query(
                         )
                         confirmation_buttons = [
                             {"label": "Yes, show relevant suppliers", "value": user_intention},
-                            {"label": "No, I want to update the reques", "value": None}
+                            {"label": "No, I want to update the request", "value": None}
                         ]
+
+                    # response_validation = state.get("Additional_class_response")
+                    # message += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
 
                         # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
 
@@ -1280,6 +1285,10 @@ def handle_vendor_query(
                                 f"You're searching for **all essential suppliers** to support your **{selected_option}** production in **{state.get('Location_info').get('Location')}**. <br/><br/>"
                                 f"Please confirm if this is correct so we can connect you with the most relevant vendors."
                             )
+
+                            # response_validation = state.get("Additional_class_response")
+                            # message += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
+
                             # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                             chat_history.append(AIMessage(content=message))  # Log user query
                             save_chat(chat_history,f"chat_{chatId}")
@@ -1422,12 +1431,15 @@ def handle_vendor_query(
                             f"Please confirm if this is correct so we can help you find the right vendors."
                         )
 
+                        # response_validation = state.get("Additional_class_response")
+                        # message += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
+
                         # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
                         chat_history.append(AIMessage(content=message))  # Log user query
                         save_chat(chat_history,f"chat_{chatId}")
                         confirmation_buttons = [
                             {"label": "Yes, show relevant suppliers", "value": user_intention},
-                            {"label": "No, I want to update the reques", "value": None}
+                            {"label": "No, I want to update the request", "value": None}
                         ]
                         response = {
                             "Ai_response": message,
@@ -1577,6 +1589,10 @@ def handle_vendor_query(
                                 f"You're searching for **all essential suppliers** to support your **{selected_option}** production in **{state.get('Location_info').get('Location')}**. <br/><br/>"
                                 f"Please confirm if this is correct so we can connect you with the most relevant vendors."
                             )
+
+                            # response_validation = state.get("Additional_class_response")
+                            # message += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
+
                             # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
                             chat_history.append(AIMessage(content=message))  # Log user query
                             save_chat(chat_history,f"chat_{chatId}")
@@ -1743,13 +1759,16 @@ def handle_vendor_query(
                             f"Please confirm if this is correct so we can help you find the right vendors."
                         )
 
+                        # response_validation = state.get("Additional_class_response")
+                        # message += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
+
                         # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
                         chat_history.append(AIMessage(content=message))  # Log user query
                         save_chat(chat_history,f"chat_{chatId}")
                         
                         confirmation_buttons = [
                             {"label": "Yes, show relevant suppliers", "value": user_intention},
-                            {"label": "No, I want to update the reques", "value": None}
+                            {"label": "No, I want to update the request", "value": None}
                         ]
 
                         response = {
@@ -1836,7 +1855,7 @@ def handle_vendor_query(
                     }
             return response
 
-def call_handle_vendor_query(input,chatId):
+def call_handle_vendor_query(input,chatId, additional_class_response = None):
 
     query = """
     select distinct supply
@@ -1897,12 +1916,13 @@ def call_handle_vendor_query(input,chatId):
             "Supply_info": {
                 "Supplies": []
             },
-            "KEYWORDS": None
+            "KEYWORDS": None,
+            "Additional_class_response": None
         }
         save_state(state,f"QVND_state_{chatId}")
 
     extracted_state = copy.deepcopy(state)
 
-    response_of_ven_query = handle_vendor_query(input, Industry_data_for_vendor, unique_supply_list, extracted_state, state, llm_70b_vers,chatId)
+    response_of_ven_query = handle_vendor_query(input, Industry_data_for_vendor, unique_supply_list, extracted_state, state, llm_70b_vers,chatId, additional_class_response)
 
     return response_of_ven_query

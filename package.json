@@ -16,5 +16,8 @@
     "frappe-client": "^2.0.2",
     "react-dom": "^19.1.0",
     "redux-persist": "^6.0.0"
+  },
+  "devDependencies": {
+    "@svgr/rollup": "^8.1.0"
   }
 }

@@ -1,8 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { FaXmark } from "react-icons/fa6";
-import completed from '../../assets/cancel.png'; // Assuming the completed image is imported
-// import Backtochat from '../Backtochat/Backtochat';
 
 const Failure = () => {
   const imageRef = useRef(null);
@@ -47,33 +45,6 @@ const Failure = () => {
    </div>
   )
 
-  // return (
-  //   <div
-  //     className="h-[70%] w-[50%] flex flex-col justify-evenly items-center z-20 bg-white"
-  //   >
-  //     {/* Container for the rectangles */}
-  //     <div className="Rectangle-Container relative h-auto sm:h-[70%] md:h-[60%] lg:h-[50%] w-full sm:w-[90%] md:w-[80%] lg:w-[70%] self-center flex justify-center items-center">
-  //       {/* <video className="ConfirmationVideo relative object-cover h-[100%] w-[100%]" height="100%" width="100%" ref={ConfirmationVideo}  autoPlay muted >
-  //         <source src={sampleVideo} type="video/mp4" />
-  //         Your browser does not support the video tag.
-  //       </video> */}
-  //       <img
-  //         ref={imageRef}
-  //         src={completed}
-  //         className=" object-contain h-[85%] w-[57%] relative"
-  //         alt="Completion image"
-  //       />
-  //     </div>
-
-  //     <div
-  //       ref={textRef}
-  //       className="Failure-text relative text-2xl font-bold sm:text-xl md:text-2xl lg:text-2xl"
-  //     >
-  //      Sorry But Something Went Wrong
-  //     </div>
-  //     {/* <Backtochat/> */}
-  //   </div>
-  // );
 };
 
 export default Failure;

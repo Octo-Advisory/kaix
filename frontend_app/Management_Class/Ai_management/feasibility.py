@@ -52,6 +52,8 @@ def run_feasibility_analysis(file_path, result_docname, user):
         doc = frappe.get_doc("Feasibility Report", result_docname)
         doc.status = "Complete"
         doc.result_data = frappe.as_json(result)
+        if result.get("feasibility_title"):
+            doc.feasibility_title = result["feasibility_title"]
         doc.save(ignore_permissions=True)
         frappe.db.commit()
         frappe.publish_realtime(

@@ -1,38 +1,29 @@
-import React, { useEffect, useState, useRef, useTransition } from 'react';
+import React, { useEffect, useState, useRef, useTransition, useContext } from 'react';
 import { FaLocationDot } from "react-icons/fa6";
-import { useFrappeGetDoc, useFrappeGetDocList } from 'frappe-react-sdk';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import markerIconPng from "leaflet/dist/images/marker-icon.png";
-import Details from '../Details/Details';
+import { FrappeContext, useFrappeGetDoc, useFrappeGetDocList } from 'frappe-react-sdk';
 import Backtochat from '../Backtochat/Backtochat';
 import MapComponent from '../MapComponent/MapComponent';
 import {
-  FaBox, FaCheckCircle, FaList, FaAward, FaStar, FaInfoCircle, FaChartBar, FaCogs, FaBoxes, FaBolt, FaShieldAlt, FaMoneyBillWave, FaCreditCard, FaComments, FaBookmark, FaStoreAlt, FaShare, FaFileAlt, FaClock, FaCheck, FaBuilding, FaMapMarkerAlt, FaCertificate, FaLocationArrow, FaDirections, FaSearch, FaTag, FaLayerGroup, FaSync
+ FaCheckCircle, FaList, FaAward, FaInfoCircle, FaChartBar, FaShieldAlt, FaStoreAlt, FaFileAlt, FaSearch
 } from 'react-icons/fa';
 import { AiFillProduct } from "react-icons/ai";
 import { MdPeopleAlt } from "react-icons/md";
-import { data } from 'react-router-dom';
-import GoogleMap from '../MapComponent/GoogleMap';
 import LogoLoader from '../Responseloader/LogoLoader';
 import { all } from 'axios';
-import MapTrial from '../MapComponent/MapTrial';
 import MapBoxMap from '../MapComponent/MapBoxMap';
 import { useSelector } from 'react-redux';
-import { useFrappeUpdateDoc } from 'frappe-react-sdk';
+import { useFrappeUpdateDoc} from 'frappe-react-sdk';
 import { current } from '@reduxjs/toolkit';
-import FailureScreen from '../Failure/FailureScreen';
 import NoResultsFound from '../Failure/NoResultsFound';
 import SingleMap from '../MapComponent/SingleMap';
 
 function Vendorresult({ result, source, rerender }) {
+  const {call} = useContext(FrappeContext)
   const [tempFailure, setTempFailure] = useState(false)
   // First check in the code should be ::::  Unfiltered All IS Supplier
   console.log(result, source, 'This is the result screen from Vendor Screen')
   const analytics_response = (source === "SolutionScreen" || source === 'FromScratch') ? result["Analytics_response"] : ''
   if ((typeof analytics_response === 'object' && analytics_response !== null) || source === "MapComponent") {
-    // const essential = analytics_response["Unfiltered Essential Supplier"];
     console.log('All good')
     // safely use `essential` here
   } else {
@@ -55,7 +46,6 @@ function Vendorresult({ result, source, rerender }) {
   const [groupedData, setGroupedData] = useState()
   const [loading, setLoading] = useState(true)
 
-
   const [essentialAllSuppliers, setEssentialAllSuppliers] = useState([])
   const [essentialBestSuppliers, setEssentialBestSuppliers] = useState([])
   const [nonEssentialAllSuppliers, setNonEssentialAllSuppliers] = useState([])
@@ -74,7 +64,12 @@ function Vendorresult({ result, source, rerender }) {
   const [updNonEssentialAllSupplier, setUpdNonEssentialAllSupplier] = useState([])
   const [updNonEssentialBestSupplier, setUpdNonEssentialBestSupplier] = useState([])
 
-  const { data: uiData } = useFrappeGetDoc("UI Configuration", "UI Configuration")
+  const { data: uiData } = useFrappeGetDoc("UI Configuration", "Vendors")
+    const configurations = uiData?.configurations || [];
+    const uiConfig = configurations.reduce((acc, curr) => {
+      acc[curr.key] = curr.value;
+      return acc;
+    }, {});
 
   const mapRef = useRef(null);
 
@@ -148,9 +143,6 @@ function Vendorresult({ result, source, rerender }) {
     limit: 500000,
   } : null);
 
-
-
-
   function groupSuppliesWithVendors(vendors, supplies) {
     // Step 1: Group supplies by parent
     const grouped = supplies.reduce((acc, item) => {
@@ -179,7 +171,6 @@ function Vendorresult({ result, source, rerender }) {
     }
   }, [vendorData, supplies])
 
-
   // Assuming the analytics response passes only the Ids ... and we have all data called from db in vendorData so match the names
   const updateData = (suppliers) => {
     console.log('Came here', suppliers)
@@ -201,7 +192,6 @@ function Vendorresult({ result, source, rerender }) {
     });
   };
 
-
   function generateAnalyticsResponse(bestIndividualSuppliers, unfilteredSuppliers) {
     console.log(bestIndividualSuppliers, unfilteredSuppliers, 'This is before conversion...')
     const Analytics_response = {
@@ -212,7 +202,6 @@ function Vendorresult({ result, source, rerender }) {
       "Best Non-Essential Supplier": null,
       "Unfiltered Non-Essential Supplier": null,
     };
-
     return Analytics_response;  // 🔥 Ready to store
   }
   function generateAnotherAnalyticsResponse(bestEssentialSuppliers, unfilteredEssentialSuppliers, bestNonEssentialSuppliers, unfilteredNonEssentialsuppliers) {
@@ -225,10 +214,31 @@ function Vendorresult({ result, source, rerender }) {
       "Best Non-Essential Supplier": bestNonEssentialSuppliers,
       "Unfiltered Non-Essential Supplier": unfilteredNonEssentialsuppliers,
     };
-
     return Analytics_response;  // 🔥 Ready to store
   }
 
+  const storeResultData = async (lastChat,solutions,intension) => {
+  if(!lastChat || !solutions) return 
+
+  try {
+    console.log(lastChat, solutions?.[0], 'Method Called')
+      const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
+      child_row_id: lastChat,
+      updated_solutions: solutions,
+      intension: intension
+      },
+    {
+    headers: {
+      'Expect': '' // 👈 Clear problematic header
+    }
+  });
+      console.log('This is the result we want ot store.... ', result.message)
+      return result.message || [];
+    } catch (err) {
+      console.error("Error Storing Result json:", err);
+      return []; // Return empty for this batch on error
+    }
+}
 
   useEffect(() => {
     if (groupedData && !isLoading && !supplyLoading) {
@@ -263,10 +273,8 @@ function Vendorresult({ result, source, rerender }) {
 
   }, [groupedData, allIndividualSuppliers, bestIndividualSuppliers, essentialAllSuppliers, essentialBestSuppliers, nonEssentialAllSuppliers, nonEssentialBestSuppliers])
 
-
   useEffect(() => {
     if ((source === "SolutionScreen" || source === 'FromScratch')) {
-
       let currentypeAll = supplierType === "Essential" ? updEssentialAllSupplier : updNonEssentialAllSupplier
       let currentypeBest = supplierType === "Essential" ? updEssentialBestSupplier : updNonEssentialBestSupplier
       let all = IndividualQuery ? updatedAllIndividualSupplier : currentypeAll
@@ -292,8 +300,7 @@ function Vendorresult({ result, source, rerender }) {
   useEffect(() => {
     // Prevents rerun if rerender flag is set
     if (rerender === 1) return;
-    console.log("souece", source);
-
+  
     if (source == 'FromScratch' || source == 'MapComponent') return;
 
     // Proceed only if suppliers are ready
@@ -315,10 +322,9 @@ function Vendorresult({ result, source, rerender }) {
         // Call the async function correctly
         (async () => {
           try {
-            await updateDoc("Chat history", lastChatId, {
-              result: JSON.stringify({ result: updatedResult }),
-              intension: "Query to Search Vendors"
-            });
+            if(lastChatId) {
+              await storeResultData(lastChatId,updatedResult,'Query to Search Vendors')
+            }
             console.log("✅ Analytics saved to chat history");
           } catch (err) {
             console.error("❌ Failed to update doc:", err);
@@ -343,10 +349,9 @@ function Vendorresult({ result, source, rerender }) {
         // Call the async function correctly
         (async () => {
           try {
-            await updateDoc("Chat history", lastChatId, {
-              result: JSON.stringify({ result: updatedResult }),
-              intension: "Query to Search Vendors"
-            });
+            if(lastChatId) {
+              await storeResultData(lastChatId,updatedResult,'Query to Search Vendors')
+            }
             console.log("✅ Analytics saved to chat history");
           } catch (err) {
             console.error("❌ Failed to update doc:", err);
@@ -483,22 +488,6 @@ function Vendorresult({ result, source, rerender }) {
     }
   }, [selectedVendor]);
 
-  const [vendorDistance, setVendorDistance] = useState()
-
-  function calculateDistance(coord1, coord2) {
-    const toRad = deg => deg * Math.PI / 180;
-    const R = 6371; // Radius of Earth in km
-    const dLat = toRad(coord2[1] - coord1[1]);
-    const dLon = toRad(coord2[0] - coord1[0]);
-    const lat1 = toRad(coord1[1]);
-    const lat2 = toRad(coord2[1]);
-
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in km
-  }
-
   const vendorLatLng = (source === "SolutionScreen" || source === 'FromScratch') ? getLatLng(selectedVendor?.latitude_longitude) : getLatLng2(selectedVendor?.latitude_longitude)
 
   const tempSource = rerender !== 1 ? source : 'FromScratch'
@@ -530,8 +519,8 @@ function Vendorresult({ result, source, rerender }) {
               <FaFileAlt className="text-xl text-[#7AA6DA]" />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold text-[#2C53A3]">{uiData?.vendor_main_title || "Vendors List"}</h1>
-              <p className="text-[#5A7EC7]">{uiData?.vendor_sub_title || "Browse required supplies for your business"}</p>
+              <h1 className="text-2xl font-semibold text-[#2C53A3]">{uiConfig?.['main_title'] || "Vendors List"}</h1>
+              <p className="text-[#5A7EC7]">{uiConfig?.['sub_title'] || "Browse required supplies for your business"}</p>
             </div>
           </div>
 
@@ -544,7 +533,7 @@ function Vendorresult({ result, source, rerender }) {
                   : "text-[#0e2044] bg-white"
                   } rounded-l-full`}
               >
-                Suppliers
+                {uiConfig?.['view_mode_suppliers'] || "Suppliers"}
               </div>
               <div
                 onClick={() => setViewMode("Map")}
@@ -552,8 +541,8 @@ function Vendorresult({ result, source, rerender }) {
                   ? "bg-[#0e2044] text-white"
                   : "text-[#0e2044] bg-white"
                   } rounded-r-full`}
-              >
-                Map
+              >   
+              {uiConfig?.['view_mode_map'] || "Map"} 
               </div>
             </div>
             {source === 'SolutionScreen' && (
@@ -577,7 +566,8 @@ function Vendorresult({ result, source, rerender }) {
                   onClick={() => { setSupplierType('Essential') }}
                   className={`px-3 py-1 text-xs cursor-pointer text-black font-semibold transition-all`}
                 >
-                  Essential Suppliers
+                  {uiConfig?.['vendor_essential_tab'] || "Essential Suppliers"}
+
                 </button>
                 <div className={`${supplierType === "Essential" ? 'bg-blue-500 w-full' : 'bg-transparent w-0'} ' h-[2px] bg-blue-500 rounded-full transition-width duration-300`}></div>
               </div>
@@ -586,7 +576,7 @@ function Vendorresult({ result, source, rerender }) {
                   onClick={() => { setSupplierType('Non-Essential') }}
                   className={`px-3 py-1 text-xs cursor-pointer text-black font-semibold transition-all`}
                 >
-                  Non Essential Suppliers
+                  {uiConfig?.['vendor_non_essential_tab'] || "Non Essential Suppliers"}
                 </button>
                 <div className={`${supplierType === "Non-Essential" ? 'bg-blue-500 w-full' : 'bg-transparent w-0'} ' h-[2px] bg-blue-500 rounded-full transition-width duration-300`}></div>
               </div>
@@ -597,7 +587,7 @@ function Vendorresult({ result, source, rerender }) {
                   onClick={() => { setCurrentData('Best Suppliers') }}
                   className={`px-3 py-1 text-xs cursor-pointer flex flex-row gap-2 items-center text-green-500 font-semibold transition-all`}
                 >
-                  <FaAward size={20} />Best Suppliers
+                  <FaAward size={20} />{uiConfig?.['vendor_best_suppliers_tab'] || "Best Suppliers"}
                 </button>
                 <div className={`${currentData === "Best Suppliers" ? 'bg-green-500 w-full' : 'bg-transparent w-0'} ' h-[2px] bg-green-500 rounded-full transition-width duration-300`}></div>
               </div>
@@ -606,7 +596,7 @@ function Vendorresult({ result, source, rerender }) {
                   onClick={() => { setCurrentData('All Suppliers') }}
                   className={`px-3 py-1 text-xs cursor-pointer flex flex-row gap-2 items-center text-orange-500 font-semibold transition-all`}
                 >
-                  <FaList size={20} />All Suppliers
+                  <FaList size={20} />{uiConfig?.['vendor_all_suppliers_tab'] || "All Suppliers"}
                 </button>
                 <div className={`${currentData === "All Suppliers" ? 'bg-orange-500 w-full' : 'bg-transparent w-0'} ' h-[2px] bg-orange-500 rounded-full transition-width duration-300`}></div>
               </div>
@@ -629,10 +619,6 @@ function Vendorresult({ result, source, rerender }) {
                           {vendor.name}
                         </h3>
                       </div>
-                      {/* <div className="flex items-center mt-2 text-sm text-[#5A7EC7]">
-                                                <FaBuilding className="mr-2" />
-                                                <span>{vendor.category}</span>
-                                            </div> */}
                     </div>
                   ))}
                 </div>
@@ -641,7 +627,7 @@ function Vendorresult({ result, source, rerender }) {
                   <div className="p-4 rounded-full mb-3 bg-gradient-to-r from-[#FF80AB]/20 to-[#9575CD]/20">
                     <FaSearch className="text-2xl text-[#5A7EC7]" />
                   </div>
-                  <h3 className="text-lg font-medium text-[#2C53A3]">{uiData?.vendor_no_vendors_found || "No Vendors found"}</h3>
+                  <h3 className="text-lg font-medium text-[#2C53A3]">{uiConfig?.['no_vendors_found'] || "No Vendors found"}</h3>
                   <p className="text-[#5A7EC7]">Try a different search term or view mode</p>
                 </div>
               )}
@@ -667,24 +653,24 @@ function Vendorresult({ result, source, rerender }) {
                     <div className="flex flex-col flex-1 gap-4">
                       <h2 className="text-xl font-bold text-gray-800 flex gap-3 flex-row items-center">
                         <FaChartBar className="text-blue-700" />
-                        {uiData?.vendor_statistics || "Company Statistics"}
+                        {uiConfig?.['vendor_statistics'] || "Company Statistics"}
                       </h2>
                       <div className="grid grid-cols-4 gap-4">
                         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm text-center">
-                          <div className="text-3xl font-bold text-blue-700">{selectedVendor.years_of_experience}+</div>
-                          <p className="text-gray-600 mt-1">Years Experience</p>
+                          <div className="text-3xl font-bold text-blue-700">{selectedVendor.years_of_experience}</div>
+                          <p className="text-gray-600 mt-1">{uiConfig?.['years_of_experience_label'] || 'Years Experience'}</p>
                         </div>
                         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm text-center">
                           <div className="text-3xl font-bold text-blue-700">{selectedVendor.no_of_services}</div>
-                          <p className="text-gray-600 mt-1">Services Offered</p>
+                          <p className="text-gray-600 mt-1">{ uiConfig?.['services_offered_label'] || 'Services Offered'}</p>
                         </div>
                         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm text-center">
-                          <div className="text-3xl font-bold text-blue-700">{selectedVendor.no_of_employees}+</div>
-                          <p className="text-gray-600 mt-1">Employees</p>
+                          <div className="text-3xl font-bold text-blue-700">{selectedVendor.no_of_employees}</div>
+                          <p className="text-gray-600 mt-1">{uiConfig?.['employees_label'] || 'Employees'}</p>
                         </div>
                         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm text-center">
-                          <div className="text-3xl font-bold text-blue-700">500+</div>
-                          <p className="text-gray-600 mt-1">Projects Completed</p>
+                          <div className="text-3xl font-bold text-blue-700">500</div>
+                          <p className="text-gray-600 mt-1">{uiConfig?.['projects_completed_label'] || 'Projects Completed'}</p>
                         </div>
                       </div>
                     </div>
@@ -704,7 +690,7 @@ function Vendorresult({ result, source, rerender }) {
                     <div className="relative flex flex-col gap-4">
                       <h2 className="text-xl font-bold text-gray-800 flex flex-row gap-3 items-center">
                         <MdPeopleAlt className="text-blue-700" />
-                        {uiData?.vendor_past_clients || "Past Clients"}
+                        {uiConfig?.['past_clients_label'] || "Past Clients"}
                       </h2>
                       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                         <div className="bg-blue-50 p-3 border-b border-gray-200">
@@ -717,7 +703,7 @@ function Vendorresult({ result, source, rerender }) {
                     {selectedVendor && selectedVendor.supplies && (<div className="relative flex flex-col gap-2">
                       <h2 className="text-xl font-bold text-gray-800 mb-4 flex flex-row gap-3 items-center">
                         <AiFillProduct className='text-blue-700' />
-                        {uiData?.vendor_supplies_and_capacities || "Supplies & Capacities"}
+                        {uiConfig?.['supplies_and_capacities_label'] || "Supplies & Capacities"}
                       </h2>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {selectedVendor.supplies && selectedVendor.supplies.map((data, index) => (
@@ -736,11 +722,11 @@ function Vendorresult({ result, source, rerender }) {
                     {selectedVendor && selectedVendor.certifications && (<div className='relative flex flex-col gap-4'>
                       <h2 className="text-xl font-bold text-gray-800 flex items-center flex-row gap-3">
                         <FaShieldAlt className="text-blue-700" />
-                        {uiData?.vendor_certifications || "Certifications"}
+                        {uiConfig?.['certifications_label'] || "Certifications"}
                       </h2>
                       <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col">
                         <div className="relative grid grid-cols-2 gap-2">
-                          {selectedVendor.certifications.split(',').map((opt, i) => (
+                          {selectedVendor.certifications.split(',').filter(opt => opt.trim() !== "").map((opt, i) => (
                             <div key={i} className="flex flex-row gap-1 items-center col-span-1">
                               <div className="bg-green-100 p-1 rounded-full">
                                 <FaCheckCircle className="text-green-700" />
@@ -754,7 +740,7 @@ function Vendorresult({ result, source, rerender }) {
                     {source !== "MapComponent" && (<div className="relative flex flex-col gap-2">
                       <h4 className="text-xl font-semibold text-gray-800 flex flex-row gap-2 items-center">
                         <FaLocationDot className='text-blue-700' size={20} />
-                        {uiData?.vendor_location || "Location"}
+                        {uiConfig?.['vendor_location_label'] || "Location"}
                       </h4>
                       <div className="relative h-[250px] w-full p-4">
                         {source !== "MapComponent" && (<MapBoxMap
@@ -784,7 +770,7 @@ function Vendorresult({ result, source, rerender }) {
               <SingleMap selectedProperty={propertyData} intension="From Vendor Screen" />
             )}
             {source !== "FromScratch" && (
-              <MapComponent solutions={map_result} source="SolutionScreen" intension={source == "FromScratch"? "For All Vendor Listing" :"For Property to Vendor" }/>
+              <MapComponent solutions={map_result} source="SolutionScreen" intension={source === "FromScratch"? "For All Vendor Listing" :"For Property to Vendor" }/>
             )}            
             {/* <MapComponent solutions={map_result} source={tempSource} intension={source == "FromScratch"? "For All Vendor Listing" :"For Property to Vendor" }/> */}
           </div>

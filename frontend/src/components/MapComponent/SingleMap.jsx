@@ -15,7 +15,10 @@ import { getDataForSingleLayer } from "./service/apiservice";
 import { FaStore } from "react-icons/fa";
 import { IoLayersOutline } from "react-icons/io5";
 import Vendorresult from '../ResultScreens/Vendorresult';
-
+import { IoMdHome } from "react-icons/io";
+import { FaPlus } from "react-icons/fa";
+import { FaMinus } from "react-icons/fa";
+import { useFrappeGetDoc } from 'frappe-react-sdk';
 mapboxgl.accessToken = 'pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ';
 
 const SingleMap = ({ selectedProperty, intension }) => {
@@ -25,30 +28,48 @@ const SingleMap = ({ selectedProperty, intension }) => {
   const lng = copyiedSelectedProperty?.latitude_longitude[1];
   let boundaryCoordinates = copyiedSelectedProperty?.boundary_coordinates;
 
-  console.log("Selected property");
+  console.log("Selected property, This is from SingleMap");
   console.log(copyiedSelectedProperty);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const mapRef = useRef(null);
   const mapContainer = useRef(null);
   const [vendorsToSend, setVendorsToSend] = useState([]);
   const [isMapoptionVisible, setMapOptionVisible] = useState(true);
+  const DIRECTIONS = {
+    LEFT:- 0.4,
+    RIGHT:0.4
+  }
+
+  const { data: uiData } = useFrappeGetDoc("UI Configuration", "Mapping")
+      const configurations = uiData?.configurations || [];
+      const uiConfig = configurations.reduce((acc, curr) => {
+        acc[curr.key] = curr.value;
+        return acc;
+      }, {});
+
   const LAYERS = {
     DEFAULT_LAYER: {
-      LABEL: "Default Layers",
-      VENDOR: "Default Vendors",
-      SUB_STATIONS: "Default Sub Stations",
-      RAILWAY_STATIONS: "Default Railway Stations",
-      AIRPORTS: "Default Airports",
-      SEAPORTS: "Default Seaports",
-      HIGHWAY: "Default Highways",
+      LABEL: `${uiConfig?.['default_layers'] || 'Default Layers'}`,
+      VENDOR: `${uiConfig?.['default_vendors'] || 'Default Vendors'}`,
+      SUB_STATIONS: `${uiConfig?.['default_sub_stations'] || 'Default Sub Stations'}`,
+      RAILWAY_STATIONS: `${uiConfig?.['default_railway_stations'] || 'Default Railway Stations'}`,
+      AIRPORTS: `${uiConfig?.['default_airports'] || 'Default Airports'}`,
+      SEAPORTS: `${uiConfig?.['default_seaports'] || 'Default Seaports'}`,
+      HIGHWAY: `${uiConfig?.['default_highway'] || 'Default Highway'}`,
     },
-    SUB_STATIONS: "Sub Stations",
-    RAILWAY_STATIONS: "Railway Stations",
-    AIRPORTS: "Airports",
-    SEAPORTS: "Seaports",
-    HIGHWAY: "Highway",
-    VENDOR: "All Vendors"
+    SUB_STATIONS: `${uiConfig?.['checkbox_sub_stations'] || 'Sub Stations'}`,
+    RAILWAY_STATIONS: `${uiConfig?.['checkbox_railway_stations'] || 'Railway Stations'}`,
+    AIRPORTS: `${uiConfig?.['checkbox_airports'] || 'Airports'}`,
+    SEAPORTS: `${uiConfig?.['checkbox_seaports'] || 'Seaports'}`,
+    HIGHWAY: `${uiConfig?.['checkbox_highway'] || 'Highway'}`,
+    VENDOR: `${uiConfig?.['checkbox_all_vendors'] || 'All Vendors'}`
   }
+  var allVendors = [];
+  var nearestAirportDetail = null;
+  var nearestSubstationDetail = null;
+  var nearestSeaportDetail = null;
+  var nearestRailwayStationDetail = null;
+  var highwayCoord = null;
   useEffect(() => {
     if (!mapContainer.current || !lat || !lng) return;
 
@@ -59,7 +80,6 @@ const SingleMap = ({ selectedProperty, intension }) => {
       center: [lng, lat],
       zoom: 14,
       attributionControl: false,
-
     });
 
     return () => mapRef.current?.remove();
@@ -81,6 +101,9 @@ const SingleMap = ({ selectedProperty, intension }) => {
     const sourceId = `boundary-${crypto.randomUUID()}`;
 
     mapRef.current.on('load', () => {
+      document.querySelector('.accordion-header').click();
+      document.querySelectorAll('.accordion-header')[1].click();
+
       mapRef.current.addSource(sourceId, {
         type: 'geojson',
         data: {
@@ -113,9 +136,10 @@ const SingleMap = ({ selectedProperty, intension }) => {
       });
 
       // Fit to bounds
-      mapRef.current.fitBounds(bounds, { padding: 50 });
+      //  mapRef.current.fitBounds(bounds, { padding: 50 });
 
       // Custom Marker with MdFactory
+      //#region Not in use
       const el = document.createElement('div');
       el.style.top = '12px';
       el.style.width = '40px';
@@ -135,19 +159,26 @@ const SingleMap = ({ selectedProperty, intension }) => {
           <MdFactory size={24} color="#4A76D1" />
         </div>
       );
-
-      new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      //#endregion
+      const marker = new mapboxgl.Marker({ anchor: 'bottom', color: '#ff0000' })
         .setLngLat([lng, lat])
         .addTo(mapRef.current);
-
+      // Apply margin-top or transform
+      marker.getElement().style.marginTop = '20px'; // for visual downward shift 
     });
   }, [boundaryCoordinates]);
 
   useEffect(() => {
-    mapRef.current.on('style.load', () => {
-      //load deafult layers
-      loadVendorlayer();
-    });
+    const handleStyleLoad = () => {
+      (async () => {
+        await loadVendorlayer();
+        resetZoomlevel();
+      })();
+    };
+    mapRef.current.on('style.load', handleStyleLoad);
+    // mapRef.current.on('style.load', () => {
+
+    // });
     document.documentElement.style.setProperty(
       "--check-icon-url",
       `url(${checkIcon})`
@@ -162,7 +193,6 @@ const SingleMap = ({ selectedProperty, intension }) => {
       if (event.target.checked) {
         asyncLoadDataForSingleLayer(event.target.name);
       } else {
-        console.log("Checkbox changed:", event.target.name, event.target.checked);
         // Handle uncheck if needed
         removeMarker(event.target.name);
       }
@@ -181,7 +211,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
     };
   }, []);
 
-  const addConnectivityLayer = (layer, coord, propertyCoord) => {
+  const addConnectivityLayer = (layer, coord, propertyCoord, detail,direction = {}) => {
     // Custom Marker with MdFactory
     const el = document.createElement('div');
     el.name = "marker_" + layer;
@@ -220,11 +250,99 @@ const SingleMap = ({ selectedProperty, intension }) => {
       .addTo(mapRef.current);
     let sourceId = 'line-string' + "_" + layer;
     let lineStringLayerId = 'line-string-layer' + "_" + layer;
-    addSingleLineLayer(sourceId, lineStringLayerId, coord, propertyCoord, '#5f2abb');
+    let name = "";
+    if (detail != undefined && detail != null) {
+      console.log("Detail in addConnectivityLayer", detail);
+      
+      switch (layer) {
+        case LAYERS.DEFAULT_LAYER.SUB_STATIONS:
+          name = detail.name+" Sub Station";
+          break;
+        case LAYERS.DEFAULT_LAYER.AIRPORTS:
+          name = detail.title+" Airport";
+          break;
+        case LAYERS.DEFAULT_LAYER.SEAPORTS:
+          name = detail.title+" Seaport";
+          break;
+        case LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS:
+          name = detail.name1+" Railway Station";
+          break;
+        default:
+          break;
+      }
+      if (name !== "") {
+        addInfoPoupp(marker, name);
+      }
+    }
+    // addSingleLineLayer(sourceId, lineStringLayerId, coord, propertyCoord, '#5f2abb');
+
+    const distanceKm = getDistance([propertyCoord[0], propertyCoord[1]], [coord[0], coord[1]]).toFixed(2);
+    const midpoint = getMidpointSimple(coord, propertyCoord);
+    const labelText = name !== "" ? `${name} </br> ${distanceKm} km` :`${distanceKm} km`;
+    generateCurveLine({ sourceId: sourceId, layerId: lineStringLayerId, from: coord, to: propertyCoord, linecolor: '#5f2abb', curvature: direction, labelText: labelText });
+    // addDistanceLabel(midpoint, `${distanceKm} km`, "default-connectivity-distance-lable");
   }
 
   //#region Map Options related code
+  const resetZoomlevel = async () => {
+    // Calculate the bounding box from your coordinates
+    const bounds = new mapboxgl.LngLatBounds();
+    allVendors.forEach(item => {
+      let coord = item.latitude_longitude.replace(" ", "").split(",").map(Number);
+      coord = [coord[1], coord[0]]; // Ensure coordinates are in [lng, lat] format
+      bounds.extend(coord);
+    });
 
+    // let propertyCoord = solution.latitude_longitude;
+    // propertyCoord = [propertyCoord[1], propertyCoord[0]]; // Ensure coordinates are in [lng, lat] format
+    bounds.extend([lng, lat]);
+
+    if (
+      nearestAirportDetail?.data?.length > 0 &&
+      nearestAirportDetail.data[0].coordinates
+    ) {
+      let airportCoord = nearestAirportDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+      airportCoord = [airportCoord[1], airportCoord[0]]
+      bounds.extend(airportCoord);
+    }
+
+    if (
+      nearestSubstationDetail?.data?.length > 0 &&
+      nearestSubstationDetail.data[0].coordinates
+    ) {
+      let substationCoord = nearestSubstationDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+      substationCoord = [substationCoord[1], substationCoord[0]]
+      bounds.extend(substationCoord);
+    }
+
+    if (
+      nearestSeaportDetail?.data?.length > 0 &&
+      nearestSeaportDetail.data[0].coordinates
+    ) {
+      let seaportCoord = nearestSeaportDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+      seaportCoord = [seaportCoord[1], seaportCoord[0]]
+      bounds.extend(seaportCoord);
+    }
+
+    if (nearestRailwayStationDetail?.data?.length > 0 &&
+      nearestRailwayStationDetail.data[0].coordinates
+    ) {
+      let railwayCoord = nearestRailwayStationDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+      railwayCoord = [railwayCoord[1], railwayCoord[0]]
+      bounds.extend(railwayCoord);
+    }
+
+    if (highwayCoord != null && highwayCoord != "") {
+      highwayCoord = [highwayCoord[1], highwayCoord[0]]
+      bounds.extend(highwayCoord);
+    }
+
+    // Fit the map to these bounds with some optional padding
+    mapRef.current.fitBounds(bounds, {
+      padding: 100,   // Adjusts space around the edges (optional)
+      duration: 1000 // Optional: smooth animation
+    });
+  };
   const loadVendorlayer = async () => {
 
     copyiedSelectedProperty.essential_vendors.forEach((item) => {
@@ -233,7 +351,11 @@ const SingleMap = ({ selectedProperty, intension }) => {
       var filteredItem = copyiedSelectedProperty.essential_vendor_details.filter(
         (detail) => detail.name?.trim() === item.vendor_name.trim()
       );
-
+      filteredItem.forEach((detail) => {
+        if (typeof detail.supplyName !== 'undefined') {
+          detail.supplyName = "";
+        }
+      });
       filteredItem.forEach((detail) => {
         if (!detail.supplyName) {
           detail.supplyName = item.supply;
@@ -250,7 +372,11 @@ const SingleMap = ({ selectedProperty, intension }) => {
       var filteredItem = copyiedSelectedProperty.non_essential_vendor_details.filter(
         (detail) => detail.name?.trim() === item.vendor_name.trim()
       );
-
+      filteredItem.forEach((detail) => {
+        if (typeof detail.supplyName !== 'undefined') {
+          detail.supplyName = "";
+        }
+      });
       filteredItem.forEach((detail) => {
         if (!detail.supplyName) {
           detail.supplyName = item.supply;
@@ -282,19 +408,39 @@ const SingleMap = ({ selectedProperty, intension }) => {
         }
       });
     }
+    allVendors = structuredClone(data);
     bindDataOnMap(data, LAYERS.DEFAULT_LAYER.VENDOR);
     //document.querySelector('[name="' + LAYERS.VENDOR + '"]').checked = true; //Check the vendor layer checkbox by default
     document.querySelector('[name="' + LAYERS.DEFAULT_LAYER.LABEL + '"]').checked = true; //Check the vendor layer checkbox by default
 
     if (data.length > 0) {
       let count = 0;
+      let direction = "right";
       data.forEach((item) => {
         if (item.latitude_longitude != null && item.latitude_longitude != "") {
           count++;
           let vendorSourceId = 'line-string_' + count + "_" + LAYERS.DEFAULT_LAYER.VENDOR;
           let vendorLineStringLayerId = 'line-string-layer_' + count + "_" + LAYERS.DEFAULT_LAYER.VENDOR;
           let coord = item.latitude_longitude.replace(" ", "").split(",").map(Number);
-          addSingleLineLayer(vendorSourceId, vendorLineStringLayerId, [coord[1], coord[0]], [lng, lat], '#5b96d8');
+          // addSingleLineLayer(vendorSourceId, vendorLineStringLayerId, [coord[1], coord[0]], [lng, lat], '#5b96d8');
+          var [vendorLongitude, vendorLatitude] = item.coordinates.split(",").map(Number);
+          const propertyLatitude = copyiedSelectedProperty?.latitude_longitude[0];
+          const propertyLongitude = copyiedSelectedProperty?.latitude_longitude[1];
+          const distanceKm = getDistance([propertyLongitude, propertyLatitude], [vendorLatitude, vendorLongitude]).toFixed(2);
+          const labelText = `${item.supplyName} </br> ${distanceKm} km`;
+          let curvedDirectionValue = null;
+          if(direction == "right")
+          {
+            direction = "left";
+            curvedDirectionValue = DIRECTIONS.LEFT;
+          }            
+          else
+          {
+            direction = "right";
+            curvedDirectionValue = DIRECTIONS.RIGHT;
+          }
+            
+          generateCurveLine({ sourceId: vendorSourceId, layerId: vendorLineStringLayerId, from: [coord[1], coord[0]], to: [lng, lat], linecolor: '#5b96d8', labelText: labelText,curvature:curvedDirectionValue });
         }
       });
     }
@@ -302,31 +448,44 @@ const SingleMap = ({ selectedProperty, intension }) => {
     //#region Add Connectivity Layers
     try {
       if (copyiedSelectedProperty.nearest_airport_coord != null && copyiedSelectedProperty.nearest_airport_coord != "") {
-        const airportCoord = copyiedSelectedProperty.nearest_airport_coord.replace(" ", "").split(",").map(Number);
-        addConnectivityLayer(LAYERS.DEFAULT_LAYER.AIRPORTS, [airportCoord[1], airportCoord[0]], [lng, lat]);
+        // const airportCoord = copyiedSelectedProperty.nearest_airport_coord.replace(" ", "").split(",").map(Number);        
+        nearestAirportDetail = await getDataForSingleLayer("Airport", { "name": copyiedSelectedProperty?.nearest_airport });
+        if (nearestAirportDetail.data.length > 0) {
+          const airportCoord = nearestAirportDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+          addConnectivityLayer(LAYERS.DEFAULT_LAYER.AIRPORTS, [airportCoord[1], airportCoord[0]], [lng, lat], nearestAirportDetail.data[0],DIRECTIONS.LEFT);
+        }
+
       }
 
-      if (copyiedSelectedProperty.nearest_power_source_coord != null && copyiedSelectedProperty.nearest_power_source_coord != "") {
-        const substationCoord = copyiedSelectedProperty.nearest_power_source_coord.replace(" ", "").split(",").map(Number);
-        addConnectivityLayer(LAYERS.DEFAULT_LAYER.SUB_STATIONS, [substationCoord[1], substationCoord[0]], [lng, lat]);
+      if (copyiedSelectedProperty.nearest_power_source != null && copyiedSelectedProperty.nearest_power_source != "") {
+        nearestSubstationDetail = await getDataForSingleLayer("Substation", { "name": copyiedSelectedProperty?.nearest_power_source });
+        if (nearestSubstationDetail.data.length > 0) {
+          const substationCoord = nearestSubstationDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+          addConnectivityLayer(LAYERS.DEFAULT_LAYER.SUB_STATIONS, [substationCoord[1], substationCoord[0]], [lng, lat], nearestSubstationDetail.data[0],DIRECTIONS.RIGHT);
+        }
       }
 
 
-      if (copyiedSelectedProperty.nearest_seaport_coord != null && copyiedSelectedProperty.nearest_seaport_coord != "") {
-        const seaportCoord = copyiedSelectedProperty.nearest_seaport_coord.replace(" ", "").split(",").map(Number);
-        addConnectivityLayer(LAYERS.DEFAULT_LAYER.SEAPORTS, [seaportCoord[1], seaportCoord[0]], [lng, lat]);
+      if (copyiedSelectedProperty.nearest_seaport != null && copyiedSelectedProperty.nearest_seaport != "") {
+        nearestSeaportDetail = await getDataForSingleLayer("Seaport", { "name": copyiedSelectedProperty?.nearest_seaport });
+        if (nearestSeaportDetail.data.length > 0) {
+          const seaportCoord = nearestSeaportDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+          addConnectivityLayer(LAYERS.DEFAULT_LAYER.SEAPORTS, [seaportCoord[1], seaportCoord[0]], [lng, lat], nearestSeaportDetail.data[0],DIRECTIONS.LEFT);
+        }
       }
 
 
-      if (copyiedSelectedProperty.nearest_railway_station_coord != null && copyiedSelectedProperty.nearest_railway_station_coord != "") {
-        const railwayCoord = copyiedSelectedProperty.nearest_railway_station_coord.replace(" ", "").split(",").map(Number);
-        addConnectivityLayer(LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS, [railwayCoord[1], railwayCoord[0]], [lng, lat]);
+      if (copyiedSelectedProperty.nearest_railway_station != null && copyiedSelectedProperty.nearest_railway_station != "") {
+        nearestRailwayStationDetail = await getDataForSingleLayer("Railway Station", { "name": copyiedSelectedProperty?.nearest_railway_station });
+        if (nearestRailwayStationDetail.data.length > 0) {
+          const railwayCoord = nearestRailwayStationDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
+          addConnectivityLayer(LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS, [railwayCoord[1], railwayCoord[0]], [lng, lat], nearestRailwayStationDetail.data[0],DIRECTIONS.RIGHT);
+        }
       }
-
 
       if (copyiedSelectedProperty.nearest_highway_coord != null && copyiedSelectedProperty.nearest_highway_coord != "") {
-        const highwayCoord = copyiedSelectedProperty.nearest_highway_coord.replace(" ", "").split(",").map(Number);
-        addConnectivityLayer(LAYERS.DEFAULT_LAYER.HIGHWAY, [highwayCoord[1], highwayCoord[0]], [lng, lat]);
+        highwayCoord = copyiedSelectedProperty.nearest_highway_coord.replace(" ", "").split(",").map(Number);
+        addConnectivityLayer(LAYERS.DEFAULT_LAYER.HIGHWAY, [highwayCoord[1], highwayCoord[0]], [lng, lat],null,DIRECTIONS.LEFT);
       }
     } catch (error) {
       console.error("Error in adding marker:", error);
@@ -356,6 +515,28 @@ const SingleMap = ({ selectedProperty, intension }) => {
       mapRef.current.getCanvas().style.cursor = '';
     });
   }
+
+  const addDistanceLabel = (coord, text, id) => {
+    const supplyNameEl = document.createElement('div');
+    supplyNameEl.style.background = 'rgba(0, 0, 0, 0.75)';
+    supplyNameEl.style.color = '#fff';
+    supplyNameEl.style.padding = '4px 8px';
+    supplyNameEl.style.borderRadius = '6px';
+    supplyNameEl.style.border = '2px solid grey';
+    supplyNameEl.style.fontSize = '12px';
+    supplyNameEl.style.fontWeight = 'bold';
+    supplyNameEl.style.zIndex=2;
+    supplyNameEl.setAttribute("data-name", id);
+    supplyNameEl.innerHTML = `${text}`;
+
+    new mapboxgl.Marker({
+      element: supplyNameEl,
+      anchor: 'center'
+    })
+      .setLngLat(coord)
+      .addTo(mapRef.current);
+  };
+
   const asyncLoadDataForSingleLayer = async (layerType) => {
     const layerMapping = {
       [LAYERS.SUB_STATIONS]: "Substation",
@@ -371,7 +552,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
         ...copyiedSelectedProperty.essential_vendor_all_details,
         ...copyiedSelectedProperty.non_essential_vendor_all_details
       ];
-
+      console.log("")
       if (data.length > 0) {
         data.forEach((item) => {
           if (item.latitude_longitude != null && item.latitude_longitude != "") {
@@ -399,7 +580,6 @@ const SingleMap = ({ selectedProperty, intension }) => {
     // let divs =  document.getElement("marker"+layerType);
     const element = document.querySelectorAll('[data-name="marker_' + layerType + '"]');
     element.forEach((div) => {
-      console.log("Removing marker", div);
       div.remove();
     });
     if (layerType === LAYERS.DEFAULT_LAYER.LABEL) {
@@ -414,7 +594,6 @@ const SingleMap = ({ selectedProperty, intension }) => {
       layerListToDelete.forEach(layerName => {
         const element = document.querySelectorAll('[data-name="marker_' + layerName + '"]');
         element.forEach((div) => {
-          console.log("Removing marker for default layer", div);
           div.remove();
         });
       });
@@ -422,7 +601,6 @@ const SingleMap = ({ selectedProperty, intension }) => {
       const filteredLayers = mapRef.current
         .getStyle()
         .layers.filter((item) => item.id.includes("Default"));
-      console.log("Filtered layers to remove", filteredLayers);
       //remove layer as per layer id
       for (let item of filteredLayers) {
         mapRef.current.removeLayer(item.id);
@@ -434,13 +612,69 @@ const SingleMap = ({ selectedProperty, intension }) => {
       for (let [key, value] of filteredSource) {
         mapRef.current.removeSource(key);
       }
+
+      //Remove all vendor distance divs
+      let allVendorDiv = document.querySelectorAll('[data-name="vendor_distance"]');
+      allVendorDiv.forEach((div) => {
+        div.remove();
+      });
+      //remove all default connectivity distance lable divs
+      let allDefaultConnectivityLabelDiv = document.querySelectorAll('[data-name="default-connectivity-distance-lable"]');
+      allDefaultConnectivityLabelDiv.forEach((div) => {
+        div.remove();
+      });
     }
   }
+
   function getMidpointSimple(coord1, coord2) {
     const midLat = (coord1[0] + coord2[0]) / 2;
     const midLng = (coord1[1] + coord2[1]) / 2;
     return [midLat, midLng];
   }
+  function getDistance(p1, p2) {
+    const dx = p2[0] - p1[0];
+    const dy = p2[1] - p1[1];
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function interpolate(p1, p2, t) {
+    return [
+      p1[0] + (p2[0] - p1[0]) * t,
+      p1[1] + (p2[1] - p1[1]) * t
+    ];
+  }
+
+  function getMidpointByLength(coords) {
+    // Step 1: Calculate total length
+    let totalLength = 0;
+    const segments = [];
+
+    for (let i = 0; i < coords.length - 1; i++) {
+      const p1 = coords[i];
+      const p2 = coords[i + 1];
+      const segmentLength = getDistance(p1, p2);
+      segments.push({ p1, p2, length: segmentLength });
+      totalLength += segmentLength;
+    }
+
+    const halfLength = totalLength / 2;
+
+    // Step 2: Walk until we reach the half-length
+    let runningLength = 0;
+
+    for (const { p1, p2, length } of segments) {
+      if (runningLength + length >= halfLength) {
+        const remaining = halfLength - runningLength;
+        const t = remaining / length;
+        return interpolate(p1, p2, t);
+      }
+      runningLength += length;
+    }
+
+    // Fallback: return last point
+    return coords[coords.length - 1];
+  }
+
   function getDistance(coord1, coord2) {
     const toRad = deg => deg * (Math.PI / 180);
     const R = 6371; // Earth's radius in km
@@ -455,12 +689,11 @@ const SingleMap = ({ selectedProperty, intension }) => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
+
   const bindDataOnMap = async (resultData, layer) => {
     try {
-      console.log("Layer type in bindDataOnMap", layer);
       resultData.forEach(data => {
         if (data.coordinates != null && data.coordinates != "") {
-          console.log("data in binddataonmap", data);
           const storeIconEl = document.createElement('div');
           storeIconEl.style.top = '12px';
           storeIconEl.style.width = '40px';
@@ -505,55 +738,26 @@ const SingleMap = ({ selectedProperty, intension }) => {
           }).setLngLat([lng, lat])
             .addTo(mapRef.current);
 
+          //If All vendor or Defualt layer is selected
           if (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) {
-            // Create a popup but don't add it yet
+            //Show label on the marker            
             addInfoPoupp(marker, data.name);
 
+            //clicking on the vendor marker a vendor detail modal will open
             marker.getElement().addEventListener('click', () => {
+              //Display the modal with vendor details
               setIsModalOpen(true);
+              //set the vendor detail
               setVendorsToSend(data);
             });
+            //If default layer is selected
             if (layer === LAYERS.DEFAULT_LAYER.VENDOR) {
-              const propertyLatitude = copyiedSelectedProperty?.latitude_longitude[0];
-              const propertyLongitude = copyiedSelectedProperty?.latitude_longitude[1];
-              // 🏷️ Add Distance Label at Midpoint
-              const midpoint = getMidpointSimple([vendorLongitude, vendorLatitude], [propertyLatitude, propertyLongitude]);
-              const distanceKm = getDistance([propertyLatitude, propertyLongitude], [vendorLongitude, vendorLatitude]).toFixed(2);
-              console.log(vendorLongitude, vendorLatitude, propertyLatitude, propertyLongitude, midpoint, distanceKm);
-              const supplyNameMidpoint = getMidpointSimple(midpoint, [vendorLongitude, vendorLatitude]);
-              console.log("supplyNameMidpoint", supplyNameMidpoint);
-
-              const labelEl = document.createElement('div');
-              labelEl.style.background = 'rgba(0, 0, 0, 0.75)';
-              labelEl.style.color = '#fff';
-              labelEl.style.padding = '4px 8px';
-              labelEl.style.borderRadius = '6px';
-              labelEl.style.fontSize = '12px';
-              labelEl.style.fontWeight = 'bold';
-              labelEl.innerText = `${data.supplyName} - ${distanceKm} km`;
-
-              new mapboxgl.Marker({
-                element: labelEl,
-                anchor: 'center'
-              })
-                .setLngLat([midpoint[1], midpoint[0]])
-                .addTo(mapRef.current);
-
-              const supplyNameEl = document.createElement('div');
-              supplyNameEl.style.background = 'rgba(0, 0, 0, 0.75)';
-              supplyNameEl.style.color = '#fff';
-              supplyNameEl.style.padding = '4px 8px';
-              supplyNameEl.style.borderRadius = '6px';
-              supplyNameEl.style.fontSize = '12px';
-              supplyNameEl.style.fontWeight = 'bold';
-              supplyNameEl.innerHTML = `${data.supplyName} </br> ${distanceKm} km`;
-
-              new mapboxgl.Marker({
-                element: supplyNameEl,
-                anchor: 'center'
-              })
-                .setLngLat([supplyNameMidpoint[1], supplyNameMidpoint[0]])
-                .addTo(mapRef.current);
+              // const propertyLatitude = copyiedSelectedProperty?.latitude_longitude[0];
+              // const propertyLongitude = copyiedSelectedProperty?.latitude_longitude[1];
+              // // Add Distance Label at Midpoint
+              // const midpoint = getMidpointSimple([vendorLongitude, vendorLatitude], [propertyLatitude, propertyLongitude]);
+              // const distanceKm = getDistance([propertyLongitude, propertyLatitude], [vendorLatitude, vendorLongitude]).toFixed(2);
+              // const supplyNameMidpoint = getMidpointSimple(midpoint, [vendorLongitude, vendorLatitude]);
 
               // const supplyNameEl = document.createElement('div');
               // supplyNameEl.style.background = 'rgba(0, 0, 0, 0.75)';
@@ -562,7 +766,8 @@ const SingleMap = ({ selectedProperty, intension }) => {
               // supplyNameEl.style.borderRadius = '6px';
               // supplyNameEl.style.fontSize = '12px';
               // supplyNameEl.style.fontWeight = 'bold';
-              // supplyNameEl.innerText = `${data.supplyName}`;
+              // supplyNameEl.setAttribute("data-name", "vendor_distance");
+              // supplyNameEl.innerHTML = `${data.supplyName} </br> ${distanceKm} km`;
 
               // new mapboxgl.Marker({
               //   element: supplyNameEl,
@@ -591,7 +796,9 @@ const SingleMap = ({ selectedProperty, intension }) => {
               default:
                 break;
             }
-            addInfoPoupp(marker, name);
+            if (name !== "") {
+              addInfoPoupp(marker, name);
+            }
           }
         }
         else {
@@ -708,7 +915,101 @@ const SingleMap = ({ selectedProperty, intension }) => {
       });
     }
   }
+  //Sets the default map location
+  const setDefaultMapPosition = () => {
+    // Fly the map to the default location
+    mapRef.current.flyTo({
+      //center: "", //fetches default coordinates
+      essential: true, // this animation is considered essential with respect to prefers-reduced-motion
+      zoom: 7, //sets default zoom level
+    });
+  };
+  //zoom in the map
+  const zoomInMap = () => {
+    //get current zoom level
+    let currentZoom = mapRef.current.getZoom();
+    //increases zoom level by 0.5
+    let newZoom = currentZoom + 0.5;
+    //sets zoom level
+    mapRef.current.zoomTo(newZoom);
+  };
 
+  //zoom out the map
+  const zoomOutMap = () => {
+    //get current zoom level
+    let currentZoom = mapRef.current.getZoom();
+    //zoom out form current zoom level
+    let newZoom = currentZoom === 0 ? currentZoom : currentZoom - 0.5;
+    //sets zoom level
+    mapRef.current.zoomTo(newZoom);
+  };
+
+  // Function to generate curved (Bézier) coordinates
+  const getCurvedLine = (start, end, curvature = 0.4, numPoints = 150) => {
+    const [x0, y0] = start;
+    const [x2, y2] = end;
+
+    // Midpoint between start and end
+    const mx = (x0 + x2) / 2;
+    const my = (y0 + y2) / 2;
+
+    // Direction vector from start to end
+    const dx = x2 - x0;
+    const dy = y2 - y0;
+
+    // ✅ These two lines define the direction and strength of the curve
+    //    Change the sign of `curvature` to bend left or right
+    const offsetX = -dy * curvature; // Perpendicular to the line (left/right deviation)
+    const offsetY = dx * curvature;  // Perpendicular to the line (left/right deviation)
+
+    // Control point: the "pull" of the curve
+    const cx = mx + offsetX;
+    const cy = my + offsetY;
+
+    // Generate points along a quadratic Bézier curve
+    const curve = [];
+    for (let t = 0; t <= 1; t += 1 / numPoints) {
+      const x = (1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * x2;
+      const y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * cy + t * t * y2;
+      curve.push([x, y]);
+    }
+
+    return curve;
+  }
+
+
+  const generateCurveLine = ({ sourceId = "", layerId = "", from = "", to = "", linecolor = "", curvature = 0.4, labelText = "" } = {}) => {
+    let getCurvedLineCoord = getCurvedLine(from, to, curvature);
+    getCurvedLineCoord.push(to);
+    console.log("curved line for ", layerId, getCurvedLineCoord, from, to)
+    mapRef.current.addSource(sourceId, {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: getCurvedLineCoord,
+        }
+      }
+    });
+
+    mapRef.current.addLayer({
+      id: layerId,
+      type: 'line',
+      source: sourceId,
+      paint: {
+        'line-color': linecolor,
+        'line-width': 1.5,
+        'line-dasharray': [1, 1] // very short "dot", longer gap
+      }
+    });
+
+    if (labelText != "") {
+      let midPoinnt = getMidpointByLength(getCurvedLineCoord);
+      addDistanceLabel(midPoinnt, labelText, layerId + " lable");
+
+    }
+  }
   //#endregion
   return (
     <div className="relative h-screen w-screen flex items-center justify-center">
@@ -936,8 +1237,29 @@ const SingleMap = ({ selectedProperty, intension }) => {
               </div>
             </div>
           </div>
+          <div className={`location-btn-container ${intension === "From Vendor Screen" ? "bottom-12" : ""}`}>
+            <div id="zoomBtn" className="right-bottom-buttons">
+              <span className="save-btn flex-d-column zoom-btn">
+                <FaPlus
+                  size={13}
+                  onClick={() => zoomInMap()}
+                />
+                <IoMdHome
+                  size={16}
+                  onClick={() => setDefaultMapPosition()}
+                />
+                <FaMinus
+                  size={13}
+                  onClick={() => zoomOutMap()}
+                />
+              </span>
+
+            </div>
+
+          </div>
         </div>
       </div>)}
+
     </div>
   );
 };

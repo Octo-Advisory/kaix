@@ -1204,6 +1204,22 @@ def query_classification(file_path, llm_model=llm_maverik, temperature=0.5):
     Ensure accurate and intelligent classification based on the content and meaning of the query.
     """
 
+    title_generation_prompt = """
+    You are a title generation assistant. Your task is to generate a short and meaningful 2 to 3 word title that summarizes the core theme of an industrial project description.
+
+    Guidelines:
+    - Focus on the main industry or product being described.
+    - Include the product or manufacturing focus if applicable (e.g., "Battery Manufacturing", "Steel Forging", "Textile Production").
+    - Do NOT include numbers, locations, or timeframes.
+    - Title must be professional, compact, and relevant to the industrial activity.
+
+    Input:
+    {feasibility_description}
+
+    Output Title:
+
+    """
+
     empty_json = {'product': None, 'main_industry': None, 'sub_sector': None, 'product_capacity': None, 'product_unit': None, 'Location': None, 'supplies': None, 'equipments': None}
 
     if questions_statement == "" and doc_info == {} and questions_list == []:
@@ -1213,7 +1229,9 @@ def query_classification(file_path, llm_model=llm_maverik, temperature=0.5):
         "user_comaptible_structured_summary": None,
         "summary_display_statement": None,
         "classified_queries": None,
+        "feasibility_title": None,
         "error_message": None,
+        "user_friendly_error_message": "The uploaded document does not contain any valid information required for feasibility analysis. Please ensure the document includes relevant industry or project details.",
         "relevance": "irrelevant document"
         }
         return final_json_0
@@ -1228,7 +1246,9 @@ def query_classification(file_path, llm_model=llm_maverik, temperature=0.5):
         "user_comaptible_structured_summary": None,
         "summary_display_statement": None,
         "classified_queries": None,
+        "feasibility_title": None,
         "error_message": error_message,
+        "user_friendly_error_message": "The uploaded document is password-protected and could not be read. Please upload an unprotected version of the file to proceed with feasibility analysis.",
         "relevance": "irrelevant document"
         }
 
@@ -1242,7 +1262,9 @@ def query_classification(file_path, llm_model=llm_maverik, temperature=0.5):
         "user_comaptible_structured_summary": None,
         "summary_display_statement": None,
         "classified_queries": None,
+        "feasibility_title": None,
         "error_message": error_message,
+        "user_friendly_error_message": "The document could not be processed due to a technical issue. Please check if the file is corrupted or in an unsupported format, and try uploading again.",
         "relevance": "irrelevant document"
         }
 
@@ -1256,12 +1278,16 @@ def query_classification(file_path, llm_model=llm_maverik, temperature=0.5):
             query_list=questions_list
         )
 
+        formatted_prompt_1 = title_generation_prompt.format(
+                feasibility_description=for_user
+        )
+
         response = llm.invoke(formatted_prompt)
-        print("response",response)
         # str_response = str(response)
         str_response = response.content
-        print("str_response",str_response)
         # Look for the list between triple backticks (```python\n ... \n```)
+
+        response_1 = llm.invoke(formatted_prompt_1)
 
         extracting_query = extract_query_list(str_response)
         print("etracting_query",extracting_query)
@@ -1271,7 +1297,9 @@ def query_classification(file_path, llm_model=llm_maverik, temperature=0.5):
         "user_comaptible_structured_summary": for_user,
         "summary_display_statement": questions_statement,
         "classified_queries": extracting_query,
+        "feasibility_title": response_1.content,
         "error_message": None,
+        "user_friendly_error_message": None,
         "relevance": "relevant document"
         }
         return final_json_0

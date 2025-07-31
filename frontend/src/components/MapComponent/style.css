@@ -470,7 +470,7 @@
   font-family: 'Inter';
   position: absolute;
   width: auto;
-  bottom: 8%;
+  bottom: 1%;
   right: 0px;
   padding: 5px;
   z-index: 1;
@@ -482,7 +482,7 @@
 
 #map-ui .zoom-btn {
   justify-content: space-around;
-  height: 80px;
+  height: 73px;
   width: 18px;
 }
 
@@ -1600,4 +1600,19 @@
 
 .top-50 {
   top: 50px !important;
+}
+
+.bottom-12 {
+  bottom: 12% !important;
+}
+
+.map-component-zoom-control {
+  right: 40px !important;
+  bottom: 17% !important;
+}
+.property-marker-opacity{
+  opacity: 0.5 !important;
+}
+.property-marker-margin{
+  margin-top: -5px !important;
 }

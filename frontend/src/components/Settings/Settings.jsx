@@ -1,20 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-    IoMdNotificationsOutline,
     IoMdArrowDropdown,
     IoMdArrowDropup,
     IoMdLogOut,
-    IoMdTrash,
-    IoMdColorPalette,
     IoMdPerson,
-    IoMdLock,
-    IoMdGlobe,
-    IoMdMail,
-    IoMdHelpCircle,
     IoMdInformationCircle
 } from "react-icons/io";
 import { IoClose, IoSettingsOutline } from "react-icons/io5";
-import { CiLock, CiUser } from "react-icons/ci";
+import { CiUser } from "react-icons/ci";
 import { useFrappeAuth, useFrappeFileUpload, useFrappeGetDoc, useFrappeUpdateDoc } from 'frappe-react-sdk';
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -42,8 +35,6 @@ const deleteUser = async (userId) => {
     console.error('Error:', error);
   }
 };
-
-
 
 function Settings({onClose}) {    
     const { currentUser } = useFrappeAuth();
@@ -102,7 +93,6 @@ function Settings({onClose}) {
         let error = '';
         console.log("name val",name,value);
         
-
         if (name === 'name' && !value.trim()) {
             error = 'Name is required';
         } else if (name === 'email') {
@@ -168,7 +158,7 @@ function Settings({onClose}) {
     };
     
     const updateUser = async (userId) => {
-  const url = `https://marsinfraix.marsbazaar.com/api/resource/User/${userId}`;
+  const url = `/api/resource/User/${userId}`;
 const updatedData = {
     "enabled": 0
 }
@@ -206,11 +196,6 @@ const updatedData = {
             if(deleteStatus) {
                 window.location.href = `/frontend/login`;
             }
-        //    await updateDoc('User', currentUser, {
-        //             enabled:0
-        //     }).then(()=>{
-        //         console.log('Deleted Successfu;;lllyyy ..................')
-        //     })
         }
         setShowDeleteConfirm(false);
     };

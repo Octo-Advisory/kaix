@@ -242,5 +242,10 @@ app_license = "mit"
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
+doc_events = {
+    "Feasibility Report": {
+        "on_update": "frontend_app.Management_Class.helpers.utility.send_realtime_update"
+    }
+}
 
 website_route_rules = [{'from_route': '/frontend/<path:app_path>', 'to_route': 'frontend'},]

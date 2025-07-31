@@ -21,14 +21,6 @@ function Home() {
   return (
     <>
     <Chatscreen />
-    {/* <MapComponent/> */}
-      {/* <Vendorresult /> */}
-      {/* <Incentiveresult /> */}
-      {/* <Industryresult /> */}
-      {/* <Approvalresult /> */}
-      {/* <Login/> */}
-      {/* <Maintanance/> */}
-      {/* <Temp /> */}
     </>
   );
 }

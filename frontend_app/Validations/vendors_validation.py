@@ -147,9 +147,10 @@ def vendor_validation(param):
                 if pass_to_analytics_location:
                     return {'pass_to_analytics': True, 'log': f'location_log: {location_log}, industry_log: {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat }
                 else:
-                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, industry_log: {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data
+                    # return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, industry_log: {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data
+                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, industry_log: {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data
             else:
-                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':None, 'from_gujarat': False } #change the latitude longitude value to latitude_longidute variable once have data
+                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':None, 'from_gujarat': False } #change the latitude longitude value to latitude_longidute variable once have data
 
        
         def location_and_supply():
@@ -171,9 +172,10 @@ def vendor_validation(param):
                 if pass_to_analytics_location:
                     return {'pass_to_analytics': True, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat }
                 else:
-                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data 
+                    # return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data 
+                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data 
             else:
-                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':None, 'from_gujarat': False } #change the latitude longitude value to latitude_longidute variable once have data
+                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':None, 'from_gujarat': False } #change the latitude longitude value to latitude_longidute variable once have data
 
         
         def geocode_check():

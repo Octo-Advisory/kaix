@@ -13,10 +13,7 @@ const LogoLoader = ({text}) => {
         className="logo max-w-[80px] max-h-[80px] w-[80px] h-[80px] object-contain z-10 relative"
       />
         <p className='text-[#0e2044] text-xl font-semibold shimmer-text'>{text}</p>
-      {/* Shimmer Overlay */}
-      {/* <div className="absolute w-48 h-48 z-20 pointer-events-none overflow-hidden">
-        <div className="shimmer-overlay " />
-      </div> */}
+      
     </div>
   );
 };

@@ -1,14 +1,14 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { FrappeContext, useFrappeAuth, useFrappeEventListener } from 'frappe-react-sdk';
 import { FaFilePdf, FaRegLightbulb, FaIndustry, FaAward } from 'react-icons/fa';
-import { FiUploadCloud, FiCheckCircle, FiAlertCircle, FiX, FiMapPin, FiPackage, FiShoppingCart, FiTool, FiUsers, FiHome, FiDollarSign, FiInfo, FiFileText, FiHelpCircle } from 'react-icons/fi';
+import { FiUploadCloud, FiCheckCircle, FiAlertCircle, FiX, FiMapPin, FiPackage, FiShoppingCart, FiTool, FiUsers, FiHome, FiDollarSign, FiInfo } from 'react-icons/fi';
 import { useDispatch } from 'react-redux';
 import { addInputtext } from '../../Redux/Store/Featuresilces/chat';
-import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ProcessFlowAnimation from '../Processflowanimation/ProcessFlowAnimation';
+import { addFeasibilityId } from '../../Redux/Store/Featuresilces/Feasibility';
 
-const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport, resultJson }) => {
+const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isDragging, setIsDragging] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -61,7 +61,6 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
         setErrorMessage('');
         setPendingReport(null);
         setProcessingRecord(null);
-        setShowHowItWorks(false);
     };
 
     const validateResultData = (data) => {
@@ -81,7 +80,7 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
 
         // Check for irrelevance
         if (data.relevance === 'irrelevant document') {
-            return { isValid: false, error: 'Document marked as irrelevant' };
+            return { isValid: false, error: data?.user_friendly_error_message || 'Document marked as irrelevant' };
         }
 
         // Check for null classified queries
@@ -189,6 +188,12 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
 
     }, []);
 
+    useEffect(() => {
+        if(!resultJson){
+            checkExistingRecords();
+        }
+    }, [currentUser,resultJson])
+
     // Check for existing processing records and unseen reports
     const checkExistingRecords = async () => {
         try {
@@ -205,7 +210,7 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
                 order_by: "creation desc",
                 limit_page_length: 1
             });
-            console.log("processing record", processingCheck);
+            // console.log("processing record", processingCheck);
 
             if (processingCheck.message && processingCheck.message.length > 0) {
                 setProcessingRecord(processingCheck.message[0]);
@@ -218,15 +223,15 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
                 doctype: "Feasibility Report",
                 filters: {
                     owner: ["=", currentUser],
-                    status: ["=", "Complete", "Fail"],
+                    status: ["in", ["Complete", "Fail"]],
                     seen_by_user: ["=", 0]
                 },
-                fields: ["name", "result_data", "creation", "file_path"],
+                fields: ["name","feasibility_title", "result_data", "creation", "file_path"],
                 order_by: "creation desc",
                 limit_page_length: 1
             });
-            console.log("unchecked records", unseenCheck);
-
+            // console.log("unchecked records", unseenCheck);
+            
             if (unseenCheck.message && unseenCheck.message.length > 0) {
                 const unseenReport = unseenCheck.message[0];
                 try {
@@ -267,13 +272,24 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
         } catch (error) {
             console.error("Error marking report as seen:", error);
         }
-    };
+    };  
 
     const handleViewPendingReport = async () => {
+        
         if (pendingReport) {
+            const pendingResultData = pendingReport?.result_data
+            if(JSON.parse(pendingResultData)?.classified_queries){
+                setStatus('success');
+            }
+            else{
+                setStatus('error');
+            }
             await markReportAsSeen(pendingReport.name);
-            setStatus('success');
+            
             setPendingReport(null);
+        }
+        else{
+            setStatus("error")
         }
     };
 
@@ -287,6 +303,7 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
     };
 
     const handleQuerySelect = (query) => {
+        console.log('This is the query', query)
         if (query) {
             dispatch(addInputtext(query))
             onClose();
@@ -294,8 +311,8 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
         }
     }
 
+    const [feasibilityId, setFeasibilityId] = useState()
     useFrappeEventListener("feasibility_analysis_done", async (data) => {
-        console.log("📡 Received event data:", data);
 
         if (data.status === "done" && data.docname) {
             try {
@@ -304,8 +321,6 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
                     doctype: "Feasibility Report",
                     name: data.docname,
                 });
-
-                console.log("📄 Fetched report doc:", res);
 
                 // Check if res.message exists and has result_data
                 if (!res.message || !res.message.result_data) {
@@ -326,7 +341,7 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
                     throw new Error(validation.error);
                 }
 
-
+                dispatch(addFeasibilityId(data.docname))
                 setResultData(parsedResult);
                 setStatus("success");
                 await markReportAsSeen(data.docname);
@@ -335,23 +350,13 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
                 console.error("❌ Error fetching result:", err);
                 setErrorMessage(err.message || "Failed to fetch or process result");
                 setStatus("error");
-
-                // Show error notification
-                // toast.error("Failed to process feasibility report. Please try again.", {
-                //     position: "top-right",
-                //     autoClose: 5000,
-                // });
+                await markReportAsSeen(data.docname);
             }
         } else {
             console.error("❌ Invalid event data or processing failed:", data);
             setErrorMessage(data.message || "Processing failed");
             setStatus("error");
-
-            // Show error notification
-            // toast.error("Feasibility analysis failed. Please try again.", {
-            //     position: "top-right",
-            //     autoClose: 5000,
-            // });
+            await markReportAsSeen(data.docname);
         }
     });
 
@@ -379,7 +384,7 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
                     </div>
 
                     {/* Modal Body - Scrollable Content */}
-                    <div className="flex-1 overflow-y-auto p-6">
+                    <div className="flex-1 overflow-y-auto ">
                         {status === 'loading' && (
                             <div className="flex flex-col items-center justify-center h-full py-8 animate-fade-in">
                                 <div className="relative mb-8">
@@ -395,19 +400,19 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
                         {/* Pending Report State */}
                         {status === 'pending_report' && pendingReport && (
                             <div className="flex flex-col items-center justify-center h-full py-8 animate-fade-in">
-                                <div className="mb-8 p-6 bg-blue-100 rounded-full">
-                                    <FiCheckCircle className="text-blue-600" size={64} />
+                                <div className="mb-6 p-4 bg-blue-100 rounded-full">
+                                    <FiCheckCircle className="text-blue-600" size={54} />
                                 </div>
-                                <h3 className="text-2xl font-semibold text-[#0B2152] mb-3">Report Ready!</h3>
-                                <p className="text-gray-600 text-center max-w-md mb-6">
+                                <h3 className="text-2xl font-semibold text-[#0B2152] mb-2">Report Ready!</h3>
+                                <p className="text-gray-600 text-center max-w-md mb-4">
                                     You have a completed feasibility analysis report that hasn't been viewed yet.
                                 </p>
 
-                                <div className="bg-[#F5F9FF] border border-[#70A1D9] rounded-xl p-6 mb-8 w-full max-w-md">
+                                <div className="bg-[#F5F9FF] border border-[#70A1D9] rounded-xl p-4 mb-6 w-full max-w-md">
                                     <div className="text-center">
                                         <p className="text-sm text-[#2C53A3] mb-2">Report Generated:</p>
                                         <p className="font-medium text-[#0B2152]">
-                                            {new Date(pendingReport.creation).toLocaleDateString()} at {new Date(pendingReport.creation).toLocaleTimeString()}
+                                            {pendingReport.feasibility_title || pendingReport.name} at {new Date(pendingReport.creation).toLocaleTimeString()}
                                         </p>
                                     </div>
                                 </div>
@@ -415,13 +420,13 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
                                 <div className="flex space-x-4">
                                     <button
                                         onClick={handleViewPendingReport}
-                                        className="px-8 py-3 bg-gradient-to-r from-[#2C53A3] to-[#0B2152] text-white rounded-lg hover:from-[#0B2152] hover:to-[#2C53A3] shadow-md transition-colors"
+                                        className="px-8 py-2 bg-gradient-to-r from-[#2C53A3] to-[#0B2152] text-white rounded-lg hover:from-[#0B2152] hover:to-[#2C53A3] shadow-md transition-colors"
                                     >
                                         View Report
                                     </button>
                                     <button
                                         onClick={handleDismissPendingReport}
-                                        className="px-6 py-3 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors border border-gray-300"
+                                        className="px-6 py-2 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors border border-gray-300"
                                     >
                                         Start New Analysis
                                     </button>
@@ -430,31 +435,22 @@ const FeasibilityStudy = ({ isOpen, onClose, hasUnseenReport, setHasUnseenReport
                         )}
 
                         {status === 'idle' && (
-                            <div className="flex flex-row-reverse w-full h-full">
-                                {/* How It Works Toggle Button */}
-                                {/* <div className="mb-6 flex justify-center">
-                                    <button
-                                        onClick={() => setShowHowItWorks(!showHowItWorks)}
-                                        className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-[#70A1D9] to-[#2C53A3] text-white rounded-lg hover:from-[#2C53A3] hover:to-[#70A1D9] transition-colors shadow-md"
-                                    >
-                                        <FiHelpCircle className="mr-2" size={18} />
-                                        {showHowItWorks ? 'Hide How It Works' : 'How It Works'}
-                                    </button>
-                                </div> */}
-
+                            <div className="flex flex-row-reverse gap-16 items-center justify-center w-full h-full">
                                 {/* How It Works Section - Collapsible */}
                                 {showHowItWorks && (
-                                    <div className="w-[40%] h-full animate-fade-in">
-                                        <ProcessFlowAnimation />
+                                    <div className="w-[45%]  h-full flex items-center justify-center animate-fade-in">
+                                        <div className='relative h-[76%] w-[85%] flex items-center justify-center'>
+                                            <ProcessFlowAnimation />
+                                        </div>
                                     </div>
                                 )}
 
                                 {/* File Upload Area - Enhanced */}
-                                <div className={`h-full ${showHowItWorks ? 'w-[60%]' : 'w-full'} flex flex-col items-center justify-center px-4`}>
+                                <div className={`h-[90%] ${showHowItWorks ? 'w-[50%]' : 'w-full'} flex flex-col items-center px-4`}>
                                     <div
                                         className={`border-2 border-dashed rounded-xl h-full flex items-center justify-center relative p-4 text-center transition-all w-full
-        ${isDragging ? 'border-[#4CAF50] bg-[#f0f9f0]' : 'border-[#70A1D9]'} 
-        ${selectedFile ? 'border-solid border-[#4CAF50] bg-[#f0f9f0]' : 'bg-white'}`}
+                                        ${isDragging ? 'border-[#4CAF50] bg-[#f0f9f0]' : 'border-[#70A1D9]'} 
+                                        ${selectedFile ? 'border-solid border-[#4CAF50] bg-[#f0f9f0]' : 'bg-white'}`}
                                         onDragOver={handleDragOver}
                                         onDragLeave={handleDragLeave}
                                         onDrop={handleDrop}

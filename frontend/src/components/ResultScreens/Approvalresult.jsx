@@ -1,20 +1,20 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useContext } from 'react';
 import Backtochat from '../Backtochat/Backtochat';
 import {
-    FaSearch, FaBuilding, FaFileAlt, FaClock, FaCheckCircle,
-    FaInfoCircle, FaTag, FaLayerGroup, FaStar, FaSync
+    FaSearch,FaClock, FaCheckCircle,
+ FaLayerGroup, FaSync
 } from 'react-icons/fa';
 import DOMPurify from 'dompurify';
 import LogoLoader from '../Responseloader/LogoLoader';
 import { useSelector } from 'react-redux';
-import { useFrappeGetDoc, useFrappeUpdateDoc } from 'frappe-react-sdk';
+import { FrappeContext, useFrappeGetDoc, useFrappeUpdateDoc } from 'frappe-react-sdk';
 import FailureScreen from '../Failure/FailureScreen';
 import NoResultsFound from '../Failure/NoResultsFound';
-
-// Parse stringified approval data
-
+import { AdditionalDetailIcon, ApprovalNameIcon, ApprovalTitleIcon, BuildingIcon, InfoIcon, SearchIcon } from '../../Icons/icon';
 
 function Approvalresult({ result, source, rerender }) {
+
+    const {call} = useContext(FrappeContext)
     const [tempFailure, setTempFailure] = useState(false)
     const [someError, setSomeError] = useState(false)
     console.log("result in approvals", result);
@@ -29,7 +29,12 @@ function Approvalresult({ result, source, rerender }) {
     const [loading, setLoading] = useState(true);
     const lastChatId = useSelector((state) => state.chat.lastId);
     const { updateDoc } = useFrappeUpdateDoc()
-    const { data: uiData } = useFrappeGetDoc("UI Configuration", "UI Configuration")
+    const { data: uiData } = useFrappeGetDoc("UI Configuration", "Approvals")
+      const configurations = uiData?.configurations || [];
+      const uiConfig = configurations.reduce((acc, curr) => {
+        acc[curr.key] = curr.value;
+        return acc;
+      }, {}); 
 
     const getLocationLevel = (city, state, country) => {
         if (city === 1) {
@@ -143,10 +148,7 @@ function Approvalresult({ result, source, rerender }) {
                     'stagewise_no_of_approvals': stageCounts
                 };
                 console.log(updatedResult, 'This are the results after prepared....', updatedResult)
-                await updateDoc("Chat history", lastChatId, {
-                    result: JSON.stringify({ "result": updatedResult }),
-                    intension: "Query to Get Approvals"
-                });
+                await storeResultData(lastChatId, updatedResult, 'Query to Get Approvals')
             }
         } catch (error) {
             console.error("Error fetching approvals:", error);
@@ -154,6 +156,28 @@ function Approvalresult({ result, source, rerender }) {
             setLoading(false);
         }
     };
+
+    const storeResultData = async (lastChat,solutions,intension) => {
+  if(!lastChat || !solutions) return 
+
+  try {
+      const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
+      child_row_id: lastChat,
+      updated_solutions: solutions,
+      intension: intension
+      },
+    {
+    headers: {
+      'Expect': '' // 👈 Clear problematic header
+    }
+  });
+      console.log('This is the result we want ot store.... ', result.message)
+      return result.message || [];
+    } catch (err) {
+      console.error("Error Storing Result json:", err);
+      return []; // Return empty for this batch on error
+    }
+}
 
     useEffect(() => {
         console.log('Entered the new log ...', rerender, result)
@@ -219,12 +243,12 @@ function Approvalresult({ result, source, rerender }) {
             <div className="w-[98%] h-[95%] mx-auto my-0 p-6 bg-white rounded-xl shadow-sm border border-white border-opacity-40 flex flex-col backdrop-blur-sm">
                 <div className="flex items-center justify-between pb-4 mb-4 border-b border-[#B8D1F3]">
                     <div className="flex items-center">
-                        <div className="p-3 mr-4 rounded-lg bg-gradient-to-r from-[#FF80AB]/10 to-[#9575CD]/10">
-                            <FaFileAlt className="text-xl text-[#7AA6DA]" />
+                        <div className="p-2 mr-4 rounded-lg h-[52px] w-[52px] flex items-center justify-center bg-gradient-to-r from-[#FF80AB] to-[#9575CD] text-white">
+                            <ApprovalTitleIcon className="h-full w-full relative" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-semibold text-[#2C53A3]">{uiData?.approval_main_title || "Approvals Catalog"}</h1>
-                            <p className="text-[#5A7EC7]">{uiData?.approval_sub_title || "Browse required approvals for your project"}</p>
+                            <h1 className="text-2xl font-semibold text-[#2C53A3]">{uiConfig?.['main_title'] || "Approvals Catalog"}</h1>
+                            <p className="text-[#5A7EC7]">{uiConfig?.['sub_title'] || "Browse required approvals for your project"}</p>
                         </div>
                     </div>
 
@@ -235,7 +259,7 @@ function Approvalresult({ result, source, rerender }) {
                                     <FaClock className="text-[#2C53A3] text-sm" />
                                 </div>
                                 <div>
-                                    <span className="font-medium text-[#5A7EC7] text-xs">TOTAL TIME</span>
+                                    <span className="font-medium text-[#5A7EC7] text-xs">{uiConfig?.['total_approval_time'] || 'Total Time'}</span>
                                     <div className="flex items-baseline gap-1.5">
                                         <span className="text-md font-bold text-[#2C53A3]">{result["Total Effective Time"]}</span>
                                         <span className="text-xs text-[#5A7EC7]/70">days</span>
@@ -248,7 +272,7 @@ function Approvalresult({ result, source, rerender }) {
                                     <FaCheckCircle className="text-[#2E7D32] text-sm" />
                                 </div>
                                 <div>
-                                    <span className="font-medium text-[#5A7EC7] text-xs">ONLINE</span>
+                                    <span className="font-medium text-[#5A7EC7] text-xs">{uiConfig?.['total_online_percentage'] || 'Online'}</span>
                                     <div className="flex items-baseline gap-1.5">
                                         <span className="text-md font-bold text-[#2E7D32]">{result["Online Percentage"]}</span>
                                         <span className="text-xs text-[#5A7EC7]/70">%</span>
@@ -264,8 +288,7 @@ function Approvalresult({ result, source, rerender }) {
 
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex gap-2">
-                        {/* below line changed by jenith on 14/05/25 13:25 */}
-                        {["Pre-Requisite", "Pre-Establishment", "Pre-Operation", "Others"].map(mode => (
+                        {JSON.parse(uiConfig?.['view_mode'] || '[]').map(mode => (
                             <button
                                 key={mode}
                                 className={`px-4 py-2 rounded-md text-sm font-medium ${viewMode === mode
@@ -285,7 +308,7 @@ function Approvalresult({ result, source, rerender }) {
                                 <FaClock className="text-[#2C53A3] text-sm" />
                             </div>
                             <div>
-                                <span className="font-medium text-[#5A7EC7] text-xs">TOTAL TIME</span>
+                                <span className="font-medium text-[#5A7EC7] text-xs">{uiConfig?.['stagewise_total_time'] || 'Total Time'}</span>
                                 <div className="flex items-baseline gap-1.5">
                                     <span className="text-md font-bold text-[#2C53A3]">{result[viewMode]}</span>
                                     <span className="text-xs text-[#5A7EC7]/70">days</span>
@@ -298,7 +321,7 @@ function Approvalresult({ result, source, rerender }) {
                                 <FaCheckCircle className="text-[#2E7D32] text-sm" />
                             </div>
                             <div>
-                                <span className="font-medium text-[#5A7EC7] text-xs">ONLINE</span>
+                                <span className="font-medium text-[#5A7EC7] text-xs">{uiConfig?.['stagewise_online_percentage'] || 'Online'}</span>
                                 <div className="flex items-baseline gap-1.5">
                                     <span className="text-md font-bold text-[#2E7D32]">{result[`Mode_${viewMode}`]}</span>
                                     <span className="text-xs text-[#5A7EC7]/70">%</span>
@@ -310,7 +333,7 @@ function Approvalresult({ result, source, rerender }) {
                 </div>
 
                 <div className="relative mb-4">
-                    <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#5A7EC7]" />
+                    <SearchIcon strokeWidth={2} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#5A7EC7]" />
                     <input
                         type="text"
                         placeholder="Search by approval name or department..."
@@ -332,12 +355,6 @@ function Approvalresult({ result, source, rerender }) {
                                                 ? "bg-[#41b655] bg-opacity-20 border-l-4 border-[#41b655] "
                                                 : "bg-[#41b655] bg-opacity-10 border-none"
                                                 }`}
-                                            // style={{
-                                            //     background: selectedApproval?.id === approval.id
-                                            //     ? 'linear-gradient(to right, rgba(255, 128, 171, 0.08), rgba(255, 255, 255, 0.9))'
-                                            //     : 'transparent',
-                                            //     borderLeftColor: selectedApproval?.id === approval.id ? '#FF80AB' : 'transparent'
-                                            // }}
                                             onClick={() => setSelectedApproval(approval)}
                                         >
                                             <div className="flex justify-between items-start">
@@ -347,7 +364,7 @@ function Approvalresult({ result, source, rerender }) {
                                                 </h3>
                                             </div>
                                             <div className="flex items-center mt-2 text-sm text-[#5A7EC7]">
-                                                <FaBuilding className="mr-2" />
+                                                <BuildingIcon size={18} className="mr-2" />
                                                 <span>{approval.government_department}</span>
                                             </div>
                                         </div>
@@ -356,9 +373,9 @@ function Approvalresult({ result, source, rerender }) {
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center text-center p-6">
                                     <div className="p-4 rounded-full mb-3 bg-gradient-to-r from-[#FF80AB]/20 to-[#9575CD]/20">
-                                        <FaSearch className="text-2xl text-[#5A7EC7]" />
+                                        <FaSearch strokeWidth={2} className="text-2xl text-[#5A7EC7]" />
                                     </div>
-                                    <h3 className="text-lg font-medium text-[#2C53A3]">{uiData?.no_approvals_found || "No approvals found"}</h3>
+                                    <h3 className="text-lg font-medium text-[#2C53A3]">{uiConfig?.['no_approvals_found'] || "No approvals found"}</h3>
                                     <p className="text-[#5A7EC7]">Try a different search term or view mode</p>
                                 </div>
                             )}
@@ -370,45 +387,42 @@ function Approvalresult({ result, source, rerender }) {
                             <div ref={containerRef} className="overflow-y-auto flex-1 p-6">
                                 <div className="mb-8">
                                     <div className="flex items-center mb-2">
-                                        <div className="p-3 mr-3 rounded-lg bg-blue-100">
-                                            <FaFileAlt className="text-blue-800" />
+                                        <div className="p-2 mr-3 h-12 w-12 flex items-center justify-center rounded-lg bg-blue-100">
+                                            <ApprovalNameIcon className="relative h-full w-full" />
                                         </div>
                                         <h2 className="text-2xl font-semibold text-[#2C53A3]">{selectedApproval.approval_name}</h2>
                                     </div>
 
                                     <div className="flex flex-wrap gap-2 mb-4">
                                         <span className="px-3 py-1 bg-gradient-to-r from-[#B8D1F3]/20 to-[#7AA6DA]/20 text-[#2C53A3] text-sm rounded-full flex items-center">
-                                            <FaBuilding className="mr-2" /> {selectedApproval.government_department}
+                                            <BuildingIcon size={12} className="mr-2" /> {selectedApproval.government_department}
                                         </span>
                                         <span className="px-3 py-1 bg-gradient-to-r from-[#E6F0FA]/30 to-[#B8D1F3]/20 text-[#2C53A3] text-sm rounded-full flex items-center">
                                             <FaLayerGroup className="mr-1" /> {selectedApproval.level}
                                         </span>
-                                        {/* <span className="px-3 py-1 bg-gradient-to-r from-[#81C784]/20 to-[#4CAF50]/20 text-[#2E7D32] text-sm rounded-full flex items-center">
-                                            <FaStar className="mr-1" /> Score: {selectedApproval.aggregated_score.toFixed(1)}
-                                        </span> */}
                                     </div>
                                 </div>
 
                                 <div className="mb-8">
-                                    <h3 className="text-lg font-semibold text-[#2C53A3] mb-3 flex items-center">
-                                        <FaInfoCircle className="mr-2 text-[#FF80AB]" />
-                                        {uiData?.approval_details || "Approval Details"}
+                                    <h3 className="text-lg font-semibold text-black mb-3 flex items-center">
+                                        <InfoIcon strokeWidth={1} className="mr-2 text-blue-700" />
+                                        {uiConfig?.['approval_details'] || "Approval Details"}
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
-                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiData?.approval_mode_of_application || "Mode of Application"}</h4>
+                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiConfig?.['mode_of_application'] || "Mode of Application"}</h4>
                                             <p className="text-[#5A7EC7]">{selectedApproval.mode_of_application}</p>
                                         </div>
                                         <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
-                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiData?.approval_stage || "Stage"}</h4>
+                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiConfig?.['stage'] || "Stage"}</h4>
                                             <p className="text-[#5A7EC7]">{selectedApproval.stage}</p>
                                         </div>
                                         <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
-                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiData?.approval_land_type || "Land Type"}</h4> {/* changed by jenith on 14/05/25 13:26 */}
+                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiConfig?.['land_type'] || "Land Type"}</h4> {/* changed by jenith on 14/05/25 13:26 */}
                                             <p className="text-[#5A7EC7]">{selectedApproval.land_type}</p>
                                         </div>
                                         <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
-                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiData?.approval_project_location || "Project Location"}</h4> {/* changed by jenith on 14/05/25 13:27 */}
+                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiConfig?.['project_location'] || "Project Location"}</h4> {/* changed by jenith on 14/05/25 13:27 */}
                                             <p className="text-[#5A7EC7]">{selectedApproval.business_location}</p>
                                         </div>
                                     </div>
@@ -416,9 +430,9 @@ function Approvalresult({ result, source, rerender }) {
 
                                 {selectedApproval.details !== "No description available" && (
                                     <div className="mb-8">
-                                        <h3 className="text-lg font-semibold text-[#2C53A3] mb-3 flex items-center">
-                                            <FaFileAlt className="mr-2 text-[#7AA6DA]" />
-                                            {uiData?.approval_description || "Description"}
+                                        <h3 className="text-lg font-semibold text-black mb-3 flex items-center">
+                                            <AdditionalDetailIcon strokeWidth={2} size={24} className="mr-2 text-[#7AA6DA]" />
+                                            {uiConfig?.['approval_description'] || "Description"}
                                         </h3>
                                         <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
                                             <div
@@ -432,9 +446,9 @@ function Approvalresult({ result, source, rerender }) {
                                 )}
 
                                 <div className="mb-8">
-                                    <h3 className="text-lg font-semibold text-[#2C53A3] mb-3 flex items-center">
-                                        <FaInfoCircle className="mr-2 text-[#9575CD]" />
-                                        {uiData?.approval_additional_information || "Additional Information"}
+                                    <h3 className="text-lg font-semibold text-black mb-3 flex items-center">
+                                        <InfoIcon strokeWidth={1} className="mr-2 text-blue-700" />
+                                        {uiConfig?.['additional_information'] || "Additional Information"}
                                     </h3>
                                     <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
                                         <p className="text-[#5A7EC7]">
@@ -442,7 +456,7 @@ function Approvalresult({ result, source, rerender }) {
                                         </p>
                                         <p className="text-[#5A7EC7]/70 text-xs mt-2 flex items-center">
                                             <FaSync className="mr-1" />
-                                            Data fetched from government sources
+                                         {uiConfig?.['data_source'] || 'Data fetched from government sources'}
                                         </p>
                                     </div>
                                 </div>

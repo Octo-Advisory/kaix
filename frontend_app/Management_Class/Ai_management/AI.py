@@ -1,6 +1,6 @@
 import frappe
 from langchain.prompts import PromptTemplate
-from frontend_app.Ai_module.Query_Classification_And_Analysis import classify_query,llm_70b_vers_creative,refine_query_with_history,llm_70b_vers,generate_fallback_message,respond_to_negative_query,detect_module_switch_intent
+from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 from frontend_app.Ai_module.employement_query.Extraction_for_employement_search import call_handle_employment_query
 from frontend_app.Ai_module.build_from_scratch.Extraction_for_Building_from_Scratch import entry_build_from_scratch
 from frontend_app.Ai_module.incentive_query.Extraction_for_incentive_search import call_incentive_search
@@ -12,10 +12,59 @@ from langchain.prompts import PromptTemplate
 from langchain.schema import HumanMessage, AIMessage
 from frontend_app.Log_management.createlog import log
 from frontend_app.Management_Class.helpers.utility import update_llm_token
+# --- AI.py (imports) ---
+from frontend_app.Ai_module.responder_consultant import (
+    consultant_response_from_langchain,
+    consultant_response_from_strings,
+)
+
+def polish_ai_response_if_possible(
+    raw_response: dict,
+    chat_history_messages,           # List[BaseMessage]  (your LangChain history)
+    chat_history_strings: list,      # Optional[List[str]] if you already built it
+) -> dict:
+    """
+    Rewrites Ai_response via the Responder-Consultant. Falls back gracefully.
+    Pass either 'chat_history_messages' OR 'chat_history_strings'.
+    """
+    try:
+        if not raw_response or raw_response.get("Error"):
+            return raw_response
+
+        ai_resp = (raw_response.get("Ai_response") or "").strip()
+        if not ai_resp:
+            return raw_response
+
+        polished = None
+        if chat_history_strings is not None:
+            # Use the string path if you already built Chat_history_normal
+            polished = consultant_response_from_strings(
+                llm=RESPONDER_LLM,
+                chat_history_strings=chat_history_strings,
+                module_ai_response=ai_resp,
+                max_history_entries=11,
+            )
+        else:
+            # Default: use the LangChain message objects directly
+            polished = consultant_response_from_langchain(
+                llm=RESPONDER_LLM,
+                chat_history=chat_history_messages,
+                module_ai_response=ai_resp,
+                max_history_entries=11,
+            )
+            
+
+        if polished:
+            raw_response["Ai_response"] = polished
+            
+        return raw_response
+    except Exception:
+        return raw_response
 
 @frappe.whitelist(allow_guest=True)
 def ai_module_call(input,confirmationMessage,chatId):
     try:
+        additional_response = None
         if input == "NOFROMUSER":
             chat_history = get_chat(f"chat_{chatId}") or []
             Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
@@ -25,13 +74,24 @@ def ai_module_call(input,confirmationMessage,chatId):
                     "Is_confirmation" : None,
                     "Error":None
                 }
+            chat_history.append(HumanMessage(content="No, I want to refine my requirements"))
+            chat_history.append(AIMessage(content=f"{resp}"))
+            save_chat(chat_history,f"chat_{chatId}")
+            chat_history = get_chat(f"chat_{chatId}") or []
+            response = polish_ai_response_if_possible(
+            raw_response=response,
+            chat_history_messages=chat_history,            # LangChain objects
+            chat_history_strings=None,      # or None if you don't want to use this path
+            )
+            chat_history = chat_history[:-1] + [AIMessage(content=response["Ai_response"])]
+            save_chat(chat_history,f"chat_{chatId}")
             return response
 
 
         # Check if user intention is already determined
         user_intension = check_user_intension(chatId)
 
-        if user_intension not in ["Valueless queries","Other industry-related queries","Negatively Intended Query",None]:
+        if user_intension not in ["Valueless queries","Other industry-related queries","Negatively Intended Query","Follow-up Query",None]:
             chat_history = get_chat(f"chat_{chatId}") or []
             Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-6:]]
             # refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_70b_vers)
@@ -52,24 +112,48 @@ def ai_module_call(input,confirmationMessage,chatId):
             else:
                 pass
 
-        if user_intension in ["Valueless queries","Other industry-related queries","Negatively Intended Query",None]:
+        if user_intension in ["Valueless queries","Other industry-related queries","Negatively Intended Query", "Follow-up Query",None]:
             chat_history = get_chat(f"chat_{chatId}") or []
             Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
             refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_70b_vers)
-            user_intension = classify_query(refine_user_input)
+            # user_intension = classify_query(refine_user_input, chatId)
+            multifactor_classification = classify_user_intent(refine_user_input, llm_70b_vers, chatId)
+
+            main_class = multifactor_classification['main_class']
+            sub_queries = multifactor_classification['sub_queries']
+            additional_response = multifactor_classification['additional_response']
+            new_input = sub_queries.get(main_class, input)
+
+            with open("testlog.txt", "a") as file:
+                file.write(f"\nMultifactor_classification found: \n\t\t\tmain_class: {main_class} \n\t\t\tsub_queries:{sub_queries} \n\t\t\tadditional_response:{additional_response} \n\t\t\tnew_input: {new_input} for chatId {chatId}")
+
+            user_intension = main_class
+            input = new_input
+            # user_intension = classify_query(refine_user_input, llm_70b_vers, chatId)
+            # user_intension_multilabel = classify_query_multilabel(refine_user_input, llm_70b_vers, chatId)
             with open("testlog.txt", "a") as file:
                 file.write(f"\nuser_intension found {user_intension} for chatId {chatId}")
+            # with open("testlog.txt", "a") as file:
+            #     file.write(f"\nMulti Label user_intension found: \n\t\t\t{user_intension_multilabel} for chatId {chatId}")
             update_user_intension(user_intension,chatId)  # Store the classified intention for future use
             log(chatId,'debug','user_intension',str(user_intension),'AI.py','ai')
          # Handle different user intentions
+        with open("testlog.txt", "a") as file:
+            file.write(f"\nBefore IF Additional response testing {additional_response} for chatId {chatId}")
         if user_intension == "Query to build industry from Scratch":
+            with open("testlog.txt", "a") as file:
+                file.write(f"\nAfter IF Additional response testing {additional_response} for chatId {chatId}")
             try:
-                response = entry_build_from_scratch(input,chatId)
+                response = entry_build_from_scratch(input,chatId, additional_class_response=additional_response)
+                response_message = response.get('Ai_response', '')
+                response_message += f"<br/><br/>**Note**: {additional_response}" if additional_response else ""
+                response["Ai_response"] = response_message
                 log(chatId,'debug','response',str(response),'AI.py','ai')
-                return response
+                # return response
+            
             except Exception as e:
                 response = { 
-                    "Ai_response": "Something went wrong while processing your request. Please try again shortly.",
+                    "Ai_response": f"Something went wrong while processing your request. Please try again shortly.{str(e)}",
                     "Is_confirmation" : None,
                     "Error":e,
                 }
@@ -78,9 +162,12 @@ def ai_module_call(input,confirmationMessage,chatId):
             
         elif user_intension == "Query to Get Employee Search":
             try:
-                response = call_handle_employment_query(input,chatId)
+                response = call_handle_employment_query(input,chatId, additional_class_response=additional_response)
+                response_message = response.get('Ai_response', '')
+                response_message += f"<br/><br/>**Note**: {additional_response}" if additional_response else ""
+                response["Ai_response"] = response_message
                 log(chatId,'debug','response',str(response),'AI.py','ai')
-                return response
+                # return response
             except Exception as e:
                 response = { 
                     "Ai_response": "Something went wrong while processing your request. Please try again shortly 5.",
@@ -92,9 +179,12 @@ def ai_module_call(input,confirmationMessage,chatId):
             
         elif user_intension == "Query to search Vendors":
             try:
-                response = call_handle_vendor_query(input,chatId)
+                response = call_handle_vendor_query(input,chatId, additional_class_response=additional_response)
                 log(chatId,'debug','response',str(response),'AI.py','ai')
-                return response
+                response_message = response.get('Ai_response', '')
+                response_message += f"<br/><br/>**Note**: {additional_response}" if additional_response else ""
+                response["Ai_response"] = response_message
+                # return response
             except Exception as e:
                 response = { 
                     "Ai_response": "Something went wrong while processing your request. Please try again shortly 4.",
@@ -106,9 +196,12 @@ def ai_module_call(input,confirmationMessage,chatId):
             
         elif user_intension == "Query to search Incentives":
             try:
-                response = call_incentive_search(input,chatId)
+                response = call_incentive_search(input,chatId, additional_class_response=additional_response)
                 log(chatId,'debug','response',str(response),'AI.py','ai')
-                return response
+                response_message = response.get('Ai_response', '')
+                response_message += f"<br/><br/>**Note**: {additional_response}" if additional_response else ""
+                response["Ai_response"] = response_message
+                # return response
             except Exception as e:
                 response = { 
                     "Ai_response": "Something went wrong while processing your request. Please try again shortly 3.",
@@ -120,9 +213,12 @@ def ai_module_call(input,confirmationMessage,chatId):
             
         elif user_intension == "Query to Get Approvals":
             try:
-                response = call_handle_approval_query(input,chatId)
+                response = call_handle_approval_query(input,chatId, additional_class_response=additional_response)
                 log(chatId,'debug','response',str(response),'AI.py','ai')
-                return response
+                response_message = response.get('Ai_response', '')
+                response_message += f"<br/><br/>**Note**: {additional_response}" if additional_response else ""
+                response["Ai_response"] = response_message
+                # return response
             except Exception as e:
                 response = { 
                     "Ai_response": "Something went wrong while processing your request. Please try again shortly 2.",
@@ -147,7 +243,7 @@ def ai_module_call(input,confirmationMessage,chatId):
                     "Is_confirmation" : None,
                 }
                 log(chatId,'debug','response',str(response),'AI.py','ai')
-                return response
+                # return response
             except Exception as e:
                 response = { 
                     "Ai_response": "Something went wrong while processing your request. Please try again shortly 1.",
@@ -156,25 +252,57 @@ def ai_module_call(input,confirmationMessage,chatId):
                 }
                 log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
                 return response
-
+        
+        elif user_intension == "Follow-up Query":
+            try:
+                response_message = generate_followup_response(input, llm_70b_vers_creative, chatId)
+                response = { 
+                        "Ai_response": response_message,
+                        "Is_confirmation" : None,
+                    }
+                
+                log(chatId,'debug','response',str(response),'AI.py','ai')
+                # return response
+            
+            except Exception as e:
+               response = { 
+                    "Ai_response": "Something went wrong while processing your request. Please try again shortly.",
+                    "Is_confirmation" : None,
+                    "error": e
+                }
+               log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
+            return response
+    
         else:
             try:
+                with open("log2.txt", "a") as file:
+                    file.write(f"\nerror_details from AI dynamic func {user_intension}, & {refine_user_input}, {chatId}")
+            
                 message = generate_dynamic_message(refine_user_input,user_intension,chatId,llm_70b_vers_creative)
                 response = { 
                     "Ai_response": message,
                     "Is_confirmation" : None,
                 }
                 log(chatId,'debug','response',str(response),'AI.py','ai') 
-                return response
+                # return response
             except Exception as e:
-                response = { 
-                    "Ai_response": "Something went wrong while processing your request. Please try again shortly00.",
+                response = {
+                    "Ai_response": f"Something went wrong while processing your request. Please try again shortly00.{str(e)} UIHDSJvhsfg",
                     "Is_confirmation" : None,
                     "error": e
                 }
                 log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
                 return response
-            
+        
+        chat_history = get_chat(f"chat_{chatId}") or []
+        response = polish_ai_response_if_possible(
+        raw_response=response,
+        chat_history_messages=chat_history,            # LangChain objects
+        chat_history_strings=None,      # or None if you don't want to use this path
+        )
+        chat_history = chat_history[:-1] + [AIMessage(content=response["Ai_response"])]
+        save_chat(chat_history,f"chat_{chatId}")
+        return response    
          
     except Exception as e:
         error_details = traceback.format_exc()
@@ -224,6 +352,8 @@ def generate_dynamic_message(user_message, user_intention, chatId,llm):
     Returns:
         str: A concise, professional, and context-aware response guiding the user appropriately.
     """
+    with open("log3.txt", "a") as file:
+            file.write(f"\nerror_details from AI dynamic func {user_intention}, & {user_message}, {chatId}")
     chat_history = get_chat(f"chat_{chatId}") or []
     
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-4:]]
