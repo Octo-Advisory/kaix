@@ -85,9 +85,9 @@ const handleMouseLeave = (index, type) => {
     };
 
 
-    useEffect(() => {
-        console.log(filteredData, 'this is the data ');
-    }, [filteredData])
+    // useEffect(() => {
+    //     console.log(filteredData, 'this is the data ');
+    // }, [filteredData])
 
 
     const isApplyDisabled = selectedProperties.length < 2;
@@ -217,7 +217,7 @@ const handleMouseLeave = (index, type) => {
                                                         {uiConfig?.['location_summary_card_tooltip'] || "Nearby Transport & Connectivity Distances"}
                                                     </div>
                                                 </div>
-                                                <span title='Property-Wise Suitability Score' className='py-1 cursor-default px-4 relative flex items-center justify-center rounded-full text-xs text-white font-semibold  bg-gradient-to-r from-[#673AB7] to-[#5f2abb]'>{property?.scores[0].toFixed(2)}&nbsp;/&nbsp;10</span>
+                                                <span title={`${uiConfig?.['location_score_hover_title'] || 'Property-Wise Suitability Score'}`} className='py-1 cursor-default px-4 relative flex items-center justify-center rounded-full text-xs text-white font-semibold  bg-gradient-to-r from-[#673AB7] to-[#5f2abb]'>{property?.scores[0].toFixed(2)}&nbsp;/&nbsp;10</span>
                                             </h2>
                                         </div>
                                         <div className="grid grid-cols-2 gap-3 w-full">
@@ -365,7 +365,7 @@ const handleMouseLeave = (index, type) => {
                                                         {uiConfig?.['vendor_card_tooltip'] ||"Nearby vendors sorted by distance and relevance to the selected property"}
                                                     </div>
                                                 </div>
-                                                 <span title='Property-Wise Vendor Score' className='py-1 cursor-default px-4 relative flex items-center  justify-center rounded-full text-white font-semibold text-xs bg-gradient-to-r from-[#70A1D9] to-[#5b96d8]'>{property?.scores[4].toFixed(2)} &nbsp;/&nbsp;10</span>
+                                                 <span title={`${uiConfig?.['vendor_score_hover_title'] || 'Property-Wise Vendor Score'}`} className='py-1 cursor-default px-4 relative flex items-center  justify-center rounded-full text-white font-semibold text-xs bg-gradient-to-r from-[#70A1D9] to-[#5b96d8]'>{property?.scores[4].toFixed(2)} &nbsp;/&nbsp;10</span>
                                             </div>
                                             <div className='relative p-2 text-sm text'></div>
                                         </div>
@@ -473,7 +473,7 @@ const handleMouseLeave = (index, type) => {
                                                         {uiConfig?.['approval_card_tooltip'] || "Govt. clearances required for the project"}
                                                     </div>
                                                 </div>
-                                                <span title='Property-Wise Approval Score' className='py-1 cursor-default px-4 relative flex items-center justify-center rounded-full text-xs tex-white text-white font-semibold bg-gradient-to-r from-[#E91E63] to-[#ec135c]'>{property?.scores[3].toFixed(2)} &nbsp;/&nbsp;10</span>
+                                                <span title={`${uiConfig?.['approvals_score_hover_title'] || 'Property-Wise Approval Score'}`}  className='py-1 cursor-default px-4 relative flex items-center justify-center rounded-full text-xs tex-white text-white font-semibold bg-gradient-to-r from-[#E91E63] to-[#ec135c]'>{property?.scores[3].toFixed(2)} &nbsp;/&nbsp;10</span>
                                             </div>
                                             <div className='relative rounded-full bg-orange-100 py-1 px-2 text-orange-800 text-xs font-semibold'>
                                                 {property.approvals.length} Needed
@@ -516,7 +516,7 @@ const handleMouseLeave = (index, type) => {
                                                         {uiConfig?.['incentives_card_tooltip'] || "Applicable Government Incentives & Schemes"}
                                                     </div>
                                                 </div>
-                                                 <span title='Property-Wise Incentive Score' className='py-1 px-4 relative cursor-default flex items-center justify-center rounded-full text-xs  text-white font-semibold bg-gradient-to-r from-[#4CAF50] to-[#3cb340]'>{property?.scores[2].toFixed(2)} &nbsp;/&nbsp;10</span>
+                                                 <span title={`${uiConfig?.['incentives_score_hover_title'] || 'Property-Wise Incentive Score'}`} className='py-1 px-4 relative cursor-default flex items-center justify-center rounded-full text-xs  text-white font-semibold bg-gradient-to-r from-[#4CAF50] to-[#3cb340]'>{property?.scores[2].toFixed(2)} &nbsp;/&nbsp;10</span>
                                             </h2>
                                             <div className='relative py-1 px-2 rounded-full text-xs text-orange-800 bg-orange-100 font-semibold'>
                                                 {property.incentives.length} Found
@@ -558,7 +558,7 @@ const handleMouseLeave = (index, type) => {
                                             {uiConfig?.['employement_card_tooltip'] || "Local Workforce Skill Levels Overview"}
                                             </div>
                                         </div>
-                                        <span title='Property-Wise Employment Score' className='py-1 px-4 relative cursor-default flex items-center justify-center rounded-full text-xs  text-white font-semibold  bg-gradient-to-r from-[#2C53A3] to-[#234ea4]'>{property?.scores[1].toFixed(2)} &nbsp;/&nbsp;10</span>
+                                        <span title={`${uiConfig?.['employment_score_hover_title'] || 'Property-Wise Employment Score'}`} className='py-1 px-4 relative cursor-default flex items-center justify-center rounded-full text-xs  text-white font-semibold  bg-gradient-to-r from-[#2C53A3] to-[#234ea4]'>{property?.scores[1].toFixed(2)} &nbsp;/&nbsp;10</span>
                                         </h2>
                                     </div>
                                     

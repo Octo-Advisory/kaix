@@ -9,11 +9,11 @@ import Vendorresult from "../ResultScreens/Vendorresult";
 import { FaXmark } from "react-icons/fa6";
 
 function MapTrial({ solutions, toggleModal, source }) {
-  console.log("solutions from map", solutions);
+  // console.log("solutions from map", solutions);
   const validation_result = useSelector((state) => state.validate.validation_result)
-  console.log("propertyCoord1", validation_result);
+  // console.log("propertyCoord1", validation_result);
   let propertyCoord = validation_result?.[0]?.[1]?.latitude_longitude?.split(",").map(Number).reverse() ?? null;
-  console.log("propertyCoord2", propertyCoord);
+  // console.log("propertyCoord2", propertyCoord);
   const [solution, setSolution] = useState({})
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [map, setMap] = useState(null);
@@ -149,7 +149,7 @@ function MapTrial({ solutions, toggleModal, source }) {
 
           newPolygons.push(polygon);
         } catch (error) {
-          console.error("Error parsing boundary coordinates:", error);
+          // console.error("Error parsing boundary coordinates:", error);
         }
       }
     });
@@ -214,9 +214,9 @@ function MapTrial({ solutions, toggleModal, source }) {
     setPolylines(newPolylines);
   };
 
-  useEffect(() => {
-    console.log('this is the solution of selected', solution);
-  }, [solution]);
+  // useEffect(() => {
+  //    console.log('this is the solution of selected', solution);
+  // }, [solution]);
 
   return (
     <div className="main-map h-screen w-screen flex items-center justify-center">

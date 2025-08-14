@@ -17,26 +17,31 @@ import Responseloader from '../Responseloader/Responseloader';
 import { FrappeContext, useFrappeAuth, useFrappeCreateDoc, useFrappeGetDoc, useFrappeGetDocList, useFrappeUpdateDoc } from 'frappe-react-sdk'
 import { addAIresponse, addSelectedoption } from '../../Redux/Store/Featuresilces/aiResponse';
 import { addResult } from '../../Redux/Store/Featuresilces/validation'
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation, useBlocker } from "react-router-dom";
 import { HiOutlineClipboardDocumentCheck } from "react-icons/hi2";
 import SideBar from '../SideBar/SideBar';
-import { FaThumbsUp, FaThumbsDown,FaArrowsRotate } from "react-icons/fa6";
+import { FaThumbsUp, FaThumbsDown, FaArrowsRotate } from "react-icons/fa6";
 import { setFormData, setIsOpen } from '../../Redux/Store/Featuresilces/detailform';
 import rehypeRaw from 'rehype-raw';
 import { FaExternalLinkAlt } from 'react-icons/fa';
-import { BuildingIcon } from '../../Icons/icon';
+import { BuildingIcon, BuildingLineIcon, ClearIcon, ClipboardCheckIcon, DollarIcon, SendIcon, ShopIcon, UserGroupIcon } from '../../Icons/icon';
 import usePersistedToggle from '../../PersistedState/useToggleState';
+import NavigationPrompt from './NavigationPrompt'
 
 function Chatscreen() {
   const { currentUser } = useFrappeAuth();
   const { data: userDoc } = useFrappeGetDoc('User', currentUser || '');
+  const { data: marsConf} = useFrappeGetDoc('Mars Configurations', 'Mars Configurations');
+  // console.log("Mars Configurations are",marsConf);
+  
   const [message, setMessage] = useState('');
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.chat.messages);
   const chatId = useSelector((state) => state.chat.chatID);
   const addInput = useSelector((state) => state.chat.addInput)
   const feasibilityId = useSelector((state) => state.feasibility.feasibility_id)
-  const [loading, setLoading] = useState(false);
+  // const [loading, setLoading] = useState(null);
+  // const [loadingSession, setLoadingSession] = useState(null);
   const [disabled, setDisabled] = useState(false);
   const { createDoc, isLoading, error } = useFrappeCreateDoc('');
   const [confirmationPending, setConfirmationPending] = useState(false);
@@ -47,66 +52,133 @@ function Chatscreen() {
   const navigate = useNavigate();
   let { sessionId } = useParams();
   const { call } = useContext(FrappeContext)
+  const location = useLocation();
+  const [chatLoading, setChatLoading] = useState(true)
+  const [loadingStates, setLoadingStates] = useState(new Map());
 
+  const createDiagnostic = (errType, logMsg,chatIdd,sessions)=> {
+      let log = ` ${logMsg}`
+      try {
+        createDoc("AIX Diagnostics Hub", {
+        type: errType,
+        note: log,
+        chat_name: chatIdd,
+        session: sessions
+        });
+      } catch(e) {
+
+      }
+  }
+
+  const noResultMessages = [
+  "Hmm… I couldn’t find anything matching your search. Could you try a different keyword or check similar options?",
+  "Looks like we don’t have that in our list yet — but new items are added all the time! Try another search to see more results.",
+  "No exact match found, but let’s explore some other options that might work for you!",
+  "I couldn’t find a match for that right now. Want me to help you look for something similar?"
+];
+
+  const noResultMsg = noResultMessages[Math.floor(Math.random() * noResultMessages.length)];
+
+
+  const setSessionLoading = (sessionId, isLoading) => {
+    setLoadingStates(prev => {
+      const newMap = new Map(prev);
+      if (isLoading) {
+        newMap.set(sessionId, true);
+      } else {
+        newMap.delete(sessionId);
+      }
+      return newMap;
+    });
+  };
+
+  const isSessionLoading = (sessionId) => {
+    return loadingStates.get(sessionId) || false;
+  };
+
+  // const blocker = useBlocker(confirmationPending);
+  // useEffect(() => {
+  //   if (blocker.state === "blocked") {
+  //     if (window.confirm("Confirmation is pending. You can’t leave this chat — if you leave, the confirmation will be lost.")) {
+  //       blocker.proceed(); // allow navigation
+  //     } else {
+  //       blocker.reset(); // cancel navigation
+  //     }
+  //   }
+  // }, [blocker]);
+
+  useEffect(() => {
+    const beforeUnloadHandler = (e) => {
+      if (confirmationPending) {
+        e.preventDefault();
+        e.returnValue = "Confirmation is pending. If you leave, it will be lost.";
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+    return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
+  }, [confirmationPending]);
+
+  const [newMessageSent, setNewMessageSent] = useState(false);
 
   if (!sessionId && !currentUser) {
     sessionId = sessionStorage.getItem("guest_session_id")
   }
 
   useEffect(() => {
-  // First: send message & create session
-  if (addInput) {
-    handleSendbtn(addInput); // this will internally set the sessionId
-  }
-}, [addInput]);
-
-useEffect(() => {
-  // Second: once sessionId is available, add to child table if not already present
-  const handleFeasibilityChatLink = async () => {
-    console.log("datasasaescwev",feasibilityId,addInput,sessionId);
-    
-    if(!addInput) return;
-    if (!feasibilityId || !sessionId) return;
-
-    try {
-      const response = await call.get("frappe.client.get", {
-        doctype: "Feasibility Report",
-        name: feasibilityId,
-      });
-
-      const chats = response.message?.chats || [];
-
-      const alreadyExists = chats.some(chat => chat.session === sessionId);
-      console.log("raw feasibility id",feasibilityId,alreadyExists);
-
-      if (!alreadyExists) {
-        await createDoc("Linked Chats", {
-          session: sessionId,
-          parent: feasibilityId,
-          parenttype: "Feasibility Report",
-          parentfield: "chats",
-        });
-        console.log("Child row added successfully.");
-        dispatch(addInputtext(null))
-      }
-    } catch (err) {
-      console.error("Error adding to child table:", err);
+    // First: send message & create session
+    if (addInput) {
+      handleSendbtn(addInput); // this will internally set the sessionId
     }
-  };
+  }, [addInput]);
 
-  handleFeasibilityChatLink();
-}, [sessionId,feasibilityId,addInput]);
+
+  useEffect(() => {
+    // Second: once sessionId is available, add to child table if not already present
+    const handleFeasibilityChatLink = async () => {
+      // console.log("datasasaescwev", feasibilityId, addInput, sessionId);
+
+      if (!addInput) return;
+      if (!feasibilityId || !sessionId) return;
+
+      try {
+        const response = await call.get("frappe.client.get", {
+          doctype: "Feasibility Report",
+          name: feasibilityId,
+        });
+
+        const chats = response.message?.chats || [];
+
+        const alreadyExists = chats.some(chat => chat.session === sessionId);
+        // console.log("raw feasibility id", feasibilityId, alreadyExists);
+
+        if (!alreadyExists) {
+          await createDoc("Linked Chats", {
+            session: sessionId,
+            parent: feasibilityId,
+            parenttype: "Feasibility Report",
+            parentfield: "chats",
+          });
+          dispatch(addInputtext(null))
+        }
+      } catch (err) {
+          createDiagnostic("Others", `Something went wrong while getting feasibility reports in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
+        // console.error("Error adding to child table:", err);
+      }
+    };
+
+    handleFeasibilityChatLink();
+  }, [sessionId, feasibilityId, addInput]);
 
   useEffect(() => {
     const handleBeforeUnload = (event) => {
-      sessionStorage.removeItem("guest_session_id");  
+      sessionStorage.removeItem("guest_session_id");
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
-  console.log("sessoin id from url", sessionId);
+  // console.log("sessoin id from url", sessionId);
 
 
   const fetchAIResponse = async (message, confirmationMessage, chatId) => {
@@ -116,11 +188,12 @@ useEffect(() => {
         confirmationMessage: confirmationMessage,
         chatId: chatId
       });
-      console.log("message", result);
+      // console.log("message", result);
       return result.message;  // Return the result so that the calling function gets it.
     } catch (err) {
-      console.log("error occurred 😂", err);
-      throw err;  // Rethrow the error if you want to catch it in the caller function.
+        createDiagnostic("Others", `Something went wrong while calling the AI module in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
+      // console.log("error occurred 😂", err);
+      // throw err;  // Rethrow the error if you want to catch it in the caller function.
     }
   };
 
@@ -150,7 +223,8 @@ useEffect(() => {
     try {
       await createDoc("Chat history", chatDoc);
     } catch (error) {
-      console.error('Error saving to child table:', error);
+      createDiagnostic("Others", `Something went wrong while creating a chat history record for ${JSON.stringify(chatDoc)} in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
+      // console.error('Error saving to child table:', error);
     }
   };
 
@@ -163,13 +237,14 @@ useEffect(() => {
       console.log("validation result", result);
       return result.message
     } catch (error) {
-      console.log("error 🤣", error);
+      createDiagnostic("Others", `Something went wrong while calling validation for ${JSON.stringify(aiResponse)} ${JSON.stringify(user_intension)} in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
+      // console.log("error 🤣", error);
     }
   }
 
   const hanldeValidation = async () => {
     try {
-      console.log("chat id", session);
+      // console.log("chat id", session);
 
       const respo = await fetch(`/api/resource/Session?fields=["user_intension"]&filters=[["name","=","${session}"]]&order_by=modified asc`, {
         method: 'GET',
@@ -185,28 +260,39 @@ useEffect(() => {
 
       // Parse the JSON response correctly
       const userIntesion = await respo.json();
-      console.log("userIntention", userIntesion);
 
       // Check if 'data' is present and contains expected data
       if (userIntesion && userIntesion.data && userIntesion.data.length > 0) {
         const user_intension = userIntesion.data[0].user_intension;
 
         // Call validation and dispatch result
-        const result = await validationCall(responseAi, user_intension);
+        const result = await validationCall([responseAi?.at(-1)], user_intension);
         dispatch(addResult(result));
         return result;
       } else {
-        console.log("No data found for the given chatId");
+        createDiagnostic("Others", `Something went wrong cause No data found for given userIntension ${JSON.stringify(userIntesion)} in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
+        // console.log("No data found for the given chatId");
       }
     } catch (error) {
-      console.log("error is here", error);
+      createDiagnostic("Others", `Something went wrong while calling Sesion Record in ChatScreen : ${JSON.stringify(error)}`,chatId,sessionId)
+      // console.log("error is here", error);
     }
   };
 
   const { updateDoc } = useFrappeUpdateDoc()
+  const clearProgressAndIntention = async (chatId) => {
+    try {
+      await updateDoc('Session', chatId, {
+        progress: [],
+      });
+    } catch (error) {
+      createDiagnostic("Others", `Something went wrong while Updating the Session record and clearing Intention for ${JSON.stringify(chatId)} in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
+      // console.error("Error updating session:", error);
+    }
+  };
 
   const handleConfirmation = async (label, response) => {
-    console.log('response', response, 'label', label)
+    // console.log('response', response, 'label', label)
     setConfirmationPending(false);
     const confirmationMessages = {
       sender: 'user',
@@ -231,7 +317,9 @@ useEffect(() => {
 
       await handleConfirmationHints()
       mutate(); // Refresh UI to show user message
-      setLoading(true);
+      // setLoadingSession(sessionId)
+      // setLoading(true);
+      setSessionLoading(session, true);
 
       const res = await hanldeValidation();
       console.log("validation result from chatscreen", res);
@@ -247,9 +335,13 @@ useEffect(() => {
         log = res.log;
       }
 
+      if(marsConf.validation_check == 0){
+        pass = true
+      }
+
       const aiResp = pass
-        ? "Thank you for your response"
-        : "We have your query, we will get back to you soon..";
+        ? "Thank you for your response; please feel free to reach out with any further industry-related queries."
+        : "We have received your query and will get back to you shortly; meanwhile, feel free to share any other questions related to industry approvals, incentives, or vendors.";
 
       if (!pass && log) {
         // handleOpenHelp();
@@ -262,18 +354,19 @@ useEffect(() => {
         });
       }
 
-
-
       // STEP 3: Update that row with AI response
       await updateDoc("Chat history", chatEntry.name, {
         ai: aiResp
       });
       mutate(); // Show updated AI message  
-      setLoading(false);
-      // if (validationResult[0]) {
-      dispatch(addSelectedoption(response))
-      navigate(`/progress/${sessionId}`);
-      // }
+      // setLoading(false);
+      // setLoadingSession(null)
+      setSessionLoading(session,false)
+      if (pass) {
+        dispatch(addSelectedoption(response))
+        await clearProgressAndIntention(sessionId)
+        navigate(`/progress/${sessionId}`);
+      }
     } else {
       let currentSession = session;
       // STEP 1: Save user's message with idx
@@ -289,10 +382,13 @@ useEffect(() => {
       if (!chatEntry.name) throw new Error("Failed to save user message");
 
       mutate(); // Refresh UI to show user message
-      setLoading(true);
+      // setLoadingSession(sessionId)
+      // setLoading(true);
+      setSessionLoading(session, true);
 
       // STEP 2: Get AI response
       const resp = await fetchAIResponse("NOFROMUSER", confirmationMessage, session);
+      
       const aiResponse = resp.Ai_response;
 
       if (resp.Is_confirmation) {
@@ -301,12 +397,14 @@ useEffect(() => {
         });
 
         if (resp.options && resp.options.length > 1) {
-          console.log(resp.options, 'this is in confirmation');
 
           setTempButtons(resp.options)
         }
         mutate();
-        setLoading(false);
+        // setLoading(false);
+        // setLoadingSession(null)
+        setSessionLoading(session, false);
+        setSessionLoading(currentSession, false);
         setConfirmationMessage(aiResponse);
         setConfirmationPending(true);
         setDisabled(true);
@@ -319,32 +417,31 @@ useEffect(() => {
       });
 
       mutate(); // Show updated AI message
-      setLoading(false);
+      // setLoading(false);
+      // setLoadingSession(null)
+      setSessionLoading(session, false);
       setDisabled(false)
       try {
         await updateDoc("Session", sessionId, {
           user_intension: "",
         });
-        console.log("Updated Successfully");
       } catch (err) {
-        console.error("Error Updating:", err);
+        createDiagnostic("Others", `Something went wrong while Updating Session Record for session and clearing user_intension ${JSON.stringify(sessionId)} in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
+        // console.error("Error Updating:", err);
       }
     }
   };
   const [session, setSession] = useState(null)
   const { data, mutate } = useFrappeGetDoc('Session', session || '');
   const { data: userintension, mutate: intensionMutate } = useFrappeGetDocList('Session', {
-    fields: ['user_intension', 'chat_json'],
+    fields: ['user_intension', 'chat_json', 'title', 'update_title'],
     filters: [['name', '=', session]]
   })
-  
+
   const [AiResponses, setAiResponses] = useState()
   const chatHistory = data?.chat_history || [];
-  console.log("data is", chatHistory,AiResponses);
+  // console.log("data is", chatHistory, AiResponses);
 
-  useEffect(()=>{
-    console.log('This are the new AI Responses', AiResponses)
-  },[AiResponses])
 
 
   const handleSendbtn = async (msg) => {
@@ -352,6 +449,7 @@ useEffect(() => {
     if (!message.trim() && !msg.trim()) return;
 
     const userMessage = msg ? msg.trim() : message.trim();
+
     setMessage('');
     try {
 
@@ -359,13 +457,17 @@ useEffect(() => {
       let currentSession = session;
 
       if (!currentSession) {
+        setSessionLoading('new-chat', true);
         const nowTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const sessionResp = await createDoc("Session", { time: nowTime, user: currentUser || '', });
         if (!sessionResp.name) throw new Error("Failed to create session");
         setSession(sessionResp.name);
         // dispatch(addChatId(sessionResp.name))
         currentSession = sessionResp.name;
+
         mutate();
+        setSessionLoading('new-chat', false);
+        setSessionLoading(currentSession, true);
         hintsMutate()
         intensionMutate();
 
@@ -378,7 +480,7 @@ useEffect(() => {
         }
 
       }
-
+      // console.log("come here !!!!!",currentSession,session)
       // STEP 1: Save user's message with idx
       const idx = chatHistory.length + 1;
       const chatEntry = await createDoc("Chat history", {
@@ -395,27 +497,33 @@ useEffect(() => {
       mutate(); // Refresh UI to show user message
       intensionMutate();
       hintsMutate()
-      setLoading(true);
+      // setLoadingSession(sessionId)
+      // setLoading(true);
+      setSessionLoading(session, true);
       setDisabled(true) //added now 
 
       // STEP 2: Get AI response
       const resp = await fetchAIResponse(userMessage, "", currentSession);
       setAiResponses(resp)
       console.log("ai response", resp)
-      const aiResponse = resp.Ai_response;
-
+      const aiMsg = resp.Ai_response === "Not Available in List" ? noResultMsg : resp.Ai_response 
+      const aiResponse = aiMsg;
+      
       if (resp.Is_confirmation) {
         await updateDoc("Chat history", chatEntry.name, {
           ai: aiResponse || "Waiting For Confirmation"
         });
 
         if (resp.options && resp.options.length > 1) {
-          console.log(resp.options, 'this is in handle')
+          // console.log(resp.options, 'this is in handle')
           setTempButtons(resp.options)
         }
         mutate();
         intensionMutate();
-        setLoading(false);
+        // setLoading(false);
+        // setLoadingSession(null)
+        // setSessionLoading(session, false);
+        setSessionLoading(currentSession || session, false);
         setConfirmationMessage(aiResponse);
         dispatch(addAIresponse(resp))
         setConfirmationPending(true);
@@ -423,7 +531,15 @@ useEffect(() => {
         processChat()
         return;
       }
-
+      if (resp.Trigger_Lead_Generation) {
+        let log = `Extracted Data: ${JSON.stringify(resp['State'])} Validation Data : ${JSON.stringify(resp['Validation Data'])}, ${resp.Ai_response} `
+        await createDoc("AIX Diagnostics Hub", {
+            type: "Data Missing",
+            note: log,
+            session: sessionId,
+            chat_name: chatEntry.name || '' 
+        });
+      }
       // STEP 3: Update that row with AI response
       await updateDoc("Chat history", chatEntry.name, {
         ai: aiResponse
@@ -431,43 +547,62 @@ useEffect(() => {
 
       mutate(); // Show updated AI message
       intensionMutate();
-      setLoading(false);
+      // setLoading(false);
+      // setLoadingSession(null)
+      // console.log("kkkkkkkkk",currentSession,session);
+      
+      setSessionLoading(currentSession, false);
+      setSessionLoading(session, false);
       processChat()
       setDisabled(false) // added now
 
     } catch (error) {
-      console.error("Error sending message:", error);
-      setLoading(false);
+      createDiagnostic("Others", `Something went wrong while sending the message in ChatScreen : ${JSON.stringify(error)}`,chatId,sessionId)
+      // console.error("Error sending message:", error);
+      // setLoading(false);
+      // setLoadingSession(null)
+      setSessionLoading(session, false);
     }
   };
 
   useEffect(() => {
+
     const fetchTitle = async () => {
       const intension = userintension?.[0]?.user_intension || '';
+      const chat_title = userintension?.[0]?.title || '';
+      const update_title_check = userintension?.[0]?.update_title || 0;
+      const rawJson = userintension?.[0]?.chat_json;
+      const fallBackIntensions = ["Valueless queries", "Other industry-related queries", "Negatively Intended Query"];
       if (intension) {
-        const rawJson = userintension?.[0]?.chat_json;
+        const isTitleUpdated = update_title_check === 1 ? true : false
+        const isFallBack = fallBackIntensions.includes(intension)
         let title = "";
         try {
           const parsedArray = JSON.parse(rawJson);
           const title_to_update = getLastMeaningfulMessage(parsedArray);
-          const isInvalidIntention = !intension || intension === "Valueless queries";
+          const shouldCallMethod = (isTitleUpdated) ? false :
+            (!chat_title || chat_title === 'New Chat') ? true
+              : (isFallBack && (!chat_title || chat_title === 'New Chat')) ? true
+                : (!isFallBack && !isTitleUpdated) ? true : false
 
-          title = isInvalidIntention
-            ? "New Chat"
-            : title_to_update
-              ? await fetchHistoryTitle(title_to_update)
-              : "New Chat";
+          title = (shouldCallMethod && title_to_update)
+            ? await fetchHistoryTitle(title_to_update)
+            : null;
         } catch (e) {
-          console.error("Invalid JSON format", e);
+          createDiagnostic("Others", `Something went wrong while fetching history Title in ChatScreen : ${JSON.stringify(e)}`,chatId,sessionId)
+          // console.error("Invalid JSON format", e);
         }
         if (title) {
-          updateDoc('Session', session, {
-            title: title
-          }).then((updatedDoc) => {
-            console.log('Title updated:✔️', updatedDoc);
-          }).catch((err) => {
-            console.error('Error updating doc:', err);
-          });
+          let updateData = { title: title }; // Always update title
+          if (!isFallBack) {
+            updateData.update_title = 1;
+          }
+          updateDoc('Session', session, updateData)
+            .then((updatedDoc) => {
+              setNewMessageSent(true)
+            }).catch((err) => {
+              // console.error('Error updating doc:', err);
+            });
         }
       }
     };
@@ -475,7 +610,8 @@ useEffect(() => {
     if (session) {
       fetchTitle();
     }
-  }, [userintension]);
+  }, [userintension, session]);
+
 
   // The below will fetch the query hints
   const { data: queryHints, isLoading: hintsLoading } = useFrappeGetDocList('Session', {
@@ -517,7 +653,7 @@ useEffect(() => {
       return result;
     }).reverse();
     let industry = userDoc?.bio ? userDoc.bio : 'Cement'
-    console.log('INPUT PASSED IN HINTS METHOD CALL', industry, allData)
+  
     let responseHints = await fetchHints(allData, industry)
 
     if (session && responseHints) {
@@ -525,7 +661,7 @@ useEffect(() => {
         const res = await updateDoc("Session", session, {
           query_hints: JSON.stringify(responseHints)
         });
-        console.log(res, "Query Hints Updated for the Session .....✅");
+      
         if (from === 'confirmation') {
           const sessionDoc = await mutate();
           let chatArray = JSON.parse(sessionDoc.chat_json || '[]');
@@ -546,7 +682,8 @@ useEffect(() => {
         }
         return true
       } catch (error) {
-        console.error("❌ Error updating Session hints or method_called:", error);
+        createDiagnostic("Others", `Something went wrong while Updating Session hints  in ChatScreen : ${JSON.stringify(error)}`,chatId,sessionId)
+        // console.error("❌ Error updating Session hints or method_called:", error);
         return false
       }
 
@@ -554,8 +691,7 @@ useEffect(() => {
   }
 
   const handleConfirmationHints = async () => {
-    let hintsUpdated = await updateHints('confirmation')
-    hintsUpdated ? console.log('QUERY HINTS UPDATED FOR COnFiRMATION....✅...') : console.log('Hints are Not Updated on Confirmation...❌')
+    await updateHints('confirmation')
   }
 
   const checkAndUpdateTriggerPoints = async (chatArray, sessionName) => {
@@ -577,23 +713,21 @@ useEffect(() => {
         }
 
         if (consecutiveZeros === 3) {
-          console.log("🔁 Triggering update due to 3 consecutive method_called: 0 at indexes:", zeroIndexes);
 
           const updatedIndex = zeroIndexes[2]; // The last (i.e., oldest) of the 3 zeroes
 
           chatArray[updatedIndex].method_called = 1;
 
           try {
-            console.log('Calling the update function for Chat Count')
             const response = await updateHints('Chat');
             if (response) {
               const res = await updateDoc("Session", sessionName, {
                 chat_json: JSON.stringify(chatArray),
               });
-              console.log(res, "✅ Chat JSON Updated for Hints (from message counts)");
             }
           } catch (error) {
-            console.error("❌ Failed to update chat_json in Session:", error);
+            createDiagnostic("Others", `Something went wrong while updating chat_json in SEssion ${JSON.stringify(sessionName)}  in ChatScreen : ${JSON.stringify(error)}`,chatId,sessionId)
+            // console.error("❌ Failed to update chat_json in Session:", error);
           }
 
           break; // Stop after triggering update
@@ -606,12 +740,16 @@ useEffect(() => {
     //default hints
     if (!hintsLoading) {
       let foundHints = null;
+
       // Go through each record and check for valid query_hints
       for (const record of queryHints) {
         try {
           const parsed = JSON.parse(record.query_hints);
+       
           if (Array.isArray(parsed) && parsed.length > 0) {
-            let tryingHints = parsed?.['query'] ? parsed : iconHints
+            let allHaveQuery = parsed.every(item => item.hasOwnProperty('query'));
+            let tryingHints = allHaveQuery ? parsed : iconHints
+            
             foundHints = tryingHints;
             break;
           }
@@ -621,7 +759,7 @@ useEffect(() => {
         }
       }
       // Set hintsArray in state
-      console.log(foundHints,'oky this are the hints ')
+   
       setHintsArray(foundHints || iconHints);
     }
   }, [hintsLoading, queryHints])
@@ -651,8 +789,9 @@ useEffect(() => {
       });
       return result.message;
     } catch (err) {
-      console.log("error occurred 😂", err);
-      throw err;  // Rethrow the error if you want to catch it in the caller function.
+      createDiagnostic("Others", `Something went wrong while calling generate_chat_title for History Title  in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
+      // console.log("error occurred 😂", err);
+      // throw err;  // Rethrow the error if you want to catch it in the caller function.
     }
   }
 
@@ -670,18 +809,19 @@ useEffect(() => {
 
         return {
           ...matchedHint,
-          hint:hintObj.query,
+          hint: hintObj.query,
           ...hintObj
         };
       });
       return newHints;
     } catch (err) {
-      console.log("error occurred in Hint Statment Function😂", err);
+      createDiagnostic("Others", `Something went wrong while calling generate_query_hints query: ${JSON.stringify(queries)} industry: ${JSON.stringify(industry)} in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
+      // console.log("error occurred in Hint Statment Function😂", err);
     }
   }
 
   useEffect(() => {
-    console.log("ascdsdd", currentUser, sessionId);
+    // console.log("ascdsdd", currentUser, sessionId);
 
     if (!currentUser && !session) {
       const guestSessionId = sessionStorage.getItem("guest_session_id");
@@ -703,8 +843,8 @@ useEffect(() => {
       chatRef.current.scrollTop = chatRef.current.scrollHeight;
     }
   }, [chatHistory]);
-  const [sideBar, setSideBar] = usePersistedToggle('aix-nav-state','true')
-  
+  const [sideBar, setSideBar] = usePersistedToggle('aix-nav-state', 'true')
+
   const renderUserAvatar = (sender) => {
     const isCurrentUser = sender === 'user';
 
@@ -748,20 +888,20 @@ useEffect(() => {
   useEffect(() => {
     // Validate session ID if provided in URL
     if (sessionId) {
-      console.log("user", currentUser);
-
       validateSession(sessionId);
     } else {
       setSession(null);
       setConfirmationMessage('');
       setConfirmationPending(false);
       setDisabled(false);
-      setLoading(false)
+      // setLoading(false)
+      // setLoadingSession(null)
+      setSessionLoading(session, false);
     }
   }, [sessionId, currentUser]);
 
   const validateSession = async (sessionId) => {
-    console.log("comegere with", sessionId, currentUser);
+    // console.log("comegere with", sessionId, currentUser);
 
     if (sessionStorage.getItem("guest_session_id") && currentUser) {
       // Not logged in, redirect to /chat
@@ -785,8 +925,8 @@ useEffect(() => {
 
       const sessionData = await res.json();
       const session = sessionData.data;
-      console.log("session", session);
-      console.log("current", currentUser);
+      // console.log("session", session);
+      // console.log("current", currentUser);
 
       // Check if session belongs to the logged-in user
       if (currentUser) {
@@ -800,7 +940,8 @@ useEffect(() => {
       }
 
     } catch (error) {
-      console.error("Error validating session:", error);
+      createDiagnostic("Others", `Something went wrong while validating the session in ChatScreen : ${JSON.stringify(error)}`,chatId,sessionId)
+      // console.error("Error validating session:", error);
       setSession(null);
       navigate("/chat", { replace: true });
     }
@@ -864,9 +1005,18 @@ useEffect(() => {
     }
   ];
 
+  useEffect(() => {
+    if (sessionId) {
+      setChatLoading(true)
+      if (chatHistory.length > 0) {
+        setChatLoading(false)
+      }
+    }
+  }, [chatHistory, sessionId])
+
   return (
     <div className='h-screen w-screen relative flex flex-row '>
-      {currentUser && <SideBar setSideBar={setSideBar} sideBar={sideBar} />}
+      {currentUser && <SideBar setSideBar={setSideBar} sideBar={sideBar} newMessageSent={newMessageSent} setNewMessageSent={setNewMessageSent} />}
       <div className="h-screen flex flex-col items-center w-full transition-width duration-300 ease-in-out main-screen">
         <Navbar />
         <div className="flex-1 overflow-y-auto p-4 flex justify-center w-full chatscreen" ref={chatRef}>
@@ -875,66 +1025,67 @@ useEffect(() => {
             <div className="chats flex flex-col w-[50%] mx-auto">
               {[...chatHistory]
                 .sort((a, b) => a.idx - b.idx)
-                .map((msg, index,arr) => {
+                .map((msg, index, arr) => {
                   const isLast = index === arr.length - 1;
                   const isCurrentAi = isLast && msg.ai === AiResponses?.Ai_response;
                   return (
-                  <div key={`chat-${msg.name || index}`}>
-                    {msg.user?.trim() && (
-                      <div className="flex gap-5 justify-start mb-3">
-                        {renderUserAvatar("user")}
-                        <div className="p-2 rounded-lg max-w-full break-words">
-                          <ReactMarkdown rehypePlugins={[rehypeRaw]}>{msg.user}</ReactMarkdown>
-                          <div
-                            onClick={() => { setMessage(msg.user), textAreaRef.current?.focus(); }}
-                            className=" flex flex-row items-center text-gray-700 w-fit bg-gray-200 gap-2 cursor-pointer text-xs p-2 transition-all duration-300  rounded-md hover:bg-gray-300"
-                            title="Copy & set to input"
-                          >
-                            <FaArrowsRotate />
+                    <div key={`chat-${msg.name || index}`}>
+                      {msg.user?.trim() && (
+                        <div className="flex gap-5 justify-start mb-3">
+                          {renderUserAvatar("user")}
+                          <div className="p-2 rounded-lg max-w-full break-words">
+                            <ReactMarkdown rehypePlugins={[rehypeRaw]}>{msg.user}</ReactMarkdown>
+                            <div
+                              onClick={() => { setMessage(msg.user), textAreaRef.current?.focus(); }}
+                              className=" flex flex-row items-center text-gray-700 w-fit bg-gray-200 gap-2 cursor-pointer text-xs p-2 transition-all duration-300  rounded-md hover:bg-gray-300"
+                              title="Copy & set to input"
+                            >
+                              <FaArrowsRotate />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                    {msg.ai?.trim() && (
-                      <div className="flex gap-5 justify-start mb-3">
-                        <img
-                          src={botLogo1}
-                          alt="AI"
-                          className="h-8 w-8 relative rounded-full top-1"
-                        />
-                        <div className="p-2 rounded-lg max-w-full break-words">
-                          {isCurrentAi ? (
-                            // <Typewriter text={msg.ai} />
-                            <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                              {msg.ai}
-                            </ReactMarkdown>
-                          ) : (
-                            <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                              {msg.ai}
-                            </ReactMarkdown>
-                          )}
-                          {/* <ReactMarkdown rehypePlugins={[rehypeRaw]}>{msg.ai}</ReactMarkdown> */}
-                          {msg.result && (
-                            <button
-                              title="View Result"
-                              onClick={() => handlerenderresult(msg)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 border border-blue-100 rounded-md transition-colors duration-150"
-                            >
-                              <FaExternalLinkAlt className="w-3 h-3" />
-                              View Result
-                            </button>
-                          )}
+                      )}
+                      {msg.ai?.trim() && (
+                        <div className="flex gap-5 justify-start mb-3">
+                          <img
+                            src={botLogo1}
+                            alt="AI"
+                            className="h-8 w-8 relative rounded-full top-1"
+                          />
+                          <div className="p-2 rounded-lg max-w-full break-words">
+                            {isCurrentAi ? (
+                              // <Typewriter text={msg.ai} />
+                              <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                                {msg.ai}
+                              </ReactMarkdown>
+                            ) : (
+                              <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                                {msg.ai}
+                              </ReactMarkdown>
+                            )}
+                            {/* <ReactMarkdown rehypePlugins={[rehypeRaw]}>{msg.ai}</ReactMarkdown> */}
+                            {msg.result && (
+                              <button
+                                title="View Result"
+                                onClick={() => handlerenderresult(msg)}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 border border-blue-100 rounded-md transition-colors duration-150"
+                              >
+                                <FaExternalLinkAlt className="w-3 h-3" />
+                                View Result
+                              </button>
+                            )}
+                          </div>
+
                         </div>
+                      )}
 
-                      </div>
-                    )}
-
-                  </div>  
+                    </div>
                   )
                 })
               }
 
-              {loading && session === sessionId && <Responseloader />}
+              {/* {loading && loadingSession === sessionId && <Responseloader />} */}
+              {(isSessionLoading(sessionId) || !sessionId && isSessionLoading('new-chat')) && <Responseloader />}
 
               {confirmationPending && (
                 <div className="m-0 p-2 rounded-lg w-full flex items-center justify-center">
@@ -942,35 +1093,35 @@ useEffect(() => {
                     {tempButtons.map((button, index) => (
                       <button
                         key={index}
-                        className={`${(button.label === 'Refine Requirements' || button.label.startsWith('No')) ? 'bg-red-500' : 'bg-green-500'} text-white px-4 py-2 rounded-full text-xs cursor-pointer justify-center w-full items-center font-semibold flex flex-row gap-2`}
+                        className={`${(button.label === 'Refine Requirements' || button.label.startsWith('No')) ? 'bg-red-400' : 'bg-green-400'} text-white px-4 py-2 rounded-full text-xs cursor-pointer justify-center w-full items-center font-semibold flex flex-row gap-2`}
                         onClick={() => { handleConfirmation(button.label, button.value) }}
                       >
                         {(button.label === 'Refine Requirements' || button.label.startsWith('No')) ? (<FaThumbsDown size={16} />) : (<FaThumbsUp size={16} />)}
                         {button.label}
                       </button>
                     ))}
-                    
+
                   </div>
                 </div>
               )}
             </div>
-          ) : (
+          ) : (chatLoading && sessionId) ? <div className="chats flex flex-col w-[50%] mx-auto"><Responseloader /></div> : (
             <div className="flex flex-col gap-2 items-center justify-center h-full w-full">
               <div className='relative text-4xl flex flex-row gap-3 items-center'>
                 <p className=" text-[#242f6a]">Welcome to</p>
                 <img src={newlogo} className='relative object-contain h-[45px] w-[150px]' />
-                
+
               </div>
               {hintsArray && hintsArray.length > 3 && (<>
                 <p className='text-sm text-gray-600 italic tracking-wide font-normal mb-1 text-center'>I'm your AI assistant for industrial intelligence and data-driven decision making.<br></br> I can help with manufacturing, supply chain, site selection, and much more.</p>
                 <p className='text-sm text-gray-600 italic tracking-wide font-normal mb-4 text-center'>What industrial challenge can I help you tackle today?</p>
-                
+
                 <div className='relative p-4 grid grid-cols-3 h-fit w-fit gap-4 items-center'>
                   {hintsArray.map((hints, index) => (
                     <div key={index} onClick={() => { handleHintClick(hints.hint) }} className='relative transition-all duration-300 ease-in-out cursor-pointer bg-white  border-gray-200 hover:border-green-700 hover:-translate-y-0.5 h-full min-w-[150px] border rounded-md max-w-[260px] flex flex-col gap-1 p-3 '>
                       <div className='relative flex flex-row items-center p-1 h-fit gap-2'>
                         <div className='bg-gradient-to-br rounded-md from-[#2C53A3] to-[#70A1D9] relative h-9 w-9 flex items-center justify-center p-2'>
-                          {hints.type === "Approvals" ? (<HiOutlineClipboardDocumentCheck className='text-white text-lg' size={22} />) : hints.type === "Vendors" ? (<BsShop className='text-white text-lg' size={22} />) : hints.type === "Incentives" ? (<AiOutlineDollar className='text-white text-lg ' size={22} />) : hints.type === "Employment" ? (<FaUserGroup className='text-white text-lg' size={22} />) : hints.type === "Property" ? (<RiBuilding2Line className='text-white text-lg' size={22} />) : (<BuildingIcon className='text-white' size={22} />)}
+                          {hints.type === "Approval" ? (<ClipboardCheckIcon strokeWidth={2} className='text-white text-lg'  size={22} />) : hints.type === "Vendor Search" ? (<ShopIcon strokeWidth={0.5} className='text-white text-lg' size={22} />) : hints.type === "Incentives" ? (<DollarIcon className='text-white text-lg ' size={24} />) : hints.type === "Employment" ? (<UserGroupIcon className='text-white text-lg' size={22} />) : hints.type === "Build From Scratch" ? (<BuildingLineIcon className='text-white text-lg' size={22} strokeWidth={2}/>) : (<BuildingIcon className='text-white' size={22} />)}
                         </div>
                         <div className='relative flex flex-col items-start'>
                           <p className='text-md font-medium text-black capitalize tracking-wide select-none'>{hints.title}</p>
@@ -1004,13 +1155,13 @@ useEffect(() => {
                   }
                 }
               }}
-              style={{ lineHeight: '1.5' }} 
+              style={{ lineHeight: '1.5' }}
             />
           </div>
 
           {message && (
             <div className="cursor-pointer p-2" onClick={() => setMessage("")}>
-              <AiOutlineClear size={24} className="text-[#242f6a]" />
+              <ClearIcon size={24} className="text-[#242f6a]" />
             </div>
           )}
 
@@ -1019,7 +1170,7 @@ useEffect(() => {
               }`}
             onClick={() => { if (!disabled) handleSendbtn() }}
           >
-            <FiSend size={26} className="text-white" />
+            <SendIcon size={26} className="text-white" />
           </div>
         </div>
 
@@ -1036,6 +1187,11 @@ useEffect(() => {
           </p>
         </div>
       </div>
+      <NavigationPrompt
+        when={confirmationPending}
+        message="Confirmation is pending. You can’t leave this chat — if you leave, the confirmation will be lost."
+        onConfirm={() => setConfirmationPending(false)}
+      />
     </div>
   );
 }

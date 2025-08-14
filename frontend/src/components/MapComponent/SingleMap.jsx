@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MdFactory } from 'react-icons/md';
+import { MdAirplanemodeActive, MdFactory } from 'react-icons/md';
 import { createRoot } from 'react-dom/client';
 import { SlEnergy } from "react-icons/sl"; // Substation
 import { CiAirportSign1 } from "react-icons/ci"; // Airport
@@ -19,6 +19,7 @@ import { IoMdHome } from "react-icons/io";
 import { FaPlus } from "react-icons/fa";
 import { FaMinus } from "react-icons/fa";
 import { useFrappeGetDoc } from 'frappe-react-sdk';
+import { getCurvedLine } from "./utils";
 mapboxgl.accessToken = 'pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ';
 
 const SingleMap = ({ selectedProperty, intension }) => {
@@ -28,8 +29,6 @@ const SingleMap = ({ selectedProperty, intension }) => {
   const lng = copyiedSelectedProperty?.latitude_longitude[1];
   let boundaryCoordinates = copyiedSelectedProperty?.boundary_coordinates;
 
-  console.log("Selected property, This is from SingleMap");
-  console.log(copyiedSelectedProperty);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const mapRef = useRef(null);
   const mapContainer = useRef(null);
@@ -233,7 +232,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
       }}>
         {
           (layer === LAYERS.SUB_STATIONS || layer === LAYERS.DEFAULT_LAYER.SUB_STATIONS) ? <SlEnergy size={24} color="#5f2abb" /> :
-            (layer === LAYERS.AIRPORTS || layer === LAYERS.DEFAULT_LAYER.AIRPORTS) ? <CiAirportSign1 size={24} color="#5f2abb" /> :
+            (layer === LAYERS.AIRPORTS || layer === LAYERS.DEFAULT_LAYER.AIRPORTS) ? <MdAirplanemodeActive size={24} color="#5f2abb" /> :
               (layer === LAYERS.SEAPORTS || layer === LAYERS.DEFAULT_LAYER.SEAPORTS) ? <RiShip2Line size={24} color="#5f2abb" /> :
                 (layer === LAYERS.RAILWAY_STATIONS || layer === LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS) ? <MdDirectionsRailwayFilled size={24} color="#5f2abb" /> :
                   (layer === LAYERS.HIGHWAY || layer === LAYERS.DEFAULT_LAYER.HIGHWAY) ? <FaRoad size={24} color="#5f2abb" /> :
@@ -251,9 +250,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
     let sourceId = 'line-string' + "_" + layer;
     let lineStringLayerId = 'line-string-layer' + "_" + layer;
     let name = "";
-    if (detail != undefined && detail != null) {
-      console.log("Detail in addConnectivityLayer", detail);
-      
+    if (detail != undefined && detail != null) {      
       switch (layer) {
         case LAYERS.DEFAULT_LAYER.SUB_STATIONS:
           name = detail.name+" Sub Station";
@@ -396,13 +393,8 @@ const SingleMap = ({ selectedProperty, intension }) => {
     // selectedProperty.non_essential_vendor_details.forEach((item,index) => {
 
     // });
-    console.log("data in loadVendorlayer", data);
     if (data.length > 0) {
       data.forEach((item) => {
-        if (item.supplyName === undefined || item.supplyName === null) {
-          console.log("Supply name in loadVendorlayer", item.supplyName);
-        }
-
         if (item.latitude_longitude != null && item.latitude_longitude != "") {
           item.coordinates = item.latitude_longitude;
         }
@@ -420,7 +412,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
         if (item.latitude_longitude != null && item.latitude_longitude != "") {
           count++;
           let vendorSourceId = 'line-string_' + count + "_" + LAYERS.DEFAULT_LAYER.VENDOR;
-          let vendorLineStringLayerId = 'line-string-layer_' + count + "_" + LAYERS.DEFAULT_LAYER.VENDOR;
+          let vendorLayerId = "default-layer_" + LAYERS.DEFAULT_LAYER.VENDOR + "_" + count;
           let coord = item.latitude_longitude.replace(" ", "").split(",").map(Number);
           // addSingleLineLayer(vendorSourceId, vendorLineStringLayerId, [coord[1], coord[0]], [lng, lat], '#5b96d8');
           var [vendorLongitude, vendorLatitude] = item.coordinates.split(",").map(Number);
@@ -440,14 +432,14 @@ const SingleMap = ({ selectedProperty, intension }) => {
             curvedDirectionValue = DIRECTIONS.RIGHT;
           }
             
-          generateCurveLine({ sourceId: vendorSourceId, layerId: vendorLineStringLayerId, from: [coord[1], coord[0]], to: [lng, lat], linecolor: '#5b96d8', labelText: labelText,curvature:curvedDirectionValue });
+          generateCurveLine({ sourceId: vendorSourceId, layerId: vendorLayerId, from: [coord[1], coord[0]], to: [lng, lat], linecolor: '#5b96d8', labelText: labelText,curvature:curvedDirectionValue });
         }
       });
     }
 
     //#region Add Connectivity Layers
     try {
-      if (copyiedSelectedProperty.nearest_airport_coord != null && copyiedSelectedProperty.nearest_airport_coord != "") {
+      if (copyiedSelectedProperty.nearest_airport != null && copyiedSelectedProperty.nearest_airport != "") {
         // const airportCoord = copyiedSelectedProperty.nearest_airport_coord.replace(" ", "").split(",").map(Number);        
         nearestAirportDetail = await getDataForSingleLayer("Airport", { "name": copyiedSelectedProperty?.nearest_airport });
         if (nearestAirportDetail.data.length > 0) {
@@ -488,7 +480,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
         addConnectivityLayer(LAYERS.DEFAULT_LAYER.HIGHWAY, [highwayCoord[1], highwayCoord[0]], [lng, lat],null,DIRECTIONS.LEFT);
       }
     } catch (error) {
-      console.error("Error in adding marker:", error);
+      // console.error("Error in adding marker:", error);
     }
     //#endregion
   }
@@ -518,16 +510,28 @@ const SingleMap = ({ selectedProperty, intension }) => {
 
   const addDistanceLabel = (coord, text, id) => {
     const supplyNameEl = document.createElement('div');
-    supplyNameEl.style.background = 'rgba(0, 0, 0, 0.75)';
-    supplyNameEl.style.color = '#fff';
+    // supplyNameEl.style.background = 'rgba(0, 0, 0, 0.75)';
+    // supplyNameEl.style.color = '#fff';
+    // supplyNameEl.style.padding = '4px 8px';
+    // supplyNameEl.style.borderRadius = '6px';
+    // supplyNameEl.style.border = '2px solid grey';
+    // supplyNameEl.style.fontSize = '12px';
+    // supplyNameEl.style.fontWeight = 'bold';
+    // supplyNameEl.style.zIndex=2;
+    // supplyNameEl.setAttribute("data-name", "distance-label");
+    // supplyNameEl.innerHTML = `${text}`;
+    supplyNameEl.style.backgroundColor = '#ffffff';
+    supplyNameEl.style.color = '#00000';
+    // supplyNameEl.style.color = '#fff';
     supplyNameEl.style.padding = '4px 8px';
     supplyNameEl.style.borderRadius = '6px';
-    supplyNameEl.style.border = '2px solid grey';
-    supplyNameEl.style.fontSize = '12px';
+    supplyNameEl.style.fontSize = '10px';
+    supplyNameEl.style.whiteSpace = 'nowrap';
     supplyNameEl.style.fontWeight = 'bold';
-    supplyNameEl.style.zIndex=2;
-    supplyNameEl.setAttribute("data-name", id);
+    supplyNameEl.setAttribute("data-name", "distance-label");
     supplyNameEl.innerHTML = `${text}`;
+    supplyNameEl.style.border = '1px solid grey';
+    supplyNameEl.style.zIndex = 2;
 
     new mapboxgl.Marker({
       element: supplyNameEl,
@@ -552,7 +556,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
         ...copyiedSelectedProperty.essential_vendor_all_details,
         ...copyiedSelectedProperty.non_essential_vendor_all_details
       ];
-      console.log("")
+
       if (data.length > 0) {
         data.forEach((item) => {
           if (item.latitude_longitude != null && item.latitude_longitude != "") {
@@ -570,7 +574,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
         const res = await getDataForSingleLayer(docTypeName);
         bindDataOnMap(res.data, layerType);
       } catch (error) {
-        console.error(`Failed to load data for ${layerType}:`, error);
+        // console.error(`Failed to load data for ${layerType}:`, error);
       }
     }
 
@@ -619,7 +623,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
         div.remove();
       });
       //remove all default connectivity distance lable divs
-      let allDefaultConnectivityLabelDiv = document.querySelectorAll('[data-name="default-connectivity-distance-lable"]');
+      let allDefaultConnectivityLabelDiv = document.querySelectorAll('[data-name="distance-label"]');
       allDefaultConnectivityLabelDiv.forEach((div) => {
         div.remove();
       });
@@ -631,11 +635,11 @@ const SingleMap = ({ selectedProperty, intension }) => {
     const midLng = (coord1[1] + coord2[1]) / 2;
     return [midLat, midLng];
   }
-  function getDistance(p1, p2) {
-    const dx = p2[0] - p1[0];
-    const dy = p2[1] - p1[1];
-    return Math.sqrt(dx * dx + dy * dy);
-  }
+  // function getDistance(p1, p2) {
+  //   const dx = p2[0] - p1[0];
+  //   const dy = p2[1] - p1[1];
+  //   return Math.sqrt(dx * dx + dy * dy);
+  // }
 
   function interpolate(p1, p2, t) {
     return [
@@ -718,12 +722,12 @@ const SingleMap = ({ selectedProperty, intension }) => {
               justifyContent: 'center'
             }}>
               {
-                (layer === LAYERS.SUB_STATIONS || layer === LAYERS.DEFAULT_LAYER.SUB_STATIONS) ? <SlEnergy size={24} color="#5f2abb" /> :
-                  (layer === LAYERS.AIRPORTS || layer === LAYERS.DEFAULT_LAYER.AIRPORTS) ? <CiAirportSign1 size={24} color="#5f2abb" /> :
-                    (layer === LAYERS.SEAPORTS || layer === LAYERS.DEFAULT_LAYER.SEAPORTS) ? <RiShip2Line size={24} color="#5f2abb" /> :
-                      (layer === LAYERS.RAILWAY_STATIONS || layer === LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS) ? <MdDirectionsRailwayFilled size={24} color="#5f2abb" /> :
-                        (layer === LAYERS.HIGHWAY || layer === LAYERS.DEFAULT_LAYER.HIGHWAY) ? <FaRoad size={24} color="#5f2abb" /> :
-                          (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) ? <FaStore size={24} color="#5b96d8" /> :
+                (layer === LAYERS.SUB_STATIONS || layer === LAYERS.DEFAULT_LAYER.SUB_STATIONS) ? <SlEnergy size={20} color="#5f2abb" /> :
+                  (layer === LAYERS.AIRPORTS || layer === LAYERS.DEFAULT_LAYER.AIRPORTS) ? <MdAirplanemodeActive size={20} color="#5f2abb" /> :
+                    (layer === LAYERS.SEAPORTS || layer === LAYERS.DEFAULT_LAYER.SEAPORTS) ? <RiShip2Line size={20} color="#5f2abb" /> :
+                      (layer === LAYERS.RAILWAY_STATIONS || layer === LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS) ? <MdDirectionsRailwayFilled size={20} color="#5f2abb" /> :
+                        (layer === LAYERS.HIGHWAY || layer === LAYERS.DEFAULT_LAYER.HIGHWAY) ? <FaRoad size={20} color="#5f2abb" /> :
+                          (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) ? <FaStore size={20} color="#5b96d8" /> :
                             ""
               }
 
@@ -802,11 +806,11 @@ const SingleMap = ({ selectedProperty, intension }) => {
           }
         }
         else {
-          console.error("Invalid coordinate " + item.coordinates + " for vendor " + data.name)
+          // console.error("Invalid coordinate " + item.coordinates + " for vendor " + data.name)
         }
       });
     } catch (error) {
-      console.error("Error in bindDataOnMap:", error);
+      // console.error("Error in bindDataOnMap:", error);
     }
 
   }
@@ -921,7 +925,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
     mapRef.current.flyTo({
       //center: "", //fetches default coordinates
       essential: true, // this animation is considered essential with respect to prefers-reduced-motion
-      zoom: 7, //sets default zoom level
+      zoom: 4, //sets default zoom level
     });
   };
   //zoom in the map
@@ -944,44 +948,9 @@ const SingleMap = ({ selectedProperty, intension }) => {
     mapRef.current.zoomTo(newZoom);
   };
 
-  // Function to generate curved (Bézier) coordinates
-  const getCurvedLine = (start, end, curvature = 0.4, numPoints = 150) => {
-    const [x0, y0] = start;
-    const [x2, y2] = end;
-
-    // Midpoint between start and end
-    const mx = (x0 + x2) / 2;
-    const my = (y0 + y2) / 2;
-
-    // Direction vector from start to end
-    const dx = x2 - x0;
-    const dy = y2 - y0;
-
-    // ✅ These two lines define the direction and strength of the curve
-    //    Change the sign of `curvature` to bend left or right
-    const offsetX = -dy * curvature; // Perpendicular to the line (left/right deviation)
-    const offsetY = dx * curvature;  // Perpendicular to the line (left/right deviation)
-
-    // Control point: the "pull" of the curve
-    const cx = mx + offsetX;
-    const cy = my + offsetY;
-
-    // Generate points along a quadratic Bézier curve
-    const curve = [];
-    for (let t = 0; t <= 1; t += 1 / numPoints) {
-      const x = (1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * x2;
-      const y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * cy + t * t * y2;
-      curve.push([x, y]);
-    }
-
-    return curve;
-  }
-
-
   const generateCurveLine = ({ sourceId = "", layerId = "", from = "", to = "", linecolor = "", curvature = 0.4, labelText = "" } = {}) => {
     let getCurvedLineCoord = getCurvedLine(from, to, curvature);
     getCurvedLineCoord.push(to);
-    console.log("curved line for ", layerId, getCurvedLineCoord, from, to)
     mapRef.current.addSource(sourceId, {
       type: 'geojson',
       data: {
@@ -1000,7 +969,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
       paint: {
         'line-color': linecolor,
         'line-width': 1.5,
-        'line-dasharray': [1, 1] // very short "dot", longer gap
+        // 'line-dasharray': [1, 1] // very short "dot", longer gap
       }
     });
 
@@ -1042,7 +1011,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                     className="accordion-header"
                     onClick={(e) => toggleAccordion(e)}
                   >
-                    <span className="main-header-font color-green">
+                    <span className="text-lg font-bold text-green-600">
                       Map Options
                     </span>
                     <span className="icon">
@@ -1069,7 +1038,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                         className="accordion-header"
                         onClick={(e) => toggleAccordion(e)}
                       >
-                        <span className="child-header-font color-green">
+                        <span className="text-base font-semibold text-green-600">
                           Basic Layers
                         </span>
                         <br />
@@ -1092,7 +1061,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                       <div className="accordion-content">
                         <div className="select-options">
                           <span
-                            className="cusor-pointer font-14 font-b color-green"
+                            className="cursor-pointer text-base tracking-wide font-medium text-green-600"
                             onClick={() =>
                               handleAllClick("traffic-section", true)
                             }
@@ -1101,7 +1070,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                           </span>{" "}
                           |{" "}
                           <span
-                            className="cusor-pointer font-14 font-b color-green"
+                            className="cursor-pointer text-base tracking-wide font-medium text-green-600"
                             onClick={() =>
                               handleAllClick("traffic-section", false)
                             }
@@ -1112,121 +1081,103 @@ const SingleMap = ({ selectedProperty, intension }) => {
                         </div>
                         <ul>
                           <li className="li-container">
-                            <label className="custom-checkbox">
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.DEFAULT_LAYER.LABEL}
                               />
                               <span className="checkmark"></span>
+                              <span>
+                                <IoLayersOutline size={20} className="text-[#5f2abb]" />
+                              </span>
+                              <span className="text-sm font-medium">
+                                {LAYERS.DEFAULT_LAYER.LABEL}
+                              </span>
                             </label>
-                            <span>
-                              <IoLayersOutline size={20} color="black" />
-                            </span>
-                            <span className="ml-5 color-black">
-                              {LAYERS.DEFAULT_LAYER.LABEL}
-                            </span>
                           </li>
                           <li className="li-container">
 
-                            <label className="custom-checkbox">
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.SUB_STATIONS}
                               />
                               <span className="checkmark"></span>
+                              <span>
+                                <SlEnergy size={20} className="text-[#5f2abb]" />
+                              </span>
+                            
+                              <span className="text-sm font-medium">
+                                {LAYERS.SUB_STATIONS}
+                              </span>
                             </label>
-                            <span>
-                              <SlEnergy size={20} color="black" />
-                            </span>
-                            {/* <img
-                                    src={<SlEnergy />}
-                                    alt="Icon"
-                                  /> */}
-                            <span className="ml-5 color-black">
-                              {LAYERS.SUB_STATIONS}
-                            </span>
                           </li>
                           <li className="li-container">
 
-                            <label className="custom-checkbox">
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.AIRPORTS}
                               />
                               <span className="checkmark"></span>
+                              <span>
+                                <MdAirplanemodeActive size={20} className="text-[#5f2abb]" />
+                              </span>
+                            
+                              <span className="text-sm font-medium">
+                                {LAYERS.AIRPORTS}
+                              </span>
                             </label>
-                            <span>
-                              <CiAirportSign1 size={20} color="black" />
-                            </span>
-                            {/* <img
-                                  src={getIcon(
-                                    enumData.trafficLayerType.CONSTRUCTION_ALERT
-                                  )}
-                                  alt="Icon"
-                                /> */}
-                            <span className="ml-5 color-black">
-                              {LAYERS.AIRPORTS}
-                            </span>
                           </li>
                           <li className="li-container">
 
-                            <label className="custom-checkbox">
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.SEAPORTS}
                               />
                               <span className="checkmark"></span>
+                              <span>
+                                <RiShip2Line size={20} className="text-[#5f2abb]" />
+                              </span>
+                            
+                              <span className="text-sm font-medium">
+                                {LAYERS.SEAPORTS}
+                              </span>
                             </label>
-                            <span>
-                              <RiShip2Line size={20} color="black" />
-                            </span>
-                            {/* <img
-                                  src={getIcon(
-                                    enumData.trafficLayerType.TRAFFIC_INCIDENT
-                                  )}
-                                  alt="Icon"
-                                /> */}
-                            <span className="ml-5 color-black">
-                              {LAYERS.SEAPORTS}
-                            </span>
                           </li>
                           <li className="li-container">
 
-                            <label className="custom-checkbox">
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.RAILWAY_STATIONS}
                               />
                               <span className="checkmark"></span>
+                              <span>
+                                <MdDirectionsRailwayFilled size={20} className="text-[#5f2abb]" />
+                              </span>
+                            
+                              <span className="text-sm font-medium">
+                                {LAYERS.RAILWAY_STATIONS}
+                              </span>
                             </label>
-                            <span>
-                              <MdDirectionsRailwayFilled size={20} color="black" />
-                            </span>
-                            {/* <img
-                                  src={getIcon(
-                                    enumData.trafficLayerType.CONSTRUCTION_ALERT
-                                  )}
-                                  alt="Icon"
-                                /> */}
-                            <span className="ml-5 color-black">
-                              {LAYERS.RAILWAY_STATIONS}
-                            </span>
                           </li>
                           <li className="li-container">
 
-                            <label className="custom-checkbox">
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.VENDOR}
                               />
                               <span className="checkmark"></span>
+                              <span>
+                                <FaStore size={20} className="text-[#5f2abb]" />
+                              </span>
+                              <span className="text-sm font-medium">
+                                {LAYERS.VENDOR}
+                              </span>
                             </label>
-                            <span>
-                              <FaStore size={20} color="black" />
-                            </span>
-                            <span className="ml-5 color-black">
-                              {LAYERS.VENDOR}
-                            </span>
                           </li>
                         </ul>
                       </div>

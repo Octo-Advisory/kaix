@@ -97,7 +97,24 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         df_with_property_wise_individual_score = calculate_property_suitability(df_for_property_wise_individual_score,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user)
         df_with_property_wise_individual_score.sort_values(by=["property_suitability_score"], ascending=False)
         final_property_ranking_for_decision = pd.DataFrame({"Property_ID": list(property_employment_df["property_id"].unique())})
-        final_property_ranking_for_decision = pd.merge(final_property_ranking_for_decision, property_employment_df[["property_id","Network Connectivity", "taxes", "local_laws", "market_trends"]].drop_duplicates(), left_on="Property_ID", right_on="property_id", how='left').drop(columns=["property_id"])
+        cols = ["property_id", "Network Connectivity", "taxes", "local_laws", "market_trends"]
+
+        right = (
+            property_employment_df[cols]
+            .drop_duplicates(subset=["property_id"])  # <-- key change
+        )
+
+        final_property_ranking_for_decision = (
+            pd.merge(
+                final_property_ranking_for_decision,
+                right,
+                left_on="Property_ID",
+                right_on="property_id",
+                how="left",
+            )
+            .drop(columns=["property_id"])
+        )
+
         with open("log2.txt", "a") as file:
             file.write(f"\n DF WITH SCORES AND MARKET TRENDsssssssssssssssssssssssssssssssS {final_property_ranking_for_decision}")
         final_property_ranking_for_decision = pd.merge(final_property_ranking_for_decision, df_with_property_wise_individual_score[["property_id","property_suitability_score"]], left_on="Property_ID", right_on="property_id", how='left').drop(columns=["property_id"])
@@ -462,6 +479,7 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
     except Exception as e:
         update_process(chatId,"Analyzing Data","Fail",0)
         error_details = traceback.format_exc()
+        
         log_to_file("main error",str(error_details))
         response = {
                 "Analytics_response": f"Error From Analytics :- {e}",

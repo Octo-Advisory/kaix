@@ -66,6 +66,29 @@ with open("testlog.txt", "a") as file:
 # with open("testlog.txt", "a") as file:
 #     file.write(f"\n%%%%%%%% Model: gpt-4o")
 
+INDUSTRY_NOT_AVAILABLE_MSG = (
+    "Thank you for sharing your requirements. The industry/product you’re exploring isn’t in our current coverage just yet. "
+    "We’re actively expanding to include a wider range of industries and product lines—your request helps us prioritize. "
+    "We’ve recorded your details, and our team will review them and get in touch with you soon. "
+    "We truly value your interest as we grow."
+)
+
+
+LOCATION_NOT_AVAILABLE_MSG = (
+    "Thank you for sharing your requirements. The location you’ve requested is currently outside our coverage. "
+    "Good news: we’re steadily adding more cities, districts, and states to broaden our reach. "
+    "We’ve logged your query, and our team will review it and get in touch with you soon. "
+    "We appreciate your interest as we expand our map."
+)
+
+SUPPLIES_NOT_AVAILABLE_MSG = (
+    "Thank you for sharing your requirements. The supplies you’re looking for (raw materials, services, or equipment) "
+    "aren’t available in our catalog yet. We’re rapidly onboarding more supply categories and vendors to serve requests like yours. "
+    "We’ve recorded your details, and our team will review them and reach out to you soon. "
+    "Thanks for helping us grow."
+)
+
+
 # Load the SpaCy model for better entity recognition
 nlp = spacy.load("en_core_web_lg")
 
@@ -298,20 +321,20 @@ def classify_query(
     chat_history = get_chat(f"chat_{chatId}") or []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
 
-    query = f"""
-    SELECT 1
-    FROM `tabSession` AS s
-    JOIN `tabChat history` AS ch
-    ON s.name = ch.parent
-    WHERE s.name = '{chatId}'
-    AND ch.result IS NOT NULL
-    AND TRIM(ch.result) != ''
-    LIMIT 1
-    """
+    # query = f"""
+    # SELECT 1
+    # FROM `tabSession` AS s
+    # JOIN `tabChat history` AS ch
+    # ON s.name = ch.parent
+    # WHERE s.name = '{chatId}'
+    # AND ch.result IS NOT NULL
+    # AND TRIM(ch.result) != ''
+    # LIMIT 1
+    # """
 
-    result = frappe.db.sql(query)
+    # result = frappe.db.sql(query)
 
-    is_result_shown = bool(result)
+    is_result_shown = False
 
     if is_result_shown:
         # Post Result
@@ -355,7 +378,10 @@ Categories & Their Definitions:
     - This category is used for queries about finding suppliers, manufacturers, or vendors for raw materials, equipment, or services.
 
 3. Query to search Incentives:  
-    - Example: What benefits are available for setting up a cement manufacturing plant in XYZ area?  
+    - Example: 
+        - What benefits are available for setting up a cement manufacturing plant in XYZ area?  
+        - Tell me the government incentives for cement industry in Vadodara,Gujarat
+        - Incentive for Anand Cement
     - This category is used for queries asking about government incentives, grants, or subsidies related to setting up or expanding an industry.
 
 4. Query to Get Approvals:  
@@ -378,7 +404,9 @@ Categories & Their Definitions:
 If None of the Above Apply, Use These Two Categories:
 
 7. Other industry-related queries:  
-    - Example: What is the role of AI in manufacturing?  
+    - Example: 
+        - What is the role of AI in manufacturing?  
+        - What investment amount is needed for setting up a bottle manufacturing industry?
     - This refers to general industry discussions, trends, or innovations that do not fit into the above categories.
     - Queries about selling property, renting facilities, or unrelated infrastructure transactions should be classified here.
 
@@ -569,71 +597,263 @@ If the query appears vague, generic, or refers to a specific vendor, policy, or 
 
 Categories & Their Definitions:
 
-1. Query to build industry from Scratch:  
-    - Examples: 
-        - I want to build a 1 TPA Cement Factory. 
-        - What are the land options for the chemical industry in Surat? 
-        - Tell me the land availability for the agricultural industry in Bharuch.
-        - I want to buy a 1 tpa cement industry
-    - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
-    - Assign this category if the user's query indicates any intent to establish, set up, construct, initiate, develop, or start a new industry or factory, regardless of the exact words used.  
-    - The classification must be based on understanding the overall intent and context rather than focusing on specific words like "build" or "establish."  
-    - Queries about buying property for building an industry may fall under this category only if the intent to use that property for setting up an industry is clearly indicated.  
-    - Queries about selling property, renting land, or general property transactions that do not involve setting up an industry should not be classified under this category.  
-    - If the intent to build is unclear, vague, or mixed with other topics, classify it under "Other industry-related queries."
+1. "Query to build industry from Scratch"  
+
+    Examples:  
+    - I want to build a 1 TPA Cement Factory.  
+    - What are the land options for the chemical industry in Surat?  
+    - Tell me the land availability for the agricultural industry in Bharuch.  
+    - I want to buy a 1 TPA cement industry  
+    - 1 MTPA Cement Industry  
+    - 1 million barrels per month petrochemical industry  
+
+    Core Definition:  
+    Classify here for queries where the user wants to start, establish, or set up a new manufacturing industry — whether:  
+    - Explicitly stated (clear build/setup request), or  
+    - Implied/vague but reasonably indicating intent to search for or explore manufacturing industry setup options.  
+
+    This includes:  
+    - Queries that are short, incomplete, or ambiguous but clearly mention an **industry type, capacity, or location** in the context of building/starting from scratch.  
+    - Vague references like “1 MTPA Cement Industry”, “1 metric tonne per month tablets industry”, etc. — treat these as build/setup intent unless they are clearly about industrial setup **guidance** details (see below).  
+
+    Explicit Action‑Oriented Trigger Phrases:  
+    If the query contains any of these phrases, it is always “Query to build industry from Scratch”:  
+    - “Build a factory for…”  
+    - “Set up a manufacturing unit for…”  
+    - “Start an industry for…”  
+    - “Establish a plant for…”  
+    - “Construct a facility for…”  
+    - “Buy land for setting up…”  
+
+    When to Classify as “Other industry‑related queries” Instead:  
+    Only classify as Other industry‑related queries if:  
+    1. The query clearly asks for details or guidance about industrial setup **without** an implied intent to search for or initiate the build itself.  
+    2. The query is purely informational or advisory about setup processes, requirements, or characteristics — not about finding or acquiring land/facilities to start manufacturing.  
+
+    Exclusion Examples (These go to Other industry‑related queries):  
+    - General industrial setup guidance:  
+    - What investment is needed for setting up a cement plant?  
+    - What are the best characteristics of land for a cement factory? 
+    - How to start a cement factory   
+    - Evaluation questions:  
+    - How to evaluate land for a cement setup?  
+    - How to vet vendors for my cement plant?  
+    - Supply-related queries:  
+    - What supplies are needed for cement production?  
+    - What is the proportion of raw material to cement production?  
+    - Non‑manufacturing property queries:  
+    - I want to rent a shop in Mangal Bazaar, Vadodara.  
+    - Looking for office space for my IT startup.  
+    - Want to sell 10 acres of farmland in Nashik.  
+    - Need warehouse space for my trading business.  
+    - Looking for a place to open a hospital.  
+    - Want to buy an existing textile shop.   
+    - I want to buy land to grow unicorns.  
+
+    Final Rule:  
+    Default to “Query to build industry from Scratch” for any query mentioning industry type, capacity, or location in the context of manufacturing setup, unless it is damn sure the user is asking for setup guidance or purely informational content. This ensures vague but build‑intended queries are captured correctly, while truly informational‑only queries remain in “Other industry‑related queries”.
+
 
 2. "Query to search Vendors"  
-    - Example: I am searching for a vendor who supplies pharmaceutical-grade raw chemicals.  
-    - For queries where the user is clearly searching for or requesting vendor/supplier/manufacturer options for materials, components, or services.
 
-    - Include this category only if the query expresses a clear intent to search, such as:
-        - “Show me vendors who supply X”
-        - “Find suppliers for copper wiring”
-        - “Search for manufacturers of solar panels in Gujarat”
-        - “List vendors for plastic injection machines”
+    Examples:  
+    - I am searching for a vendor who supplies pharmaceutical-grade raw chemicals.  
+    - Show me vendors for steel rods in Ahmedabad.  
+    - Search for suppliers of plastic granules in Vapi.  
+    - List manufacturers who produce glass bottles near Surat.  
+    - Vendors for Anand Cement  
+    - Steel supplier who has ISO 9001 certificate  
 
-    - DO NOT classify under this category if the user is simply asking about a specific vendor’s features, capabilities, product types, or company information — without asking to retrieve or explore multiple vendor options.
+    Core Definition:  
+    Classify here for queries where the user wants to explore, retrieve, or list vendor, supplier, or manufacturer options for materials, components, products, or services — whether:  
+    - Explicitly stated (clear search request), or  
+    - Implied/vague but reasonably indicating search intent.  
 
-        - These should be classified as “Other industry-related queries” instead.
+    This includes:  
+    - Queries that are short, incomplete, or ambiguous but clearly mention “vendor(s)”, “supplier(s)”, “manufacturer(s)”, or “producer(s)” in relation to an industry, supply/suppies, location, or business type.  
+    - Vague vendor references like “Vendors for cement in Vadodara”, “Vendor Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
+
+    Explicit Action‑Oriented Trigger Phrases:  
+    If the query contains any of these phrases, it is always “Query to search Vendors”:  
+    - “Show me vendors for…”  
+    - “List suppliers of…”  
+    - “Search for manufacturers of…”  
+    - “Find suppliers for…”  
+    - “Get me vendors for…”  
+    - “Retrieve producers of…”  
+
+    When to Classify as “Other industry‑related queries” Instead:  
+    Only classify as Other industry‑related queries if:  
+    1. The query clearly asks for details about a specific known vendor without any implied search or exploration intent.  
+    2. The query is purely informational or definitional about a vendor or supply type.  
+
+    Exclusion Examples (These go to Other industry‑related queries):  
+    - General information:  
+    - What does Maniratna Metal Industries supply?  
+    - What supplies are needed for cement production?  
+    - Company capability details:  
+    - What are the past clients of Anand Cement?  
+    - What standard certifications does Maheta Pvt Ltd have?  
+    - Definitions:  
+    - What is an ISO 9001 certificate?  
+    - Specific detail request:  
+    - What products does Agriland Biotech supply?  
+    - What are all raw materials needed for school bag production?  
+    - What is the proportion of raw material to cement production?  
+
+    Final Rule:  
+    Default to “Query to search Vendors” for any query mentioning vendors, suppliers, manufacturers, or producers in an industry/location/business/supply context, unless it is damn sure the user is asking for details of one known vendor or purely informational content. This ensures vague but search‑intended queries are captured correctly, while truly informational‑only queries remain in “Other industry‑related queries”.
 
 
 3. "Query to search Incentives"  
-    - Example: What benefits are available for setting up a cement plant in XYZ area?  
-    - For queries explicitly asking to search, list, retrieve, or view government incentives, grants, subsidies, or financial schemes.
 
-    - Include only if the user’s intent is clearly action-oriented, using phrases like:
-        - “Show me incentive schemes…”
-        - “List the available incentives…”
-        - “Search for schemes applicable to...”
-        - “Retrieve incentives under XYZ policy...”
+    Examples:  
+    - What benefits are available for setting up a cement plant in XYZ area?  
+    - Tell me the government incentives for cement industry in Vadodara, Gujarat  
+    - Incentive for Anand Cement  
+    - Search for green estate incentives for cement industry  
 
-    - Do NOT classify as “Query to search Incentives” if the user simply asks for general information, definitions, program status, eligibility, or names of schemes — without any explicit search intent.
-        - These should be classified under “Other industry-related queries” instead.
+    Core Definition:  
+    Classify here for queries where the user wants to explore, retrieve, or list incentives, subsidies, grants, or financial schemes — whether:  
+    - Explicitly stated (clear search request), or  
+    - Implied/vague but reasonably indicating search intent.  
+
+    This includes:  
+    - Queries that are short, incomplete, or ambiguous but clearly mention “incentive(s)” in relation to an industry, location, or business type.  
+    - Vague incentive references like “Incentive for cement in Vadodara”, “Incentive Anand Cement”, etc. — treat these as search intent unless they are clearly detail-focused (see below).  
+
+    Explicit Action-Oriented Trigger Phrases:  
+    If the query contains any of these phrases, it is always “Query to search Incentives”:  
+    - “Show me incentive schemes…”  
+    - “List the available incentives…”  
+    - “Search for schemes applicable to…”  
+    - “Retrieve incentives under XYZ policy…”  
+    - “Find subsidies for…”  
+    - “Give me incentives for…”  
+
+    When to Classify as “Other industry-related queries” Instead:  
+    Only classify as Other industry-related queries if:  
+    1. The query clearly asks for details about a specific known incentive or scheme without any implied search or exploration intent.  
+    2. The query is purely informational or definitional about an incentive.  
+
+    Exclusion Examples (These go to Other industry-related queries):  
+    - General information:  
+    - What assistance is available under Startup Innovation Gujarat-2020?  
+    - What is the eligibility under CGTMSE?  
+    - Definitions:  
+    - What is CGTMSE?  
+    - Program status:  
+    - What is the incentive program period of the Gujarat Industrial Policy?  
+    - Eligibility checks:  
+    - What is the eligibility for Startup Innovation Gujarat-2020?  
+    - Specific detail request:  
+    - What is the quantum of assistance under Gujarat Industrial Policy?  
+    - I want to know about the green estate incentive for cement industry (meaning — details about that scheme, not finding other schemes).  
+
+    Final Rule:  
+    Default to “Query to search Incentives” for any query mentioning incentives in an industry/location/business context, unless it is damn sure the user is asking for details of one known incentive or purely informational content. This ensures vague but search-intended queries are captured correctly, while truly informational-only queries remain in “Other industry-related queries”.
 
 
 4. "Query to Get Approvals"  
-    - Example: I want to get approval for my cement plant.  
-    - For queries where the user is clearly seeking to search, find, or retrieve approval requirements, processes, or documents needed for setting up or running a business or industry.
 
-    - Include only if the query expresses action-oriented search intent, such as:
-        - “What approvals are needed to start a cement factory?”
-        - “List required clearances for food processing industry”
-        - “Which licenses are needed in Surat for pharma manufacturing?”
+    Examples:  
+    - I want to get approval for my cement plant.  
+    - What approvals are required to start a dairy in Gujarat?  
+    - Search approvals for textile manufacturing in Valsad.  
+    - What licenses do I need for food processing in Vadodara?  
+    - Approvals for Anand Cement  
+    - Search for tree cutting approvals for cement industry  
 
-    - DO NOT include this category if the user is only asking for:
-        - Approval definitions
-        - Names of departments
-        - Application mode or status
-        - Specific approval name without search context
+    Core Definition:  
+    Classify here for queries where the user wants to explore, retrieve, or list approvals, licenses, clearances, or permissions needed for setting up or running a business or industry — whether:  
+    - Explicitly stated (clear search request), or  
+    - Implied/vague but reasonably indicating search intent.  
 
-        - These should be classified as “Other industry-related queries” instead.
+    This includes:  
+    - Queries that are short, incomplete, or ambiguous but clearly mention “approval(s)”, “license(s)”, “clearance(s)”, or “permission(s)” in relation to an industry, location, or business type.  
+    - Vague approval references like “Approval for cement in Vadodara”, “Approval Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
 
-5. Query to Get Employee Search:  
-    - Example: 
-        - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
-        - What are the labor options for agricultural industry in Vadodara?
-    - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
+    Explicit Action‑Oriented Trigger Phrases:  
+    If the query contains any of these phrases, it is always “Query to Get Approvals”:  
+    - “Show me approvals for…”  
+    - “List the required approvals…”  
+    - “Search for licenses needed for…”  
+    - “Retrieve clearance requirements for…”  
+    - “Find permissions for…”  
+    - “Get me approvals for…”  
 
+    When to Classify as “Other industry‑related queries” Instead:  
+    Only classify as Other industry‑related queries if:  
+    1. The query clearly asks for details about a specific known approval without any implied search or exploration intent.  
+    2. The query is purely informational or definitional about an approval.  
+
+    Exclusion Examples (These go to Other industry‑related queries):  
+    - General information:  
+    - From which department is the Factory Plan application taken?  
+    - Which department handles Factory License?  
+    - Definitions:  
+    - What is Environment Clearance?  
+    - Process/timeframe details:  
+    - How long does it take to get Environment Clearance?  
+    - What is the process for Solid Waste Authorization Module (under Solid Waste Management Rules, 2016)?  
+    - Specific detail request:  
+    - What department issues Tree Cutting Approval?  
+    - I want to know about the tree cutting approval for cement industry (meaning — details about that approval, not finding other required approvals).  
+
+    Final Rule:  
+    Default to “Query to Get Approvals” for any query mentioning approvals, licenses, clearances, or permissions in an industry/location/business context, unless it is damn sure the user is asking for details of one known approval or purely informational content. This ensures vague but search‑intended queries are captured correctly, while truly informational‑only queries remain in “Other industry‑related queries”.
+
+
+5. "Query to Get Employee Search"  
+
+    Examples:  
+    - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
+    - What are the labor options for agricultural industry in Vadodara?  
+    - Employment for Anand Cement  
+    - Search for skilled workers for textile industry in Surat  
+    - Labour statistics for cement industry in Gujarat  
+
+    Core Definition:  
+    Classify here for queries where the user wants to explore, retrieve, or list options for employees, workers, or labour for an industry — whether:  
+    - Explicitly stated (clear search/recruitment request), or  
+    - Implied/vague but reasonably indicating search intent.  
+
+    This includes:  
+    - Queries that are short, incomplete, or ambiguous but clearly mention “employment”, “employees”, “labour”, “workers”, or “manpower” in relation to an industry, location, or business type.  
+    - Vague references like “Employment for cement in Vadodara”, “Labour for Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
+
+    Explicit Action‑Oriented Trigger Phrases:  
+    If the query contains any of these phrases, it is always “Query to Get Employee Search”:  
+    - “Show me workers for…”  
+    - “List available labour for…”  
+    - “Search for employees in…”  
+    - “Find skilled manpower for…”  
+    - “Get me labour for…”  
+    - “Recruit workers for…”  
+
+    When to Classify as “Other industry‑related queries” Instead:  
+    Only classify as Other industry‑related queries if:  
+    1. The query clearly asks for details about employment concepts, definitions, or company‑specific employment information without any implied search/recruitment intent.  
+    2. The query is purely informational about employment types, workforce structures, or general labour concepts.  
+
+    Exclusion Examples (These go to Other industry‑related queries):  
+    - General employment information:  
+    - What does semi‑skilled employment mean?  
+    - Who comes under skilled labour category?  
+    - Employment statistics or company‑specific data:  
+    - What is the employee strength of Reliance Industries?  
+    - What does employee strength mean for an industry?  
+    - Workforce requirement details:  
+    - What kinds of employee types are needed for cement industry setup?  
+    - What are all the employee and job roles needed to start a mining industry?  
+    - Certification or job standard queries:  
+    - What are the standard duties of a machinist?  
+    - What qualifications are needed for an AI developer?  
+
+    Final Rule:  
+    Default to “Query to Get Employee Search” for any query mentioning employment, workers, labour, or manpower in an industry/location/business context, unless it is damn sure the user is asking for definitions, conceptual explanations, or specific company employment statistics. This ensures vague but search‑intended queries are captured correctly, while truly informational‑only queries remain in “Other industry‑related queries”.
+
+    
 6. "Negatively Intended Query"  
     IMPORTANT RULE: If the user mentions one or more factors negatively, but also clearly mentions any one factor positively,  
     you MUST NOT return "Negatively Intended Query". Only return the categories that reflect the user’s positive interest.  
@@ -666,87 +886,122 @@ Categories & Their Definitions:
 
 If None of the Above Apply, Use These Two Categories:
 
-7. "Other industry-related queries"  
-    - Example: What is the role of AI in manufacturing?  
-    - For industry-related questions that don’t fit into the specific categories above (e.g., trends, innovation, non-supply chain topics).
 
-    Use this category when the query refers vaguely to a specific vendor, incentive, approval, or scheme — but lacks a clear action-oriented intent such as “search”, “get”, “find”, “show me”, or “retrieve”.
+7. "Other industry‑related queries"  
 
-    Examples that should be classified as "Other industry-related queries":
-    - “Can Maniratna Metal Industries supply Silver?”
-    - “What is the incentive program period of the Gujarat Industrial Policy?”
-    - “From which department is the Factory Plan application taken?”
-    - “What is the eligibility for Assistance for Dormitories?”
+    Examples:  
+    - What is the role of AI in manufacturing?  
+    - What is the eligibility under CGTMSE?  
+    - Looking for office space for my IT startup.  
+    - I want to rent a shop in Mangal Bazaar, Vadodara.
 
-    - Use this category if the user passively refers to a specific vendor, scheme, policy, or approval — but does not express clear intent to search, retrieve, or explore options.
-    - This includes:
-        - Inquiries about individual schemes (e.g., “What is CGTMSE?”)
-        - General descriptions or feature questions (e.g., “What assistance is available under startup innovation?”)
-        - Organizational questions (e.g., “From which department is Factory Plan approval taken?”)
-        - Company-level questions (e.g., “What does Maniratna Metal Industries supply?”)
+    Core Definition:  
+    Use this category for industry‑related questions that do not fit into any of the five main categories ("Query to build industry from Scratch", "Query to search Vendors", "Query to search Incentives", "Query to Get Approvals", "Query to Get Employee Search").  
+    This includes:  
+    1. Queries that are **purely informational, definitional, or knowledge‑based** about a specific topic from any of the main categories — with **no search, retrieval, or exploration intent**.  
+    2. Queries that are **non‑manufacturing in scope** (e.g., retail, office, hospitality, healthcare, property sales, etc.) **but still have legitimate business/commercial intent**.  
+    3. Queries that are **business-related but clearly out of scope** for manufacturing search (e.g., unrealistic business ideas with commercial intent).  
 
-    - Such queries often reflect curiosity or conceptual understanding rather than an intent to use the system to search.
+    Important:  
+    - **Only** classify as "Other industry‑related queries" if it is **damn sure** the query has **legitimate business/commercial context** and is **purely informational / definitional** for that category OR is **completely outside manufacturing scope but still business-related**.  
+    - If there is **any reasonable chance** that the query is a vague search intent for one of the five main categories, **do not** classify here — instead, classify under the relevant main category.  
+    - **Must have business context** — if there's no business/commercial intent whatsoever, classify as "Valueless queries".
 
-    - Classify these only as “Other industry-related queries”.
+    When "Other industry‑related queries" is Correct:  
 
-    Important:
-    - If none of the main 5 categories (Vendor, Approval, Incentive, Employee Search, Build from Scratch) are **clearly and positively intended**, include only "Other industry-related queries".
-    - If even one valid main category is clearly intended, do not include "Other industry-related queries".
+    **A. Build from Scratch context:**  
+    - Query is only about setup guidance / concept, not searching to build:  
+    - What investment is needed for a cement plant?  
+    - What are the best characteristics of land for a cement factory? 
+    - How to start a cement factory 
+    - Query is non‑manufacturing property related **with business intent**:  
+    - I want to rent a shop in Mangal Bazaar, Vadodara.  
+    - Looking for office space for my IT startup.  
+    - Need café location in Mumbai.  
+    - Looking for a place to open a hospital.  
+    - Want to buy an existing textile shop.  
+    - Unrealistic **business ideas**:  
+    - I want to build chocolate factory on moon for commercial purpose.
 
-    This ensures consistency with how these queries are handled in the single-label prompt before any results are shown.
+    **B. Vendors context:**  
+    - Vendor capability / product detail questions:  
+    - What does Maniratna Metal Industries supply?  
+    - What standard certifications does Maheta Pvt Ltd have?  
+    - General supply knowledge:  
+    - What supplies are needed for cement production?  
+    - What is an ISO 9001 certificate?  
 
-    Examples that are **"Other industry-related queries"**:
-    - What assistance is available for startup innovation schemes?
-    - What is the status of Gujarat Industrial Policy 2020?
-    - Who provides subsidy for toy manufacturers?
-    - What are the eligibility criteria under CGTMSE?
-    - What is the role of MIDC in Maharashtra?
-    - Which department handles Factory License?
-    - What does Maniratna Metal Industries supply?
-    - Can Maniratna Cement supply white cement?
-    - What are the company statistics for Galaxy Pipes?
-    - What is the eligibility under the Startup India scheme?
-    - Which department handles Factory License?
-    - From where do I apply for the Environment Clearance?
+    **C. Incentives context:**  
+    - Incentive definitions / details:  
+    - What is CGTMSE?  
+    - What is the eligibility for Startup Innovation Gujarat‑2020?  
+    - What is the incentive program period of the Gujarat Industrial Policy?  
+    - What is the quantum of assistance under Gujarat Industrial Policy?  
 
-    Examples that are **"Query to search Incentives"**:
-    - Show me all schemes applicable for toy manufacturing in Gujarat.
-    - List incentives under Gujarat Industrial Policy 2020.
-    - Search for subsidy schemes for setting up a plastic unit.
+    **D. Approvals context:**  
+    - Approval definitions / process detail:  
+    - What is Environment Clearance?  
+    - From which department is the Factory Plan application taken?  
+    - How long does it take to get Environment Clearance?  
 
-    Examples that are **"Query to search Vendors"**:
-    - Show me vendors for steel rods in Ahmedabad.
-    - Search for suppliers of plastic granules in Vapi.
-    - List manufacturers who produce glass bottles near Surat.
+    **E. Employee Search context:**  
+    - Employment definitions / statistics:  
+    - What does semi‑skilled employment mean?  
+    - Who comes under skilled labour category?  
+    - What is the employee strength of Reliance Industries?  
 
-    Examples that are **"Query to Get Approvals"**:
-    - What approvals are required to start a dairy in Gujarat?
-    - Search approvals for textile manufacturing in Valsad.
-    - What licenses do I need for food processing in Vadodara?
+    Final Rule:  
+    If none of the five main categories are **clearly and positively intended** — and the query has **legitimate business context** and is **purely informational, definitional, non‑manufacturing business, or unrealistic business ideas** — classify as "Other industry‑related queries".  
+    If **even one** main category is clearly intended (even vaguely), do **not** classify as "Other industry‑related queries".
+    If there is **no business context at all**, classify as "Valueless queries".
+
 
 8. "Valueless queries"  
-    - Example: Who is Donald Trump?  
+    - Examples: 
+        - Hello, how are you?
+        - Who is Donald Trump?
+        - What's the weather today?
+        - I want to make a shirt for my friend.  
+        - Want 10 acres to build a castle. (personal/fantasy, no business intent)
+        - Need place for my TikTok dance studio factory. (entertainment, not serious business)
+        - I want to buy a bike for personal use.
+        - Tell me a joke.
+        - Good morning!
+        - Thank you, goodbye.
+        - Blahblah build blah idk 🤷‍♀️
+
     - For queries that are completely irrelevant to business, industry setup, or supply chains.  
     - This includes:
-        - General knowledge or political questions unrelated to industry
-        - Personal queries, unrelated product buying decisions, or entertainment topics
-        - Queries where industry-related keywords are present but the **intent** is not relevant to industry-building or supply chains
+        - **Conversational elements**: Greetings, pleasantries, social interactions
+        - **General knowledge or political questions** unrelated to industry
+        - **Personal queries**, unrelated product buying decisions, or entertainment topics
+        - **Fantasy/joke queries** with no legitimate business intent
+        - Queries where industry-related keywords are present but the **intent** is not relevant to industry-building or supply chains and has **no commercial purpose**
 
     - Use this category ONLY if:
         - None of the main 5 classes are relevant or positively intended (i.e., Build from Scratch, Vendor, Incentive, Approval, Employee Search)
-        - The query contains no actionable business or industry-specific context
+        - The query contains **no actionable business or industry-specific context**
         - The user is clearly not looking for information connected to business workflows
+        - **No commercial intent** — purely personal, social, entertainment, or general knowledge
 
     - DO NOT include this category if:
         - The query includes any valid industry intent (even alongside irrelevant elements)
         - The query could be interpreted as loosely connected to industry setup, supply chain, approvals, etc.
+        - The query has **any legitimate business or commercial context**
 
-    Additional Example:
-    - I’m going to buy a new bike, for that which approvals do I need? → Not relevant to industry-building
+    **Key Distinguishing Rule:**
+    Ask: "Does this query have ANY business/commercial intent or context?"
+    - **YES** + doesn't fit main 5 categories → "Other industry-related queries"  
+    - **NO** (zero business context) → "Valueless queries"
 
-    Classify only if the query is irrelevant in both content **and** intent.
+    Additional Examples:
+    - I'm going to buy a new bike, for that which approvals do I need? → Not relevant to industry-building (personal purchase)
+    - What's your favorite color? → No business context
+    - How are you doing today? → Social interaction, no business context
 
+    Classify only if the query is irrelevant in both content **and** intent, with **zero commercial/business purpose**.
 
+    
 Strict Classification Rules:
 
 1. Return Only One Class:  
@@ -1060,20 +1315,20 @@ def classify_query_multilabel(
     chat_history = get_chat(f"chat_{chatId}") or []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
 
-    query = f"""
-    SELECT 1
-    FROM `tabSession` AS s
-    JOIN `tabChat history` AS ch
-    ON s.name = ch.parent
-    WHERE s.name = '{chatId}'
-    AND ch.result IS NOT NULL
-    AND TRIM(ch.result) != ''
-    LIMIT 1
-    """
+    # query = f"""
+    # SELECT 1
+    # FROM `tabSession` AS s
+    # JOIN `tabChat history` AS ch
+    # ON s.name = ch.parent
+    # WHERE s.name = '{chatId}'
+    # AND ch.result IS NOT NULL
+    # AND TRIM(ch.result) != ''
+    # LIMIT 1
+    # """
 
-    result = frappe.db.sql(query)
+    # result = frappe.db.sql(query)
 
-    is_result_shown = bool(result)
+    is_result_shown = False
 
 
     MAIN_CATEGORIES = {
@@ -1129,7 +1384,10 @@ Categories & Their Definitions:
     - IMPORTANT: If the query refers to a specific vendor or supplier (e.g., "Maniratna Metal Industries") that appears to be part of a previous result (as seen in `chat_history_normal`), do NOT classify it under "Query to search Vendors" — instead, classify only as "Follow-up Query".
 
 3. "Query to search Incentives"  
-    - Example: What benefits are available for setting up a cement plant in XYZ area?  
+    - Example: 
+        - What benefits are available for setting up a cement plant in XYZ area?  
+        - Tell me the government incentives for cement industry in Vadodara,Gujarat
+        - Incentive for Anand Cement
     - For queries asking about government incentives, grants, subsidies, or financial schemes.
 
 4. "Query to Get Approvals"  
@@ -1171,7 +1429,9 @@ Categories & Their Definitions:
         - The query also includes any valid main category — in such cases, classify only the positive categories.
 
 7. "Other industry-related queries"  
-    - Example: What is the role of AI in manufacturing?  
+    - Example: 
+        - What is the role of AI in manufacturing?  
+        - What investment amount is needed for setting up a bottle manufacturing industry?
     - For industry-related questions that don’t fit into the specific categories above (e.g., trends, innovation, non-supply chain topics).
 
     Use this category ONLY when none of the main factor categories are applicable.
@@ -1341,70 +1601,263 @@ These queries may become **Follow-up Queries** in later stages once the user see
 
 Categories & Their Definitions:
 
-1. Query to build industry from Scratch:  
-    - Examples: 
-        - I want to build a 1 TPA Cement Factory. 
-        - What are the land options for the chemical industry in Surat? 
-        - Tell me the land availability for the agricultural industry in Bharuch.
-    - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
-    - Assign this category if the user's query indicates any intent to establish, set up, construct, initiate, develop, or start a new industry or factory, regardless of the exact words used.  
-    - The classification must be based on understanding the overall intent and context rather than focusing on specific words like "build" or "establish."  
-    - Queries about buying property for building an industry may fall under this category only if the intent to use that property for setting up an industry is clearly indicated.  
-    - Queries about selling property, renting land, or general property transactions that do not involve setting up an industry should not be classified under this category.  
-    - If the intent to build is unclear, vague, or mixed with other topics, classify it under "Other industry-related queries."
+1. "Query to build industry from Scratch"  
+
+    Examples:  
+    - I want to build a 1 TPA Cement Factory.  
+    - What are the land options for the chemical industry in Surat?  
+    - Tell me the land availability for the agricultural industry in Bharuch.  
+    - I want to buy a 1 TPA cement industry  
+    - 1 MTPA Cement Industry  
+    - 1 million barrels per month petrochemical industry  
+
+    Core Definition:  
+    Classify here for queries where the user wants to start, establish, or set up a new manufacturing industry — whether:  
+    - Explicitly stated (clear build/setup request), or  
+    - Implied/vague but reasonably indicating intent to search for or explore manufacturing industry setup options.  
+
+    This includes:  
+    - Queries that are short, incomplete, or ambiguous but clearly mention an **industry type, capacity, or location** in the context of building/starting from scratch.  
+    - Vague references like “1 MTPA Cement Industry”, “1 metric tonne per month tablets industry”, etc. — treat these as build/setup intent unless they are clearly about industrial setup **guidance** details (see below).  
+
+    Explicit Action‑Oriented Trigger Phrases:  
+    If the query contains any of these phrases, it is always “Query to build industry from Scratch”:  
+    - “Build a factory for…”  
+    - “Set up a manufacturing unit for…”  
+    - “Start an industry for…”  
+    - “Establish a plant for…”  
+    - “Construct a facility for…”  
+    - “Buy land for setting up…”  
+
+    When to Classify as “Other industry‑related queries” Instead:  
+    Only classify as Other industry‑related queries if:  
+    1. The query clearly asks for details or guidance about industrial setup **without** an implied intent to search for or initiate the build itself.  
+    2. The query is purely informational or advisory about setup processes, requirements, or characteristics — not about finding or acquiring land/facilities to start manufacturing.  
+
+    Exclusion Examples (These go to Other industry‑related queries):  
+    - General industrial setup guidance:  
+    - What investment is needed for setting up a cement plant?  
+    - What are the best characteristics of land for a cement factory?  
+    - Evaluation questions:  
+    - How to evaluate land for a cement setup?  
+    - How to vet vendors for my cement plant?  
+    - Supply-related queries:  
+    - What supplies are needed for cement production?  
+    - What is the proportion of raw material to cement production?  
+    - Non‑manufacturing property queries:  
+    - I want to rent a shop in Mangal Bazaar, Vadodara.  
+    - Looking for office space for my IT startup.  
+    - Want to sell 10 acres of farmland in Nashik.  
+    - Need warehouse space for my trading business.  
+    - Looking for a place to open a hospital.  
+    - Want to buy an existing textile shop.  
+    - How to start a cement factory  
+    - I want to buy land to grow unicorns.  
+
+    Final Rule:  
+    Default to “Query to build industry from Scratch” for any query mentioning industry type, capacity, or location in the context of manufacturing setup, unless it is damn sure the user is asking for setup guidance or purely informational content. This ensures vague but build‑intended queries are captured correctly, while truly informational‑only queries remain in “Other industry‑related queries”.
+
 
 2. "Query to search Vendors"  
-    - Example: I am searching for a vendor who supplies pharmaceutical-grade raw chemicals.  
-    - For queries where the user is clearly searching for or requesting vendor/supplier/manufacturer options for materials, components, or services.
 
-    - Include this category only if the query expresses a clear intent to search, such as:
-        - “Show me vendors who supply X”
-        - “Find suppliers for copper wiring”
-        - “Search for manufacturers of solar panels in Gujarat”
-        - “List vendors for plastic injection machines”
+    Examples:  
+    - I am searching for a vendor who supplies pharmaceutical-grade raw chemicals.  
+    - Show me vendors for steel rods in Ahmedabad.  
+    - Search for suppliers of plastic granules in Vapi.  
+    - List manufacturers who produce glass bottles near Surat.  
+    - Vendors for Anand Cement  
+    - Steel supplier who has ISO 9001 certificate  
 
-    - DO NOT classify under this category if the user is simply asking about a specific vendor’s features, capabilities, product types, or company information — without asking to retrieve or explore multiple vendor options.
+    Core Definition:  
+    Classify here for queries where the user wants to explore, retrieve, or list vendor, supplier, or manufacturer options for materials, components, products, or services — whether:  
+    - Explicitly stated (clear search request), or  
+    - Implied/vague but reasonably indicating search intent.  
 
-        - These should be classified as “Other industry-related queries” instead.
+    This includes:  
+    - Queries that are short, incomplete, or ambiguous but clearly mention “vendor(s)”, “supplier(s)”, “manufacturer(s)”, or “producer(s)” in relation to an industry, supply/suppies, location, or business type.  
+    - Vague vendor references like “Vendors for cement in Vadodara”, “Vendor Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
+
+    Explicit Action‑Oriented Trigger Phrases:  
+    If the query contains any of these phrases, it is always “Query to search Vendors”:  
+    - “Show me vendors for…”  
+    - “List suppliers of…”  
+    - “Search for manufacturers of…”  
+    - “Find suppliers for…”  
+    - “Get me vendors for…”  
+    - “Retrieve producers of…”  
+
+    When to Classify as “Other industry‑related queries” Instead:  
+    Only classify as Other industry‑related queries if:  
+    1. The query clearly asks for details about a specific known vendor without any implied search or exploration intent.  
+    2. The query is purely informational or definitional about a vendor or supply type.  
+
+    Exclusion Examples (These go to Other industry‑related queries):  
+    - General information:  
+    - What does Maniratna Metal Industries supply?  
+    - What supplies are needed for cement production?  
+    - Company capability details:  
+    - What are the past clients of Anand Cement?  
+    - What standard certifications does Maheta Pvt Ltd have?  
+    - Definitions:  
+    - What is an ISO 9001 certificate?  
+    - Specific detail request:  
+    - What products does Agriland Biotech supply?  
+    - What are all raw materials needed for school bag production?  
+    - What is the proportion of raw material to cement production?  
+
+    Final Rule:  
+    Default to “Query to search Vendors” for any query mentioning vendors, suppliers, manufacturers, or producers in an industry/location/business/supply context, unless it is damn sure the user is asking for details of one known vendor or purely informational content. This ensures vague but search‑intended queries are captured correctly, while truly informational‑only queries remain in “Other industry‑related queries”.
 
 
 3. "Query to search Incentives"  
-    - Example: What benefits are available for setting up a cement plant in XYZ area?  
-    - For queries explicitly asking to search, list, retrieve, or view government incentives, grants, subsidies, or financial schemes.
 
-    - Include only if the user’s intent is clearly action-oriented, using phrases like:
-        - “Show me incentive schemes…”
-        - “List the available incentives…”
-        - “Search for schemes applicable to...”
-        - “Retrieve incentives under XYZ policy...”
+    Examples:  
+    - What benefits are available for setting up a cement plant in XYZ area?  
+    - Tell me the government incentives for cement industry in Vadodara, Gujarat  
+    - Incentive for Anand Cement  
+    - Search for green estate incentives for cement industry  
 
-    - Do NOT classify as “Query to search Incentives” if the user simply asks for general information, definitions, program status, eligibility, or names of schemes — without any explicit search intent.
-        - These should be classified under “Other industry-related queries” instead.
+    Core Definition:  
+    Classify here for queries where the user wants to explore, retrieve, or list incentives, subsidies, grants, or financial schemes — whether:  
+    - Explicitly stated (clear search request), or  
+    - Implied/vague but reasonably indicating search intent.  
+
+    This includes:  
+    - Queries that are short, incomplete, or ambiguous but clearly mention “incentive(s)” in relation to an industry, location, or business type.  
+    - Vague incentive references like “Incentive for cement in Vadodara”, “Incentive Anand Cement”, etc. — treat these as search intent unless they are clearly detail-focused (see below).  
+
+    Explicit Action-Oriented Trigger Phrases:  
+    If the query contains any of these phrases, it is always “Query to search Incentives”:  
+    - “Show me incentive schemes…”  
+    - “List the available incentives…”  
+    - “Search for schemes applicable to…”  
+    - “Retrieve incentives under XYZ policy…”  
+    - “Find subsidies for…”  
+    - “Give me incentives for…”  
+
+    When to Classify as “Other industry-related queries” Instead:  
+    Only classify as Other industry-related queries if:  
+    1. The query clearly asks for details about a specific known incentive or scheme without any implied search or exploration intent.  
+    2. The query is purely informational or definitional about an incentive.  
+
+    Exclusion Examples (These go to Other industry-related queries):  
+    - General information:  
+    - What assistance is available under Startup Innovation Gujarat-2020?  
+    - What is the eligibility under CGTMSE?  
+    - Definitions:  
+    - What is CGTMSE?  
+    - Program status:  
+    - What is the incentive program period of the Gujarat Industrial Policy?  
+    - Eligibility checks:  
+    - What is the eligibility for Startup Innovation Gujarat-2020?  
+    - Specific detail request:  
+    - What is the quantum of assistance under Gujarat Industrial Policy?  
+    - I want to know about the green estate incentive for cement industry (meaning — details about that scheme, not finding other schemes).  
+
+    Final Rule:  
+    Default to “Query to search Incentives” for any query mentioning incentives in an industry/location/business context, unless it is damn sure the user is asking for details of one known incentive or purely informational content. This ensures vague but search-intended queries are captured correctly, while truly informational-only queries remain in “Other industry-related queries”.
 
 
 4. "Query to Get Approvals"  
-    - Example: I want to get approval for my cement plant.  
-    - For queries where the user is clearly seeking to search, find, or retrieve approval requirements, processes, or documents needed for setting up or running a business or industry.
 
-    - Include only if the query expresses action-oriented search intent, such as:
-        - “What approvals are needed to start a cement factory?”
-        - “List required clearances for food processing industry”
-        - “Which licenses are needed in Surat for pharma manufacturing?”
+    Examples:  
+    - I want to get approval for my cement plant.  
+    - What approvals are required to start a dairy in Gujarat?  
+    - Search approvals for textile manufacturing in Valsad.  
+    - What licenses do I need for food processing in Vadodara?  
+    - Approvals for Anand Cement  
+    - Search for tree cutting approvals for cement industry  
 
-    - DO NOT include this category if the user is only asking for:
-        - Approval definitions
-        - Names of departments
-        - Application mode or status
-        - Specific approval name without search context
+    Core Definition:  
+    Classify here for queries where the user wants to explore, retrieve, or list approvals, licenses, clearances, or permissions needed for setting up or running a business or industry — whether:  
+    - Explicitly stated (clear search request), or  
+    - Implied/vague but reasonably indicating search intent.  
 
-        - These should be classified as “Other industry-related queries” instead.
+    This includes:  
+    - Queries that are short, incomplete, or ambiguous but clearly mention “approval(s)”, “license(s)”, “clearance(s)”, or “permission(s)” in relation to an industry, location, or business type.  
+    - Vague approval references like “Approval for cement in Vadodara”, “Approval Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
 
-5. Query to Get Employee Search:  
-    - Example: 
-        - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
-        - What are the labor options for agricultural industry in Vadodara?
-    - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
+    Explicit Action‑Oriented Trigger Phrases:  
+    If the query contains any of these phrases, it is always “Query to Get Approvals”:  
+    - “Show me approvals for…”  
+    - “List the required approvals…”  
+    - “Search for licenses needed for…”  
+    - “Retrieve clearance requirements for…”  
+    - “Find permissions for…”  
+    - “Get me approvals for…”  
 
+    When to Classify as “Other industry‑related queries” Instead:  
+    Only classify as Other industry‑related queries if:  
+    1. The query clearly asks for details about a specific known approval without any implied search or exploration intent.  
+    2. The query is purely informational or definitional about an approval.  
+
+    Exclusion Examples (These go to Other industry‑related queries):  
+    - General information:  
+    - From which department is the Factory Plan application taken?  
+    - Which department handles Factory License?  
+    - Definitions:  
+    - What is Environment Clearance?  
+    - Process/timeframe details:  
+    - How long does it take to get Environment Clearance?  
+    - What is the process for Solid Waste Authorization Module (under Solid Waste Management Rules, 2016)?  
+    - Specific detail request:  
+    - What department issues Tree Cutting Approval?  
+    - I want to know about the tree cutting approval for cement industry (meaning — details about that approval, not finding other required approvals).  
+
+    Final Rule:  
+    Default to “Query to Get Approvals” for any query mentioning approvals, licenses, clearances, or permissions in an industry/location/business context, unless it is damn sure the user is asking for details of one known approval or purely informational content. This ensures vague but search‑intended queries are captured correctly, while truly informational‑only queries remain in “Other industry‑related queries”.
+
+
+5. "Query to Get Employee Search"  
+
+    Examples:  
+    - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
+    - What are the labor options for agricultural industry in Vadodara?  
+    - Employment for Anand Cement  
+    - Search for skilled workers for textile industry in Surat  
+    - Labour statistics for cement industry in Gujarat  
+
+    Core Definition:  
+    Classify here for queries where the user wants to explore, retrieve, or list options for employees, workers, or labour for an industry — whether:  
+    - Explicitly stated (clear search/recruitment request), or  
+    - Implied/vague but reasonably indicating search intent.  
+
+    This includes:  
+    - Queries that are short, incomplete, or ambiguous but clearly mention “employment”, “employees”, “labour”, “workers”, or “manpower” in relation to an industry, location, or business type.  
+    - Vague references like “Employment for cement in Vadodara”, “Labour for Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
+
+    Explicit Action‑Oriented Trigger Phrases:  
+    If the query contains any of these phrases, it is always “Query to Get Employee Search”:  
+    - “Show me workers for…”  
+    - “List available labour for…”  
+    - “Search for employees in…”  
+    - “Find skilled manpower for…”  
+    - “Get me labour for…”  
+    - “Recruit workers for…”  
+
+    When to Classify as “Other industry‑related queries” Instead:  
+    Only classify as Other industry‑related queries if:  
+    1. The query clearly asks for details about employment concepts, definitions, or company‑specific employment information without any implied search/recruitment intent.  
+    2. The query is purely informational about employment types, workforce structures, or general labour concepts.  
+
+    Exclusion Examples (These go to Other industry‑related queries):  
+    - General employment information:  
+    - What does semi‑skilled employment mean?  
+    - Who comes under skilled labour category?  
+    - Employment statistics or company‑specific data:  
+    - What is the employee strength of Reliance Industries?  
+    - What does employee strength mean for an industry?  
+    - Workforce requirement details:  
+    - What kinds of employee types are needed for cement industry setup?  
+    - What are all the employee and job roles needed to start a mining industry?  
+    - Certification or job standard queries:  
+    - What are the standard duties of a machinist?  
+    - What qualifications are needed for an AI developer?  
+
+    Final Rule:  
+    Default to “Query to Get Employee Search” for any query mentioning employment, workers, labour, or manpower in an industry/location/business context, unless it is damn sure the user is asking for definitions, conceptual explanations, or specific company employment statistics. This ensures vague but search‑intended queries are captured correctly, while truly informational‑only queries remain in “Other industry‑related queries”.
+
+    
 6. "Negatively Intended Query"  
     IMPORTANT RULE: If the user mentions one or more factors negatively, but also clearly mentions any one factor positively,  
     you MUST NOT return "Negatively Intended Query". Only return the categories that reflect the user’s positive interest.  
@@ -1435,87 +1888,122 @@ Categories & Their Definitions:
         - The rejection is vague or ambiguous (e.g., “not sure about incentives” should not trigger this).
         - The query also includes any valid main category — in such cases, classify only the positive categories.
 
-7. "Other industry-related queries"  
-    - Example: What is the role of AI in manufacturing?  
-    - For industry-related questions that don’t fit into the specific categories above (e.g., trends, innovation, non-supply chain topics).
+        
+7. "Other industry‑related queries"  
 
-    Use this category when the query refers vaguely to a specific vendor, incentive, approval, or scheme — but lacks a clear action-oriented intent such as “search”, “get”, “find”, “show me”, or “retrieve”.
+    Examples:  
+    - What is the role of AI in manufacturing?  
+    - What is the eligibility under CGTMSE?  
+    - Looking for office space for my IT startup.  
+    - I want to rent a shop in Mangal Bazaar, Vadodara.
 
-    Examples that should be classified as "Other industry-related queries":
-    - “Can Maniratna Metal Industries supply Silver?”
-    - “What is the incentive program period of the Gujarat Industrial Policy?”
-    - “From which department is the Factory Plan application taken?”
-    - “What is the eligibility for Assistance for Dormitories?”
+    Core Definition:  
+    Use this category for industry‑related questions that do not fit into any of the five main categories ("Query to build industry from Scratch", "Query to search Vendors", "Query to search Incentives", "Query to Get Approvals", "Query to Get Employee Search").  
+    This includes:  
+    1. Queries that are **purely informational, definitional, or knowledge‑based** about a specific topic from any of the main categories — with **no search, retrieval, or exploration intent**.  
+    2. Queries that are **non‑manufacturing in scope** (e.g., retail, office, hospitality, healthcare, property sales, etc.) **but still have legitimate business/commercial intent**.  
+    3. Queries that are **business-related but clearly out of scope** for manufacturing search (e.g., unrealistic business ideas with commercial intent).  
 
-    - Use this category if the user passively refers to a specific vendor, scheme, policy, or approval — but does not express clear intent to search, retrieve, or explore options.
-    - This includes:
-        - Inquiries about individual schemes (e.g., “What is CGTMSE?”)
-        - General descriptions or feature questions (e.g., “What assistance is available under startup innovation?”)
-        - Organizational questions (e.g., “From which department is Factory Plan approval taken?”)
-        - Company-level questions (e.g., “What does Maniratna Metal Industries supply?”)
+    Important:  
+    - **Only** classify as "Other industry‑related queries" if it is **damn sure** the query has **legitimate business/commercial context** and is **purely informational / definitional** for that category OR is **completely outside manufacturing scope but still business-related**.  
+    - If there is **any reasonable chance** that the query is a vague search intent for one of the five main categories, **do not** classify here — instead, classify under the relevant main category.  
+    - **Must have business context** — if there's no business/commercial intent whatsoever, classify as "Valueless queries".
 
-    - Such queries often reflect curiosity or conceptual understanding rather than an intent to use the system to search.
+    When "Other industry‑related queries" is Correct:  
 
-    - Classify these only as “Other industry-related queries”.
+    **A. Build from Scratch context:**  
+    - Query is only about setup guidance / concept, not searching to build:  
+    - What investment is needed for a cement plant?  
+    - What are the best characteristics of land for a cement factory? 
+    - How to start a cement factory 
+    - Query is non‑manufacturing property related **with business intent**:  
+    - I want to rent a shop in Mangal Bazaar, Vadodara.  
+    - Looking for office space for my IT startup.  
+    - Need café location in Mumbai.  
+    - Looking for a place to open a hospital.  
+    - Want to buy an existing textile shop.  
+    - Unrealistic **business ideas**:  
+    - I want to build chocolate factory on moon for commercial purpose.
 
-    Important:
-    - If none of the main 5 categories (Vendor, Approval, Incentive, Employee Search, Build from Scratch) are **clearly and positively intended**, include only "Other industry-related queries".
-    - If even one valid main category is clearly intended, do not include "Other industry-related queries".
+    **B. Vendors context:**  
+    - Vendor capability / product detail questions:  
+    - What does Maniratna Metal Industries supply?  
+    - What standard certifications does Maheta Pvt Ltd have?  
+    - General supply knowledge:  
+    - What supplies are needed for cement production?  
+    - What is an ISO 9001 certificate?  
 
-    This ensures consistency with how these queries are handled in the single-label prompt before any results are shown.
+    **C. Incentives context:**  
+    - Incentive definitions / details:  
+    - What is CGTMSE?  
+    - What is the eligibility for Startup Innovation Gujarat‑2020?  
+    - What is the incentive program period of the Gujarat Industrial Policy?  
+    - What is the quantum of assistance under Gujarat Industrial Policy?  
 
-    Examples that are **"Other industry-related queries"**:
-    - What assistance is available for startup innovation schemes?
-    - What is the status of Gujarat Industrial Policy 2020?
-    - Who provides subsidy for toy manufacturers?
-    - What are the eligibility criteria under CGTMSE?
-    - What is the role of MIDC in Maharashtra?
-    - Which department handles Factory License?
-    - What does Maniratna Metal Industries supply?
-    - Can Maniratna Cement supply white cement?
-    - What are the company statistics for Galaxy Pipes?
-    - What is the eligibility under the Startup India scheme?
-    - Which department handles Factory License?
-    - From where do I apply for the Environment Clearance?
+    **D. Approvals context:**  
+    - Approval definitions / process detail:  
+    - What is Environment Clearance?  
+    - From which department is the Factory Plan application taken?  
+    - How long does it take to get Environment Clearance?  
 
-    Examples that are **"Query to search Incentives"**:
-    - Show me all schemes applicable for toy manufacturing in Gujarat.
-    - List incentives under Gujarat Industrial Policy 2020.
-    - Search for subsidy schemes for setting up a plastic unit.
+    **E. Employee Search context:**  
+    - Employment definitions / statistics:  
+    - What does semi‑skilled employment mean?  
+    - Who comes under skilled labour category?  
+    - What is the employee strength of Reliance Industries?  
 
-    Examples that are **"Query to search Vendors"**:
-    - Show me vendors for steel rods in Ahmedabad.
-    - Search for suppliers of plastic granules in Vapi.
-    - List manufacturers who produce glass bottles near Surat.
-
-    Examples that are **"Query to Get Approvals"**:
-    - What approvals are required to start a dairy in Gujarat?
-    - Search approvals for textile manufacturing in Valsad.
-    - What licenses do I need for food processing in Vadodara?
+    Final Rule:  
+    If none of the five main categories are **clearly and positively intended** — and the query has **legitimate business context** and is **purely informational, definitional, non‑manufacturing business, or unrealistic business ideas** — classify as "Other industry‑related queries".  
+    If **even one** main category is clearly intended (even vaguely), do **not** classify as "Other industry‑related queries".
+    If there is **no business context at all**, classify as "Valueless queries".
 
 
 8. "Valueless queries"  
-    - Example: Who is Donald Trump?  
+    - Examples: 
+        - Hello, how are you?
+        - Who is Donald Trump?
+        - What's the weather today?
+        - I want to make a shirt for my friend.  
+        - Want 10 acres to build a castle. (personal/fantasy, no business intent)
+        - Need place for my TikTok dance studio factory. (entertainment, not serious business)
+        - I want to buy a bike for personal use.
+        - Tell me a joke.
+        - Good morning!
+        - Thank you, goodbye.
+        - Blahblah build blah idk 🤷‍♀️
+
     - For queries that are completely irrelevant to business, industry setup, or supply chains.  
     - This includes:
-        - General knowledge or political questions unrelated to industry
-        - Personal queries, unrelated product buying decisions, or entertainment topics
-        - Queries where industry-related keywords are present but the **intent** is not relevant to industry-building or supply chains
+        - **Conversational elements**: Greetings, pleasantries, social interactions
+        - **General knowledge or political questions** unrelated to industry
+        - **Personal queries**, unrelated product buying decisions, or entertainment topics
+        - **Fantasy/joke queries** with no legitimate business intent
+        - Queries where industry-related keywords are present but the **intent** is not relevant to industry-building or supply chains and has **no commercial purpose**
 
     - Use this category ONLY if:
         - None of the main 5 classes are relevant or positively intended (i.e., Build from Scratch, Vendor, Incentive, Approval, Employee Search)
-        - The query contains no actionable business or industry-specific context
+        - The query contains **no actionable business or industry-specific context**
         - The user is clearly not looking for information connected to business workflows
+        - **No commercial intent** — purely personal, social, entertainment, or general knowledge
 
     - DO NOT include this category if:
         - The query includes any valid industry intent (even alongside irrelevant elements)
         - The query could be interpreted as loosely connected to industry setup, supply chain, approvals, etc.
+        - The query has **any legitimate business or commercial context**
 
-    Additional Example:
-    - I’m going to buy a new bike, for that which approvals do I need? → Not relevant to industry-building
+    **Key Distinguishing Rule:**
+    Ask: "Does this query have ANY business/commercial intent or context?"
+    - **YES** + doesn't fit main 5 categories → "Other industry-related queries"  
+    - **NO** (zero business context) → "Valueless queries"
 
-    Classify only if the query is irrelevant in both content **and** intent.
+    Additional Examples:
+    - I'm going to buy a new bike, for that which approvals do I need? → Not relevant to industry-building (personal purchase)
+    - What's your favorite color? → No business context
+    - How are you doing today? → Social interaction, no business context
 
+    Classify only if the query is irrelevant in both content **and** intent, with **zero commercial/business purpose**.
+
+    
 Instructions:
 
     - Return a list of all applicable categories that match the user's query.  
@@ -1565,7 +2053,7 @@ Query:
 
 Output:
         """
-        
+       
     prompt = PromptTemplate(
         input_variables=["query", "chat_history_normal"],
         template=prompt_template
@@ -1619,7 +2107,6 @@ def classify_user_intent(user_query, llm, chat_id):
             'additional_response': str
         }
     """
-
     # Step 1: Main and multilabel classification
     main_intent = classify_query(user_query, llm, chat_id)
     multilabel_result = classify_query_multilabel(user_query, llm, chat_id)
@@ -2784,56 +3271,79 @@ def extract_main_industry_and_product_universal(user_query: str, main_industries
     
     # Define the universal prompt
     prompt_template = """
-    You are an expert in analyzing industry-related queries and extracting specific details.
-    Based on the user's query, identify the following details:
+You are an expert in analyzing industry-related queries and extracting specific details.
 
-    1. Main-Industry: Infer or predict the main industry based on the context of the query.  
+**CRITICAL INSTRUCTION: When determining Main-Industry classification, focus ONLY on the product, service, or industry terms mentioned in the query. Completely ignore geographic locations (cities, states, countries) for industry inference. Location information should not influence industry selection in any way.**
+
+Based on the user's query, identify the following details:
+
+1. Main-Industry: Infer or predict the main industry based on the context of the query.  
     - Users may phrase their queries in different ways, such as:
         - "What incentives are available for the automobile sector?"
         - "Which approvals are needed for the pharmaceutical industry?"
         - "I am looking for steel vendors."
     - In all such cases, identify the relevant industry even if the query is vague or incomplete.  
+    - **Focus exclusively on product/service/industry keywords - NOT on location.**
     - If the inferred main industry can logically match any category from the provided list of Main-Industries, return the matched category from the list and set `"Forced-Mapping": "No"`.  
     - If no logical match is possible but a mapping must still be provided, forcefully map the inferred main industry to the closest match from the provided list and set `"Forced-Mapping": "Yes"`.  
-    - If no main industry can be inferred from the query, return `"None"` for both `"Original-Inferred-Main-Industry"` and `"Main-Industry"`.  
+    - If no main industry can be inferred from the query, return `"None"` for both `"Original-Inferred-Main-Industry"` and `"Main-Industry"`.   
 
-    2. Product (if applicable): Identify the specific product mentioned in the query (e.g., "Cement," "Steel Rods").  
+2. Product (if applicable): Identify the specific product mentioned in the query (e.g., "Cement," "Steel Rods").  
+    - Always extract the widely recognized industry-standard name for the product.  
+    - If the product is given as an abbreviation, acronym, or chemical formula, return the full name instead.  
+    - Example:
+        - "NaCl" → "Sodium Chloride"
+        - "PVC" → "Polyvinyl Chloride"
+        - "PET" → "Polyethylene Terephthalate"
+        - "H₂SO₄" → "Sulfuric Acid"  
+    - If a product has multiple common names, choose the most widely used commercial name.  
+    - Example:
+        - "Isopropanol" → "Isopropyl Alcohol"
+        - "Ethene" → "Ethylene"
+        - "Acetic Acid" → "Vinegar" (if referring to food-grade usage)
     - If the inferred term logically represents a product, include it in the output.  
-    - If no product is mentioned or it does not logically fit as a product, return `"None"`.  
+    - If no product is mentioned or it does not logically fit as a product, return `"None"`.
 
-    Logical Matching for Main Industries:
+**Product-to-Industry Mapping Rules (Location-Independent):**
+- Chalk/Calcium Carbonate → "Mining" (manufacturing/processing)
+- Steel/Iron → "Capital Goods" 
+- Pharmaceuticals/Medicines → "Healthcare & Pharmaceuticals"
+- Cement/Concrete → "Cement"
+- Food items → "Foods and Beverages"
+
+Logical Matching for Main Industries:
     - A logical match occurs when the inferred main industry and an available main industry from the list are conceptually or functionally similar.  
     - Examples of logical matches:  
-        - Inferred: "Chemical Processing" → Available: "Chemical Manufacturing" (`Forced-Mapping`: "No`).  
-        - Inferred: "Electronics Production" → Available: "Electronics Manufacturing" (`Forced-Mapping`: "No`).  
+        - Inferred: "Chemical Processing" → Available: "Chemical" (`Forced-Mapping`: "No`).  
+        - Inferred: "Electronics Production" → Available: "Capital Goods" (`Forced-Mapping`: "No`).  
     - Examples of forced mappings:  
-        - Inferred: "Nanotechnology Development" → Available: "Advanced Manufacturing" (`Forced-Mapping`: "Yes`).  
-        - Inferred: "Eco-friendly Energy Solutions" → Available: "Green Manufacturing" (`Forced-Mapping`: "Yes`).  
+        - Inferred: "Nanotechnology Development" → Available: "Chemical" (`Forced-Mapping`: "Yes`).  
+        - Inferred: "Eco-friendly Energy Solutions" → Available: "Energy" (`Forced-Mapping`: "Yes`).  
 
-    Provided List of Main-Industries:  
-    {main_industries}  
+Provided List of Main-Industries:  
+{main_industries}  
 
-    Important Notes:
+Important Notes:
     - Always assume that the query is related to an industry-specific inquiry, whether it is about incentives, approvals, or vendors.
     - Ensure that the output is strictly limited to the required JSON format and contains no explanations, reasoning, or comments.  
     - Do not provide additional text, explanations, or reasoning within the fields of the JSON object.  
     - Each field in the JSON must only contain the exact extracted information or the specified fallback values (e.g., "None").  
     - If the query mentions only a location but no specific industry or product context, do not infer the industry from prior knowledge of the location. Instead, return None.
 
-    Output Format:
-    Output the result strictly as a JSON object in the following format:  
-    {{
-        "Main-Industry": <Mapped Main-Industry>,
-        "Original-Inferred-Main-Industry": <Inferred Main-Industry or 'None'>,
-        "Forced-Mapping": <'Yes' or 'No'>,
-        "Product": <Extracted Product or 'None'>
-    }}
+Output Format:
+Output the result strictly as a JSON object in the following format:  
+{{
+    "Main-Industry": <Mapped Main-Industry>,
+    "Original-Inferred-Main-Industry": <Inferred Main-Industry or 'None'>,
+    "Forced-Mapping": <'Yes' or 'No'>,
+    "Product": <Extracted Product or 'None'>
+}}
 
-    Query: {query}  
+Query: {query}  
 
-    Provide only the JSON object in the required format.  
+Provide only the JSON object in the required format.  
     """
-
+    
     # Create the prompt using the provided variables
     prompt = PromptTemplate(
         input_variables=["query", "main_industries"],
@@ -2918,67 +3428,74 @@ def extract_sub_sector_and_product_universal(
 
     # Define the universal prompt
     prompt_template = """
-    You are an expert in analyzing industry-related queries and extracting specific details.  
-    Sub-Sector is the functional or operational category that immediately follows the Main-Industry in the hierarchy.  
-    It encompasses broader categories of related activities, processes, or areas of focus that form part of the Main-Industry.  
+You are an expert in analyzing industry-related queries and extracting specific details.  
 
-    For example:  
-    - In the "Automobile" Main-Industry, possible Sub-Sectors include "Vehicle Assembly," "Automotive Components," or "Electric Vehicles."
-    - In the "Pharmaceuticals" Main-Industry, possible Sub-Sectors include "Allopathic Medicines," "Ayurvedic Medicines," or "Biotechnology."
-    - In the "Renewable Energy" Main-Industry, possible Sub-Sectors include "Solar Energy," "Wind Power," or "Hydropower."
-    - Sub-Sectors are broad categories and are not tied to individual products but rather industry segments.
+**CRITICAL INSTRUCTION: When determining Sub-Sector classification, focus ONLY on the product, service, or industry terms mentioned in the query. Completely ignore geographic locations (cities, states, countries) for sub-sector inference. Location information should not influence sub-sector selection in any way.**
 
-    {context}
+Sub-Sector is the functional or operational category that immediately follows the Main-Industry in the hierarchy.  
+It encompasses broader categories of related activities, processes, or areas of focus that form part of the Main-Industry.  
 
-    Based on the user's query, identify the following details:
+{context}
 
-    1. Sub-Sector Extraction:  
-    - The query may relate to industry incentives, approvals, or vendor searches. Identify the most relevant sub-sector.  
-    - If the inferred sub-sector can logically match any category from the provided list, return the matched category from the list and set `"Forced-Mapping"` to `"No"`.  
-    - If no logical match is possible but a mapping must still be provided, forcefully map the inferred sub-sector to the closest match from the provided list and set `"Forced-Mapping"` to `"Yes"`.  
-    - If no sub-sector can be inferred from the query, return `"None"` for `"Original-Inferred-Sub-Sector"` and `"Sub-Sector"`.  
+**MANDATORY CONSTRAINT: You MUST select the Sub-Sector value ONLY from the provided list below. You cannot create or invent sub-sector names that are not in this exact list.**
 
-    2. Product Extraction (if applicable):  
-    - If the product context is provided, return the same product in the output JSON exactly as mentioned in the query.  
-    - If the inferred term logically represents a product, include it in the output.  
-    - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
+Provided List of Sub-Sectors (THESE ARE YOUR ONLY OPTIONS):  
+{sub_sectors_str}  
 
-    Important Notes:
-    - Do NOT assume that all queries are related to manufacturing. Queries may relate to incentives, approvals, or vendors across various industries.  
-    - Logical Matching for Sub-Sectors:  
-    - A logical match occurs when the inferred sub-sector and an available sub-sector from the list are conceptually or functionally similar.  
-    - Examples of Logical Matches:  
-        - Incentives: "Tax Benefits for Renewable Energy" → Available: "Renewable Energy" (`Forced-Mapping`: `"No"`).  
-        - Approvals: "Environmental Clearance for Chemical Plants" → Available: "Chemical Manufacturing" (`Forced-Mapping`: `"No"`).  
-        - Vendors: "Suppliers of Medical Equipment" → Available: "Medical Devices" (`Forced-Mapping`: `"No"`).  
-    - Examples of Forced Mappings:  
-        - "Government Grants for AI Startups" → Available: "Technology & IT Services" (`Forced-Mapping`: `"Yes"`).  
-        - "Supply Chain for Nano-Materials" → Available: "Advanced Materials" (`Forced-Mapping`: `"Yes"`).  
-    - If no logical match exists, set `"Forced-Mapping"` to `"Yes"`.
+Based on the user's query, identify the following details:
 
-    Output Constraints:  
-    - Strictly limit the output to the required JSON format and ensure that it contains no explanations, reasoning, or additional text.  
-    - Do not provide reasoning like *"This matches because..."* or *"Assumed based on context."*  
-    - Each field in the JSON must contain only the extracted information or the specified fallback values (`"None"`).  
-    - If the query mentions only a location but no specific industry or product context, do not infer the sub-sector from prior knowledge of the location. Instead, return None.
+1. Sub-Sector Extraction:  
+    - **Focus exclusively on product/service/industry keywords - NOT on location.**
+    - First, infer what sub-sector the query relates to based on the product/industry mentioned
+    - Then, find the CLOSEST MATCH from the provided list above
+    - **STEP-BY-STEP PROCESS:**
+        a) Identify what industry segment the query refers to (e.g., "chalk" → "basic chemicals/mineral processing")
+        b) Check if this exactly matches any item in the provided list
+        c) If YES: Use that exact match and set `"Forced-Mapping": "No"`
+        d) If NO: Find the closest related option from the provided list and set `"Forced-Mapping": "Yes"`
+    
+    **For Chemical Industry Products - Mapping Priority:**
+    - Chalk/Calcium Carbonate → **"Paint, Coatings & Inks"** (chalk used as filler in paints)
+    - Pharmaceuticals/APIs → **"Pharma and Biotechnology Chemical"**
+    - Fertilizers → **"Agrochemical"**
+    - Plastics/Polymers → **"Polymers and Plastics"**
+    - Adhesive products → **"Adhesives"**
+    - Gas products → **"Industrial Gases"**
+    - Oil/petroleum products → **"Petrochemical"**
 
-    Provided List of Sub-Sectors:  
-    {sub_sectors_str}  
+2. Product Extraction (if applicable):  
+    - Always extract the widely recognized industry-standard name for the product.
+    - If no product is mentioned or the term does not logically fit as a product, return `"None"`.
 
-    Output Format:  
-    Output the result strictly as a JSON object in the following format:  
-    {{
-        "Sub-Sector": <Mapped Sub-Sector>,
-        "Original-Inferred-Sub-Sector": <Inferred Sub-Sector or 'None'>,
-        "Forced-Mapping": <'Yes' or 'No'>,
-        "Product": <Extracted Product or 'None'>
-    }}
+**VALIDATION RULES:**
+- Your "Sub-Sector" field MUST contain EXACTLY one of these values: {sub_sectors_str} OR "None"
+- If you cannot find any reasonable connection to the provided sub-sectors, only then return "None"
+- If the "Sub-Sector" matches exactly what you inferred, set `"Forced-Mapping": "No"`
+- If the "Sub-Sector" is different from what you initially inferred, set `"Forced-Mapping": "Yes"`
 
-    Query: {user_query}  
+**Examples:**
+- Query: "chalk industry approvals" 
+  - Inferred: "Basic Chemicals" 
+  - Closest Available: "Paint, Coatings & Inks" (chalk used in paints)
+  - Output: `"Sub-Sector": "Paint, Coatings & Inks", "Original-Inferred-Sub-Sector": "Basic Chemicals", "Forced-Mapping": "Yes"`
 
-    Provide only the JSON object in the required format.  
+Output Constraints:  
+- The "Sub-Sector" field can ONLY contain values from the provided list or "None"
+- Do not create new sub-sector names
+- Strictly limit the output to the required JSON format with no explanations
+
+Output Format:  
+{{
+    "Sub-Sector": <MUST be from provided list or "None">,
+    "Original-Inferred-Sub-Sector": <What you initially inferred or "None">,
+    "Forced-Mapping": <"Yes" if Sub-Sector differs from Original-Inferred, "No" if exact match>,
+    "Product": <Extracted Product or "None">
+}}
+
+Query: {user_query}  
+
+Provide only the JSON object in the required format.  
     """
-
 
     # Create the prompt using the provided variables
     prompt = PromptTemplate(
@@ -3068,65 +3585,102 @@ def extract_segment_and_product_universal(
 
     # Define the prompt
     prompt_template = """
-    You are an expert in analyzing industry-related queries and extracting specific details.
-    A Segment is a logical grouping of products or services that come immediately next in the hierarchy after the Sub-Sector.
-    The Sub-Sector itself is a functional or operational category following the Main-Industry in the hierarchy.
+You are an expert in analyzing industry-related queries and extracting specific details.
 
-    For example:
-    - In the "Automobile" industry, a Sub-Sector like "Automotive Components" may have Segments such as "Engines," "Batteries," or "Tires."
-    - In the "Pharmaceuticals" industry, a Sub-Sector like "Allopathic Medicines" may have Segments such as "Antibiotics" or "Analgesics."
-    - In the "Textile" industry, a Sub-Sector like "Fabric Production" may have Segments such as "Cotton Weaving" or "Synthetic Fiber Manufacturing."
+**CRITICAL INSTRUCTION: When determining Segment classification, focus ONLY on the product, service, or industry terms mentioned in the query. Completely ignore geographic locations (cities, states, countries) for segment inference. Location information should not influence segment selection in any way.**
 
-    Based on the user's query, identify the following details:
+A Segment is a logical grouping of products or services that come immediately next in the hierarchy after the Sub-Sector.
+The Sub-Sector itself is a functional or operational category following the Main-Industry in the hierarchy.
 
-    {context}
+For example:
+- In the "Automobile" industry, a Sub-Sector like "Automotive Components" may have Segments such as "Engines," "Batteries," or "Tires."
+- In the "Pharmaceuticals" industry, a Sub-Sector like "Allopathic Medicines" may have Segments such as "Antibiotics" or "Analgesics."
+- In the "Textile" industry, a Sub-Sector like "Fabric Production" may have Segments such as "Cotton Weaving" or "Synthetic Fiber Manufacturing."
 
-    1. Segment: First, infer or predict the segment based on the context of the query.
+{context}
+
+**MANDATORY CONSTRAINT: You MUST select the Segment value ONLY from the provided list below. You cannot create or invent segment names that are not in this exact list.**
+
+Provided List of Segments (THESE ARE YOUR ONLY OPTIONS):  
+{segments_str}  
+
+**Product-to-Segment Mapping Rules (Location-Independent):**
+Based on your Sub-Sector context:
+- If Sub-Sector is Chemical-related → Look for chemical product categories, processing types, or application segments
+- If Sub-Sector is Manufacturing-related → Look for product categories, equipment types, or process segments
+- If Sub-Sector is Service-related → Look for service categories, business functions, or client segments
+
+Based on the user's query, identify the following details:
+
+1. Segment: First, infer or predict the segment based on the context of the query.
+    - **Focus exclusively on product/service/industry keywords - NOT on location.**
     - In most cases, users may not explicitly mention "business activity" or "sector-specific terms," but they are referring to industry-related segments. Assume the query relates to an industry segment unless it is clearly illogical to do so.
     - The query may sometimes be vague or incomplete. In such cases, analyze the implied intent and context to infer the appropriate segment.
-    - If the inferred segment can logically match any category from the provided list of Segments, return the matched category from the list and set `Forced-Mapping` to `No`.
-    - If no logical match is possible but a mapping must still be provided, forcefully map the inferred segment to the closest match from the provided list and set `Forced-Mapping` to `Yes`.
-    - If no segment can be inferred from the query, return `"None"` for both `Original-Inferred-Segment` and `Segment`.
+    
+    **STEP-BY-STEP PROCESS:**
+    a) Identify what specific product/service/business activity the query refers to
+    b) Check if this exactly matches any item in the provided list above
+    c) If YES: Use that exact match and set `"Forced-Mapping": "No"`
+    d) If NO: Find the closest related option from the provided list and set `"Forced-Mapping": "Yes"`
+    
+    - If the inferred segment can logically match any category from the provided list of Segments, return the matched category from the list and set `"Forced-Mapping"` to `"No"`.
+    - If no exact logical match exists, identify the CLOSEST available segment based on:
+        * Product category similarity
+        * Business function overlap
+        * Industry application area
+        * Service type alignment
+        * End-use market segment
+    - **MANDATORY: Always attempt a forced mapping before returning "None"**
+    - **Only return "None" if the query contains absolutely no industry/product/service context whatsoever**
 
-    2. Product: If the product context is provided, return the same product in the output JSON as it is in the context.  
+2. Product: If the product context is provided, return the same product in the output JSON as it is in the context.  
+    - **Focus exclusively on product terms - NOT on location.**
     - Identify the specific product or service the query refers to (e.g., "Cement," "Steel Rods," "Industrial Equipment").  
     - If the inferred term logically represents a product or service, include it in the output.  
     - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
 
-    Important Notes:
+**VALIDATION RULES:**
+- Your "Segment" field MUST contain EXACTLY one of these values from the provided list OR "None"
+- If you cannot find any reasonable connection to the provided segments, only then return "None"
+- If the "Segment" matches exactly what you inferred, set `"Forced-Mapping": "No"`
+- If the "Segment" is different from what you initially inferred, set `"Forced-Mapping": "Yes"`
 
-    Logical Matching for Segments:
-    - A logical match occurs when the inferred segment and an available segment from the list are conceptually or functionally similar.
-    - Examples of logical matches:
-        - Inferred: "Tax Incentives for Startups" → Available: "Government Grants & Subsidies" (Not forced, `Forced-Mapping`: No).
-        - Inferred: "Pollution Control Compliance" → Available: "Environmental Approvals" (Not forced, `Forced-Mapping`: No).
-    - Examples of forced mappings:
-        - Inferred: "Renewable Energy Investment Benefits" → Available: "Green Industry Incentives" (Forced, `Forced-Mapping`: Yes).
-        - Inferred: "Vendor Sourcing for Construction" → Available: "Building Materials Suppliers" (Forced, `Forced-Mapping`: Yes).
-    - If no logical match exists, set `Forced-Mapping` to `Yes`.
+Logical Matching for Segments:
+- A logical match occurs when the inferred segment and an available segment from the list are conceptually or functionally similar.
+- Examples of logical matches:
+    - Inferred: "Tax Incentives for Startups" → Available: "Government Grants & Subsidies" (`Forced-Mapping`: "No").
+    - Inferred: "Pollution Control Compliance" → Available: "Environmental Approvals" (`Forced-Mapping`: "No").
+- Examples of forced mappings:
+    - Inferred: "Basic Chemical Manufacturing" → Available: "Industrial Chemicals" (if closest match) (`Forced-Mapping`: "Yes").
+    - Inferred: "Renewable Energy Investment Benefits" → Available: "Green Industry Incentives" (`Forced-Mapping`: "Yes").
+    - Inferred: "Vendor Sourcing for Construction" → Available: "Building Materials Suppliers" (`Forced-Mapping`: "Yes").
 
-    Provided List of Segments:  
-    {segments_str}  
+**Examples:**
+- Query: "chalk manufacturing approvals in Mumbai" 
+  - Inferred: "Basic Chemical Manufacturing" 
+  - Closest Available: "Industrial Chemicals" (if available in list)
+  - Output: `"Segment": "Industrial Chemicals", "Original-Inferred-Segment": "Basic Chemical Manufacturing", "Forced-Mapping": "Yes"`
 
-    Output Format:
-    - Ensure that the output strictly adheres to the specified JSON format without any additional reasoning, explanations, or comments.
-    - Do not include any reasoning or justification in the fields. For example, avoid entries such as `"This matches because..."` or `"Assumed based on the context..."`.
-    - Each field should only contain the extracted information or the specified fallback values (e.g., "None").
-    - If the query mentions only a location but no specific industry or product context, do not infer the segment from prior knowledge of the location. Instead, return None.
+Output Format:
+- The "Segment" field can ONLY contain values from the provided list or "None"
+- Do not create new segment names
+- Ensure that the output strictly adheres to the specified JSON format without any additional reasoning, explanations, or comments.
+- Do not include any reasoning or justification in the fields. For example, avoid entries such as `"This matches because..."` or `"Assumed based on the context..."`.
+- Each field should only contain the extracted information or the specified fallback values (e.g., "None").
 
-    Output the result strictly as a JSON object in the following format:
-    {{
-        "Segment": <Mapped Segment>,
-        "Original-Inferred-Segment": <Inferred Segment or 'None'>,
-        "Forced-Mapping": <'Yes' or 'No'>,
-        "Product": <Extracted Product or 'None'>
-    }}
+Output the result strictly as a JSON object in the following format:
+{{
+    "Segment": <MUST be from provided list or "None">,
+    "Original-Inferred-Segment": <What you initially inferred or "None">,
+    "Forced-Mapping": <"Yes" if Segment differs from Original-Inferred, "No" if exact match>,
+    "Product": <Extracted Product or "None">
+}}
 
-    Query: {user_query}
+Query: {user_query}
 
-    Provide only the JSON object in the required format.
+Provide only the JSON object in the required format.
     """
-
+    
     # Create the prompt using the provided variables
     prompt = PromptTemplate(
         input_variables=["user_query", "segments_str", "context"],

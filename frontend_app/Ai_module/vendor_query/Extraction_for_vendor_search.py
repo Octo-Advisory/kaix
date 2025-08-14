@@ -417,7 +417,7 @@ def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
         "From_India": from_india
     }
 
-def get_best_supply_match(extracted_supplies: List[str], available_supplies: List[str], fuzzy_threshold: int = 75, spacy_threshold: float = 0.65) -> List[str]:
+def get_best_supply_match(extracted_supplies: List[str], available_supplies: List[str], fuzzy_threshold: int = 95, spacy_threshold: float = 0.80) -> List[str]:
     """
     Finds the best matches for extracted supplies using both SpaCy similarity and fuzzy matching.
 
@@ -455,10 +455,10 @@ def get_best_supply_match(extracted_supplies: List[str], available_supplies: Lis
                 spacy_match_name = available_supply
 
         # Use the best matching method
-        if fuzzy_score >= fuzzy_threshold:
-            validated_supplies.append(fuzzy_match_name)
-        elif best_spacy_score >= spacy_threshold:
+        if best_spacy_score >= spacy_threshold:
             validated_supplies.append(spacy_match_name)
+        # elif fuzzy_score >= fuzzy_threshold:
+        #     validated_supplies.append(fuzzy_match_name)
         else:
             validated_supplies.append("Not Available in List")
 
@@ -1061,6 +1061,59 @@ def get_static_follow_up_for_vendor(vendor_state: Dict[str, Dict[str, Optional[s
                 message += f" But {missing_details[0]}"
 
         return message
+
+def build_supply_confirmation_message_human_tone(extracted_state: dict, validated_state: dict) -> str:
+    extracted_supplies = (extracted_state or {}).get("Supply_info", {}).get("Supplies", []) or []
+    validated_supplies = (validated_state or {}).get("Supply_info", {}).get("Supplies", []) or []
+    location = (
+        (validated_state or {}).get("Location_info", {}) or
+        (extracted_state or {}).get("Location_info", {})
+    ).get("Location", "your selected area")
+
+    # Pair extracted with validated for mapping
+    pairs = list(zip(extracted_supplies, validated_supplies)) \
+            if len(validated_supplies) == len(extracted_supplies) \
+            else [(e, validated_supplies[i] if i < len(validated_supplies) else "Not Available in List")
+                  for i, e in enumerate(extracted_supplies)]
+
+    exact_matches = []
+    close_matches = []
+    unavailable = []
+
+    for extracted, validated in pairs:
+        e = (extracted or "").strip()
+        v = (validated or "").strip()
+        if not v or v.lower() == "not available in list":
+            unavailable.append(e)
+        elif v.lower() == e.lower():
+            exact_matches.append(v)
+        else:
+            close_matches.append((e, v))
+
+    # Build natural conversational message
+    parts = []
+
+    if extracted_supplies:
+        parts.append(f"You mentioned you’re looking for **{', '.join(extracted_supplies)}** in **{location}**.")
+
+    if exact_matches:
+        parts.append(f"We have vendors for **{', '.join(exact_matches)}**, exactly as you requested.")
+
+    if close_matches:
+        close_texts = []
+        for src, dst in close_matches:
+            close_texts.append(f"we couldn’t find vendors for **{src}** exactly, but we do have vendors for **{dst}**, which is a very close match to your requirement")
+        parts.append("For " + " and ".join(close_texts) + ".")
+
+    if unavailable:
+        parts.append(f"Unfortunately, we couldn’t find any vendors at all for **{', '.join(unavailable)}**.")
+
+    # More natural closing line
+    parts.append("Would you like me to go ahead and connect you with vendors for everything we can source for you right now?")
+
+    return " ".join(parts)
+
+
 # Entry Point
 def handle_vendor_query(
     user_input: str,
@@ -1126,6 +1179,7 @@ def handle_vendor_query(
             "State" : state,
             "User Intention": user_intention,
             "options": None,
+            "Trigger_Lead_Generation":False
         }
         return response
     else:
@@ -1191,22 +1245,54 @@ def handle_vendor_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": confirmation_buttons
+                        "options": confirmation_buttons,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
                 else:
-                    message = "Not Available in List"
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
-                    response = {
-                        "Ai_response": message,
-                        "Is_confirmation" : None,
-                        "Extracted Data": extracted_state,
-                        "Validation Data": state,
-                        "User Intention": user_intention,
-                        "options": None
-                    }
-                    return response
+                    if state["Supply_info"]["Supplies"] and all(item == "Not Available in List" for item in state["Supply_info"]["Supplies"]):
+                        message = SUPPLIES_NOT_AVAILABLE_MSG
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        save_chat(chat_history,f"chat_{chatId}")
+                        response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention,
+                            "options": None,
+                            "Trigger_Lead_Generation":True
+                        }
+                        return response
+                    
+                    elif state["Industry_info"]["Main-Industry"] == "Not Available in List" or state["Industry_info"]["Sub-Sector"] == "Not Available in List":
+                        message = INDUSTRY_NOT_AVAILABLE_MSG
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        save_chat(chat_history,f"chat_{chatId}")
+                        response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention,
+                            "options": None,
+                            "Trigger_Lead_Generation":True
+                        }
+                        return response
+                    else:                        
+                        message = SUPPLIES_NOT_AVAILABLE_MSG + "AND" + INDUSTRY_NOT_AVAILABLE_MSG
+                        chat_history.append(AIMessage(content=message))  # Log user query
+                        save_chat(chat_history,f"chat_{chatId}")
+                        response = {
+                            "Ai_response": message,
+                            "Is_confirmation" : None,
+                            "Extracted Data": extracted_state,
+                            "Validation Data": state,
+                            "User Intention": user_intention,
+                            "options": None,
+                            "Trigger_Lead_Generation":True
+                        }
+                        return response
             else:
                 response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                 message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
@@ -1218,7 +1304,8 @@ def handle_vendor_query(
                             "Extracted Data": extracted_state,
                             "Validation Data": state,
                             "User Intention": user_intention,
-                            "options": None
+                            "options": None,
+                            "Trigger_Lead_Generation":False
                         }
                 return response
         
@@ -1302,7 +1389,8 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": confirmation_buttons
+                                "options": confirmation_buttons,
+                                "Trigger_Lead_Generation":False
                             }
                             return response
                             
@@ -1317,7 +1405,8 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":False
                             }
                             return response
     
@@ -1327,7 +1416,7 @@ def handle_vendor_query(
                         state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                         save_state(state,f"QVND_state_{chatId}")
                         if perfect_location_data:
-                            message = "Not Available in List"
+                            message = INDUSTRY_NOT_AVAILABLE_MSG
                             chat_history.append(AIMessage(content=message))  # Log user query
                             response = {
                                 "Ai_response": message,
@@ -1335,7 +1424,8 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":True
                             }
                             return response
                         else:
@@ -1349,7 +1439,8 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":False
                             }
                             return response
                 else:
@@ -1368,7 +1459,8 @@ def handle_vendor_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
             else:
@@ -1378,7 +1470,7 @@ def handle_vendor_query(
                 state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                 save_state(state,f"QVND_state_{chatId}")
                 if perfect_location_data:
-                    message = "Not Available in List"
+                    message = INDUSTRY_NOT_AVAILABLE_MSG
                     chat_history.append(AIMessage(content=message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
                     response = {
@@ -1387,7 +1479,8 @@ def handle_vendor_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
                 else:
@@ -1401,7 +1494,8 @@ def handle_vendor_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
 
@@ -1426,13 +1520,38 @@ def handle_vendor_query(
             if not all(supply == "Not Available in List" for supply in state["Supply_info"]["Supplies"]):
                 if state["Supply_info"]["Supplies"]:
                     if perfect_location_data:
-                        message = (
-                            f"You're looking for suppliers that provide **{', '.join(state['Supply_info']['Supplies'])}** in **{state.get('Location_info').get('Location')}**. <br/><br/>"
-                            f"Please confirm if this is correct so we can help you find the right vendors."
-                        )
+                        # message = (
+                        #     f"You're looking for suppliers that provide **{', '.join(state['Supply_info']['Supplies'])}** in **{state.get('Location_info').get('Location')}**. <br/><br/>"
+                        #     f"Please confirm if this is correct so we can help you find the right vendors."
+                        # )
 
                         # response_validation = state.get("Additional_class_response")
                         # message += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
+
+                        # available_supplies = state['Supply_info']['Supplies']
+                        # requested_supplies = extracted_state['Supply_info']['Supplies']
+
+                        # # Find items not available
+                        # unavailable_supplies = [item for item in requested_supplies if item not in available_supplies]
+
+                        # # Build the main message
+                        # message_parts = []
+
+                        # if available_supplies:
+                        #     message_parts.append(
+                        #         f"You're looking for suppliers that provide **{', '.join(available_supplies)}** in **{state.get('Location_info', {}).get('Location', 'your selected area')}**."
+                        #     )
+
+                        # if unavailable_supplies:
+                        #     message_parts.append(
+                        #         f"<br/><br/>Currently no vendors available for the following item(s): **{', '.join(unavailable_supplies)}**"
+                        #     )
+
+                        # # Add confirmation request
+                        # message_parts.append("<br/><br/>Please confirm if this is correct so we can help you find the right vendors.")
+
+                        # # Final message
+                        message = build_supply_confirmation_message_human_tone(extracted_state=extracted_state, validated_state=state)
 
                         # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
                         chat_history.append(AIMessage(content=message))  # Log user query
@@ -1447,7 +1566,8 @@ def handle_vendor_query(
                             "Extracted Data": extracted_state,
                             "Validation Data": state,
                             "User Intention": user_intention,
-                            "options": confirmation_buttons
+                            "options": confirmation_buttons,
+                            "Trigger_Lead_Generation":False
                         }
                         return response
                     else:
@@ -1462,7 +1582,8 @@ def handle_vendor_query(
                                     "Extracted Data": extracted_state,
                                     "Validation Data": state,
                                     "User Intention": user_intention,
-                                    "options": None
+                                    "options": None,
+                                    "Trigger_Lead_Generation":False
                                 }
                         return response
                 else:
@@ -1477,12 +1598,13 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":False
                             }
                     return response
             else:
                 if perfect_location_data: 
-                    message = "Not Available in List"
+                    message = SUPPLIES_NOT_AVAILABLE_MSG
                     chat_history.append(AIMessage(content=message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
                     response = {
@@ -1491,7 +1613,8 @@ def handle_vendor_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
                 else:
@@ -1506,7 +1629,8 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":False
                             }
                     return response
                 
@@ -1608,7 +1732,8 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": confirmation_buttons
+                                "options": confirmation_buttons,
+                                "Trigger_Lead_Generation":False
                             }
                             return response
                             
@@ -1623,7 +1748,8 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":False
                             }
                             return response
                     else:
@@ -1632,7 +1758,7 @@ def handle_vendor_query(
                         state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                         save_state(state,f"QVND_state_{chatId}")
                         if perfect_location_data:
-                            message = "Not Available in List"
+                            message = INDUSTRY_NOT_AVAILABLE_MSG
                             chat_history.append(AIMessage(content=message))  # Log user query
                             save_chat(chat_history,f"chat_{chatId}")
                             response = {
@@ -1641,7 +1767,8 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":True
                             }
                             return response
                         else:
@@ -1655,7 +1782,8 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":False
                             }
                             return response
                 else:
@@ -1674,7 +1802,8 @@ def handle_vendor_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
 
@@ -1685,7 +1814,7 @@ def handle_vendor_query(
                 state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                 save_state(state,f"QVND_state_{chatId}")
                 if perfect_location_data: 
-                    message = "Not Available in List"
+                    message = INDUSTRY_NOT_AVAILABLE_MSG
                     chat_history.append(AIMessage(content=message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
                     response = {
@@ -1694,7 +1823,8 @@ def handle_vendor_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
                 else:
@@ -1709,7 +1839,8 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":False
                             }
                     return response
 
@@ -1754,13 +1885,39 @@ def handle_vendor_query(
             if not all(supply == "Not Available in List" for supply in state["Supply_info"]["Supplies"]):
                 if state["Supply_info"]["Supplies"]:
                     if perfect_location_data and perfect_supply_data:
-                        message = (
-                            f"You're looking for suppliers that provide **{', '.join(state['Supply_info']['Supplies'])}** in **{state.get('Location_info').get('Location')}**. <br/><br/>"
-                            f"Please confirm if this is correct so we can help you find the right vendors."
-                        )
+                        # message = (
+                        #     f"You're looking for suppliers that provide **{', '.join(state['Supply_info']['Supplies'])}** in **{state.get('Location_info').get('Location')}**. <br/><br/>"
+                        #     f"Please confirm if this is correct so we can help you find the right vendors."
+                        # )
 
                         # response_validation = state.get("Additional_class_response")
                         # message += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
+
+                        # available_supplies = state['Supply_info']['Supplies']
+                        # requested_supplies = extracted_state['Supply_info']['Supplies']
+
+                        # # Find items not available
+                        # unavailable_supplies = [item for item in requested_supplies if item not in available_supplies]
+
+                        # # Build the main message
+                        # message_parts = []
+
+                        # if available_supplies:
+                        #     message_parts.append(
+                        #         f"You're looking for suppliers that provide **{', '.join(available_supplies)}** in **{state.get('Location_info', {}).get('Location', 'your selected area')}**."
+                        #     )
+
+                        # if unavailable_supplies:
+                        #     message_parts.append(
+                        #         f"<br/><br/>Currently no vendors available for the following item(s): **{', '.join(unavailable_supplies)}**"
+                        #     )
+
+                        # # Add confirmation request
+                        # message_parts.append("<br/><br/>Please confirm if this is correct so we can help you find the right vendors.")
+
+                        # Final message
+                        message = build_supply_confirmation_message_human_tone(extracted_state=extracted_state, validated_state=state)
+
 
                         # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
                         chat_history.append(AIMessage(content=message))  # Log user query
@@ -1777,7 +1934,8 @@ def handle_vendor_query(
                             "Extracted Data": extracted_state,
                             "Validation Data": state,
                             "User Intention": user_intention,
-                            "options": confirmation_buttons
+                            "options": confirmation_buttons,
+                            "Trigger_Lead_Generation":False
                         }
                         return response
                     else:
@@ -1792,7 +1950,8 @@ def handle_vendor_query(
                                     "Extracted Data": extracted_state,
                                     "Validation Data": state,
                                     "User Intention": user_intention,
-                                    "options": None
+                                    "options": None,
+                                    "Trigger_Lead_Generation":False
                                 }
                         return response
                 else:
@@ -1807,12 +1966,13 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":False
                             }
                     return response
             else:
                 if perfect_location_data and perfect_supply_data: 
-                    message = "Not Available in List"
+                    message = SUPPLIES_NOT_AVAILABLE_MSG
                     chat_history.append(AIMessage(content=message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
                     response = {
@@ -1821,7 +1981,8 @@ def handle_vendor_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
                 else:
@@ -1835,7 +1996,8 @@ def handle_vendor_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":False
                             }
                     return response
 
@@ -1851,7 +2013,8 @@ def handle_vendor_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":False
                     }
             return response
 

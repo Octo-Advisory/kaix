@@ -16,7 +16,7 @@ function Login() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const { currentUser,login } = useFrappeAuth();
+  const { currentUser, login } = useFrappeAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,20 +28,29 @@ function Login() {
       setIsLoading(false);
       return;
     }
-    
+
     try {
-      await login({username:login_username,password: login_password});
-      toast.success("Login successful!", {
-        position: "top-center",
-        autoClose: 2000,
-        hideProgressBar: true,
-        closeOnClick: true,
-        pauseOnHover: false,
-        draggable: false,
-      });
-      navigate("/chat");
+      const results = await login({ username: login_username, password: login_password });
+      // console.log("result of login is", results);
+      if (results && results.message === 'Logged In') {
+        toast.success("Login successful!", {
+          position: "top-center",
+          autoClose: 1000,
+          hideProgressBar: true,
+          closeOnClick: true,
+          pauseOnHover: false,
+          draggable: false,
+        });
+
+        // Redirect immediately after successful login
+        setTimeout(() => {
+          // navigate("/chat");
+          // window.location.reload();
+          window.location.href = "/frontend/chat"
+        }, 1000);
+      }
     } catch (err) {
-      console.error("Login failed:", err);
+      // console.error("Login failed:", err);
       setError("Invalid username or password.");
     } finally {
       setIsLoading(false);
@@ -54,12 +63,12 @@ function Login() {
         {/* Left Side - Illustration */}
         <div className="hidden md:block md:w-1/2 bg-gradient-to-br from-[#0e2044] to-[#41b655] relative overflow-hidden">
           <div className="absolute inset-0 bg-black/10" />
-          <img 
-            src={illustration1} 
+          <img
+            src={illustration1}
             className="w-full h-full object-cover object-center"
             alt="AI-Powered Industrial Solutions"
           />
-          
+
           <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
             <h2 className="text-3xl font-bold mb-2">MarsAIX Platform</h2> {/* Changed by Jenith on 15-5-25 9:49 */}
             <p className="text-gray-200">
@@ -72,10 +81,10 @@ function Login() {
         {/* Right Side - Login Form */}
         <div className="w-full md:w-1/2 py-12 px-8 sm:px-12 lg:px-16 flex flex-col justify-center">
           <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
+            {/* <div className="flex items-center justify-center mb-4">
               <span className="text-3xl font-bold text-[#0e2044]">Mars</span>
               <span className="text-3xl font-bold text-[#41b655]">AIX</span>
-            </div>
+            </div> */}
             <h1 className="text-2xl font-semibold text-gray-800 mb-2">Welcome back</h1>
             <p className="text-gray-600">Sign in to continue building your industrial project</p>{/* Changed by Jenith on 15-5-25 9:50 */}
           </div>
@@ -130,7 +139,7 @@ function Login() {
                 <button
                   type="button"
                   className="text-sm text-[#41b655] hover:text-[#0e2044] transition"
-                  onClick={()=>{navigate("/forgotpassword")}}
+                  onClick={() => { navigate("/forgotpassword") }}
                 >
                   Forgot password?
                 </button>
@@ -173,14 +182,14 @@ function Login() {
             </p>
           </div>
 
-           <div className="mt-8 border-t border-gray-200 pt-6 text-center">
+          <div className="mt-8 border-t border-gray-200 pt-6 text-center">
             <button
               className="text-sm text-gray-500 hover:text-gray-700 transition"
-              onClick={()=> navigate('/chat')}
+              onClick={() => navigate('/chat')}
             >
               Continue as guest
             </button>
-          </div> 
+          </div>
         </div>
       </div>
       <ToastContainer />

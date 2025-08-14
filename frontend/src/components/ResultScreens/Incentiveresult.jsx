@@ -7,7 +7,7 @@ import DOMPurify from 'dompurify';
 import "../ResultScreens/incentives.css"
 import LogoLoader from "../Responseloader/LogoLoader";
 import { useSelector } from "react-redux";
-import { FrappeContext, useFrappeGetDoc, useFrappeUpdateDoc } from "frappe-react-sdk";
+import { FrappeContext, useFrappeGetDoc, useFrappeUpdateDoc, useFrappeCreateDoc } from "frappe-react-sdk";
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkBreaks from 'remark-breaks';
@@ -16,34 +16,70 @@ import NoResultsFound from "../Failure/NoResultsFound";
 import FailureScreen from "../Failure/FailureScreen";
 import { AdditionalDetailIcon, BuildingIcon, ClipboardCheckIcon, DollarIcon, EligibilityIcon, FinancialSummaryIcon, IncentiveNameIcon, IncentiveTitleIcon, InfoIcon, ListCheckIcon, ScheduleIcon, SearchIcon, TriangleDownIcon, TriangleUpIcon } from "../../Icons/icon";
 
-function Incentiveresult({ result, source, rerender }) {
+function Incentiveresult({ res, source, rerender }) {
+  const { createDoc, isLoading, error } = useFrappeCreateDoc('');
+    const lastChatId = useSelector((state) => state.chat.lastId);
   const { data: uiData } = useFrappeGetDoc("UI Configuration", "Incentive")
   const configurations = uiData?.configurations || [];
   const uiConfig = configurations.reduce((acc, curr) => {
     acc[curr.key] = curr.value;
     return acc;
   }, {}); 
+ 
+  const createDiagnostic = (errType, logMsg,chatId)=> {
+      let log = ` ${logMsg}`
+      createDoc("AIX Diagnostics Hub", {
+      type: errType,
+      note: log,
+      chat_name: chatId
+      });
+  }
+
+  let Analytics_response = rerender!==1 ?  res['Analytics_response'] : {}
+  if ((
+    typeof Analytics_response !== 'object' || 
+    Analytics_response === null || 
+    typeof Analytics_response === 'string') && rerender!== 1
+  ) {
+    // createDiagnostic("Data Error", `Invalid Data was passed that couldn't be rendered due to ${Analytics_response} in Incentives`,lastChatId)
+    return <NoResultsFound diagnostics={true} type='Incentive' chatId={lastChatId} data={Analytics_response} module='Incentives'/>;
+  }
+  const result = rerender!==1 ?  JSON.parse(Analytics_response["Incentive Data"]) : {}
 
   const { call } = useContext(FrappeContext)
   const [tempFailure, setTempFailure] = useState(false)
   const [someError, setSomeError] = useState(false)
-  console.log("result is", result);
-   if (typeof result === 'object' && result !== null) {
  
-    console.log('All good')
-  // safely use `essential` here
-  } else {
-    let msg = result;
-    console.log(msg, 'Setting the result fail...')
-    setTempFailure(true)
-    // fallback or ignore
-}
-  const lastChatId = useSelector((state) => state.chat.lastId);
+//    if (typeof result === 'object' && result !== null) {
+ 
+//     console.log('All good')
+//   // safely use `essential` here
+//   } else {
+//     let msg = result;
+//     console.log(msg, 'Setting the result fail...')
+//     setTempFailure(true)
+//     // fallback or ignore
+// }
+// const analytics_response = result['Analytics_response']
+
+
   const [selectedIncentive, setSelectedIncentive] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [incentives, setIncentives] = useState([]);
   const [loading, setLoading] = useState(true);
   const { updateDoc } = useFrappeUpdateDoc()
+
+  function safeJsonParse(input) {
+  try {
+    if (typeof input === 'object') return input; // already parsed
+    return JSON.parse(input);
+  } catch (e) {
+    // console.error("❌ JSON parse error:", e.message);
+    // console.warn("Raw input:", input);
+    return {};
+  }
+}
+
 
   const getLocationLevel = (city, state, country) => {
     if (city === 1) {
@@ -97,7 +133,6 @@ function Incentiveresult({ result, source, rerender }) {
           }
         }
       }
-      console.log(fetchedIndustryIncentives, 'This are industry incentives')
       for (const [index, id] of incentiveIds.entries()) {
         const filters = JSON.stringify([["name", "=", id]]);
         const fields = JSON.stringify(["*"]);
@@ -113,9 +148,14 @@ function Incentiveresult({ result, source, rerender }) {
         });
 
         if (response.ok) {
+          
           const data = await response.json();
           if (data.data && data.data.length > 0) {
+            
             const incentive = data.data[0];
+            
+            let parsedContext = safeJsonParse(incentive.contextual_analysis);
+
             fetchedIncentives.push({
               id: incentive.name,
               name: incentive.incentive_name,
@@ -123,7 +163,9 @@ function Incentiveresult({ result, source, rerender }) {
               quantum_of_assistance: incentive.quantum_of_assistance,
               description: incentive.description,
               // rank: result["Incentive Rank"]?.[index] ?? "N/A",
-              incentive_rank: incentive.incentive_rank || "N/A",
+              incentive_rank: incentive.incentive_rank || "N/A",              
+              contextual_analysis: parsedContext?.final_markdown || '',
+              // contextual_analysis: JSON.parse(incentive.contextual_analysis)?.["final_markdown"] || '',
               aggregated_score: result?.["aggregated_score"]?.[index] ?? 0,
               startDate: incentive.incentive_operation_start_date || "N/A",
               endDate: incentive.incentive_operation_end_date || "N/A",
@@ -152,6 +194,7 @@ function Incentiveresult({ result, source, rerender }) {
     });
 
       setIncentives(fetchedIncentives);
+
       setSelectedIncentive(fetchedIncentives.length > 0 ? fetchedIncentives[0] : null);
       setLoading(false);
 
@@ -166,7 +209,8 @@ function Incentiveresult({ result, source, rerender }) {
       }
 
     } catch (error) {
-      console.error("Error fetching incentives:", error);
+      // console.error("Error fetching incentives:", error);
+      createDiagnostic("Incentive", `API call failed to get response due to  ${JSON.stringify(error)} in Incentives`, lastChatId)
       setSomeError(true)
       setLoading(false);
     }
@@ -186,25 +230,44 @@ function Incentiveresult({ result, source, rerender }) {
       'Expect': '' // 👈 Clear problematic header
     }
   });
-      console.log('This is the result we want ot store.... ', result.message)
+      // console.log('This is the result we want ot store.... ', result.message)
       return result.message || [];
     } catch (err) {
-      console.error("Error Storing Result json:", err);
+      // console.error("Error Storing Result json:", err);
+      createDiagnostic("Incentive", `Error Storing Result Json ${JSON.stringify(err)} in Incentives`, lastChatId)
       return []; // Return empty for this batch on error
     }
 }
   useEffect(() => {
-    if (rerender === 1 || source==='FromScratch') {
-      console.log(result, 'Got this from BfsM')
-      setIncentives(result)
-      setSelectedIncentive(result?.[0])
-      setLoading(false);
+    try {
+        if (rerender === 1 || source==='FromScratch') {
+        let tempResult = res?.['result'] ? res.result : res
+        setIncentives(tempResult)
+        setSelectedIncentive(tempResult?.[0])
+        setLoading(false);
+      }
+      else {
+        fetchIncentivesDetails();
+      }
     }
-    else {
-      fetchIncentivesDetails();
+    catch(err) {
+      createDiagnostic("Incentive", `Something went wrong while rendering the data. Rerender = ${JSON.stringify(rerender)}, Source = ${JSON.stringify(source)}  ${JSON.stringify(err)} in Incentives`, lastChatId)
+      setSomeError(true)
     }
+  }, [res]);
+  // useEffect(() => {
+  //   if (rerender === 1 || source==='FromScratch') {
+  //     console.log(res, 'Got this from BfsM')
+  //     let tempResult = res?.['result'] ? res.result : Analytics_response
+  //     setIncentives(tempResult)
+  //     setSelectedIncentive(tempResult?.[0])
+  //     setLoading(false);
+  //   }
+  //   else {
+  //     fetchIncentivesDetails();
+  //   }
 
-  }, [result]);
+  // }, [res]);
 
   useEffect(()=>{
     if(incentives.length>0) {
@@ -212,7 +275,7 @@ function Incentiveresult({ result, source, rerender }) {
     }
   },[incentives])
 
-  const [activeContext, setActiveContext] = useState('Small')
+  const [activeContext, setActiveContext] = useState()
   const [showFull, setShowFull] = useState(false);
   const [testJson, setTestJson] = useState({
     "Small": "## Incentives under Gujarat Industrial Policy 2020 for Small Businesses\n### Core Benefit Overview\nThe incentive provides assistance to Micro, Small, and Medium Enterprises (MSEs) for sheds developed by private developers. It offers a proportional benefit of **15%** of the total cost of land, building, other infrastructure facilities, Technical Consultancy fees, and TPQA charges.\n\n### Illustrative Financial Details\nAssuming a total investment of **\u20b95,00,00,000**, the benefit calculation is as follows:\n- Total Investment: **\u20b95,00,00,000**\n- Benefit: **15%** of **\u20b95,00,00,000** = **\u20b975,00,000**\n- Net Cost: **\u20b95,00,00,000** - **\u20b975,00,000** = **\u20b94,25,00,000**\n\n### Key Financial Insights\n- The benefit is calculated as **15%** of the total investment in eligible costs.\n- There is no explicit cap mentioned for this benefit.\n- This incentive is particularly beneficial for small businesses as it provides significant support for infrastructure development, reducing the net investment burden.\n\n### Conclusion\nThis incentive is highly beneficial for small businesses under the Gujarat Industrial Policy 2020, as it provides substantial financial assistance for infrastructure development, thereby reducing the overall investment burden and fostering business growth.",
@@ -284,6 +347,14 @@ function Incentiveresult({ result, source, rerender }) {
     if (containerRef.current) {
       containerRef.current.scrollTop = 0;
     }
+    if (selectedIncentive?.contextual_analysis) {
+    const keys = Object.keys(selectedIncentive.contextual_analysis);
+    setActiveContext(keys.includes("Default") ? "Default" : keys[0]);
+  }
+
+  if(showFull) {
+    setShowFull(false)
+  }
   }, [selectedIncentive])
 
   useEffect(() => {
@@ -341,7 +412,7 @@ function Incentiveresult({ result, source, rerender }) {
             </div>
           </div>
 
-          {source === 'SolutionScreen' && (
+          {source === 'SolutionScreen' && rerender!==1 && (
             <Backtochat text='Back to Chat' />
           )}
         </div>
@@ -477,7 +548,7 @@ function Incentiveresult({ result, source, rerender }) {
                 </div>
 
                 {/* Additional Details Section */}
-                {selectedIncentive.quantum_of_assistance !== "N/A" && (
+                {selectedIncentive.quantum_of_assistance !== "N/A" && selectedIncentive.quantum_of_assistance && (
                   <div className="mb-8">
                     <h3 className="text-lg font-semibold mb-3 flex items-center text-black">
                       <AdditionalDetailIcon strokeWidth={2} size={24} className="mr-2 text-blue-700" />
@@ -541,27 +612,38 @@ function Incentiveresult({ result, source, rerender }) {
                 <div className={`relative max-w-full ${showFull ? 'h-[80vh]' : 'h-[60vh]'} border border-gray-200 rounded-lg shadow-lg flex flex-col overflow-hidden`}>
 
                   {/* Sticky Header */}
-                  <div className="sticky top-0 z-10 bg-white p-4 border-b border-gray-200 shadow-sm h-[120px] flex-shrink-0">
-                    <h2 className="text-lg font-semibold text-black mb-2 gap-2 flex flex-row items-center"> <span className="relative h-7 w-7 flex"><FinancialSummaryIcon className='text-blue-700 mr-2 h-full w-full' /></span>{uiConfig?.['financial_benefit_summary'] || "Financial Benefit Summary"}</h2>
+                  <div className="sticky top-0 z-10 bg-white flex flex-col gap-2 p-4 border-b border-gray-200 shadow-sm  h-fit flex-shrink-0">
+                    <h2 className="text-lg font-semibold text-black gap-2 flex flex-row items-center"> <span className="relative h-7 w-7 flex"><FinancialSummaryIcon className='text-blue-700 mr-2 h-full w-full' /></span>{uiConfig?.['financial_benefit_summary'] || "Financial Benefit Summary"}</h2>
 
-                    <div className="flex gap-4 overflow-x-auto pb-2">
-                      {testJson && Object.entries(testJson).map(([key]) => (
-                        <div key={key} className="flex flex-col items-center min-w-fit">
-                          <button
-                            className={`text-base font-medium ${activeContext === key ? 'text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
-                            onClick={() => setActiveContext(key)}
-                          >
-                            {key}
-                          </button>
-                          <div className={`${activeContext === key ? 'w-full' : 'w-0'} h-0.5 bg-blue-500 rounded-full transition-all duration-300`}></div>
-                        </div>
-                      ))}
+                    <div className="flex gap-4 overflow-x-auto h-fit">
+                      {selectedIncentive.contextual_analysis &&
+                        Object.entries(selectedIncentive.contextual_analysis).map(([key]) => {
+                          if (key === 'Default') return null; // 👈 Hide "Default" button
+
+                          return (
+                            <div key={key} className="flex flex-col items-center min-w-fit">
+                              <button
+                                className={`text-base font-medium ${
+                                  activeContext === key ? 'text-blue-600' : 'text-gray-600 hover:text-gray-800'
+                                }`}
+                                onClick={() => setActiveContext(key)}
+                              >
+                                {key}
+                              </button>
+                              <div
+                                className={`${
+                                  activeContext === key ? 'w-full' : 'w-0'
+                                } h-0.5 bg-blue-500 rounded-full transition-all duration-300`}
+                              ></div>
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
 
                   {/* Scrollable Content Area */}
                   <div ref={contextualRef} className={`flex-grow px-6 py-4 ${showFull ? 'overflow-y-auto' : 'overflow-hidden'}`}>
-                    {testJson && Object.entries(testJson)
+                    {selectedIncentive.contextual_analysis && Object.entries(selectedIncentive.contextual_analysis)
                       .filter(([key]) => key === activeContext)
                       .map(([key, value]) => (
                         <div key={key} className="prose max-w-none pb-8">
@@ -578,7 +660,7 @@ function Incentiveresult({ result, source, rerender }) {
                               li: ({node, ...props}) => <li className="text-gray-700 text-sm mb-1" {...props} />,
                             }}
                           >
-                            {value}
+                            {value || testJson['Medium']}
                           </ReactMarkdown>
                         </div>
                       ))}

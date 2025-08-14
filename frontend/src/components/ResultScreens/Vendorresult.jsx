@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useTransition, useContext } from 'react';
 import { FaLocationDot } from "react-icons/fa6";
-import { FrappeContext, useFrappeGetDoc, useFrappeGetDocList } from 'frappe-react-sdk';
+import { FrappeContext, useFrappeGetDoc, useFrappeGetDocList,useFrappeCreateDoc } from 'frappe-react-sdk';
 import Backtochat from '../Backtochat/Backtochat';
 import MapComponent from '../MapComponent/MapComponent';
 import {
@@ -18,25 +18,64 @@ import NoResultsFound from '../Failure/NoResultsFound';
 import SingleMap from '../MapComponent/SingleMap';
 
 function Vendorresult({ result, source, rerender }) {
+  const { createDoc } = useFrappeCreateDoc('');
+  const lastChatId = useSelector((state) => state.chat.lastId);
+  const createDiagnostic = (errType, logMsg,chatId)=> {
+      let log = `${logMsg}`
+      createDoc("AIX Diagnostics Hub", {
+      type: errType,
+      note: log,
+      chat_name: chatId
+      });
+  }
   const {call} = useContext(FrappeContext)
   const [tempFailure, setTempFailure] = useState(false)
+  const [forcedFail, setForcedFail]= useState(false)
   // First check in the code should be ::::  Unfiltered All IS Supplier
-  console.log(result, source, 'This is the result screen from Vendor Screen')
+  // console.log(result, source, 'This is the result screen from Vendor Screen')
   const analytics_response = (source === "SolutionScreen" || source === 'FromScratch') ? result["Analytics_response"] : ''
-  if ((typeof analytics_response === 'object' && analytics_response !== null) || source === "MapComponent") {
-    console.log('All good')
-    // safely use `essential` here
-  } else {
-    let msg = analytics_response;
-    console.log(msg, 'Setting the result fail...')
-    setTempFailure(true)
-    // fallback or ignore
+  // if ((typeof analytics_response === 'object' && analytics_response !== null && typeof analytics_response !== 'string') ) {
+  //   console.log('All good')
+  //   // safely use `essential` here
+  // } else {
+  //   let msg = analytics_response;
+  //   console.log(msg, 'Setting the result fail...')
+  //   setTempFailure(true)
+  //   // fallback or ignore
+  // }
+  if(source!=='MapComponent') {
+    if (
+     typeof analytics_response !== 'object' || 
+     analytics_response === null || 
+     typeof analytics_response === 'string' 
+   ) {
+      // console.log('Invalid analytics_response:', analytics_response,source, rerender);
+      // createDiagnostic("Data Error", `Invalid Data was passed that couldn't be rendered due to ${analytics_response} in Vendors`,lastChatId)
+      return <NoResultsFound diagnostics={true} type='Suppliers' chatId={lastChatId} data={analytics_response} module='Vendors'/>;
+    }
   }
+  
+  
+
   const IndividualQuery = analytics_response?.['Unfiltered All IS Supplier'] ? true : false
-  console.log(IndividualQuery, 'This is the Individual Query')
+  
+  if(!IndividualQuery && source!=='MapComponent') {
+    let essential_all = analytics_response?.['Unfiltered Essential Supplier']
+    let essential_best = analytics_response?.['Best Essential Supplier']
+    let non_essential_all = analytics_response?.['Unfiltered Non-Essential Supplier']
+    let non_essential_best = analytics_response?.['Best Non-Essential Supplier']
+    let check_all = [essential_all, essential_best, non_essential_all, non_essential_best]
+    // console.log(check_all, essential_all, essential_best, non_essential_all, non_essential_best)
+    let allNull = check_all.every(item=> !item)
+    if(allNull) {
+      // createDiagnostic("Data Error", `Invalid Data was passed that couldn't be rendered due to ${analytics_response} in Vendors`,lastChatId)
+      return <NoResultsFound diagnostics={true} type='Suppliers' chatId={lastChatId} data={analytics_response} module='Vendors'/>;
+    }
+  }
+  // console.log(IndividualQuery, 'This is the Individual Query')
   const user_lat_long = result["latitude_longitude"]
   const propertyData = (source === "FromScratch") ? result['propertyData'] : ''
-  console.log(result, rerender, user_lat_long, analytics_response, 'This is the result in vendors Screen')
+  // console.log(result, rerender, user_lat_long, analytics_response, 'This is the result in vendors Screen')
   const [viewMode, setViewMode] = useState('Suppliers')
   const [currentData, setCurrentData] = useState("All Suppliers");
   const [supplierType, setSupplierType] = useState('Essential')
@@ -73,7 +112,7 @@ function Vendorresult({ result, source, rerender }) {
 
   const mapRef = useRef(null);
 
-  const lastChatId = useSelector((state) => state.chat.lastId);
+  
   const { updateDoc } = useFrappeUpdateDoc()
 
   const parseSuppliers = (supplierData) => {
@@ -126,7 +165,7 @@ function Vendorresult({ result, source, rerender }) {
   const allSupplyNames = [...(nonEssentialAllSuppliers || []).map(f => f?.supply_id), ...(essentialAllSuppliers || []).map(f => f?.supply_id)];
   const vendorNames = ((source === "SolutionScreen") && rerender !== 1) ? IndividualQuery ? allIndividualSuppliers?.map(f => f.vendor_id) : allVendorNames : []
   const supplyNames = ((source === "SolutionScreen") && rerender !== 1) ? IndividualQuery ? allIndividualSuppliers?.map(f => f.supply_id) : allSupplyNames : []
-  console.log(vendorNames, 'This are the Vendor Names', supplyNames)
+  // console.log(vendorNames, 'This are the Vendor Names', supplyNames)
   const ShouldRender = rerender === 1 ? false : true
 
   const { data: vendorData, error, isLoading } = useFrappeGetDocList('Vendor', ShouldRender ? {
@@ -163,9 +202,9 @@ function Vendorresult({ result, source, rerender }) {
   useEffect(() => {
     if ((source === "SolutionScreen") && rerender !== 1) {
       if (vendorData && supplies && !supplyLoading && !isLoading && vendorData.length > 0 && supplies.length > 0) {
-        console.log('Data Before Mapping ', vendorData, supplies)
+        // console.log('Data Before Mapping ', vendorData, supplies)
         let d = groupSuppliesWithVendors(vendorData, supplies)
-        console.log(d, 'this is data grouped');
+        // console.log(d, 'this is data grouped');
         setGroupedData(d)
       }
     }
@@ -173,7 +212,7 @@ function Vendorresult({ result, source, rerender }) {
 
   // Assuming the analytics response passes only the Ids ... and we have all data called from db in vendorData so match the names
   const updateData = (suppliers) => {
-    console.log('Came here', suppliers)
+    // console.log('Came here', suppliers)
     if (!suppliers || suppliers.length < 1) return []
     const updatedSet = new Set();
 
@@ -193,7 +232,7 @@ function Vendorresult({ result, source, rerender }) {
   };
 
   function generateAnalyticsResponse(bestIndividualSuppliers, unfilteredSuppliers) {
-    console.log(bestIndividualSuppliers, unfilteredSuppliers, 'This is before conversion...')
+    // console.log(bestIndividualSuppliers, unfilteredSuppliers, 'This is before conversion...')
     const Analytics_response = {
       "Best IS Supplier": bestIndividualSuppliers,
       "Unfiltered All IS Supplier": unfilteredSuppliers,
@@ -205,7 +244,7 @@ function Vendorresult({ result, source, rerender }) {
     return Analytics_response;  // 🔥 Ready to store
   }
   function generateAnotherAnalyticsResponse(bestEssentialSuppliers, unfilteredEssentialSuppliers, bestNonEssentialSuppliers, unfilteredNonEssentialsuppliers) {
-    console.log(bestEssentialSuppliers, unfilteredEssentialSuppliers, unfilteredNonEssentialsuppliers, bestNonEssentialSuppliers, 'This is before conversion...')
+    // console.log(bestEssentialSuppliers, unfilteredEssentialSuppliers, unfilteredNonEssentialsuppliers, bestNonEssentialSuppliers, 'This is before conversion...')
     const Analytics_response = {
       "Best IS Supplier": null,
       "Unfiltered All IS Supplier": null,
@@ -221,7 +260,7 @@ function Vendorresult({ result, source, rerender }) {
   if(!lastChat || !solutions) return 
 
   try {
-    console.log(lastChat, solutions?.[0], 'Method Called')
+    // console.log(lastChat, solutions?.[0], 'Method Called')
       const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
       child_row_id: lastChat,
       updated_solutions: solutions,
@@ -232,10 +271,11 @@ function Vendorresult({ result, source, rerender }) {
       'Expect': '' // 👈 Clear problematic header
     }
   });
-      console.log('This is the result we want ot store.... ', result.message)
+      // console.log('This is the result we want ot store.... ', result.message)
       return result.message || [];
     } catch (err) {
-      console.error("Error Storing Result json:", err);
+      // console.error("Error Storing Result json:", err);
+      createDiagnostic("Suppliers", `Error storing Result Json due to ${JSON.stringify(err)} in Vendors`,lastChatId)
       return []; // Return empty for this batch on error
     }
 }
@@ -297,6 +337,20 @@ function Vendorresult({ result, source, rerender }) {
     }
   }, [currentData, supplierType, groupedData, searchQuery, updEssentialAllSupplier, updEssentialBestSupplier, updNonEssentialAllSupplier, updNonEssentialBestSupplier, updatedAllIndividualSupplier, updatedBestIndividualSupplier]);
 
+  useEffect(()=>{
+    if(!IndividualQuery) {
+     
+      if(updEssentialAllSupplier.length> 0) {
+        setSupplierType('Essential')
+        setCurrentData('All Suppliers')
+      }
+      else {
+        setSupplierType('Non-Essential')
+        setCurrentData('All Suppliers')
+      }
+    }
+  },[updEssentialAllSupplier, updNonEssentialAllSupplier])
+
   useEffect(() => {
     // Prevents rerun if rerender flag is set
     if (rerender === 1) return;
@@ -306,7 +360,7 @@ function Vendorresult({ result, source, rerender }) {
     // Proceed only if suppliers are ready
     if (IndividualQuery) {
       if (updatedAllIndividualSupplier && updatedAllIndividualSupplier.length > 0) {
-        console.log(updatedAllIndividualSupplier, updatedBestIndividualSupplier, 'This is the log we want to see')
+        // console.log(updatedAllIndividualSupplier, updatedBestIndividualSupplier, 'This is the log we want to see')
         const analyticsJSON = generateAnalyticsResponse(updatedBestIndividualSupplier, updatedAllIndividualSupplier);
         const updatedResult = {
           'Analytics_response': analyticsJSON,
@@ -325,16 +379,17 @@ function Vendorresult({ result, source, rerender }) {
             if(lastChatId) {
               await storeResultData(lastChatId,updatedResult,'Query to Search Vendors')
             }
-            console.log("✅ Analytics saved to chat history");
+            // console.log("✅ Analytics saved to chat history");
           } catch (err) {
-            console.error("❌ Failed to update doc:", err);
+            createDiagnostic("Suppliers", `Failed to Update Doc due to ${JSON.stringify(err)} in Vendors`,lastChatId)
+            // console.error("❌ Failed to update doc:", err);
           }
         })();
       }
     }
     if (!IndividualQuery) {
       if (updNonEssentialAllSupplier && updNonEssentialAllSupplier.length > 0 || updEssentialAllSupplier && updEssentialAllSupplier.length > 0) {
-        console.log(updNonEssentialAllSupplier, updNonEssentialAllSupplier, 'This is the log we want to see')
+        // console.log(updNonEssentialAllSupplier, updNonEssentialAllSupplier, 'This is the log we want to see')
         const analyticsJSON = generateAnotherAnalyticsResponse(updEssentialBestSupplier, updEssentialAllSupplier, updNonEssentialBestSupplier, updNonEssentialAllSupplier);
         const updatedResult = {
           'Analytics_response': analyticsJSON,
@@ -352,9 +407,10 @@ function Vendorresult({ result, source, rerender }) {
             if(lastChatId) {
               await storeResultData(lastChatId,updatedResult,'Query to Search Vendors')
             }
-            console.log("✅ Analytics saved to chat history");
+            // console.log("✅ Analytics saved to chat history");
           } catch (err) {
-            console.error("❌ Failed to update doc:", err);
+            createDiagnostic("Suppliers", `Failed to Update Doc due to ${JSON.stringify(err)} in Vendors`,lastChatId)
+            // console.error("❌ Failed to update doc:", err);
           }
         })();
       }
@@ -445,9 +501,6 @@ function Vendorresult({ result, source, rerender }) {
     setMapResult(validSuppliers);
   }, [map_allSuppliers, map_bestSuppliers]);
 
-  useEffect(() => {
-    console.log(map_result, 'This id he map result')
-  }, [map_result])
 
   const handleVendorClick = (vendor) => {
     setSelectedVendor((prev) => {
@@ -475,7 +528,7 @@ function Vendorresult({ result, source, rerender }) {
 
   useEffect(() => {
     if (source === 'MapComponent') {
-      console.log(result, 'This is the result passed from the map component....')
+      // console.log(result, 'This is the result passed from the map component....')
       setSelectedVendor(result)
       setLoading(false)
     }
@@ -491,10 +544,10 @@ function Vendorresult({ result, source, rerender }) {
   const vendorLatLng = (source === "SolutionScreen" || source === 'FromScratch') ? getLatLng(selectedVendor?.latitude_longitude) : getLatLng2(selectedVendor?.latitude_longitude)
 
   const tempSource = rerender !== 1 ? source : 'FromScratch'
-  console.log(tempSource, source, ' okay from vendor')
+  // console.log(tempSource, source, ' okay from vendor')
 
   const coord = user_lat_long;
-  console.log(coord, 'This is the coordinates passed')
+  // console.log(coord, 'This is the coordinates passed')
   const fixedCoord = source === "SolutionScreen" ? coord[0].split(',').map(Number).reverse() : source === "FromScratch" ? coord.slice().reverse() : null
   if (loading) {
     return (
@@ -545,7 +598,7 @@ function Vendorresult({ result, source, rerender }) {
               {uiConfig?.['view_mode_map'] || "Map"} 
               </div>
             </div>
-            {source === 'SolutionScreen' && (
+            {source === 'SolutionScreen' && rerender!==1 && (
               <Backtochat text='Back to Chat' />
             )}
           </div>

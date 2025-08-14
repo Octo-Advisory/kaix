@@ -746,7 +746,8 @@ def handle_approval_query(
             "Extracted Data": extracted_state,
             "Validation Data": state,
             "User Intention": user_intention,
-            "options": None
+            "options": None,
+            "Trigger_Lead_Generation":False
         }
         return response
     else:
@@ -854,11 +855,12 @@ def handle_approval_query(
                             "Extracted Data": extracted_state,
                             "Validation Data": state,
                             "User Intention": user_intention,
-                            "options": confirmation_buttons
+                            "options": confirmation_buttons,
+                            "Trigger_Lead_Generation":False
                         }
                         return response
                     else:
-                        message = "Not Available in List"
+                        message = INDUSTRY_NOT_AVAILABLE_MSG
                         chat_history.append(AIMessage(content=message))  # Log user query
                         save_chat(chat_history,f"chat_{chatId}")
                         response = {
@@ -867,7 +869,8 @@ def handle_approval_query(
                             "Extracted Data": extracted_state,
                             "Validation Data": state,
                             "User Intention": user_intention,
-                            "options": None
+                            "options": None,
+                            "Trigger_Lead_Generation":True
                         }
                         return response
                 else:
@@ -881,7 +884,8 @@ def handle_approval_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
             
@@ -891,16 +895,17 @@ def handle_approval_query(
                 state["Location_info"]["State"] = "Not Available in List"
                 save_state(state,f"QAPP_state_{chatId}")
                 if perfect_industry_data:
-                    message = "Not Available in List"
+                    message = LOCATION_NOT_AVAILABLE_MSG
                     chat_history.append(AIMessage(content=message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
                     response = {
-                        "Ai_response": "Not Available in List",
+                        "Ai_response": LOCATION_NOT_AVAILABLE_MSG,
                         "Is_confirmation" : None,
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
                 else:
@@ -914,7 +919,8 @@ def handle_approval_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
 
@@ -1008,11 +1014,12 @@ def handle_approval_query(
                                     "Extracted Data": extracted_state,
                                     "Validation Data": state,
                                     "User Intention": user_intention,
-                                    "options": confirmation_buttons
+                                    "options": confirmation_buttons,
+                                    "Trigger_Lead_Generation":False
                                 }
                                 return response
                             else:
-                                message = "Not Available in List"
+                                message = LOCATION_NOT_AVAILABLE_MSG
                                 chat_history.append(AIMessage(content=message))  # Log user query
                                 save_chat(chat_history,f"chat_{chatId}")
                                 response = {
@@ -1021,7 +1028,8 @@ def handle_approval_query(
                                     "Extracted Data": extracted_state,
                                     "Validation Data": state,
                                     "User Intention": user_intention,
-                                    "options": None
+                                    "options": None,
+                                    "Trigger_Lead_Generation":True
                                 }
                                 return response
                         else:
@@ -1035,7 +1043,8 @@ def handle_approval_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":False
                             }
                             return response
     
@@ -1044,7 +1053,7 @@ def handle_approval_query(
                         state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                         save_state(state,f"QAPP_state_{chatId}")
                         if perfect_location_data:
-                            message = "Not Available in List"
+                            message = INDUSTRY_NOT_AVAILABLE_MSG
                             chat_history.append(AIMessage(content=message))  # Log user query
                             save_chat(chat_history,f"chat_{chatId}")
                             response = {
@@ -1053,7 +1062,8 @@ def handle_approval_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":True
                             }
                             return response
                         else:
@@ -1067,7 +1077,8 @@ def handle_approval_query(
                                 "Extracted Data": extracted_state,
                                 "Validation Data": state,
                                 "User Intention": user_intention,
-                                "options": None
+                                "options": None,
+                                "Trigger_Lead_Generation":False
                             }
                             return response
                 else:
@@ -1085,7 +1096,8 @@ def handle_approval_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
             else:
@@ -1094,7 +1106,7 @@ def handle_approval_query(
                 state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                 save_state(state,f"QAPP_state_{chatId}")
                 if perfect_location_data:
-                    message = "Not Available in List"
+                    message = INDUSTRY_NOT_AVAILABLE_MSG
                     chat_history.append(AIMessage(content=message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
                     response = {
@@ -1103,7 +1115,8 @@ def handle_approval_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
                 else:
@@ -1117,7 +1130,8 @@ def handle_approval_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
 
@@ -1129,6 +1143,7 @@ def handle_approval_query(
             extracted_state["Location_info"] = extracted_data
             main_industry_list = list(main_industry_to_subsector_mapped_dict.keys())
             ind_extracted_data, ind_validated_data = extract_main_industry_and_product_universal(refined_user_input, main_industry_list, llm)
+            main_industry_name = ind_validated_data["Main-Industry"]
             main_industry_name = ind_validated_data["Main-Industry"]
             product_name = ind_validated_data["Product"]
             extracted_state["Industry_info"]["Main-Industry"] = ind_extracted_data["Main-Industry"]
@@ -1182,18 +1197,40 @@ def handle_approval_query(
                         state["Industry_info"]["Sub-Sector"] = "Not Available in List"
                         state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                         save_state(state,f"QAPP_state_{chatId}")
-                        message = "Not Available in List"
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"chat_{chatId}")
-                        response = {
-                            "Ai_response": message,
-                            "Is_confirmation" : None,
-                            "Extracted Data": extracted_state,
-                            "Validation Data": state,
-                            "User Intention": user_intention,
-                            "options": None
-                        }
-                        return response
+                        if (state["Location_info"]["Area"] is not None or state["Location_info"]["City"] is not None) or (state["Only_State_Attempt_Count"] >= 2):
+                            perfect_location_data = True
+                        else:
+                            perfect_location_data = False
+                        
+                        if perfect_location_data:
+                            message = INDUSTRY_NOT_AVAILABLE_MSG
+                            chat_history.append(AIMessage(content=message))  # Log user query
+                            save_chat(chat_history,f"chat_{chatId}")
+                            response = {
+                                "Ai_response": message,
+                                "Is_confirmation" : None,
+                                "Extracted Data": extracted_state,
+                                "Validation Data": state,
+                                "User Intention": user_intention,
+                                "options": None,
+                                "Trigger_Lead_Generation":True
+                            }
+                            return response
+                        else:
+                            response_static_message = get_static_follow_up_for_approval(state, user_intention)
+                            message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
+                            chat_history.append(AIMessage(content=message))  # Log user query
+                            save_chat(chat_history,f"chat_{chatId}")
+                            response = {
+                                "Ai_response": message,
+                                "Is_confirmation" : None,
+                                "Extracted Data": extracted_state,
+                                "Validation Data": state,
+                                "User Intention": user_intention,
+                                "options": None,
+                                "Trigger_Lead_Generation":False
+                            }
+                            return response
 
                 else:
                     state["Industry_info"]["Main-Industry"] = None
@@ -1265,7 +1302,8 @@ def handle_approval_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": confirmation_buttons
+                        "options": confirmation_buttons,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
                 else:
@@ -1279,7 +1317,8 @@ def handle_approval_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
             
@@ -1311,7 +1350,7 @@ def handle_approval_query(
                             state["Industry_info"]["Sub-Sector"] = "Not Available in List"
                             state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                             save_state(state,f"QAPP_state_{chatId}")
-                    message = "Not Available in List"
+                    message = LOCATION_NOT_AVAILABLE_MSG
                     chat_history.append(AIMessage(content=message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
                     response = {
@@ -1320,7 +1359,8 @@ def handle_approval_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
                 elif main_industry_name == "Not Available in List" and area_name != "Not Available in List":
@@ -1356,7 +1396,7 @@ def handle_approval_query(
                         state["Location_info"]["State"] = None
                         save_state(state,f"QAPP_state_{chatId}")
                     
-                    message = "Not Available in List"
+                    message = INDUSTRY_NOT_AVAILABLE_MSG
                     chat_history.append(AIMessage(content=message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
                     response = {
@@ -1365,7 +1405,8 @@ def handle_approval_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
                 else:
@@ -1376,7 +1417,7 @@ def handle_approval_query(
                     state["Industry_info"]["Sub-Sector"] = "Not Available in List"
                     state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                     save_state(state,f"QAPP_state_{chatId}")
-                    message = "Not Available in List"
+                    message = LOCATION_NOT_AVAILABLE_MSG + "AND" + INDUSTRY_NOT_AVAILABLE_MSG
                     chat_history.append(AIMessage(content=message))  # Log user query
                     save_chat(chat_history,f"chat_{chatId}")
                     response = {
@@ -1385,7 +1426,8 @@ def handle_approval_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
                 
@@ -1400,7 +1442,8 @@ def handle_approval_query(
                         "Extracted Data": extracted_state,
                         "Validation Data": state,
                         "User Intention": user_intention,
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":False
                     }
             return response
 

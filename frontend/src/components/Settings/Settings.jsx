@@ -6,12 +6,13 @@ import {
     IoMdPerson,
     IoMdInformationCircle
 } from "react-icons/io";
-import { IoClose, IoSettingsOutline } from "react-icons/io5";
+import { IoClose, IoSettingsOutline, IoWarningOutline } from "react-icons/io5";
 import { CiUser } from "react-icons/ci";
-import { useFrappeAuth, useFrappeFileUpload, useFrappeGetDoc, useFrappeUpdateDoc } from 'frappe-react-sdk';
+import { useFrappeAuth, useFrappeFileUpload, useFrappeGetDoc, useFrappeUpdateDoc,useFrappeGetDocList } from 'frappe-react-sdk';
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 
 const deleteUser = async (userId) => {
@@ -27,21 +28,23 @@ const deleteUser = async (userId) => {
     });
 
     if (response.ok) {
-      console.log('User deleted successfully');
+    //   console.log('User deleted successfully');
     } else {
-      console.error('Error deleting user:', response.statusText);
+    //   console.error('Error deleting user:', response.statusText);
     }
   } catch (error) {
-    console.error('Error:', error);
+    // console.error('Error:', error);
   }
 };
 
 function Settings({onClose}) {    
-    const { currentUser } = useFrappeAuth();
+    const { currentUser,logout } = useFrappeAuth();
     const { updateDoc } = useFrappeUpdateDoc();
     const { upload } = useFrappeFileUpload();
 
-    console.log("curent use",currentUser);
+    const navigate = useNavigate()
+
+    // console.log("curent use",currentUser);
     const { data: userDoc, isLoading, error } = useFrappeGetDoc(
         "User",
         currentUser || "Guest" // fallback to a dummy value to avoid hook breaking
@@ -51,8 +54,8 @@ function Settings({onClose}) {
     const [user, setUser] = useState({
         name: null,
         email: null,
-        company: 'Marsbazaar.com',
-        position: 'Developer',
+        company: null,
+        position: null,
         phone: null,
         avatar: null
     });
@@ -85,13 +88,30 @@ function Settings({onClose}) {
     const [pushNotifications, setPushNotifications] = useState(true);
     const [securityAlerts, setSecurityAlerts] = useState(true);
 
+    const [showWarning, setShowWarning] = useState(false)
+
     // Danger zone states
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    const [industryList,setIndustryList] = useState(['Cement', 'Steel', 'Chemicals', 'Textiles', 'Automotive']);
+     const {data:industriess} = useFrappeGetDocList('Industry', {
+        fields:['name']
+      })
+      const getIndustries = async ()=>{
+        if(industriess && industriess.length>0) {
+            let names = industriess.map(industry=> industry.name)
+            // console.log(names, 'Industry NAmes')
+            setIndustryList(names)
+        }
+      }
+      useEffect(()=>{
+        getIndustries()
+      },[industriess])
 
     // Validate form fields
     const validateField = (name, value) => {
         let error = '';
-        console.log("name val",name,value);
+        // console.log("name val",name,value);
         
         if (name === 'name' && !value.trim()) {
             error = 'Name is required';
@@ -107,6 +127,15 @@ function Settings({onClose}) {
             if (!phoneRegex.test(trimmed)) {
                 error = 'Invalid phone number';
             }
+        } else if (name === 'position') {
+            if (value==='') {
+                error = 'Position is required';
+            }
+        } else if (name === 'company') {
+            
+            if (value==='') {
+                error = 'Company Name is required';
+            }
         }
 
         setErrors(prev => ({ ...prev, [name]: error }));
@@ -119,13 +148,27 @@ function Settings({onClose}) {
         validateField(name, value);
     };
 
+
+     const handleLogout = async () => {
+    try {
+      await logout();
+      sessionStorage.removeItem("guest_session_id")
+      navigate('/login');
+    } catch (error) {
+    //   console.error("Logout failed:", error);
+    }
+  };
+    
     const handleSaveChanges = async () => {
+        setShowWarning(false)
         if (!user || !currentUser) return;
     
         const isNameValid = validateField('name', user.name);
         const isPhoneValid = validateField('phone', user.phone);
-    
-        if (isNameValid && isPhoneValid) {
+        const isPositionValid = validateField('position', user.position);
+        const isCompanyValid = validateField('company', user.company);
+        
+        if (isNameValid && isPhoneValid && industry && isPositionValid && isCompanyValid) {
             try {
                 let userImageURL = user.avatar; // fallback if image isn't changed
     
@@ -138,6 +181,9 @@ function Settings({onClose}) {
                     full_name: user.name,
                     mobile_no: user.phone,
                     user_image: userImageURL,
+                    interest: user.company,
+                    bio:industry,
+                    location:user.position
                 });
     
                 toast.success('Profile updated successfully!', {
@@ -147,7 +193,7 @@ function Settings({onClose}) {
                 });
     
             } catch (err) {
-                console.error('Error updating user:', err);
+                // console.error('Error updating user:', err);
                 toast.error('Something went wrong while saving.', {
                     position: "top-center",
                     autoClose: 3000,
@@ -159,9 +205,7 @@ function Settings({onClose}) {
     
     const updateUser = async (userId) => {
   const url = `/api/resource/User/${userId}`;
-const updatedData = {
-    "enabled": 0
-}
+
   try {
     const response = await fetch(url, {
       method: 'PUT',
@@ -169,23 +213,26 @@ const updatedData = {
         'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045', // Replace with your token
         'Content-Type': 'application/json',
       },
+      credentials:'include',
       body: JSON.stringify({
-        "enabled": 0
+        "enabled": 0,
       }), // Pass fields to update
     });
 
     if (response) {
       const result = await response.json();
-      console.log('User updated successfully:', result);
+    //   console.log('User updated successfully:', result);
       return true
     } else {
       const errorData = await response.json();
-      console.error('Failed to update user:', errorData.message);
+    //   console.error('Failed to update user:', errorData.message);
+      return false
     }
   } catch (error) {
-    console.error('Error updating user:', error);
+    // console.error('Error updating user:', error);
   }
 };
+
 
 
     const handleDeleteAccount = async() => {
@@ -193,7 +240,9 @@ const updatedData = {
         alert('Account deletion initiated');
         if(currentUser) {
             let deleteStatus = await updateUser(currentUser)
+            // console.log(deleteStatus, 'Ok thats the Delete Status ')
             if(deleteStatus) {
+                updateUser(currentUser)
                 window.location.href = `/frontend/login`;
             }
         }
@@ -235,12 +284,13 @@ const updatedData = {
 
     useEffect(() => {
         if (userDoc) {
-          console.log("Fetched user document:", userDoc);
+        //   console.log("Fetched user document:", userDoc);
           setUser({
             name: userDoc.first_name,
             email: userDoc.email,
-            company: 'Pharmaceutical Pvt Ltd.',
-            position: "Senior Manager",
+            company: userDoc.interest,
+            industry: userDoc.bio,
+            position: userDoc.location,
             phone:  userDoc.mobile_no || null,
             avatar: userDoc.user_image || null
         })
@@ -330,7 +380,7 @@ const updatedData = {
                         </nav>
 
                         <div className="p-4 border-t">
-                            <button className="w-full flex items-center justify-center space-x-2 p-2 text-red-600 rounded-lg hover:bg-red-50 transition">
+                            <button className="w-full flex items-center justify-center space-x-2 p-2 text-red-600 rounded-lg hover:bg-red-50 transition" onClick={()=>{handleLogout()}}>
                                 <IoMdLogOut />
                                 <span>Log Out</span>
                             </button>
@@ -345,7 +395,7 @@ const updatedData = {
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-lg font-semibold">Personal Information</h3>
                                     <button
-                                        onClick={handleSaveChanges}
+                                        onClick={()=>{setShowWarning(true)}}
                                         className="px-4 py-2 bg-[#41b655] text-white rounded-lg hover:bg-green-600 transition disabled:opacity-50"
                                         disabled={Object.values(errors).some(error => error)}
                                     >
@@ -391,9 +441,9 @@ const updatedData = {
                                         </div>
                                     </div>
 
-                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
                                         {/* Personal Information Group */}
-                                        <div className="space-y-4">
+                                        <div className="space-y-6">
                                             <h4 className="font-medium text-gray-700 border-b pb-2">Personal Details</h4>
 
                                             <div>
@@ -437,7 +487,7 @@ const updatedData = {
                                         </div>
 
                                         {/* Professional Information Group */}
-                                        <div className="space-y-4">
+                                        <div className="space-y-6">
                                             <h4 className="font-medium text-gray-700 border-b pb-2">Professional Details</h4>
 
                                             <div>
@@ -447,8 +497,9 @@ const updatedData = {
                                                     name="company"
                                                     value={user.company}
                                                     onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#41b655] focus:border-transparent"
+                                                    className={`w-full px-3 py-2 border ${errors.company ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-[#41b655] focus:border-transparent`}
                                                 />
+                                                {errors.company && <p className="text-red-500 text-xs mt-1">{errors.company}</p>}
                                             </div>
 
                                             <div>
@@ -458,8 +509,9 @@ const updatedData = {
                                                     name="position"
                                                     value={user.position}
                                                     onChange={handleInputChange}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#41b655] focus:border-transparent"
+                                                    className={`w-full px-3 py-2 border ${errors.position ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-[#41b655] focus:border-transparent`}
                                                 />
+                                                {errors.position && <p className="text-red-500 text-xs mt-1">{errors.position}</p>}
                                             </div>
 
                                             <div>
@@ -473,15 +525,15 @@ const updatedData = {
                                                         {industryDropdown ? <IoMdArrowDropup /> : <IoMdArrowDropdown />}
                                                     </button>
                                                     {industryDropdown && (
-                                                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
-                                                            {industries.map((item) => (
+                                                        <div className="absolute z-10 mt-1 overflow-y-auto max-h-[130px] w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+                                                            {industryList.map((item) => (
                                                                 <button
                                                                     key={item}
                                                                     onClick={() => {
                                                                         setIndustry(item);
                                                                         setIndustryDropdown(false);
                                                                     }}
-                                                                    className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${industry === item ? 'bg-[#41b655] text-white hover:bg-[#41b655]' : ''}`}
+                                                                    className={`w-full text-left px-3 text-sm py-2 hover:bg-gray-100 ${industry === item ? 'bg-[#41b655] text-white hover:bg-[#41b655]' : ''}`}
                                                                 >
                                                                     {item}
                                                                 </button>
@@ -766,6 +818,42 @@ const updatedData = {
                 </div>
             </div>
             <ToastContainer />
+            {showWarning && (
+  <div className="fixed inset-0 z-[111] flex items-center justify-center bg-black/30">
+    <div className="w-fit min-w-[360px] p-4 bg-white rounded-lg flex flex-col gap-2 items-center shadow-lg overflow-hidden">
+      
+      {/* Icon */}
+      <IoWarningOutline className="text-yellow-500 text-6xl" /> 
+      
+      {/* Title */}
+      <h2 className="text-lg font-semibold text-gray-800 text-center">
+        Confirm Update
+      </h2>
+      
+      {/* Description */}
+      <p className="text-gray-600 text-center">
+        Are you sure you want to update your details?
+      </p>
+      
+      {/* Buttons */}
+      <div className="w-full flex justify-center gap-3 mt-4">
+        <button
+          className="px-5 py-2 rounded-md bg-green-500 text-white font-medium hover:bg-green-600 transition"
+          onClick={() => { handleSaveChanges(); }}
+        >
+          Update
+        </button>
+        <button
+          className="px-5 py-2 rounded-md bg-gray-300 text-gray-800 font-medium hover:bg-gray-400 transition"
+          onClick={() => { setShowWarning(false); }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
         </div>
     );
 }

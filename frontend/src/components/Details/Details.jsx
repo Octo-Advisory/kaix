@@ -41,7 +41,7 @@ function Details() {
         note: formData.description // optional
       });
     } catch (err) {
-      console.error("Error Creating User:", err);
+      // console.error("Error Creating User:", err);
     } finally {
       setIsSubmitting(false);
     }

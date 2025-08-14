@@ -2,6 +2,7 @@ from frontend_app.Market_Trends.market_trends import get_market_trends
 import requests
 import json
 import frappe
+import logging
 
     
 def retreiving_sql_database_or_llm_market_trends(sql_query,llm_query,main_industry,sub_sector,segment,state,city):
@@ -33,6 +34,8 @@ def retreiving_sql_database_or_llm_market_trends(sql_query,llm_query,main_indust
         market_trends_0 = websearch_agent_result
         local_laws = None if not sql_or_llm_results else sql_or_llm_results[0][-2]
         taxes =  None if not sql_or_llm_results else sql_or_llm_results[0][-1]
+        with open("market_trends_logs.txt", "a") as file:
+            file.write(f"\n📨 Getting New Market Trends Check 1  : {market_trends_0}  {local_laws} {check}")
         return market_trends_0, local_laws, taxes, check
     
     # SQL result is valid
@@ -40,6 +43,8 @@ def retreiving_sql_database_or_llm_market_trends(sql_query,llm_query,main_indust
     local_laws = sql_or_llm_results[0][-2]
     taxes = sql_or_llm_results[0][-1]
 
+    with open("market_trends_logs.txt", "a") as file:
+        file.write(f"\n📨 Getting New Market Trends Check 2 : {market_trends_0}  {local_laws} {check}")
     return market_trends_0, local_laws, taxes, check
 
 
@@ -159,7 +164,6 @@ def retrieving_market_trends(
     deepdown_location_info: str
     ) -> str:
     
-    
     try:
         all_params = locals()
         selected_keys = ["main_industry", "sub_sector", "segment", "state", "city"]
@@ -199,19 +203,46 @@ def retrieving_market_trends(
             with open("market_trends_logs.txt", "a") as file:
                 file.write(f"\n📨 final results  : {final_results} local Laws {local_laws} taxes {taxes} ")
 
-            if update_check == "llm":
-                updating_database_with_llm_market_trends(update_check=update_check,
-                                                        main_industry = main_industry,
-                                                        sub_sector = sub_sector,
-                                                        segment = segment,
-                                                        state = state,
-                                                        city = city,
-                                                        final_results=final_results,
-                                                        )    
+            if isinstance(final_results, dict): # if llm call 
+                if update_check == "llm" and not final_results.get("success"): # if success: False
+                    updating_database_with_llm_market_trends(update_check=update_check,
+                                                            main_industry = main_industry,
+                                                            sub_sector = sub_sector,
+                                                            segment = segment,
+                                                            state = state,
+                                                            city = city,
+                                                            final_results=None,
+                                                            )    
+                    
+                elif update_check == "llm" and final_results.get("success"): # if success: True
+                    updating_database_with_llm_market_trends(update_check=update_check,
+                                            main_industry = main_industry,
+                                            sub_sector = sub_sector,
+                                            segment = segment,
+                                            state = state,
+                                            city = city,
+                                            final_results=final_results["data"],
+                                            )  
+            else:
+                final_results_temp = {"data":final_results}
+                final_results = final_results_temp
+
+            # else: 
+            #     if update_check == "llm":
+            #         updating_database_with_llm_market_trends(update_check=update_check,
+            #                                                 main_industry = main_industry,
+            #                                                 sub_sector = sub_sector,
+            #                                                 segment = segment,
+            #                                                 state = state,
+            #                                                 city = city,
+            #                                                 final_results=final_results,
+            #                                                 )  
 
         elif (deepdown_industry_info.lower() in ("industry","pan_industry") and 
             deepdown_location_info.lower() in ("state","pan_state") and  ##✔️
-            all(x != None for x in [main_industry, state])):    
+            all(x != None for x in [main_industry, state])): 
+            with open("market_trends_logs.txt", "a") as file:
+                file.write(f"\n📨 I'm in Elif :) ========================= ")
             llm_query = f"market trends for {main_industry} industry in {state} for 2024-2025" ## asd 1
             sql_query = f"""
                         SELECT state, industry, pan_industry, pan_state, market_trends, local_laws, taxes
@@ -226,14 +257,40 @@ def retrieving_market_trends(
                                                     state = state,
                                                     city = city,
                                                     )
+            
+            with open("market_trends_logs.txt", "a") as file:
+                file.write(f"\n📨 I've called the function successfully :) ========================= ")
             # CHECK final_results, local_laws, taxes
-            if update_check == "llm":
-                updating_database_with_llm_market_trends(update_check=update_check,
-                                                        main_industry = main_industry,
-                                                        state = state,
-                                                        final_results=final_results,
-                                                        pan_industry=1,
-                                                        pan_state=1)     
+
+            if isinstance(final_results, dict):
+                if update_check == "llm" and not final_results.get("success"):
+                    updating_database_with_llm_market_trends(update_check=update_check,
+                                                            main_industry = main_industry,
+                                                            state = state,
+                                                            final_results=None,
+                                                            pan_industry=1,
+                                                            pan_state=1)
+                    
+                elif update_check == "llm" and final_results.get("success"): # if success: True
+                    updating_database_with_llm_market_trends(update_check=update_check,
+                                                            main_industry = main_industry,
+                                                            state = state,
+                                                            final_results=final_results["data"],
+                                                            pan_industry=1,
+                                                            pan_state=1) 
+            else:
+                final_results_temp = {"data":final_results}
+                final_results = final_results_temp
+                    
+
+            # else:
+            #     if update_check == "llm":
+            #         updating_database_with_llm_market_trends(update_check=update_check,
+            #                                                 main_industry = main_industry,
+            #                                                 state = state,
+            #                                                 final_results=final_results,
+            #                                                 pan_industry=1,
+            #                                                 pan_state=1)
 
         elif (deepdown_industry_info.lower() in ("industry","pan_industry") and
             deepdown_location_info.lower() == "city" and ##✔️
@@ -263,13 +320,34 @@ def retrieving_market_trends(
                                                     city = city,
                                                     )
             # CHECK CHECK final_results, local_laws, taxes
-            if update_check == "llm":
-                updating_database_with_llm_market_trends(update_check=update_check,
-                                                        main_industry = main_industry,
-                                                        state = state,
-                                                        city = city,
-                                                        final_results=final_results,
-                                                        pan_industry=1)     
+            if isinstance(final_results, dict):
+                if update_check == "llm" and not final_results.get("success"):
+                    updating_database_with_llm_market_trends(update_check=update_check,
+                                                            main_industry = main_industry,
+                                                            state = state,
+                                                            city = city,
+                                                            final_results=None,
+                                                            pan_industry=1)  
+
+                elif update_check == "llm" and final_results.get("success"): # if success: True
+                    updating_database_with_llm_market_trends(update_check=update_check,
+                                                            main_industry = main_industry,
+                                                            state = state,
+                                                            city = city,
+                                                            final_results=final_results["data"],
+                                                            pan_industry=1)
+            else:
+                final_results_temp = {"data":final_results}
+                final_results = final_results_temp 
+                
+            # else:
+            #     if update_check == "llm":
+            #         updating_database_with_llm_market_trends(update_check=update_check,
+            #                                                 main_industry = main_industry,
+            #                                                 state = state,
+            #                                                 city = city,
+            #                                                 final_results=final_results,
+            #                                                 pan_industry=1) 
 
         elif (deepdown_industry_info.lower() in ("sub_sector","pan_sub_sector") and 
             deepdown_location_info.lower() == "city" and  ##✔️
@@ -303,14 +381,37 @@ def retrieving_market_trends(
                 file.write(f"\n📨 final results  : {final_results} local Laws {local_laws} taxes {taxes} ")
 
             # CHECK CHECK final_results, local_laws, taxes
-            if update_check == "llm":
-                updating_database_with_llm_market_trends(update_check=update_check,
-                                                        main_industry = main_industry,
-                                                        sub_sector = sub_sector,
-                                                        state = state,
-                                                        city = city,
-                                                        final_results=final_results,
-                                                        pan_sub_sector = 1)     
+            if isinstance(final_results, dict):
+                if update_check == "llm" and not final_results.get("success"):
+                    updating_database_with_llm_market_trends(update_check=update_check,
+                                                            main_industry = main_industry,
+                                                            sub_sector = sub_sector,
+                                                            state = state,
+                                                            city = city,
+                                                            final_results=None,
+                                                            pan_sub_sector = 1)   
+
+                elif update_check == "llm" and final_results.get("success"): # if success: True
+                    updating_database_with_llm_market_trends(update_check=update_check,
+                                                            main_industry = main_industry,
+                                                            sub_sector = sub_sector,
+                                                            state = state,
+                                                            city = city,
+                                                            final_results=final_results["data"],
+                                                            pan_sub_sector = 1) 
+            else:
+                final_results_temp = {"data":final_results}
+                final_results = final_results_temp 
+
+            # else:
+            #     if update_check == "llm":
+            #         updating_database_with_llm_market_trends(update_check=update_check,
+            #                                                 main_industry = main_industry,
+            #                                                 sub_sector = sub_sector,
+            #                                                 state = state,
+            #                                                 city = city,
+            #                                                 final_results=final_results,
+            #                                                 pan_sub_sector = 1) 
 
         elif (deepdown_industry_info.lower() in ("sub-sector","pan_sub_sector") and 
             deepdown_location_info.lower() in ("state","pan_state") and ##✔️
@@ -339,18 +440,42 @@ def retrieving_market_trends(
                                                     state = state,
                                                     city = city,
                                                     )
+            
             with open("market_trends_logs.txt", "a") as file:
                 file.write(f"\n📨 final results  : {final_results} local Laws {local_laws} taxes {taxes} ")
             # CHECK final_results, local_laws, taxes
-          
-            if update_check == "llm":
-                updating_database_with_llm_market_trends(update_check=update_check,
-                                                        main_industry = main_industry,
-                                                        state = state,
-                                                        sub_sector = sub_sector,
-                                                        final_results=final_results,
-                                                        pan_sub_sector=1,
-                                                        pan_state=1) 
+            if isinstance(final_results, dict):
+                if update_check == "llm" and not final_results.get("success"):
+                    updating_database_with_llm_market_trends(update_check=update_check,
+                                                            main_industry = main_industry,
+                                                            state = state,
+                                                            sub_sector = sub_sector,
+                                                            final_results=None,
+                                                            pan_sub_sector=1,
+                                                            pan_state=1)
+
+                elif update_check == "llm" and final_results.get("success"): # if success: True
+                    updating_database_with_llm_market_trends(update_check=update_check,
+                                                            main_industry = main_industry,
+                                                            state = state,
+                                                            sub_sector = sub_sector,
+                                                            final_results=final_results["data"],
+                                                            pan_sub_sector=1,
+                                                            pan_state=1)
+            else:
+                final_results_temp = {"data":final_results}
+                final_results = final_results_temp
+                
+            # else:
+            #     if update_check == "llm":
+            #         updating_database_with_llm_market_trends(update_check=update_check,
+            #                                                 main_industry = main_industry,
+            #                                                 state = state,
+            #                                                 sub_sector = sub_sector,
+            #                                                 final_results=final_results,
+            #                                                 pan_sub_sector=1,
+            #                                                 pan_state=1)
+
 
         elif (deepdown_industry_info.lower() == "segment" and 
             deepdown_location_info.lower() in ("state","pan_state") and 
@@ -380,27 +505,51 @@ def retrieving_market_trends(
                                                     state = state,
                                                     city = city,
                                                     )    
+            
             # CHECK final_results, local_laws, taxes
             with open("market_trends_logs.txt", "a") as file:
                 file.write(f"\n📨 final results  : {final_results} local Laws {local_laws} taxes {taxes} ")
 
-            if update_check == "llm":
-                updating_database_with_llm_market_trends(update_check=update_check,
-                                                        main_industry = main_industry,
-                                                        state = state,
-                                                        sub_sector = sub_sector,
-                                                        segment = segment,
-                                                        final_results=final_results,
-                                                        pan_state=1)     
+            if isinstance(final_results, dict):
+                if update_check == "llm" and not final_results.get("success"):
+                    updating_database_with_llm_market_trends(update_check=update_check,
+                                                            main_industry = main_industry,
+                                                            state = state,
+                                                            sub_sector = sub_sector,
+                                                            segment = segment,
+                                                            final_results=None,
+                                                            pan_state=1)   
+
+                elif update_check == "llm" and final_results.get("success"): # if success: True
+                     updating_database_with_llm_market_trends(update_check=update_check,
+                                                            main_industry = main_industry,
+                                                            state = state,
+                                                            sub_sector = sub_sector,
+                                                            segment = segment,
+                                                            final_results=final_results["data"],
+                                                            pan_state=1)
+            else:
+                final_results_temp = {"data":final_results}
+                final_results = final_results_temp
+
+            # else:
+            #     if update_check == "llm":
+            #         updating_database_with_llm_market_trends(update_check=update_check,
+            #                                                 main_industry = main_industry,
+            #                                                 state = state,
+            #                                                 sub_sector = sub_sector,
+            #                                                 segment = segment,
+            #                                                 final_results=final_results,
+            #                                                 pan_state=1) 
                 
-        selected_params["market_trends"] = final_results
+        selected_params["market_trends"] = final_results["data"]
         selected_params["local_laws"] = local_laws
         selected_params["taxes"] = taxes
 
-        return final_results, selected_params
+        return final_results["data"], selected_params
         
     except Exception as e:
-        return f"Error fetching market trends ❌, {e}"
+        return f"Error fetching market trends ❌, {e}", {}
 
     
     

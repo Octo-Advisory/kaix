@@ -18,6 +18,9 @@ import Renderresult from './components/Rerenderresult/Renderresult';
 import Propertycreation from './components/Propertycreation/Propertycreation';
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary';
 import NoResultsFound from './components/Failure/NoResultsFound';
+import ChatApp from './components/Home/Temp';
+import Maintanance from './components/Maintanance/Maintanance';
+import NotFound404 from './components/Failure/NotFound404';
 
 const PrivateRoute = () => {
   const { currentUser, isValidating } = useFrappeAuth();
@@ -28,10 +31,17 @@ const PrivateRoute = () => {
 function App() {
 
   const { currentUser } = useFrappeAuth();
+  const isUnderMaintenance = false;
   return (
     <>
       <BrowserRouter basename="/frontend">
       {/* <ErrorBoundary> */}
+      {
+    isUnderMaintenance ? (
+      <Routes>
+        <Route path="*" element={<Maintanance />} />
+      </Routes>
+    ) : (
         <Routes>
           {/* Redirect root path to /login */}
           <Route path="/" element={<Navigate to={currentUser ? "/chat" : "/login"} replace />} />
@@ -50,13 +60,13 @@ function App() {
           <Route path="/progress/:sessionId" element={<ProgressScreen />} />
           <Route path="/solution" element={<Solutionscreen />} />
           <Route path="/build" element={<TestComponent />} />
-          {/* <Route path="/test" element={<Test />} /> */}
-          <Route path="/test" element={<NoResultsFound />} />
+          <Route path="/test" element={<NotFound404 />} />
+          <Route path="/test" element={ <ChatApp />} />
           <Route path="/map" element={<MapComponent />} />
           <Route path="/forgotpassword" element={<ForgotPassword />} />
           <Route path="/result" element={<Renderresult />} />
           <Route path="/property" element={<Propertycreation />} />
-        </Routes>
+        </Routes>)}
         {/* </ErrorBoundary> */}
       </BrowserRouter>
       

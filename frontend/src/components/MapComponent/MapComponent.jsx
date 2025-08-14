@@ -9,7 +9,7 @@ import Vendorcards from "../ResultScreens/Vendorcards";
 import IndustryResultScreen from "../ResultScreens/IndustryResultScreen";
 import Vendorresult from "../ResultScreens/Vendorresult";
 import { FaRoad, FaXmark } from "react-icons/fa6";
-import { FaStore } from "react-icons/fa";
+import { FaStore, FaTimes } from "react-icons/fa";
 import { createRoot } from 'react-dom/client';
 import downimage from './assets/caretdown.svg';
 import upimage from './assets/caretup.svg';
@@ -20,12 +20,16 @@ import { MdDirectionsRailwayFilled } from "react-icons/md"; // Railway station
 import { RiShip2Line } from "react-icons/ri"; //seaport
 import { getDataForSingleLayer } from "./service/apiservice";
 import { IoLayersOutline } from "react-icons/io5";
-import { getMidpointSimple, getDistance, getMidpointByLength } from "./utils";
+import { getMidpointSimple, getDistance, getMidpointByLength, getCurvedLine } from "./utils";
 import { IoMdHome } from "react-icons/io";
 import { FaPlus } from "react-icons/fa";
 import { FaMinus } from "react-icons/fa";
+import { MdAirplanemodeActive } from "react-icons/md";
 import { use } from "react";
 import { useFrappeGetDoc } from "frappe-react-sdk";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+import { HiOutlineBolt, HiOutlineMap } from "react-icons/hi2";
 
 function MapComponent({ solutions, toggleModal, source, intension }) {
   //var copyiedSelectedProperty = null;
@@ -36,13 +40,8 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   var nearestRailwayStationDetail = null;
   var highwayCoord = null;
 
-  console.log("source in map component", source);
-  console.log("intension in map component", intension);
-  console.log("solutons from map", solutions);
   const validation_result = useSelector((state) => state.validate.validation_result)
-  console.log("validation_result", validation_result);
   let propertyCoord = validation_result?.[0]?.[1]?.latitude_longitude?.split(",").map(Number).reverse() ?? null;
-  console.log("propertyCoord", propertyCoord);
   const [solution, setSolution] = useState({})
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMapoptionVisible, setMapOptionVisible] = useState(true);
@@ -55,31 +54,32 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   const mapRef = useRef(null); // Store map instance
   const copyiedSelectedProperty = useRef(null); // Store the real solution object
   mapboxgl.accessToken = 'pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ';
-  
+
   const { data: uiData } = useFrappeGetDoc("UI Configuration", "Mapping")
-        const configurations = uiData?.configurations || [];
-        const uiConfig = configurations.reduce((acc, curr) => {
-          acc[curr.key] = curr.value;
-          return acc;
-        }, {});
-  
-    const LAYERS = {
-      DEFAULT_LAYER: {
-        LABEL: `${uiConfig?.['default_layers'] || 'Default Layers'}`,
-        VENDOR: `${uiConfig?.['default_vendors'] || 'Default Vendors'}`,
-        SUB_STATIONS: `${uiConfig?.['default_sub_stations'] || 'Default Sub Stations'}`,
-        RAILWAY_STATIONS: `${uiConfig?.['default_railway_stations'] || 'Default Railway Stations'}`,
-        AIRPORTS: `${uiConfig?.['default_airports'] || 'Default Airports'}`,
-        SEAPORTS: `${uiConfig?.['default_seaports'] || 'Default Seaports'}`,
-        HIGHWAY: `${uiConfig?.['default_highway'] || 'Default Highway'}`,
-      },
-      SUB_STATIONS: `${uiConfig?.['checkbox_sub_stations'] || 'Sub Stations'}`,
-      RAILWAY_STATIONS: `${uiConfig?.['checkbox_railway_stations'] || 'Railway Stations'}`,
-      AIRPORTS: `${uiConfig?.['checkbox_airports'] || 'Airports'}`,
-      SEAPORTS: `${uiConfig?.['checkbox_seaports'] || 'Seaports'}`,
-      HIGHWAY: `${uiConfig?.['checkbox_highway'] || 'Highway'}`,
-      VENDOR: `${uiConfig?.['checkbox_all_vendors'] || 'All Vendors'}`
-    }
+  const configurations = uiData?.configurations || [];
+  const uiConfig = configurations.reduce((acc, curr) => {
+    acc[curr.key] = curr.value;
+    return acc;
+  }, {});
+
+  const LAYERS = {
+    DEFAULT_LAYER: {
+      LABEL: `${uiConfig?.['default_layers'] || 'Default Layers'}`,
+      VENDOR: `${uiConfig?.['default_vendors'] || 'Default Vendors'}`,
+      SUB_STATIONS: `${uiConfig?.['default_sub_stations'] || 'Default Sub Stations'}`,
+      RAILWAY_STATIONS: `${uiConfig?.['default_railway_stations'] || 'Default Railway Stations'}`,
+      AIRPORTS: `${uiConfig?.['default_airports'] || 'Default Airports'}`,
+      SEAPORTS: `${uiConfig?.['default_seaports'] || 'Default Seaports'}`,
+      HIGHWAY: `${uiConfig?.['default_highway'] || 'Default Highway'}`,
+    },
+    SUB_STATIONS: `${uiConfig?.['checkbox_sub_stations'] || 'Sub Stations'}`,
+    RAILWAY_STATIONS: `${uiConfig?.['checkbox_railway_stations'] || 'Railway Stations'}`,
+    AIRPORTS: `${uiConfig?.['checkbox_airports'] || 'Airports'}`,
+    SEAPORTS: `${uiConfig?.['checkbox_seaports'] || 'Seaports'}`,
+    HIGHWAY: `${uiConfig?.['checkbox_highway'] || 'Highway'}`,
+    VENDOR: `${uiConfig?.['checkbox_all_vendors'] || 'All Vendors'}`
+  }
+
   const DIRECTIONS = {
     LEFT: - 0.4,
     RIGHT: 0.4
@@ -102,69 +102,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     });
     return () => mapRef.current.remove(); // Cleanup the map instance on unmount
   }, []); // Empty dependency array to run only once
-
-  useEffect(() => {
-    // Get all checkboxes
-    const allTrafficCheckbox = document.querySelectorAll(
-      "[name='traffic-section'] [type='checkbox']"
-    );
-
-    // Define the handler once
-    const handleCheckboxChange = (event) => {
-      if (event.target.checked) {
-        asyncLoadDataForSingleLayer(event.target.name);
-      } else {
-        // Handle uncheck if needed
-        removeMarker(event.target.name);
-      }
-    };
-
-    // Attach event listener
-    allTrafficCheckbox.forEach((element) => {
-      element.addEventListener("change", handleCheckboxChange);
-    });
-
-    // Cleanup function to remove listeners
-    return () => {
-      allTrafficCheckbox.forEach((element) => {
-        element.removeEventListener("change", handleCheckboxChange);
-      });
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isMapoptionVisible) {
-      const mapUI = document.getElementById("map-ui");
-      if (mapUI) {
-        // Get all checkboxes
-        const allTrafficCheckbox = document.querySelectorAll(
-          "[name='traffic-section'] [type='checkbox']"
-        );
-
-        // Define the handler once
-        const handleCheckboxChange = (event) => {
-          if (event.target.checked) {
-            asyncLoadDataForSingleLayer(event.target.name);
-          } else {
-            // Handle uncheck if needed
-            removeMarker(event.target.name);
-          }
-        };
-
-        // Attach event listener
-        allTrafficCheckbox.forEach((element) => {
-          element.addEventListener("change", handleCheckboxChange);
-        });
-        // Cleanup function to remove listeners
-        return () => {
-          allTrafficCheckbox.forEach((element) => {
-            element.removeEventListener("change", handleCheckboxChange);
-          });
-        };
-      }
-    }
-  }, [isMapoptionVisible]);
-
 
   // Function to validate latitude and longitude
   function isValidLatLng(coord) {
@@ -191,10 +128,8 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   }
 
   const draw = async () => {
-    console.log("intention is", intension);
     // Filter out invalid coordinates
     const validCoordinates = latLongArray.filter(isValidLatLng);
-    console.log("validCoordinates", validCoordinates);
     const coordinates = validCoordinates;
 
     // Get the bounding box
@@ -299,45 +234,81 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         .addTo(mapRef.current);
 
       // Generate LineString Features
-      let layerId = `Custom_property_vendor_lines_layer_${crypto.randomUUID()}`;
-      const lines = latLongArray.map(vendorCoord => ({
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: [propertyCoord, vendorCoord]
-        },
-        properties: {}
-      }));
 
-      mapRef.current.addSource('property-vendor-lines', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: lines
-        },
-        lineMetrics: true
-      });
-
-      mapRef.current.addLayer({
-        id: layerId,
-        type: 'line',
-        source: 'property-vendor-lines',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
-        paint: {
-          'line-width': 3,
-          'line-opacity': 0.9,
-          'line-gradient': [
-            'interpolate',
-            ['linear'],
-            ['line-progress'],
-            0, '#0e2044',
-            1, '#41b655'
-          ]
+      let count = 1;
+      let direction = "right";
+      latLongArray.forEach(vendorCoord => {
+        if (!isValidLatLng(vendorCoord)) return; // Skip invalid coordinates
+        let sourceId = 'property-vendor-lines-' + count;
+        let layerId = `Custom_property_vendor_lines_layer_${crypto.randomUUID()}`;
+        let curvedDirectionValue = null;
+        if (direction == "right") {
+          direction = "left";
+          curvedDirectionValue = DIRECTIONS.LEFT;
         }
+        else {
+          direction = "right";
+          curvedDirectionValue = DIRECTIONS.RIGHT;
+        }
+        const distanceKm = getDistance(propertyCoord, vendorCoord).toFixed(2);
+        const labelText = `${distanceKm} km`;
+        // Generate curved line coordinates
+        generateCurveLine({ from: propertyCoord, to: vendorCoord, layerId: layerId, sourceId: sourceId, curvature: curvedDirectionValue, linecolor: '#5b96d8', labelText: labelText });
+        count++;
       });
+
+      let vendorArrayForFitBounds = structuredClone(latLongArray); // clone vendory array
+      vendorArrayForFitBounds.push(propertyCoord); //push property coordinates to the vendor array for fit bounds
+      // Get the bounding box
+      const bounds = vendorArrayForFitBounds.reduce(
+        (bounds, coord) => bounds.extend(coord),
+        new mapboxgl.LngLatBounds(coordinates[0], coordinates[0])
+      );
+      // Fit the map to the bounds
+      mapRef.current.fitBounds(bounds, {
+        padding: 150,    // Adds padding around the points
+        // maxZoom: 10,    // Prevents zooming in too much
+        duration: 1000  // Animation duration in milliseconds
+      });
+
+      // const lines = latLongArray.map(vendorCoord => ({
+      //   type: 'Feature',
+      //   geometry: {
+      //     type: 'LineString',
+      //     coordinates: [propertyCoord, vendorCoord]
+      //   },
+      //   properties: {}
+      // }));
+
+      // mapRef.current.addSource('property-vendor-lines', {
+      //   type: 'geojson',
+      //   data: {
+      //     type: 'FeatureCollection',
+      //     features: lines
+      //   },
+      //   lineMetrics: true
+      // });
+
+      // mapRef.current.addLayer({
+      //   id: layerId,
+      //   type: 'line',
+      //   source: 'property-vendor-lines',
+      //   layout: {
+      //     'line-join': 'round',
+      //     'line-cap': 'round'
+      //   },
+      //   paint: {
+      //     'line-width': 3,
+      //     'line-opacity': 0.9,
+      //     'line-gradient': [
+      //       'interpolate',
+      //       ['linear'],
+      //       ['line-progress'],
+      //       0, '#0e2044',
+      //       1, '#41b655'
+      //     ]
+      //   }
+      // });
 
       // Removed distance labels code here
     }
@@ -350,26 +321,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       "--check-icon-url",
       `url(${checkIcon})`
     );
-
-    // Get all checkboxes
-    const allTrafficCheckbox = document.querySelectorAll(
-      "[name='traffic-section'] [type='checkbox']"
-    );
-
-    // Define the handler once
-    const handleCheckboxChange = (event) => {
-      if (event.target.checked) {
-        asyncLoadDataForSingleLayer(event.target.name);
-      } else {
-        // Handle uncheck if needed
-        removeMarker(event.target.name);
-      }
-    };
-
-    // Attach event listener
-    allTrafficCheckbox.forEach((element) => {
-      element.addEventListener("change", handleCheckboxChange);
-    });
   }
 
   const asyncLoadDataForSingleLayer = async (layerType) => {
@@ -382,8 +333,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
 
     try {
       if (layerType === LAYERS.VENDOR) {
-
-        console.log(copyiedSelectedProperty.current, 'copyiedSelectedProperty.current in asyncLoadDataForSingleLayer');
+        if (copyiedSelectedProperty.current?.essential_vendor_all_details) {
         let data = [
           ...copyiedSelectedProperty.current.essential_vendor_all_details,
           ...copyiedSelectedProperty.current.non_essential_vendor_all_details
@@ -400,19 +350,17 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         let uniqueVendorNames = Array.from(
           new Map(data.map(item => [item.name, item])).values()
         );
-        console.log(uniqueVendorNames, 'uniqueVendorNames in asyncLoadDataForSingleLayer');
-
         bindDataOnMap(uniqueVendorNames, LAYERS.VENDOR);
+        }
       }
       else {
         const docTypeName = layerMapping[layerType];
         if (!docTypeName) return;
-
         const res = await getDataForSingleLayer(docTypeName);
         bindDataOnMap(res.data, layerType);
       }
     } catch (error) {
-      console.error(`Failed to load data for ${layerType}:`, error);
+      // console.error(`Failed to load data for ${layerType}:`, error);
     }
   };
 
@@ -467,7 +415,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
 
   const bindDataOnMap = async (resultData, layer) => {
     resultData.forEach(data => {
-      console.log("data in binddataonmap", data);
       const storeIconEl = document.createElement('div');
       storeIconEl.style.width = '40px';
       storeIconEl.style.height = '40px';
@@ -481,27 +428,51 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       storeIconEl.appendChild(tempContainer);
 
       const root = createRoot(tempContainer);
+      //       <div class="relative w-8 h-8">
+      //   <!-- Pin Circle -->
+      //   <div class="absolute z-[10] inset-0 bg-[#E91E63] rounded-full flex items-center justify-center ">
+      //       ✨
+      //   </div>
+
+      //   <!-- Pointer Tip -->
+      //   <div class="absolute z-[9] left-1/2 bg-[#E91E63] pin-tip"></div>
+      // </div>
       root.render(
-        <div style={{
-          background: 'white',
-          borderRadius: '50%',
-          padding: '4px',
-          boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginTop: '20px'
-        }}>
-          {
-            layer === LAYERS.SUB_STATIONS ? <SlEnergy size={24} color="#4A76D1" /> :
-              layer === LAYERS.AIRPORTS ? <CiAirportSign1 size={24} color="#4A76D1" /> :
-                layer === LAYERS.SEAPORTS ? <RiShip2Line size={24} color="#4A76D1" /> :
-                  (layer === LAYERS.RAILWAY_STATIONS || layer === LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS) ? <MdDirectionsRailwayFilled size={24} color="#5f2abb" /> :
-                    (layer === LAYERS.HIGHWAY || layer === LAYERS.DEFAULT_LAYER.HIGHWAY) ? <FaRoad size={24} color="#5f2abb" /> :
-                      (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) ? <FaStore size={24} color="#5b96d8" /> :
-                        ""
-          }
+        <div className="relative w-8 h-8">
+          <div className="absolute z-[10] inset-0 bg-white rounded-full flex items-center justify-center">
+            {
+              layer === LAYERS.SUB_STATIONS ? <SlEnergy size={20} color="#5f2abb" /> :
+                layer === LAYERS.AIRPORTS ? <MdAirplanemodeActive size={20} color="#5f2abb" /> :
+                  layer === LAYERS.SEAPORTS ? <RiShip2Line size={20} color="#5f2abb" /> :
+                    (layer === LAYERS.RAILWAY_STATIONS || layer === LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS) ? <MdDirectionsRailwayFilled size={20} color="#5f2abb" /> :
+                      (layer === LAYERS.HIGHWAY || layer === LAYERS.DEFAULT_LAYER.HIGHWAY) ? <FaRoad size={20} color="#5f2abb" /> :
+                        (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) ? <FaStore size={20} color="#5b96d8" /> :
+                          ""
+            }
+          </div>
+          <div className="absolute z-[9] left-1/2 bg-white pin-tip"></div>
         </div>
+
+        // <div style={{
+        //   background: 'white',
+        //   borderRadius: '50%',
+        //   padding: '4px',
+        //   boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+        //   display: 'flex',
+        //   alignItems: 'center',
+        //   justifyContent: 'center',
+        //   marginTop: '20px'
+        // }}>
+        //   {
+        //     layer === LAYERS.SUB_STATIONS ? <SlEnergy size={24} color="#5f2abb" /> :
+        //       layer === LAYERS.AIRPORTS ? <MdAirplanemodeActive size={24} color="#5f2abb" /> :
+        //         layer === LAYERS.SEAPORTS ? <RiShip2Line size={24} color="#5f2abb" /> :
+        //           (layer === LAYERS.RAILWAY_STATIONS || layer === LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS) ? <MdDirectionsRailwayFilled size={24} color="#5f2abb" /> :
+        //             (layer === LAYERS.HIGHWAY || layer === LAYERS.DEFAULT_LAYER.HIGHWAY) ? <FaRoad size={24} color="#5f2abb" /> :
+        //               (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) ? <FaStore size={24} color="#5b96d8" /> :
+        //                 ""
+        //   }
+        // </div>
       );
       data.coordinates = data.coordinates.replace(" ", "");
       const [lat, lng] = data.coordinates.split(",").map(Number);
@@ -574,7 +545,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   const increaseSelectedPropertyMarkerSize = (propertyId) => {
     let propertyDivs = document.querySelectorAll('[data-name="Property-Marker"]');
     propertyDivs.forEach(element => {
-      console.log("Current element for resize", element)
       let dataId = element.getAttribute("data-id");
       let idToCheck = "Property-marker-" + propertyId;
       if (dataId == idToCheck) {
@@ -614,7 +584,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     const vendorCoords = [];
 
     elements.forEach(data => {
-      console.log("data in addPointersToMap", data);
       const coordsString = data.coordinates.toString();
       if (solutionLookup[coordsString]?.result_type === "Vendor") {
         vendorCoords.push(data);
@@ -644,8 +613,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         if (solution) {
           setSolution(solution);
           setIsConfirmationModalOpen(true);
-          console.log("Solution is set", solution);
-          console.log("State is set");
           // setIsModalOpen(true);
           // setMapOptionVisible(false);
         }
@@ -830,6 +797,12 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   //Handle All action
   const handleAllClick = (sectionName, isForCheck) => {
     if (sectionName === "traffic-section") {
+      //Remove all data
+      removeMarker(LAYERS.SUB_STATIONS);
+      removeMarker(LAYERS.AIRPORTS);
+      removeMarker(LAYERS.SEAPORTS);
+      removeMarker(LAYERS.RAILWAY_STATIONS);
+
       // Get all checkboxes
       const allTrafficCheckbox = document.querySelectorAll(
         "[name='traffic-section'] [type='checkbox']"
@@ -919,7 +892,8 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
           let coord = item.latitude_longitude.replace(" ", "").split(",").map(Number);
           var [vendorLongitude, vendorLatitude] = item.coordinates.split(",").map(Number);
           const distanceKm = getDistance([propertyLongitude, propertyLatitude], [vendorLatitude, vendorLongitude]).toFixed(2);
-          const labelText = `${item.supplyName} </br> ${distanceKm} km`;
+          const labelText = `${item.supplyName} ${distanceKm} km`;
+          // const labelText = `${item.supplyName} </br> ${distanceKm} km`;
           let curvedDirectionValue = null;
           if (direction == "right") {
             direction = "left";
@@ -937,7 +911,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     //#region Add Connectivity Layers
     try {
 
-      if (copyiedSelectedProperty.current.nearest_airport_coord != null && copyiedSelectedProperty.current.nearest_airport_coord != "") {
+      if (copyiedSelectedProperty.current.nearest_airport != null && copyiedSelectedProperty.current.nearest_airport != "") {
         nearestAirportDetail = await getDataForSingleLayer("Airport", { "name": copyiedSelectedProperty.current?.nearest_airport });
         if (nearestAirportDetail.data.length > 0) {
           const airportCoord = nearestAirportDetail.data[0].coordinates.replace(" ", "").split(",").map(Number);
@@ -977,7 +951,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         addConnectivityLayer(LAYERS.DEFAULT_LAYER.HIGHWAY, [highwayCoord[1], highwayCoord[0]], [lng, lat], null, DIRECTIONS.LEFT);
       }
     } catch (error) {
-      console.error("Error in adding marker:", error);
+      // console.error("Error in adding marker:", error);
     }
     //#endregion
   }
@@ -1004,7 +978,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       }}>
         {
           (layer === LAYERS.SUB_STATIONS || layer === LAYERS.DEFAULT_LAYER.SUB_STATIONS) ? <SlEnergy size={24} color="#5f2abb" /> :
-            (layer === LAYERS.AIRPORTS || layer === LAYERS.DEFAULT_LAYER.AIRPORTS) ? <CiAirportSign1 size={24} color="#5f2abb" /> :
+            (layer === LAYERS.AIRPORTS || layer === LAYERS.DEFAULT_LAYER.AIRPORTS) ? <MdAirplanemodeActive size={24} color="#5f2abb" /> :
               (layer === LAYERS.SEAPORTS || layer === LAYERS.DEFAULT_LAYER.SEAPORTS) ? <RiShip2Line size={24} color="#5f2abb" /> :
                 (layer === LAYERS.RAILWAY_STATIONS || layer === LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS) ? <MdDirectionsRailwayFilled size={24} color="#5f2abb" /> :
                   (layer === LAYERS.HIGHWAY || layer === LAYERS.DEFAULT_LAYER.HIGHWAY) ? <FaRoad size={24} color="#5f2abb" /> :
@@ -1045,21 +1019,26 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       }
     }
     const distanceKm = getDistance([propertyCoord[0], propertyCoord[1]], [coord[0], coord[1]]).toFixed(2);
-    const labelText = name !== "" ? `${name} </br> ${distanceKm} km` : `${distanceKm} km`;
+    const labelText = name !== "" ? `${name} ${distanceKm} km` : `${distanceKm} km`;
+    // const labelText = name !== "" ? `${name} </br> ${distanceKm} km` : `${distanceKm} km`;
     generateCurveLine({ sourceId: sourceId, layerId: lineStringLayerId, from: coord, to: propertyCoord, linecolor: '#5f2abb', curvature: direction, labelText: labelText });
   }
 
   const addDistanceLabel = (coord, text, id) => {
+
     const supplyNameEl = document.createElement('div');
-    supplyNameEl.style.background = 'rgba(0, 0, 0, 0.75)';
-    supplyNameEl.style.color = '#fff';
+    // supplyNameEl.style.background = 'rgba(0, 0, 0, 0.75)';
+    supplyNameEl.style.backgroundColor = '#ffffff';
+    supplyNameEl.style.color = '#00000';
+    // supplyNameEl.style.color = '#fff';
     supplyNameEl.style.padding = '4px 8px';
     supplyNameEl.style.borderRadius = '6px';
-    supplyNameEl.style.fontSize = '12px';
+    supplyNameEl.style.fontSize = '10px';
+    supplyNameEl.style.whiteSpace = 'nowrap';
     supplyNameEl.style.fontWeight = 'bold';
     supplyNameEl.setAttribute("data-name", "distance-label");
     supplyNameEl.innerHTML = `${text}`;
-    supplyNameEl.style.border = '2px solid grey';
+    supplyNameEl.style.border = '1px solid grey';
     supplyNameEl.style.zIndex = 2;
     new mapboxgl.Marker({
       element: supplyNameEl,
@@ -1147,6 +1126,8 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     await loadDefaultLayer();
     resetZoomlevel();
     document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.display = "flex"; //Disable the vendor layer checkbox
+    // document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.flexDirection = "flex-row"; //Disable the vendor layer checkbox
+    // document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.gap = "5px"; //Disable the vendor layer checkbox
     changeMarkerOpacity();
     increaseSelectedPropertyMarkerSize(solution.property_id);
 
@@ -1169,7 +1150,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     mapRef.current.flyTo({
       //center: "", //fetches default coordinates
       essential: true, // this animation is considered essential with respect to prefers-reduced-motion
-      zoom: 7, //sets default zoom level
+      zoom: 4, //sets default zoom level
     });
   };
   //zoom in the map
@@ -1201,44 +1182,9 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     // });
   }
 
-  // Function to generate curved (Bézier) coordinates
-  const getCurvedLine = (start, end, curvature = 0.4, numPoints = 150) => {
-    const [x0, y0] = start;
-    const [x2, y2] = end;
-
-    // Midpoint between start and end
-    const mx = (x0 + x2) / 2;
-    const my = (y0 + y2) / 2;
-
-    // Direction vector from start to end
-    const dx = x2 - x0;
-    const dy = y2 - y0;
-
-    // ✅ These two lines define the direction and strength of the curve
-    //    Change the sign of `curvature` to bend left or right
-    const offsetX = -dy * curvature; // Perpendicular to the line (left/right deviation)
-    const offsetY = dx * curvature;  // Perpendicular to the line (left/right deviation)
-
-    // Control point: the "pull" of the curve
-    const cx = mx + offsetX;
-    const cy = my + offsetY;
-
-    // Generate points along a quadratic Bézier curve
-    const curve = [];
-    for (let t = 0; t <= 1; t += 1 / numPoints) {
-      const x = (1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * x2;
-      const y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * cy + t * t * y2;
-      curve.push([x, y]);
-    }
-
-    return curve;
-  }
-
-
   const generateCurveLine = ({ sourceId = "", layerId = "", from = "", to = "", linecolor = "", curvature = 0.4, labelText = "" } = {}) => {
     let getCurvedLineCoord = getCurvedLine(from, to, curvature);
     getCurvedLineCoord.push(to);
-    console.log("curved line for ", layerId, getCurvedLineCoord, from, to)
     mapRef.current.addSource(sourceId, {
       type: 'geojson',
       data: {
@@ -1257,7 +1203,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       paint: {
         'line-color': linecolor,
         'line-width': 1.5,
-        'line-dasharray': [1, 1] // very short "dot", longer gap
+        // 'line-dasharray': [1, 1] // very short "dot", longer gap
       }
     });
     if (labelText != "") {
@@ -1266,6 +1212,26 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
 
     }
   }
+  const handleSingleCheckbox = (event) => {
+    if (event.target.checked) {
+      asyncLoadDataForSingleLayer(event.target.name);
+    } else {
+      // Handle uncheck if needed
+      removeMarker(event.target.name);
+    }
+  }
+
+  const optionPopup = useRef()
+  useGSAP(() => {
+    if (optionPopup.current) {
+      gsap.from(optionPopup.current, {
+        opacity: 0,
+        y: 30,
+        duration: 0.4,
+        ease: "power2.out",
+      });
+    }
+  }, { dependencies: [isConfirmationModalOpen], scope: optionPopup });
 
   return (
     <div className="main-map h-screen w-screen flex items-center justify-center">
@@ -1279,8 +1245,8 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         <Modal key={solution.result_type} onClose={() => { setIsModalOpen(false); setMapOptionVisible(true); }} type={solution.result_type}>
           {/* {solution.result_type === "Industry_Result" && <Property solution={solution} toggleModal={toggleModal} />} */}
           {/* {solution.result_type === "Vendor" && <Vendorcards supplier={solution} />} */}
-          {solution.result_type === "Vendor" && <Vendorresult result={solution} source="MapComponent" />}
-          {solution.result_type === "Industry_Result" && <IndustryResultScreen result={solution} source="MapComponent" />}
+          {solution.result_type === "Vendor" && <Vendorresult result={solution} source="MapComponent" rerender={1} />}
+          {solution.result_type === "Industry_Result" && <IndustryResultScreen result={solution} source="MapComponent" rerender={1} />}
 
         </Modal>
       )}
@@ -1295,7 +1261,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                     className="accordion-header"
                     onClick={(e) => toggleAccordion(e)}
                   >
-                    <span className="main-header-font color-green">
+                    <span className="text-lg font-bold text-green-600">
                       Map Options
                     </span>
                     <span className="icon">
@@ -1322,7 +1288,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                         className="accordion-header"
                         onClick={(e) => toggleAccordion(e)}
                       >
-                        <span className="child-header-font color-green">
+                        <span className="text-base font-semibold text-green-600">
                           Basic Layers
                         </span>
                         <br />
@@ -1345,7 +1311,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                       <div className="accordion-content">
                         <div className="select-options">
                           <span
-                            className="cusor-pointer font-14 font-b color-green"
+                            className="cursor-pointer text-base tracking-wide font-medium text-green-600"
                             onClick={() =>
                               handleAllClick("traffic-section", true)
                             }
@@ -1354,7 +1320,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                           </span>{" "}
                           |{" "}
                           <span
-                            className="cusor-pointer font-14 font-b color-green"
+                            className="cursor-pointer text-base tracking-wide font-medium text-green-600"
                             onClick={() =>
                               handleAllClick("traffic-section", false)
                             }
@@ -1381,106 +1347,93 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                               </span>
                             </li>
                           )} */}
-                          <li className="li-container">
+                          <li className="li-container"  >
 
-                            <label className="custom-checkbox">
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.SUB_STATIONS}
+                                onChange={(e) => handleSingleCheckbox(e)}
                               />
                               <span className="checkmark"></span>
+                              <span>
+                                <SlEnergy size={20} className="text-[#5f2abb]" />
+                              </span>
+                              <span className="text-sm font-medium">
+                                {LAYERS.SUB_STATIONS}
+                              </span>
                             </label>
-                            <span>
-                              <SlEnergy size={20} color="black" />
-                            </span>
-                            {/* <img
-                              src={<SlEnergy />}
-                              alt="Icon"
-                            /> */}
-                            <span className="ml-5 color-black">
-                              {LAYERS.SUB_STATIONS}
-                            </span>
-                          </li>
-                          <li className="li-container">
 
-                            <label className="custom-checkbox">
+                          </li>
+                          <li className="li-container" >
+
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.AIRPORTS}
+                                onChange={(e) => handleSingleCheckbox(e)}
                               />
                               <span className="checkmark"></span>
+                              <span>
+                                <MdAirplanemodeActive size={20} className="text-[#5f2abb]" />
+                              </span>
+                              <span className="text-sm font-medium">
+                                {LAYERS.AIRPORTS}
+                              </span>
                             </label>
-                            <span>
-                              <CiAirportSign1 size={20} color="black" />
-                            </span>
-                            {/* <img
-                            src={getIcon(
-                              enumData.trafficLayerType.CONSTRUCTION_ALERT
-                            )}
-                            alt="Icon"
-                          /> */}
-                            <span className="ml-5 color-black">
-                              {LAYERS.AIRPORTS}
-                            </span>
+
                           </li>
                           <li className="li-container">
 
-                            <label className="custom-checkbox">
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.SEAPORTS}
+                                onChange={(e) => handleSingleCheckbox(e)}
                               />
                               <span className="checkmark"></span>
+                              <span>
+                                <RiShip2Line size={20} className="text-[#5f2abb]" />
+                              </span>
+
+                              <span className="text-sm font-medium">
+                                {LAYERS.SEAPORTS}
+                              </span>
                             </label>
-                            <span>
-                              <RiShip2Line size={20} color="black" />
-                            </span>
-                            {/* <img
-                            src={getIcon(
-                              enumData.trafficLayerType.TRAFFIC_INCIDENT
-                            )}
-                            alt="Icon"
-                          /> */}
-                            <span className="ml-5 color-black">
-                              {LAYERS.SEAPORTS}
-                            </span>
                           </li>
                           <li className="li-container">
 
-                            <label className="custom-checkbox">
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.RAILWAY_STATIONS}
+                                onChange={(e) => handleSingleCheckbox(e)}
                               />
                               <span className="checkmark"></span>
+                              <span>
+                                <MdDirectionsRailwayFilled size={20} className="text-[#5f2abb]" />
+                              </span>
+
+                              <span className="text-sm font-medium">
+                                {LAYERS.RAILWAY_STATIONS}
+                              </span>
                             </label>
-                            <span>
-                              <MdDirectionsRailwayFilled size={20} color="black" />
-                            </span>
-                            {/* <img
-                            src={getIcon(
-                              enumData.trafficLayerType.CONSTRUCTION_ALERT
-                            )}
-                            alt="Icon"
-                          /> */}
-                            <span className="ml-5 color-black">
-                              {LAYERS.RAILWAY_STATIONS}
-                            </span>
                           </li>
                           <li className="li-container" style={{ display: "none" }} data-name={"checkbox-container-" + LAYERS.VENDOR}>
-                            <label className="custom-checkbox">
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.VENDOR}
+                                onChange={(e) => handleSingleCheckbox(e)}
                               />
                               <span className="checkmark"></span>
+                              <span>
+                                <FaStore size={20} className="text-[#5f2abb]" />
+                              </span>
+                              <span className="text-sm font-medium">
+                                {LAYERS.VENDOR}
+                              </span>
                             </label>
-                            <span>
-                              <FaStore size={20} color="black" />
-                            </span>
-                            <span className="ml-5 color-black">
-                              {LAYERS.VENDOR}
-                            </span>
                           </li>
                         </ul>
                       </div>
@@ -1514,18 +1467,68 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         </div>
       </div>)}
       {isConfirmationModalOpen && (
-        <div className='h-screen w-screen fixed inset-0 z-[444] flex items-center justify-center bg-black bg-opacity-20'>
-
-
-          <div className='relative h-fit w-[30%] flex flex-col items-center gap-4 bg-white rounded-md border py-6 px-8'>
-            <div className={`absolute top-2 right-2 z-[335] cursor-pointer h-8 w-8 rounded-full bg-white flex self-end items-center justify-center`} onClick={() => { closeConfirmPoup() }}>
-              <FaXmark size={20} />
+        // <div ref={optionPopup} className='h-screen w-screen fixed inset-0 z-[444] flex items-center justify-center bg-black bg-opacity-20'>
+        //   <div className='relative h-fit w-[30%] flex flex-col items-center gap-4 bg-white rounded-md border py-6 px-8'>
+        //     <div className={`absolute top-2 right-2 z-[335] cursor-pointer h-8 w-8 rounded-full bg-white flex self-end items-center justify-center`} onClick={() => { closeConfirmPoup() }}>
+        //       <FaXmark size={20} />
+        //     </div>
+        //     <h2 className="relative  tracking-wide text-lg text-center ">Do you want to see nearest connectivity or property details?</h2>
+        //     <div className="relative flex flex-row gap-3">
+        //       <button className="relative py-1 px-4 text-sm transition-all duration-200 hover:-translate-y-0.5 flex items-center text-white justify-center bg-gradient-to-br rounded-md from-[#2C53A3] to-[#70A1D9]" onClick={(e) => { showNearestConnectivity() }}>Nearest Connectivity</button>
+        //       <button className="relative py-1 px-4 text-sm transition-all duration-200 hover:-translate-y-0.5 flex items-center text-white justify-center bg-gradient-to-br rounded-md from-[#2C53A3] to-[#70A1D9]" onClick={(e) => { showPropertyDetails() }}>Property Detail</button>
+        //     </div>
+        //   </div>
+        // </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div ref={optionPopup} className="min-w-[340px]  w-fit mb-6 bg-white rounded-lg shadow-lg overflow-hidden">
+            {/* Header */}
+            <div className="bg-[#0e2044] flex flex-row justify-between p-6  text-white relative">
+              <div className="relative flex flex-col gap-1 items-start">
+                <span className="flex flex-row gap-2 items-center p-2">
+                  <h2 className="text-lg font-semibold text-white">{solution.area}</h2>
+                  <h2 className="text-md tracking-wide text-white">{solution.address}</h2>
+                </span>
+                <p className="text-md opacity-90">What would you like to explore?</p>
+              </div>
+              <button
+                className="absolute top-3 right-3 text-white hover:opacity-80"
+                onClick={() => { closeConfirmPoup() }}
+              >
+                <FaTimes size={20} />
+              </button>
             </div>
-            <h2 className="relative  tracking-wide text-lg text-center ">Do you want to see nearest connectivity or property details?</h2>
 
-            <div className="relative flex flex-row gap-3">
-              <button className="relative py-1 px-4 text-sm transition-all duration-200 hover:-translate-y-0.5 flex items-center text-white justify-center bg-gradient-to-br rounded-md from-[#2C53A3] to-[#70A1D9]" onClick={(e) => { showNearestConnectivity() }}>Nearest Connectivity</button>
-              <button className="relative py-1 px-4 text-sm transition-all duration-200 hover:-translate-y-0.5 flex items-center text-white justify-center bg-gradient-to-br rounded-md from-[#2C53A3] to-[#70A1D9]" onClick={(e) => { showPropertyDetails() }}>Property Detail</button>
+            {/* Options */}
+            <div className="p-4 space-y-3">
+              <button
+                onClick={(e) => { showNearestConnectivity() }}
+                className="flex items-center gap-3 hover:-translate-y-0.5 p-3 rounded-md border hover:shadow-sm w-full text-left"
+              >
+                <div className="h-10 w-10 bg-blue-100 text-blue-600 flex items-center justify-center rounded-full">
+                  <HiOutlineBolt size={20} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Nearest Connectivity</p>
+                  <p className="text-xs text-gray-600">
+                    View distances to key infrastructure points
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => { showPropertyDetails() }}
+                className="flex items-center gap-3 p-3 hover:-translate-y-0.5 rounded-md border hover:shadow-sm w-full text-left"
+              >
+                <div className="h-10 w-10 bg-green-100 text-green-600 flex items-center justify-center rounded-full">
+                  <HiOutlineMap size={20} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Property Details</p>
+                  <p className="text-xs text-gray-600">
+                    View comprehensive property information
+                  </p>
+                </div>
+              </button>
             </div>
           </div>
         </div>

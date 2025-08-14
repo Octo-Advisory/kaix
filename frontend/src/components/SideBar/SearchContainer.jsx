@@ -24,7 +24,7 @@ const getDateFromDatetime = (datetime) => {
 };
 
     useEffect(() => {
-        console.log(data,searchQuery)
+        // console.log(data,searchQuery)
     if (!searchQuery.trim()) {
         // If search is empty, show all data without filtering
         setFilteredData(data.filter(item => item.messages && item.messages.length > 0));
@@ -39,7 +39,7 @@ const getDateFromDatetime = (datetime) => {
             )
             : []
     })).filter(historyContent => historyContent.messages.length > 0);
-    console.log(result)
+    // console.log(result)
     setFilteredData(result);
 }, [data, searchQuery]);
 // Re-run when data or searchQuery changes

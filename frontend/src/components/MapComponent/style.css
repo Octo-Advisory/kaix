@@ -36,6 +36,13 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
 
+.pin-tip {
+      width: 16px;
+      height: 16px;
+      transform: translateX(-50%) rotate(45deg);
+      bottom: -3.5px;
+    }
+
 #map-ui .map-overlay {
   font-size: 12px;
   line-height: 20px;
@@ -1615,4 +1622,7 @@
 }
 .property-marker-margin{
   margin-top: -5px !important;
+}
+.mapboxgl-popup{
+  z-index: 10 !important;
 }

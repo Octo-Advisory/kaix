@@ -92,9 +92,11 @@ def call_vendor_query(aiResponse,chatId,validationResult):
                 "Analytics_response": combined_data,
                 "Is_Error" : False,
                 "latitude_longitude" : latitude_longitude or []
-            }
+            } 
+       
         time.sleep(1)
         update_process(chatId,"Analyzing Data","Complete",1)
+        
         update_process(chatId,"Preparing Result","Processing",0)
         time.sleep(5)
         update_process(chatId,"Preparing Result","Complete",1)

@@ -24,10 +24,10 @@ import { FaHandHoldingUsd, FaRegLightbulb } from "react-icons/fa";
 import { LuUserRoundCheck } from "react-icons/lu";
 import { IoIosClose } from "react-icons/io";
 import { HiOutlineDocumentReport } from "react-icons/hi";
-import { FaUserLarge, FaArrowLeft, FaArrowRight, FaListCheck,FaLandmark } from "react-icons/fa6";
-import { BsBuildingCheck  } from "react-icons/bs";
+import { FaUserLarge, FaArrowLeft, FaArrowRight, FaListCheck,FaLandmark, FaUserGroup, FaUser } from "react-icons/fa6";
+import { BsBuildingCheck, BsShop  } from "react-icons/bs";
 import { TbTriangleInvertedFilled, TbTriangleFilled } from "react-icons/tb";
-import { HiOutlineClipboardDocumentList,HiOutlineQuestionMarkCircle } from "react-icons/hi2";
+import { HiOutlineClipboardDocumentCheck, HiOutlineClipboardDocumentList,HiOutlineQuestionMarkCircle } from "react-icons/hi2";
 import { GoInfo } from "react-icons/go";
 import { HiOutlineCurrencyDollar } from "react-icons/hi2";
 import FinancialSummary from './IconPNGs/financial-planning (1).png'
@@ -35,6 +35,9 @@ import IncentiveTitle from './IconPNGs/incentive.png'
 import IncentiveName from './IconPNGs/agreement.png'
 import ApprovalName from './IconPNGs/approve.png'
 import ApprovalTitle from './IconPNGs/attestation.png'
+import { AiOutlineClear, AiOutlineDollar } from "react-icons/ai";
+import { RiBuilding2Line } from "react-icons/ri";
+import { FiSend } from "react-icons/fi";
 
 const DEFAULT_SIZE = 24;
 const DEFAULT_STROKE = 1;
@@ -92,6 +95,9 @@ export const ApprovalNameIcon = (props) =>
     alt: "Approval Name",
     ...props
   });
+
+
+  
   
   // Wrapped React/Lucide Icons
 export const IncentiveIcon = withDefaults(FaHandHoldingUsd)
@@ -130,3 +136,12 @@ export const AddIcon = withDefaults(Plus);
 export const DeleteIcon = withDefaults(Trash);
 export const SaveIcon = withDefaults(Save);
 export const HistoryIcon = withDefaults(History)
+export const ShopIcon = withDefaults(BsShop)
+export const UserGroupIcon = withDefaults(FaUserGroup)
+export const BuildingLineIcon = withDefaults(RiBuilding2Line)
+export const ClearIcon = withDefaults(AiOutlineClear)
+
+
+
+
+

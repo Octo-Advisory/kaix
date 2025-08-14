@@ -1,13 +1,39 @@
 import { motion } from "framer-motion";
 import { useState,useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaSyncAlt } from "react-icons/fa";
-import { useFrappeGetDocList, useFrappeAuth, useFrappeUpdateDoc } from 'frappe-react-sdk';
+import { useFrappeGetDocList, useFrappeAuth, useFrappeUpdateDoc,useFrappeCreateDoc } from 'frappe-react-sdk';
 
 
-const NoResultsFound = () => {
-    
-    const navigate = useNavigate();
+function NoResultsFound ({diagnostics, type, chatId,data,module}) {
+  const { createDoc } = useFrappeCreateDoc('');
+  const lastChatId = chatId;
+  // const createDiagnostic = (errType, logMsg,chatId)=> {
+  //     let log = `${logMsg}`
+  //     createDoc("AIX Diagnostics Hub", {
+  //     type: errType,
+  //     note: log,
+  //     chat_name: chatId
+  //     });
+  // }
+
+  useEffect(()=> {
+      const createDiagnostic =async()=> {
+        
+      await createDoc("AIX Diagnostics Hub", {
+      type: type,
+      note: `Invalid Data was passed that couldn't be rendered due to '${data}' passed in Analytics Response in ${module}`,
+      chat_name: lastChatId
+      });  
+    }
+    if(diagnostics) {
+      createDiagnostic()
+    }
+    // console.log(diagnostics, type, chatId,data)
+  },[diagnostics])
+
+    // console.log('Came in No Results')
+    // const navigate = useNavigate();
     const { currentUser } = useFrappeAuth();
     const { updateDoc } = useFrappeUpdateDoc("Session");
     const [session, setSession] = useState(null);

@@ -15,7 +15,7 @@ function Maintanance() {
     }, []);
   
     return (
-      <div className="max-h-60vh bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+      <div className="max-h-100vh bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -40,7 +40,7 @@ function Maintanance() {
               </motion.div>
   
               <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-2 text-center">
-                Feature Under Construction
+                Site Under Construction
               </h1>
               
               <p className="text-gray-600 text-center mb-8">
@@ -91,7 +91,7 @@ function Maintanance() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">
                   {daysLeft > 0 ? `Estimated launch in ${daysLeft} days` : 'Launching soon!'}
                 </h3>
-                <p className="text-gray-600">June 30, 2025</p>
+                <p className="text-gray-600">Febuary 30, 2026</p>
               </div>
   
               <div className="flex space-x-4 mb-6">

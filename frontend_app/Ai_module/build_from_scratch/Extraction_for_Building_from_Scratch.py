@@ -327,18 +327,22 @@ def extract_main_industry_and_product_for_scratch(user_query: str, main_industri
     
     # Define the prompt
     prompt_template = """
-    You are an expert in analyzing industry-building queries and extracting specific details.
-    Based on the user's query, identify the following details:
+You are an expert in analyzing industry-building queries and extracting specific details.
 
-    1. Main-Industry: First, infer or predict the main industry based on the context of the query.  
+**CRITICAL INSTRUCTION: When determining Main-Industry classification, focus ONLY on the product, service, or industry terms mentioned in the query. Completely ignore geographic locations (cities, states, countries) for industry inference. Location information should not influence industry selection in any way.**
+
+Based on the user's query, identify the following details:
+
+1. Main-Industry: First, infer or predict the main industry based on the context of the query.  
     - Users may phrase their queries in various ways, such as "I want to set up a spectacle factory," "I want to set up a spectacle industry," or simply "Spectacles." In all such cases, assume they are referring to manufacturing the product mentioned unless it is clearly illogical.  
     - Do not rely on specific words like "factory," "industry," or similar terms to infer manufacturing intent. The product name alone (e.g., "Spectacles") is sufficient to deduce that the query is about manufacturing that product.  
     - The query may sometimes be vague, incomplete, or consist of just the product name. In such cases, logically infer the appropriate main industry.  
+    - **Focus exclusively on product/service/industry keywords - NOT on location.**
     - If the inferred main industry can logically match any category from the provided list of Main-Industries, return the matched category from the list and set `"Forced-Mapping": "No"`.  
     - If no logical match is possible but a mapping must still be provided, forcefully map the inferred main industry to the closest match from the provided list and set `"Forced-Mapping": "Yes"`.  
     - If no main industry can be inferred from the query, return `"None"` for both `"Original-Inferred-Main-Industry"` and `"Main-Industry"`.  
 
-    2. Product: Identify the specific product the query refers to (e.g., "Cement", "Steel Rods").  
+2. Product: Identify the specific product the query refers to (e.g., "Cement", "Steel Rods").  
     - Always extract the widely recognized industry-standard name for the product.  
     - If the product is given as an abbreviation, acronym, or chemical formula, return the full name instead.  
     - Example:
@@ -353,7 +357,15 @@ def extract_main_industry_and_product_for_scratch(user_query: str, main_industri
         - "Acetic Acid" → "Vinegar" (if referring to food-grade usage)
     - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
 
-    Logical Matching for Main Industries:
+**Product-to-Industry Mapping Rules (Location-Independent):**
+- Spectacles/Eyeglasses → "Healthcare & Pharmaceuticals" (medical devices)
+- Chalk/Calcium Carbonate → "Mining" (manufacturing/processing)
+- Steel/Iron → "Capital Goods" 
+- Pharmaceuticals/Medicines → "Healthcare & Pharmaceuticals"
+- Cement/Concrete → "Cement"
+- Food items → "Foods and Beverages"
+
+Logical Matching for Main Industries:
     - A logical match occurs when the inferred main industry and an available main industry from the list are conceptually or functionally similar.  
     - Examples of logical matches:  
         - Inferred: "Chemical Processing" → Available: "Chemical Manufacturing" (`Forced-Mapping`: "No").  
@@ -362,27 +374,28 @@ def extract_main_industry_and_product_for_scratch(user_query: str, main_industri
         - Inferred: "Nanotechnology Production" → Available: "Advanced Manufacturing" (`Forced-Mapping`: "Yes").  
         - Inferred: "Eco-friendly Systems Design" → Available: "Green Manufacturing" (`Forced-Mapping`: "Yes").  
 
-    Provided List of Main-Industries:  
-    {main_industries}  
+Provided List of Main-Industries:  
+{main_industries}  
 
-    Important Notes:
+Important Notes:
     - Always assume that the user is referring to manufacturing unless the context explicitly suggests otherwise.  
     - Ensure that the output is strictly limited to the required JSON format and contains no explanations, reasoning, or comments.  
     - Do not provide additional text, explanations, or reasoning within the fields of the JSON object. For example, avoid including reasoning like "This matches because..." or "Assumed manufacturing based on context."  
     - Each field in the JSON must only contain the exact extracted information or the specified fallback values (e.g., "None").  
+    - If the query mentions only a location but no specific industry or product context, do not infer the industry from prior knowledge of the location. Instead, return None.
 
-    Output Format:
-    Output the result strictly as a JSON object in the following format:  
-    {{
-        "Main-Industry": <Mapped Main-Industry>,
-        "Original-Inferred-Main-Industry": <Inferred Main-Industry or 'None'>,
-        "Forced-Mapping": <'Yes' or 'No'>,
-        "Product": <Extracted Product or 'None'>
-    }}
+Output Format:
+Output the result strictly as a JSON object in the following format:  
+{{
+    "Main-Industry": <Mapped Main-Industry>,
+    "Original-Inferred-Main-Industry": <Inferred Main-Industry or 'None'>,
+    "Forced-Mapping": <'Yes' or 'No'>,
+    "Product": <Extracted Product or 'None'>
+}}
 
-    Query: {query}  
+Query: {query}  
 
-    Provide only the JSON object in the required format.  
+Provide only the JSON object in the required format.  
     """
 
     # Create the prompt using the provided variables
@@ -536,27 +549,57 @@ def extract_sub_sector_and_product_for_scratch(
 
     # Define the prompt
     prompt_template = """
-    You are an expert in analyzing industry-building queries and extracting specific details.  
-    Sub-Sector is the functional or operational category that immediately follows the Main-Industry in the hierarchy.  
-    It encompasses broader categories of related activities, processes, or areas of focus that form part of the Main-Industry.  
+You are an expert in analyzing industry-building queries and extracting specific details.  
 
-    For example:  
-    - In the "Automobile" Main-Industry, possible Sub-Sectors include "Vehicle Assembly," "Automotive Components," or "Electric Vehicles."
-    - In the "Pharmaceuticals" Main-Industry, possible Sub-Sectors include "Allopathic Medicines," "Ayurvedic Medicines," or "Biotechnology."
-    - Sub-Sectors are not specific to individual products; they represent broader categories within the Main-Industry.
+**CRITICAL INSTRUCTION: When determining Sub-Sector classification, focus ONLY on the product, service, or industry terms mentioned in the query. Completely ignore geographic locations (cities, states, countries) for sub-sector inference. Location information should not influence sub-sector selection in any way.**
 
-    {context}
+Sub-Sector is the functional or operational category that immediately follows the Main-Industry in the hierarchy.  
+It encompasses broader categories of related activities, processes, or areas of focus that form part of the Main-Industry.  
 
-    Based on the user's query, identify the following details:
+For example:  
+- In the "Automobile" Main-Industry, possible Sub-Sectors include "Vehicle Assembly," "Automotive Components," or "Electric Vehicles."
+- In the "Pharmaceuticals" Main-Industry, possible Sub-Sectors include "Allopathic Medicines," "Ayurvedic Medicines," or "Biotechnology."
+- Sub-Sectors are not specific to individual products; they represent broader categories within the Main-Industry.
 
-    1. Sub-Sector: First, infer or predict the sub-sector based on the context of the query.  
+{context}
+
+**MANDATORY CONSTRAINT: You MUST select the Sub-Sector value ONLY from the provided list below. You cannot create or invent sub-sector names that are not in this exact list.**
+
+Provided List of Sub-Sectors (THESE ARE YOUR ONLY OPTIONS):  
+{sub_sectors_str}  
+
+**Product-to-Sub-Sector Mapping Rules (Location-Independent):**
+For Manufacturing Industries:
+- Spectacles/Eyeglasses → Look for "Medical Devices", "Optical Equipment", or closest precision manufacturing category
+- Chalk/Calcium Carbonate → Look for "Basic Chemicals", "Construction Materials", or closest chemical processing category  
+- Steel/Iron → Look for "Metal Processing", "Heavy Manufacturing", or closest metals category
+- Textiles → Look for "Textile Manufacturing", "Fabric Production", or closest textile category
+- Electronics → Look for "Electronics Manufacturing", "Components", or closest technology category
+
+Based on the user's query, identify the following details:
+
+1. Sub-Sector: First, infer or predict the sub-sector based on the context of the query.  
+    - **Focus exclusively on product/service/industry keywords - NOT on location.**
     - In the majority of cases, users may not explicitly mention "manufacturing" or related terms but are still referring to manufacturing-related sub-sectors. Assume the query is about a manufacturing-related sub-sector unless it is clearly illogical to do so.  
     - The query may sometimes be vague or incomplete. In such cases, try to understand the implied intent and context to infer the appropriate sub-sector.  
+    
+    **STEP-BY-STEP PROCESS:**
+    a) Identify what industry segment the query refers to (e.g., "spectacles" → "optical equipment manufacturing")
+    b) Check if this exactly matches any item in the provided list above
+    c) If YES: Use that exact match and set `"Forced-Mapping": "No"`
+    d) If NO: Find the closest related option from the provided list and set `"Forced-Mapping": "Yes"`
+    
     - If the inferred sub-sector can logically match any category from the provided list of Sub-Sectors, return the matched category from the list and set `"Forced-Mapping"` to `"No"`.  
-    - If no logical match is possible but a mapping must still be provided, forcefully map the inferred sub-sector to the closest match from the provided list and set `"Forced-Mapping"` to `"Yes"`.  
-    - If no sub-sector can be inferred from the query, return `"None"` for the `"Original-Inferred-Sub-Sector"` and `"Sub-Sector"`.  
+    - If no exact logical match exists, identify the CLOSEST available sub-sector based on:
+        * Raw materials used
+        * Manufacturing processes
+        * End-use applications
+        * Product category
+        * Industry segment overlap
+    - **MANDATORY: Always attempt a forced mapping before returning "None"**
+    - **Only return "None" if the query contains absolutely no industry/product context whatsoever**
 
-    2. Product: Identify the specific product the query refers to (e.g., "Cement," "Steel Rods").  
+2. Product: Identify the specific product the query refers to (e.g., "Cement," "Steel Rods").  
     - Always extract the widely recognized industry-standard name for the product.  
     - If the product is given as an abbreviation, acronym, or chemical formula, return the full name instead.  
     - Example:
@@ -571,38 +614,49 @@ def extract_sub_sector_and_product_for_scratch(
         - "Acetic Acid" → "Vinegar" (if referring to food-grade usage)
     - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
 
-    Logical Matching for Sub-Sectors:
+**VALIDATION RULES:**
+- Your "Sub-Sector" field MUST contain EXACTLY one of these values from the provided list OR "None"
+- If you cannot find any reasonable connection to the provided sub-sectors, only then return "None"
+- If the "Sub-Sector" matches exactly what you inferred, set `"Forced-Mapping": "No"`
+- If the "Sub-Sector" is different from what you initially inferred, set `"Forced-Mapping": "Yes"`
+
+Logical Matching for Sub-Sectors:
     - A logical match occurs when the inferred sub-sector and an available sub-sector from the list are conceptually or functionally similar.  
     - Examples of logical matches:  
         - Inferred: "Electric Cars" → Available: "Electric Vehicles" (`Forced-Mapping`: `"No"`).  
         - Inferred: "Biological Research" → Available: "Biotechnology" (`Forced-Mapping`: `"No"`).  
     - Examples of forced mappings:  
+        - Inferred: "Optical Equipment" → Available: "Precision Manufacturing" (`Forced-Mapping`: `"Yes"`).
         - Inferred: "Clean Energy Solutions" → Available: "Renewable Energy" (`Forced-Mapping`: `"Yes"`).  
         - Inferred: "Pharma Research Labs" → Available: "Biotechnology" (`Forced-Mapping`: `"Yes"`).  
-    - If no logical match exists, set `"Forced-Mapping"` to `"Yes"`.  
 
-    Output Constraints:  
+**Examples:**
+- Query: "spectacles manufacturing setup" 
+  - Inferred: "Optical Equipment Manufacturing" 
+  - Closest Available: "Precision Manufacturing" (if available)
+  - Output: `"Sub-Sector": "Precision Manufacturing", "Original-Inferred-Sub-Sector": "Optical Equipment Manufacturing", "Forced-Mapping": "Yes"`
+
+Output Constraints:  
+    - The "Sub-Sector" field can ONLY contain values from the provided list or "None"
+    - Do not create new sub-sector names
     - Ensure that the output is strictly limited to the required JSON format and contains no explanations, reasoning, or comments.  
     - Do not provide additional text, explanations, or reasoning within the fields of the JSON object. For example, avoid including reasoning like "This matches because..." or "Assumed manufacturing based on context."  
     - Each field in the JSON must only contain the exact extracted information or the specified fallback values (e.g., `"None"`).  
 
-    Provided List of Sub-Sectors:  
-    {sub_sectors_str}  
+Output Format:  
+Output the result strictly as a JSON object in the following format:  
+{{
+    "Sub-Sector": <MUST be from provided list or "None">,
+    "Original-Inferred-Sub-Sector": <What you initially inferred or "None">,
+    "Forced-Mapping": <"Yes" if Sub-Sector differs from Original-Inferred, "No" if exact match>,
+    "Product": <Extracted Product or "None">
+}}
 
-    Output Format:  
-    Output the result strictly as a JSON object in the following format:  
-    {{
-        "Sub-Sector": <Mapped Sub-Sector>,
-        "Original-Inferred-Sub-Sector": <Inferred Sub-Sector or 'None'>,
-        "Forced-Mapping": <'Yes' or 'No'>,
-        "Product": <Extracted Product or 'None'>
-    }}
+Query: {user_query}  
 
-    Query: {user_query}  
-
-    Provide only the JSON object in the required format.  
+Provide only the JSON object in the required format.  
     """
-
+    
     # Create the prompt using the provided variables
     prompt = PromptTemplate(
         input_variables=["user_query", "sub_sectors_str", "context"],
@@ -755,26 +809,56 @@ def extract_segment_and_product_for_scratch(
 
     # Define the prompt
     prompt_template = """
-    You are an expert in analyzing industry-building queries and extracting specific details.
-    Segment is the logical grouping of products, which comes immediately next in the hierarchy after the Sub-Sector.
-    Sub-Sector itself is the functional or operational category following the Main-Industry in the hierarchy.
+You are an expert in analyzing industry-building queries and extracting specific details.
 
-    For example:
-    - In the "Automobile" Main-Industry, a Sub-Sector like "Automotive Components" may have Segments such as "Engines," "Batteries," or "Tires."
-    - In the "Pharmaceuticals" Main-Industry, a Sub-Sector like "Allopathic Medicines" may have Segments like "Antibiotics" or "Analgesics."
+**CRITICAL INSTRUCTION: When determining Segment classification, focus ONLY on the product, service, or industry terms mentioned in the query. Completely ignore geographic locations (cities, states, countries) for segment inference. Location information should not influence segment selection in any way.**
 
-    Based on the user's query, identify the following details:
+Segment is the logical grouping of products, which comes immediately next in the hierarchy after the Sub-Sector.
+Sub-Sector itself is the functional or operational category following the Main-Industry in the hierarchy.
 
-    {context}
+For example:
+- In the "Automobile" Main-Industry, a Sub-Sector like "Automotive Components" may have Segments such as "Engines," "Batteries," or "Tires."
+- In the "Pharmaceuticals" Main-Industry, a Sub-Sector like "Allopathic Medicines" may have Segments like "Antibiotics" or "Analgesics."
 
-    1. Segment: First, infer or predict the segment based on the context of the query.
+{context}
+
+**MANDATORY CONSTRAINT: You MUST select the Segment value ONLY from the provided list below. You cannot create or invent segment names that are not in this exact list.**
+
+Provided List of Segments (THESE ARE YOUR ONLY OPTIONS):  
+{segments_str}
+
+**Product-to-Segment Mapping Rules (Location-Independent):**
+For Manufacturing Industries:
+- Chalk/Calcium Carbonate → Look for "Basic Chemicals", "Chemical Products", or closest chemical manufacturing segment
+- Metal products → Look for "Metalworking Machinery", "Metal Products", or closest metal processing segment
+- Machinery/Equipment → Look for "Industrial Machinery", "Manufacturing Equipment", or closest equipment segment
+- Electronics → Look for "Electronic Components", "Electronic Equipment", or closest electronics segment
+
+Based on the user's query, identify the following details:
+
+1. Segment: First, infer or predict the segment based on the context of the query.
+    - **Focus exclusively on product/service/industry keywords - NOT on location.**
     - In the majority of cases, users may not explicitly mention "manufacturing" or related terms but are still referring to manufacturing-related segments. Assume the query is about manufacturing unless it is clearly illogical to do so.
     - The query may sometimes be vague or incomplete. In such cases, try to understand the implied intent and context to infer the appropriate segment.
-    - If the inferred segment can logically match any category from the provided list of Segments, return the matched category from the list and set `Forced-Mapping` to `No`.
-    - If no logical match is possible but a mapping must still be provided, forcefully map the inferred segment to the closest match from the provided list and set `Forced-Mapping` to `Yes`.
-    - If no segment can be inferred from the query, return `"None"` for both `"Original-Inferred-Segment"` and `"Segment"`.
+    
+    **STEP-BY-STEP PROCESS:**
+    a) Identify what specific product/manufacturing activity the query refers to
+    b) Check if this exactly matches any item in the provided list above
+    c) If YES: Use that exact match and set `"Forced-Mapping": "No"`
+    d) If NO: Find the closest related option from the provided list and set `"Forced-Mapping": "Yes"`
+    
+    - If the inferred segment can logically match any category from the provided list of Segments, return the matched category from the list and set `"Forced-Mapping"` to `"No"`.
+    - If no exact logical match exists, identify the CLOSEST available segment based on:
+        * Product category similarity
+        * Manufacturing process type
+        * Raw materials used
+        * End-use application
+        * Industry segment overlap
+    - **MANDATORY: Always attempt a forced mapping before returning "None"**
+    - **Only return "None" if the query contains absolutely no industry/product/manufacturing context whatsoever**
 
-    2. Product: Identify the specific product the query refers to (e.g., "Cement," "Steel Rods").  
+2. Product: Identify the specific product the query refers to (e.g., "Cement," "Steel Rods").  
+    - **Focus exclusively on product terms - NOT on location.**
     - Always extract the widely recognized industry-standard name for the product.  
     - If the product is given as an abbreviation, acronym, or chemical formula, return the full name instead.  
     - Example:
@@ -789,39 +873,49 @@ def extract_segment_and_product_for_scratch(
         - "Acetic Acid" → "Vinegar" (if referring to food-grade usage)
     - If no product is mentioned or the term does not logically fit as a product, return `"None"`.  
 
-    Important Notes:
+**VALIDATION RULES:**
+- Your "Segment" field MUST contain EXACTLY one of these values from the provided list OR "None"
+- If you cannot find any reasonable connection to the provided segments, only then return "None"
+- If the "Segment" matches exactly what you inferred, set `"Forced-Mapping": "No"`
+- If the "Segment" is different from what you initially inferred, set `"Forced-Mapping": "Yes"`
 
-    Logical Matching for Segments:
-    - A logical match occurs when the inferred segment and an available segment from the list are conceptually or functionally similar.
-    - Examples of logical matches:
-        - Inferred: "Metal Equipment" → Available: "Metalworking Machinery" (`Forced-Mapping`: No).
-        - Inferred: "Metal Fabrication Tools" → Available: "Metalworking Machinery" (`Forced-Mapping`: No).
-    - Examples of forced mappings:
-        - Inferred: "Advanced Robotics Systems" → Available: "Automation Equipment" (`Forced-Mapping`: Yes).
-        - Inferred: "Metal Gear Production" → Available: "Metalworking Machinery" (`Forced-Mapping`: Yes).
-    - If no logical match exists, set `Forced-Mapping` to `Yes`.
+Logical Matching for Segments:
+- A logical match occurs when the inferred segment and an available segment from the list are conceptually or functionally similar.
+- Examples of logical matches:
+    - Inferred: "Metal Equipment" → Available: "Metalworking Machinery" (`Forced-Mapping`: "No").
+    - Inferred: "Metal Fabrication Tools" → Available: "Metalworking Machinery" (`Forced-Mapping`: "No").
+- Examples of forced mappings:
+    - Inferred: "Basic Chemical Manufacturing" → Available: "Industrial Chemicals" (if closest match) (`Forced-Mapping`: "Yes").
+    - Inferred: "Advanced Robotics Systems" → Available: "Automation Equipment" (`Forced-Mapping`: "Yes").
+    - Inferred: "Metal Gear Production" → Available: "Metalworking Machinery" (`Forced-Mapping`: "Yes").
 
-    Provided List of Segments:  
-    {segments_str} 
+**Examples:**
+- Query: "chalk manufacturing setup in Delhi" 
+  - Inferred: "Basic Chemical Manufacturing" 
+  - Closest Available: "Chemical Products" (if available in list)
+  - Output: `"Segment": "Chemical Products", "Original-Inferred-Segment": "Basic Chemical Manufacturing", "Forced-Mapping": "Yes"`
 
-    Output Format:
-    - Ensure that the output strictly adheres to the specified JSON format without any additional reasoning, explanations, or comments.
-    - Do not include any reasoning or justification in the fields. For example, avoid entries such as `"This matches because..."` or `"Assumed based on the context..."`.
-    - Each field should only contain the extracted information or the specified fallback values (e.g., "None").
+Output Format:
+- The "Segment" field can ONLY contain values from the provided list or "None"
+- Do not create new segment names
+- Ensure that the output strictly adheres to the specified JSON format without any additional reasoning, explanations, or comments.
+- Do not include any reasoning or justification in the fields. For example, avoid entries such as `"This matches because..."` or `"Assumed based on the context..."`.
+- Each field should only contain the extracted information or the specified fallback values (e.g., "None").
+- If the query mentions only a location but no specific industry or product context, do not infer the segment from prior knowledge of the location. Instead, return None.
 
-    Output the result strictly as a JSON object in the following format:
-    {{
-        "Segment": <Mapped Segment>,
-        "Original-Inferred-Segment": <Inferred Segment or 'None'>,
-        "Forced-Mapping": <'Yes' or 'No'>,
-        "Product": <Extracted Product or 'None'>
-    }}
+Output the result strictly as a JSON object in the following format:
+{{
+    "Segment": <MUST be from provided list or "None">,
+    "Original-Inferred-Segment": <What you initially inferred or "None">,
+    "Forced-Mapping": <"Yes" if Segment differs from Original-Inferred, "No" if exact match>,
+    "Product": <Extracted Product or "None">
+}}
 
-    Query: {user_query}
+Query: {user_query}
 
-    Provide only the JSON object in the required format.
+Provide only the JSON object in the required format.
     """
-
+    
     # Create the prompt using the provided variables
     prompt = PromptTemplate(
         input_variables=["user_query", "segments_str", "context"],
@@ -1194,7 +1288,8 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
             "Is_confirmation" : False,
             "state":state,
             "options": None,
-            "User Intention": user_intention
+            "User Intention": user_intention,
+            "Trigger_Lead_Generation":False
         }
         return response
     else:
@@ -1242,10 +1337,11 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                     "Is_confirmation" : False,
                     "state":state,
                     "options": None,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "Trigger_Lead_Generation":False
                     }
         
-        elif state["Main-Industry"] == 'Not Available in List' and state["Product"] == 'None':
+        elif state["Main-Industry"] == 'Not Available in List':
             capacity_json = extract_capacity_details(refined_query,llm)
             
             if any(value != 'None' for value in capacity_json.values()):
@@ -1256,12 +1352,13 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                 save_state(state,f"QIND_state_{chatId}")
             missing_fields = [field for field, value in capacity_json.items() if value == 'None']
             if len(missing_fields) == 0:
-                message = "Not Available in List"
+                message = INDUSTRY_NOT_AVAILABLE_MSG
                 return {"Ai_response": message,
                     "Is_confirmation" : False,
                     "state":state,
                     "options": None,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "Trigger_Lead_Generation":True
                     }
             else:
                 chat_history = get_chat(f"chat_{chatId}")
@@ -1274,7 +1371,8 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                     "Is_confirmation" : False,
                     "state":state,
                     "options": None,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "Trigger_Lead_Generation":False
                     }
             
         elif state["Main-Industry"] != 'None':
@@ -1320,7 +1418,8 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                         "Is_confirmation" : False,
                         "state":state,
                         "options": None,
-                        "User Intention": user_intention
+                        "User Intention": user_intention,
+                        "Trigger_Lead_Generation":False
                         }
                 else:
                     selected_option = next(
@@ -1413,7 +1512,8 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                         "validated_data" : segment_validated_data,
                         "state" : state,
                         "options": confirmation_message_options,
-                        "User Intention": user_intention
+                        "User Intention": user_intention,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
 
@@ -1430,15 +1530,17 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                         "Is_confirmation" : False,
                         "state": state,
                         "options": None,
-                        "User Intention": user_intention
+                        "User Intention": user_intention,
+                        "Trigger_Lead_Generation":False
                         }
                 else:
-                    message = "Not Available in List"
+                    message = INDUSTRY_NOT_AVAILABLE_MSG
                     return {"Ai_response": message,
                     "Is_confirmation" : False,
                     "state":state,
                     "options": None,
-                    "User Intention": user_intention
+                    "User Intention": user_intention,
+                    "Trigger_Lead_Generation":True
                     }
 
             else:
@@ -1452,7 +1554,8 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                     "Is_confirmation" : False,
                     "state":state,
                     "options": None,
-                    "User Intention": user_intention}
+                    "User Intention": user_intention,
+                    "Trigger_Lead_Generation":False}
         
         else:
             response = {
@@ -1460,7 +1563,8 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                 "Is_confirmation" : False,
                 "state":state,
                 "options": None,
-                "User Intention": user_intention
+                "User Intention": user_intention,
+                "Trigger_Lead_Generation":False
             }
             return response
 
@@ -1854,11 +1958,12 @@ def entry_build_from_scratch(input,chatId, additional_class_response = None):
     k = gather_industry_details(input,main_industry,llm_70b_vers,chatId, additional_class_response=additional_class_response)
 
     if k['Is_confirmation']:
-        s = do_unit_conversion(k['state'])
+        s, new_s = do_unit_conversion(k['state'])
         with open("\nlog2.txt", "a") as file:
             file.write(f"s {s}")
         k['state'].update(s)
         save_state(k['state'],f"QIND_state_{chatId}")
+        k.update(new_s)
         return k
     else:
         return k
@@ -1916,29 +2021,255 @@ def get_keys_for_capicity(chatId):
     return filtered_data
 
 def do_unit_conversion(state):
-    query = f"""
-    select distinct jcrla.capacity_unit
-    from (
-        select crla.capacity_unit, crla.sub_sector, sst.sub_sector_name, sst.industry_id
-        from `tabIndustry Capacity Rule` as crla
-        join `tabSub Sector` as sst
-        on crla.sub_sector = sst.name
-    ) as jcrla
-    where jcrla.sub_sector_name = '{state['Sub-Sector']}' and jcrla.industry_id = '{state['Main-Industry']}'
-    """
+    # 1) Try SEGMENT-level rule first (assumes `crla.segment` exists; tweak if your schema differs)
+    results = []
+    level_check = None
 
-    results = frappe.db.sql(query)
+    if state.get("Segment"):
+        query = f"""
+        select distinct jcrla.capacity_unit
+        from (
+            select crla.capacity_unit, crla.sub_sector, crla.extremity_record, sst.sub_sector_name, seg.segment, IT.industry_name
+            from `tabIndustry Capacity Rule` as crla
+            join `tabSub Sector` as sst on crla.sub_sector = sst.name
+            join `tabSegment`   as seg on crla.segment   = seg.name
+            join `tabIndustry`  as IT  on crla.industry  = IT.name
+        ) as jcrla
+        where (jcrla.segment = '{state['Segment']}' and jcrla.sub_sector_name = '{state['Sub-Sector']}' and jcrla.industry_name = '{state['Main-Industry']}')
+        AND extremity_record = 0
+        limit 1
+        """
+        results = frappe.db.sql(query)
+        if results:
+            level_check = "Segment"
+
+    # 2) Fallback: SUB-SECTOR
+    if not results:
+        query = f"""
+        select distinct jcrla.capacity_unit
+        from (
+            select crla.capacity_unit, crla.sub_sector, crla.extremity_record, sst.sub_sector_name, sst.industry_id, IT.industry_name
+            from `tabIndustry Capacity Rule` as crla
+            join `tabSub Sector` as sst on crla.sub_sector = sst.name
+            join `tabIndustry`  as IT  on crla.industry  = IT.name
+        ) as jcrla
+        where (jcrla.sub_sector_name = '{state['Sub-Sector']}' and jcrla.industry_name = '{state['Main-Industry']}')
+        AND extremity_record = 0
+        limit 1
+        """
+        results = frappe.db.sql(query)
+        if results:
+            level_check = "Sub-Sector"
+
+    # 3) Fallback: INDUSTRY (pick most frequent capacity_unit)
+    if not results:
+        query = f"""
+        select jcrla.capacity_unit
+        from (
+            select crla.capacity_unit, crla.extremity_record, IT.industry_name
+            from `tabIndustry Capacity Rule` as crla
+            join `tabIndustry` as IT on crla.industry = IT.name
+        ) as jcrla
+        where jcrla.industry_name = '{state['Main-Industry']}'
+        AND extremity_record = 0
+        group by jcrla.capacity_unit
+        order by count(*) desc
+        limit 1
+        """
+        results = frappe.db.sql(query)
+        if results:
+            level_check = "Industry"
+
+    if not results:
+        raise ValueError(
+            f"No capacity unit rule found for Industry='{state.get('Main-Industry')}', "
+            f"Sub-Sector='{state.get('Sub-Sector')}', Segment='{state.get('Segment')}'."
+        )
+
     db_unit_for_ss = results[0][0]
     standard_unit_time = split_unit_and_time_period(db_unit_for_ss, llm_70b_vers)
-    product_name = state["Product"]
-    user_quantity = state["Capacity"]
-    user_unit = state["Capacity Unit"]
-    user_time_period = state["Time Period"]
-    db_standard_unit = standard_unit_time["unit"]
-    db_standard_time_period = standard_unit_time["time_period"]
+
+    product_name          = state["Product"]
+    user_quantity         = state["Capacity"]
+    user_unit             = state["Capacity Unit"]
+    user_time_period      = state["Time Period"]
+    db_standard_unit      = standard_unit_time["unit"]
+    db_standard_time_per  = standard_unit_time["time_period"]
 
     converted_output = convert_to_standard_unit(
-        user_quantity, user_unit, user_time_period, db_standard_unit, db_standard_time_period, product_name, llm_deepseek
+        user_quantity, user_unit, user_time_period,
+        db_standard_unit, db_standard_time_per,
+        product_name, llm_deepseek
     )
 
-    return converted_output
+    converted_output_temp = {}
+    # record which level resolved the base unit
+    converted_output_temp["DBFetchCheck"] = level_check
+
+    # --------------------------
+    # Extremity check (exact-unit-first; auto-convert if needed)
+    # --------------------------
+    converted_output_temp["Trigger_Lead_Generation"] = False
+    cap_unit_for_check = str(converted_output.get("Capacity Unit", "")).strip()
+
+    # Predefined messages
+    UPPER_MSG = ("Thank you for sharing your requirements. The production scale you’re requesting is beyond "
+                 "the maximum we currently support. We have recorded your query details, and our team will review "
+                 "them and get in touch with you soon. We truly value your interest in our platform.")
+    LOWER_MSG = ("Thank you for sharing your requirements. The production scale you’re requesting is significantly "
+                 "below the minimum we currently support. We have recorded your query details, and our team will review "
+                 "them and get in touch with you soon. We truly value your interest in our platform.")
+
+    def _to_float(x):
+        if x is None:
+            return None
+        try:
+            return float(str(x).replace(",", ""))
+        except Exception:
+            return None
+
+    def _build_ext_query(level, include_unit):
+        unit_clause = " and crla.capacity_unit = %s" if include_unit else ""
+        if level == "Segment":
+            q = f"""
+                select crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
+                from `tabIndustry Capacity Rule` as crla
+                join `tabSub Sector` as sst on crla.sub_sector = sst.name
+                join `tabSegment`   as seg on crla.segment   = seg.name
+                join `tabIndustry`  as IT  on crla.industry  = IT.name
+                where seg.segment = %s
+                  and sst.sub_sector_name = %s
+                  and IT.industry_name    = %s
+                  and crla.extremity_record = 1
+                  {unit_clause}
+                limit 1
+            """
+            args = [state["Segment"], state["Sub-Sector"], state["Main-Industry"]]
+        elif level == "Sub-Sector":
+            q = f"""
+                select crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
+                from `tabIndustry Capacity Rule` as crla
+                join `tabSub Sector` as sst on crla.sub_sector = sst.name
+                join `tabIndustry`  as IT  on crla.industry  = IT.name
+                where sst.sub_sector_name = %s
+                  and IT.industry_name    = %s
+                  and crla.extremity_record = 1
+                  {unit_clause}
+                limit 1
+            """
+            args = [state["Sub-Sector"], state["Main-Industry"]]
+        else:  # Industry
+            q = f"""
+                select crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
+                from `tabIndustry Capacity Rule` as crla
+                join `tabIndustry` as IT on crla.industry = IT.name
+                where IT.industry_name = %s
+                  and crla.extremity_record = 1
+                  {unit_clause}
+                limit 1
+            """
+            args = [state["Main-Industry"]]
+        if include_unit:
+            args.append(cap_unit_for_check)
+        return q, tuple(args)
+
+    # If there's no unit in converted output, we can't check ranges safely
+    if cap_unit_for_check and level_check:
+        # 1) Try an extremity row with the same unit
+        q1, a1 = _build_ext_query(level_check, include_unit=True)
+        ext_rows = frappe.db.sql(q1, a1)
+
+        # 2) Fallback: any extremity row for this level
+        if not ext_rows:
+            q2, a2 = _build_ext_query(level_check, include_unit=False)
+            ext_rows = frappe.db.sql(q2, a2)
+
+        if ext_rows:
+            ext_unit, min_ext, max_ext = ext_rows[0][0], ext_rows[0][1], ext_rows[0][2]
+
+            if str(ext_unit).strip() == cap_unit_for_check:
+                # Direct comparison (same unit/time)
+                cap_val = _to_float(converted_output.get("Capacity"))
+                min_v   = _to_float(min_ext)
+                max_v   = _to_float(max_ext)
+
+                if cap_val is not None and min_v is not None and max_v is not None:
+                    # fix swapped bounds if any
+                    if min_v > max_v:
+                        min_v, max_v = max_v, min_v
+
+                    if cap_val < min_v:
+                        converted_output_temp["Trigger_Lead_Generation"] = True
+                        converted_output_temp["Ai_response"] = LOWER_MSG
+                        converted_output_temp["Is_confirmation"] = False
+                        converted_output_temp["options"] = None
+                    elif cap_val > max_v:
+                        converted_output_temp["Trigger_Lead_Generation"] = True
+                        converted_output_temp["Ai_response"] = UPPER_MSG
+                        converted_output_temp["Is_confirmation"] = False
+                        converted_output_temp["options"] = None
+
+                    # else in range -> no trigger/message
+                else:
+                    # Can't compare reliably; keep prior behavior (no message side)
+                    pass
+            else:
+                # Units differ → convert extremity bounds to the SAME standard unit/time
+                try:
+                    ext_parsed      = split_unit_and_time_period(str(ext_unit), llm_70b_vers)
+                    ext_unit_only   = ext_parsed.get("unit")
+                    ext_time_period = ext_parsed.get("time_period")
+
+                    min_num = _to_float(min_ext)
+                    max_num = _to_float(max_ext)
+
+                    min_conv = convert_to_standard_unit(
+                        min_num, ext_unit_only, ext_time_period,
+                        db_standard_unit, db_standard_time_per,
+                        product_name, llm_deepseek
+                    ) if min_num is not None else None
+
+                    max_conv = convert_to_standard_unit(
+                        max_num, ext_unit_only, ext_time_period,
+                        db_standard_unit, db_standard_time_per,
+                        product_name, llm_deepseek
+                    ) if max_num is not None else None
+
+                    cap_val = _to_float(converted_output.get("Capacity"))
+                    min_v   = _to_float(min_conv.get("Capacity")) if isinstance(min_conv, dict) else None
+                    max_v   = _to_float(max_conv.get("Capacity")) if isinstance(max_conv, dict) else None
+
+                    if cap_val is not None and min_v is not None and max_v is not None:
+                        if min_v > max_v:
+                            min_v, max_v = max_v, min_v
+
+                        if cap_val < min_v:
+                            converted_output_temp["Trigger_Lead_Generation"] = True
+                            converted_output_temp["Ai_response"] = LOWER_MSG
+                            converted_output_temp["Is_confirmation"] = False
+                            converted_output_temp["options"] = None
+
+
+                        elif cap_val > max_v:
+                            converted_output_temp["Trigger_Lead_Generation"] = True
+                            converted_output_temp["Ai_response"] = UPPER_MSG
+                            converted_output_temp["Is_confirmation"] = False
+                            converted_output_temp["options"] = None
+                        
+
+                        # else in range -> no trigger/message
+                    else:
+                        # Can't compare reliably; keep prior behavior (no message side)
+                        pass
+                except Exception as e:
+                    # On conversion failure, keep prior conservative trigger; no side-specific message
+                    print("Extremity conversion error:", e)
+                    Fall_back_message = ("Thank you for sharing your requirements. There went something wrong "
+                    "While Processing your requirements. We have recorded your query details, and our team will review "
+                    "them and get in touch with you soon. We truly value your interest in our platform.")
+
+                    converted_output_temp["Trigger_Lead_Generation"] = True
+                    converted_output_temp["Ai_response"] = Fall_back_message
+                    converted_output_temp["Is_confirmation"] = False
+
+    return converted_output, converted_output_temp

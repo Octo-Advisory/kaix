@@ -34,13 +34,13 @@ function Searchbar() {
         }
   
         const data = await response.json();
-        console.log("data is", data);
-        console.log("res is", data.candidates);
+        // console.log("data is", data);
+        // console.log("res is", data.candidates);
   
         const aiMessage = data?.candidates[0]?.content?.parts[0].text.trim() || "I'm sorry, I couldn't process that.";
         return aiMessage;
       } catch (error) {
-        console.error('Error fetching AI response:', error);
+        // console.error('Error fetching AI response:', error);
         return "Something went wrong. Please try again.";
       }
     };

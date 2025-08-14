@@ -7,11 +7,11 @@ import {
 import { IoIosArrowForward } from 'react-icons/io';
 import { ImHammer2 } from "react-icons/im";
 import { RiShipFill } from "react-icons/ri";
-import { BsPatchCheckFill } from "react-icons/bs";
+import { BsCashCoin, BsCurrencyExchange, BsPatchCheckFill } from "react-icons/bs";
 import { MdOfflineBolt } from "react-icons/md";
 import { FaCircleXmark, FaTriangleExclamation } from 'react-icons/fa6';
 import { FaXmark } from "react-icons/fa6";
-import { FrappeContext, useFrappePostCall, useFrappeUpdateDoc } from 'frappe-react-sdk';
+import { FrappeContext, useFrappePostCall, useFrappeUpdateDoc,useFrappeCreateDoc } from 'frappe-react-sdk';
 import MapComponent from '../MapComponent/MapComponent';
 import Backtochat from '../Backtochat/Backtochat';
 import { useFrappeGetDoc } from 'frappe-react-sdk';
@@ -34,11 +34,21 @@ import { IoWifi } from 'react-icons/io5';
 import MapBoxMap from '../MapComponent/MapBoxMap';
 import SingleMap from '../MapComponent/SingleMap';
 import NoResultsFound from '../Failure/NoResultsFound';
+import { CiCoinInsert } from 'react-icons/ci';
 
 
 const IndustryResultScreen = ({ result, source, rerender }) => {
+  const { createDoc } = useFrappeCreateDoc('');
+  const lastChatId = useSelector((state) => state.chat.lastId);
+  const createDiagnostic = (errType, logMsg,chatId)=> {
+      let log = ` ${logMsg}`
+      createDoc("AIX Diagnostics Hub", {
+      type: errType,
+      note: log,
+      chat_name: chatId
+      });
+  }
 
-  console.log("result in industry from scrtch", result);
   const { data: uiData } = useFrappeGetDoc("UI Configuration", "Build From Scratch")
   const configurations = uiData?.configurations || [];
   const uiConfig = configurations.reduce((acc, curr) => {
@@ -58,6 +68,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
   const [vendorsToSend, setVendorsToSend] = useState()
   const [marketAndLaws, setMarketAndLaws] = useState('Local Laws')
   const [showLocalLaws, setShowLocalLaws] = useState(true)
+  const [showtaxes, setShowTaxes] = useState(false)
   const [showMarketTrends, setShowMarketTrends] = useState(false)
   const [someError, setSomeError] = useState(false)
   const [tempFailure, setTempFailure] = useState(false)
@@ -66,7 +77,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedProperty, setSelectedProperty] = useState()
   const [solutions, setSolutions] = useState([])
-  const lastChatId = useSelector((state) => state.chat.lastId);
+ 
 
   ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -89,14 +100,25 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
   };
 
   const analytics_response = source === "MapComponent" ? '' : result["Analytics_response"]
-  console.log("analytics respon", analytics_response);
-  if ((typeof analytics_response === 'object' && analytics_response !== null) || source === "MapComponent") {
-    console.log('All good')
-  } else {
-    let msg = analytics_response;
-    console.log(msg, 'Setting the result fail...')
-    setTempFailure(true)
+  if(source!== "MapComponent") {
+
+    if (
+      typeof analytics_response !== 'object' || 
+      analytics_response === null || 
+      typeof analytics_response === 'string'
+    ) {
+      console.log('Invalid analytics_response:', analytics_response);
+      // createDiagnostic("Data Error", `Invalid Data was passed that couldn't be rendered due to ${analytics_response} in Build From Scratch`,lastChatId)
+      return <NoResultsFound diagnostics={true} type='Land & Approval' chatId={lastChatId} data={analytics_response} module='Build From Scratch'/>;
+    }
   }
+  // if ((typeof analytics_response === 'object' && analytics_response !== null) || source === "MapComponent") {
+  //   console.log('All good')
+  // } else {
+  //   let msg = analytics_response;
+  //   console.log(msg, 'Setting the result fail...')
+  //   setTempFailure(true)
+  // }
 
   // This part is for showing the Query Title in the Solutions Screen 
   const aiResponse = useSelector((state) => state.ai.aiReponse);
@@ -110,7 +132,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
   const [randomTitle, setRandomTitle] = useState(null);
   useEffect(() => {
     if (tempIndustry) {
-      const newTitle = titles[Math.floor(Math.random() * titles.length)];
+      const newTitle = titles[Math.floor(Math.random() * titles.length)].toLowerCase();
       setRandomTitle(newTitle);
     }
   }, [tempIndustry]);
@@ -129,7 +151,8 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
       const data = await response.json();
       return data.data
     } catch (error) {
-      console.error('Error fetching data:', error);
+      // console.error('Error fetching data:', error);
+      createDiagnostic("Land & Approvals", `Something went wrong while fetching Survey Data ${JSON.stringify(error)} in Build From Scratch`,lastChatId)
       setSomeError(true)
     }
   }
@@ -147,7 +170,8 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
       const data = await response.json();
       return data.data[0]
     } catch (error) {
-      console.error('Error fetching data:', error);
+      // console.error('Error fetching data:', error);
+      createDiagnostic("Land & Approvals", `Something went wrong while fetching Area Name ${JSON.stringify(error)} in Build From Scratch`,lastChatId)
       setSomeError(true)
     }
   }
@@ -175,7 +199,8 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
 
       return results;
     } catch (error) {
-      console.error('Error fetching data:', error);
+      // console.error('Error fetching data:', error);
+      createDiagnostic("Land & Approvals", `Something went wrong while fetching Approvals Data ${JSON.stringify(error)} in Build From Scratch`,lastChatId)
       setSomeError(true)
       return [];
     }
@@ -185,7 +210,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     if (!lastChat || !solutions) return
 
     try {
-      console.log(lastChat, solutions?.[0], 'Method Called')
+      // console.log(lastChat, solutions?.[0], 'Method Called')
       const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
         child_row_id: lastChat,
         updated_solutions: solutions,
@@ -198,7 +223,8 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
         });
       return result.message || [];
     } catch (err) {
-      console.error("Error Storing Result json:", err);
+      // console.error("Error Storing Result json:", err);
+      createDiagnostic("Land & Approvals", `Something went wrong while storing the result json ${JSON.stringify(err)} in Build From Scratch`,lastChatId)
       return []; // Return empty for this batch on error
     }
   }
@@ -217,7 +243,8 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
         });
         return result.message || [];
       } catch (err) {
-        console.error("Error fetching child records for batch:", err);
+        // console.error("Error fetching child records for batch:", err);
+        createDiagnostic("Land & Approvals", `Something went wrong while fetching child records for batch  ${JSON.stringify(err)} in Build From Scratch`,lastChatId)
         return []; // Return empty for this batch on error
       }
     };
@@ -243,7 +270,8 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
         return mergedResults;
       }
     } catch (err) {
-      console.error("Error fetching child records:", err);
+      // console.error("Error fetching child records:", err);
+      createDiagnostic("Land & Approvals", `Something went wrong while fetching child records  ${JSON.stringify(err)} in Build From Scratch`,lastChatId)
       return []; // Return empty array on failure
     }
   };
@@ -275,10 +303,11 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
       }
 
       // If we get here, the input was invalid
-      console.warn("Invalid vendorList type:", typeof vendorList);
+      // console.warn("Invalid vendorList type:", typeof vendorList);
       return [];
     } catch (err) {
-      console.error("❌ Error in getAllVendorsData:", err);
+      // console.error("❌ Error in getAllVendorsData:", err);
+      createDiagnostic("Land & Approvals", `Something went wrong while fetching All Vendors Data ${JSON.stringify(err)} in Build From Scratch`,lastChatId)
       // setSomeError(true)
       return [];
     }
@@ -289,7 +318,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
 
       for (const incentive of incentiveList) {
         const response = await fetch(
-          `/api/resource/Incentive?fields=["incentive_name", "incentive_type","incentive_operation_start_date", "incentive_operation_end_date", "incentive_rank", "name","quantum_of_assistance", "description", "category_description"]&filters=${encodeURIComponent(JSON.stringify([["name", "=", incentive]]))}&order_by=modified asc`,
+          `/api/resource/Incentive?fields=["incentive_name", "incentive_type","incentive_operation_start_date", "incentive_operation_end_date", "incentive_rank", "name","quantum_of_assistance", "description", "category_description", "contextual_analysis"]&filters=${encodeURIComponent(JSON.stringify([["name", "=", incentive]]))}&order_by=modified asc`,
           {
             method: 'GET',
             headers: {
@@ -307,7 +336,8 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
 
       return results;
     } catch (error) {
-      console.error('Error fetching incentives:', error);
+      // console.error('Error fetching incentives:', error);
+      createDiagnostic("Land & Approvals", `Something went wrong while fetching Incentives Data ${JSON.stringify(error)} in Build From Scratch`,lastChatId)
       setSomeError(true)
       return [];
     }
@@ -336,7 +366,8 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
 
       return results;
     } catch (error) {
-      console.error('Error fetching incentives:', error);
+      // console.error('Error fetching incentives:', error);
+      createDiagnostic("Land & Approvals", `Something went wrong while fetching Industry Incentives Data ${JSON.stringify(error)} in Build From Scratch`,lastChatId)
       setSomeError(true)
       return [];
     }
@@ -412,6 +443,144 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     }).filter(Boolean);
   }
 
+  function parseLegalOrTaxText(rawText) {
+  // Normalize line breaks
+  rawText = rawText.replace(/\r/g, "").trim();
+
+  // First, split into blocks — either numbered sections or by line
+  let parts;
+
+  if (/^\d+\./m.test(rawText)) {
+    // If it contains numbered items, split by number pattern
+    parts = rawText.split(/(?=\d+\.)/g).filter(Boolean);
+  } else {
+    // Else split each entry into its own "block"
+    parts = rawText.split(/\n+/).filter(Boolean);
+  }
+
+  return parts.map((block, index) => {
+    const cleaned = block.trim().replace(/\s+/g, " ");
+
+    // Match patterns like "1.Title – Description" or "Title – Description"
+    const match = cleaned.match(/^(?:\d+\.)?\s*(.+?)\s*[–-]\s*(.+)$/);
+
+    if (match) {
+      return {
+        number: /^\d+\./.test(cleaned)
+          ? parseInt(cleaned.match(/^(\d+)\./)[1])
+          : index + 1,
+        title: match[1].trim(),
+        description: match[2].trim()
+      };
+    }
+
+    // Fallback: no dash found
+    return {
+      number: /^\d+\./.test(cleaned)
+        ? parseInt(cleaned.match(/^(\d+)\./)[1])
+        : index + 1,
+      title: cleaned,
+      description: ""
+    };
+  });
+}
+
+const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6.5% Real GDP**
+
+- Real GDP growth clocked in at **6.5%** for fiscal year 2024–25, making India the fastest-growing major economy. :contentReference[oaicite:1]{index=1}
+
+- The economy's nominal GDP expanded by **9.9%** in the same period, with real GVA rising **6.4%**. :contentReference[oaicite:2]{index=2}
+
+- Growth was underpinned by robust private consumption, improving private investment (with gross fixed capital formation rising), strong public capex, and resilient exports. :contentReference[oaicite:3]{index=3}
+ 
+## **Inflation Moderates to Multi-Year Lows**
+
+- Retail inflation averaged **~4.6%** in 2024–25—the lowest since 2018–19. :contentReference[oaicite:4]{index=4}
+
+- In July 2025, inflation dropped sharply to **1.55%**, its lowest in eight years, driven mainly by falling food prices. :contentReference[oaicite:5]{index=5}
+
+- Core inflation remained moderate (~4–4.1%), signaling maintained consumer demand. :contentReference[oaicite:6]{index=6}
+ 
+## **Exports and Foreign Investment Surge**
+
+- Total exports reached a record **USD 825 billion** in 2024–25, up **76%** over the past decade. Services exports alone grew to **USD 387 billion**—more than double since 2013–14. :contentReference[oaicite:7]{index=7}
+
+- Cumulative FDI inflows exceeded **USD 1.05 trillion**, with equity inflows jumping **27%** in the first nine months of FY 25. :contentReference[oaicite:8]{index=8}
+
+- Digital transactions grew nine-fold from FY18 to FY24, with UPI processing **172 billion transactions** in 2024. :contentReference[oaicite:9]{index=9}
+ 
+## **Monetary Policy and Outlook**
+
+- The RBI cut interest rates sharply—its largest cuts in five years—to lend support to growth; the target is an “aspirational” **7–8% growth**. :contentReference[oaicite:10]{index=10}
+
+- The full year FY 2024–25 fiscal deficit was brought down to **4.8%** of GDP, with early FY 2025–26 indicators showing further improvement. :contentReference[oaicite:11]{index=11}
+
+- OECD projects real GDP to grow at **6.3% in FY 2025–26** and **6.4% in FY 2026–27**, with inflation contained around **4%**. :contentReference[oaicite:12]{index=12}
+
+- A Reuters poll similarly forecasts **6.4% growth** for FY 2025–26 and **6.7% in FY 2026–27**, with inflation averaging **3.6%**, rising to **4.3%** next year. :contentReference[oaicite:13]{index=13}
+ 
+## **Risks: Trade Tensions and Currency**
+
+- New U.S. tariffs on Indian goods—approaching **50%**—could dent GDP growth by approximately **0.6 percentage points**, threatening key sectors like textiles and jewelry. :contentReference[oaicite:14]{index=14}
+
+- The rupee weakened, trading near **₹87.66/USD**, with RBI intervention aiming to stabilize it. Bond yields rose (~6.41% on the 10-year). :contentReference[oaicite:15]{index=15}
+
+- Despite these headwinds, government support (e.g. credit guarantees, export relief) and ongoing structural reforms may mitigate the impact. :contentReference[oaicite:16]{index=16}
+
+ 
+## **India’s Economy Sustains Strong Growth at ~6.5% Real GDP**
+
+- Real GDP growth clocked in at **6.5%** for fiscal year 2024–25, making India the fastest-growing major economy
+
+- The economy's nominal GDP expanded by **9.9%** in the same period, with real GVA rising **6.4%**
+
+- Growth was underpinned by robust private consumption, improving private investment, strong public capex, and resilient exports
+ 
+## **Inflation Moderates to Multi-Year Lows**
+
+- Retail inflation averaged **~4.6%** in 2024–25—the lowest since 2018–19
+
+- In July 2025, inflation dropped sharply to **1.55%**, its lowest in eight years, driven mainly by falling food prices
+
+- Core inflation remained moderate (~4–4.1%), signaling maintained consumer demand
+ 
+## **Exports and Foreign Investment Surge**
+
+- Total exports reached a record **USD 825 billion** in 2024–25, up **76%** over the past decade
+
+- Services exports alone grew to **USD 387 billion**—more than double since 2013–14
+
+- Cumulative FDI inflows exceeded **USD 1.05 trillion**, with equity inflows jumping **27%** in the first nine months of FY 25
+ 
+## **Monetary Policy and Outlook**
+
+- The RBI cut interest rates sharply—its largest cuts in five years—to lend support to growth; the target is an “aspirational” **7–8% growth**
+
+- The full year FY 2024–25 fiscal deficit was brought down to **4.8%** of GDP, with early FY 2025–26 indicators showing further improvement
+
+- Forecasts project real GDP to grow at **6.3% in FY 2025–26** and **6.4% in FY 2026–27**, with inflation contained around **4%**
+ 
+## **Risks: Trade Tensions and Currency**
+
+- New U.S. tariffs on Indian goods—approaching **50%**—could dent GDP growth by approximately **0.6 percentage points**, threatening key sectors like textiles and jewelry
+
+- The rupee weakened, trading near **₹87.66/USD**, with RBI intervention aiming to stabilize it; bond yields rose to ~6.41% on the 10-year
+
+- Despite these headwinds, government support and ongoing structural reforms may mitigate the impact
+
+ `
+
+   function safeJsonParse(input) {
+  try {
+    if (typeof input === 'object') return input; // already parsed
+    return JSON.parse(input);
+  } catch (e) {
+    // console.error("❌ JSON parse error:", e.message);
+    // console.warn("Raw input:", input);
+    return {};
+  }
+}
+
   const fetchPropertyData = async (analytics_response) => {
     let preaparedSolutions = [];
     const final_scoring_df = JSON.parse(analytics_response?.['final_scoring_df'])
@@ -427,13 +596,13 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     const Employment_lookup_df = JSON.parse(analytics_response['Employment_lookup_df'])
     const Solution_lookup_df = JSON.parse(analytics_response['Solution_lookup_df'])
     const Approval_lookup_df = JSON.parse(analytics_response['Approval_lookup_df'])
-    console.log('This is Vendor Lookup for Essential', Essential_supply_vendor_lookup_df)
-    console.log('This is Vendor Lookup All for Essential', Essential_supply_all_vendor_lookup_df)
-    console.log('This is Vendor Lookup for Non Essential', nonEssential_supply_vendor_lookup_df)
-    console.log('This is Vendor Lookup All for Non Essential', nonEssential_supply_all_vendor_lookup_df)
-    console.log('This is Employment Lookup', Employment_lookup_df)
-    console.log('This is Solution Lookup', Solution_lookup_df)
-    console.log('This is Approval Lookup', Approval_lookup_df)
+    // console.log('This is Vendor Lookup for Essential', Essential_supply_vendor_lookup_df)
+    // console.log('This is Vendor Lookup All for Essential', Essential_supply_all_vendor_lookup_df)
+    // console.log('This is Vendor Lookup for Non Essential', nonEssential_supply_vendor_lookup_df)
+    // console.log('This is Vendor Lookup All for Non Essential', nonEssential_supply_all_vendor_lookup_df)
+    // console.log('This is Employment Lookup', Employment_lookup_df)
+    // console.log('This is Solution Lookup', Solution_lookup_df)
+    // console.log('This is Approval Lookup', Approval_lookup_df)
 
     const promises = Object.entries(property_id).map(async ([key, value]) => {
       try {
@@ -567,6 +736,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
           const unskilled_no = Employment_lookup_df['Unskilled'][employment_index] || 0
 
           let incenetives = incentive_data.map(incentive => {
+            let parsedContext = safeJsonParse(incentive.contextual_analysis);
             let inc = {
               id: incentive.name,
               name: incentive.incentive_name,
@@ -575,6 +745,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
               incentive_rank: incentive.incentive_rank,
               type: incentive.incentive_type,
               quantum_of_assistance: incentive.quantum_of_assistance,
+              contextual_analysis: parsedContext?.final_markdown || '',
               description: incentive.description,
               category_description: JSON.parse(incentive.category_description)
             };
@@ -650,7 +821,9 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
           const local_laws = final_scoring_df['local_laws'][key]
           const parsedLocalLaws = local_laws ? parseLegalText(local_laws) : []
           const taxes = final_scoring_df['taxes'][key]
-          const market_trends = final_scoring_df['market_trends'][key]
+          const parsedTaxes = taxes ? parseLegalOrTaxText(taxes) : []
+          const market_trends = final_scoring_df['market_trends'][key] ? final_scoring_df['market_trends'][key] : fallBackMarketTrend;
+
 
           const temp_power_source = Math.floor(Math.random() * (20 - 2 + 1)) + 2;
 
@@ -702,7 +875,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
             result_type: "Industry_Result",
             network_availability: network_availability,
             local_laws: parsedLocalLaws,
-            taxes: taxes,
+            taxes: parsedTaxes,
             market_trends: market_trends,
             industryTitle: industryTitle,
             scores: scores,
@@ -717,12 +890,13 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
             nearest_seaport: data.nearest_seaport,
           }
           preaparedSolutions.push(solution)
-          console.log(solution, 'This is the solution printed ......')
+          // console.log(solution, 'This is the solution printed ......')
 
         }
       } catch (error) {
-        console.log("error is ❌", error);
-        // setSomeError(true)
+        // console.log("error is ❌", error);
+        createDiagnostic("Land & Approvals", `Something went wrong while preparing Full Data for Rendering ${JSON.stringify(error)} in Build From Scratch`,lastChatId)
+        setSomeError(true)
       }
     });
 
@@ -765,7 +939,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
   }, []);
 
   useEffect(() => {
-    console.log(solutions, selectedProperty);
+    // console.log(solutions, selectedProperty);
     if (solutions && solutions.length > 0) {
       let tempsolutions = solutions.sort((a, b) => b.score - a.score)
       setSelectedProperty(tempsolutions[0])
@@ -773,7 +947,18 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
   }, [solutions]);
 
   useEffect(() => {
-    console.log(selectedProperty, 'this are the Property Solutions');
+    // console.log(selectedProperty, 'this are the Property Solutions');
+    if(selectedProperty) {
+      if(selectedProperty.essential_vendors.length===0) {
+        setShowEssentialMaterials(false)
+      }
+      else if(selectedProperty.nonessential_vendors.length===0) {
+        setShowEssentialMaterials(true)
+      }
+      else if (selectedProperty.essential_vendors.length===0 && nonessential_vendors.length===0) {
+        setShowEssentialMaterials(true)
+      }
+    }
   }, [selectedProperty])
 
   const gridPart = useRef(null)
@@ -886,10 +1071,6 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     }
   }, [selectedProperty, activeTab, activeButton])
 
-  useEffect(() => {
-    console.log(solutions, 'this is the solutions prepared')
-  }, [solutions])
-
   // for local laws containers 
   const bgMap = [
     'border-[#2c53a3] bg-[#2c53a3]/10',
@@ -909,9 +1090,9 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
           {source === 'SolutionScreen' && (<div className='sticky top-0 left-0 w-full h-fit flex flex-col z-99  bg-white border-b border-gray-300'>
             <div className='relative w-full h-12 p-4 flex flex-row justify-between mb-4'>
               <div className='relative flex flex-row gap-2 items-center'>
-                <h1 className="text-2xl font-bold text-[#0e2044]"> {uiConfig["main_title"] || "Industrial Property Solutions"}<span className="bg-gradient-to-br from-[#3CB35B] via-[#2E8C4A] to-[#152F4F] font-bold bg-clip-text text-transparent ml-2">{randomTitle}</span></h1>
+                <h1 className="text-2xl font-bold text-[#0e2044]"> {uiConfig["main_title"] || "Industrial property solutions"}<span className="bg-gradient-to-br from-[#3CB35B] via-[#2E8C4A] to-[#152F4F] font-bold bg-clip-text text-transparent ml-2">{randomTitle}</span></h1>
               </div>
-              <Backtochat text='Back to Chat' />
+              {rerender!==1 && source==="SolutionScreen" && (<Backtochat text='Back to Chat' />)}
             </div>
 
             <div className='relative flex flex-row gap-6 w-full h-fit px-4 justify-start items-center border-b border-gray-300'>
@@ -998,7 +1179,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
                               <FaRegQuestionCircle size={15} className="text-gray-400" onMouseEnter={() => { handleMouseEnter('tooltip2') }} onMouseLeave={() => { handleMouseLeave('tooltip2') }} />
                               <div className={`${visibleTooltips.tooltip2 ? 'block' : 'hidden'} absolute top-6 left-1/2 transform -translate-x-1/2 text-xs text-white bg-black rounded-md p-2 min-w-fit whitespace-nowrap z-[333]`}>{uiConfig?.['vendor_card_tooltip'] || "Nearby vendors sorted by distance and relevance to the selected property"}</div>
                             </div>
-                            <span title='Property-Wise Vendor Score' className='py-1 cursor-default px-4 relative flex items-center  justify-center rounded-full text-white font-semibold text-xs bg-gradient-to-r from-[#70A1D9] to-[#5b96d8]'>{selectedProperty?.scores[4].toFixed(2)} &nbsp;/&nbsp;10</span>
+                            <span title={`${uiConfig?.['vendor_score_hover_title'] || 'Property-Wise Vendor Score'}`} className='py-1 cursor-default px-4 relative flex items-center  justify-center rounded-full text-white font-semibold text-xs bg-gradient-to-r from-[#70A1D9] to-[#5b96d8]'>{selectedProperty?.scores[4].toFixed(2)} &nbsp;/&nbsp;10</span>
                           </div>
                           <div className='relative p-2 text-sm text'></div>
                         </div>
@@ -1112,7 +1293,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
                               <FaRegQuestionCircle size={15} className="text-gray-400" onMouseEnter={() => { handleMouseEnter('tooltip3') }} onMouseLeave={() => { handleMouseLeave('tooltip3') }} />
                               <div className={`${visibleTooltips.tooltip3 ? 'block' : 'hidden'} absolute top-6 left-1/2 transform -translate-x-1/2 text-xs text-white bg-black rounded-md p-2 min-w-fit whitespace-nowrap z-[333]`}>  {uiConfig?.['approval_card_tooltip'] || "Govt. clearances required for the project"}</div>
                             </div>
-                            <span title='Property-Wise Approval Score' className='py-1 cursor-default px-4 relative flex items-center justify-center rounded-full text-xs tex-white text-white font-semibold bg-gradient-to-r from-[#E91E63] to-[#ec135c]'>{selectedProperty?.scores[3].toFixed(2)} &nbsp;/&nbsp;10</span>
+                            <span title={`${uiConfig?.['approvals_score_hover_title'] || 'Property-Wise Approval Score'}`} className='py-1 cursor-default px-4 relative flex items-center justify-center rounded-full text-xs tex-white text-white font-semibold bg-gradient-to-r from-[#E91E63] to-[#ec135c]'>{selectedProperty?.scores[3].toFixed(2)} &nbsp;/&nbsp;10</span>
                           </div>
                           <div className='relative rounded-full bg-orange-100 py-1 px-2 text-orange-800 text-xs font-semibold'>{selectedProperty.approvals.length} Needed</div>
                         </div>
@@ -1157,7 +1338,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
                             <FaRegQuestionCircle size={15} className="text-gray-400" onMouseEnter={() => { handleMouseEnter('tooltip4') }} onMouseLeave={() => { handleMouseLeave('tooltip4') }} />
                             <div className={`${visibleTooltips.tooltip4 ? 'block' : 'hidden'} absolute top-6 left-1/2 transform -translate-x-1/2 text-xs text-white bg-black rounded-md p-2 min-w-fit whitespace-nowrap z-[333]`}> {uiConfig?.['location_summary_card_tooltip'] || "Nearby Transport & Connectivity Distances"}</div>
                           </div>
-                          <span title='Property-Wise Suitability Score' className='py-1 cursor-default px-4 relative flex items-center justify-center rounded-full text-xs text-white font-semibold  bg-gradient-to-r from-[#673AB7] to-[#5f2abb]'>{selectedProperty?.scores[0].toFixed(2)}&nbsp;/&nbsp;10</span>
+                          <span title={`${uiConfig?.['location_score_hover_title'] || 'Property-Wise Suitability Score'}`} className='py-1 cursor-default px-4 relative flex items-center justify-center rounded-full text-xs text-white font-semibold  bg-gradient-to-r from-[#673AB7] to-[#5f2abb]'>{selectedProperty?.scores[0].toFixed(2)}&nbsp;/&nbsp;10</span>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="flex items-center col-span-1 flex-row gap-2">
@@ -1241,7 +1422,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
                       <div className="card p-4 bg-white rounded col-span-4 pb-12 shadow-md gap-6 relative flex flex-col items-start">
                         <div className="flex flex-row justify-between items-center w-full">
                           <h2 className="text-base font-semibold text-primary flex flex-row gap-2 items-center"> {uiConfig?.['incentives_card_title'] || "Subsidy & Support Matrix"} <div className='relative inline-block'><FaRegQuestionCircle size={15} className="text-gray-400" onMouseEnter={() => { handleMouseEnter('tooltip6') }} onMouseLeave={() => { handleMouseLeave('tooltip6') }} /><div className={`${visibleTooltips.tooltip6 ? 'block' : 'hidden'} absolute top-6 left-1/2 transform -translate-x-1/2 text-xs text-white bg-black rounded-md p-2 min-w-fit whitespace-nowrap z-[333]`}>{uiConfig?.['incentives_card_tooltip'] || "Applicable Government Incentives & Schemes"}</div></div>
-                            <span title='Property-Wise Incentive Score' className='py-1 px-4 relative cursor-default flex items-center justify-center rounded-full text-xs  text-white font-semibold bg-gradient-to-r from-[#4CAF50] to-[#3cb340]'>{selectedProperty?.scores[2].toFixed(2)} &nbsp;/&nbsp;10</span>
+                            <span  title={`${uiConfig?.['incentives_score_hover_title'] || 'Property-Wise Incentive Score'}`} className='py-1 px-4 relative cursor-default flex items-center justify-center rounded-full text-xs  text-white font-semibold bg-gradient-to-r from-[#4CAF50] to-[#3cb340]'>{selectedProperty?.scores[2].toFixed(2)} &nbsp;/&nbsp;10</span>
                           </h2>
                           <div className='relative py-1 px-2 rounded-full text-xs text-orange-800 bg-orange-100 font-semibold'>{selectedProperty.incentives.length} Found</div>
                         </div>
@@ -1276,7 +1457,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
                           <h2 className="text-base font-semibold text-primary flex flex-row gap-2 items-center">{uiConfig?.['employement_card_title'] || "Workforce Availability Insights"} <div className='relative inline-block'><FaRegQuestionCircle size={15} className="text-gray-400" onMouseEnter={() => { handleMouseEnter('tooltip5') }} onMouseLeave={() => { handleMouseLeave('tooltip5') }} />
                             <div className={`${visibleTooltips.tooltip5 ? 'block' : 'hidden'} absolute top-6 left-1/2 transform -translate-x-1/2 text-xs text-white bg-black rounded-md p-2 min-w-fit whitespace-nowrap z-[333]`}>{uiConfig?.['employement_card_tooltip'] || "Local Workforce Skill Levels Overview"}</div>
                           </div>
-                            <span title='Property-Wise Employment Score' className='py-1 px-4 relative cursor-default flex items-center justify-center rounded-full text-xs  text-white font-semibold  bg-gradient-to-r from-[#2C53A3] to-[#234ea4]'>{selectedProperty?.scores[1].toFixed(2)} &nbsp;/&nbsp;10</span>
+                            <span  title={`${uiConfig?.['employment_score_hover_title'] || 'Property-Wise Employment Score'}`} className='py-1 px-4 relative cursor-default flex items-center justify-center rounded-full text-xs  text-white font-semibold  bg-gradient-to-r from-[#2C53A3] to-[#234ea4]'>{selectedProperty?.scores[1].toFixed(2)} &nbsp;/&nbsp;10</span>
                           </h2>
                         </div>
 
@@ -1321,13 +1502,17 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
 
                       {/* Market Trends and Local Laws */}
                       <div className={`relative col-span-6 w-full rounded p-4 max-h-[350px] bg-white transition-all shadow-md duration-300 overflow-hidden`}>
-                        <div className='h-fit w-full flex flex-row border-b  items-center justify-start gap-4 '>
-                          <div className='relative flex flex-col gap-1 w-fit bg-white cursor-pointer select-none' onClick={() => { setMarketAndLaws('Local Laws'), setShowMarketTrends(false), setShowLocalLaws(true), handleLocalLawsClick() }}>
-                            <h1 className='font-semibold text-base text-black flex flex-row gap-2 items-center'><ImHammer2 className='text-blue-600' /> {uiConfig?.['local_laws_card_title'] || "Local Laws & Taxes"}</h1>
+                        <div className='h-fit w-full flex flex-row border-b  items-center justify-start gap-8'>
+                          <div className='relative flex flex-col gap-1 w-fit bg-white cursor-pointer select-none' onClick={() => { setMarketAndLaws('Local Laws'), setShowMarketTrends(false), setShowLocalLaws(true),setShowTaxes(false), handleLocalLawsClick() }}>
+                            <h1 className='font-semibold text-base text-black flex flex-row gap-2 items-center'><ImHammer2 className='text-blue-600 font-semibold' /> {uiConfig?.['local_laws_card_title'] || "Local Laws"}</h1>
                             <div className={`${marketAndLaws === 'Local Laws' ? 'bg-blue-500 w-full' : 'bg-transparent w-0'} h-[2px] bg-blue-500 rounded-full transition-width duration-300`}></div>
                           </div>
+                          <div className='relative flex flex-col gap-1 w-fit bg-white cursor-pointer select-none' onClick={() => { setMarketAndLaws('Taxes'), setShowMarketTrends(false), setShowLocalLaws(false),setShowTaxes(true), handleLocalLawsClick() }}>
+                            <h1 className='font-semibold text-base text-black flex flex-row gap-2 items-center'><BsCurrencyExchange className='text-blue-600 text-2xl font-bold' /> {uiConfig?.['taxes_card_title'] || "Taxes"}</h1>
+                            <div className={`${marketAndLaws === 'Taxes' ? 'bg-blue-500 w-full' : 'bg-transparent w-0'} h-[2px] bg-blue-500 rounded-full transition-width duration-300`}></div>
+                          </div>
 
-                          <div className='relative flex flex-col gap-1 w-fit bg-white cursor-pointer select-none' onClick={() => { setMarketAndLaws('Market Trends'), setShowMarketTrends(true), setShowLocalLaws(false), handleLocalLawsClick() }}>
+                          <div className='relative flex flex-col gap-1 w-fit bg-white cursor-pointer select-none' onClick={() => { setMarketAndLaws('Market Trends'), setShowMarketTrends(true), setShowLocalLaws(false),setShowTaxes(false), handleLocalLawsClick() }}>
                             <h1 className='font-semibold text-base text-black flex flex-row gap-2 items-center'><FaChartLine className='text-purple-600' /> {uiConfig?.['market_trends_card_title'] || "Market Trends"}</h1>
                             <div className={`${marketAndLaws === 'Market Trends' ? 'bg-blue-500 w-full' : 'bg-transparent w-0'} h-[2px] bg-blue-500 rounded-full transition-width duration-300`}></div>
                           </div>
@@ -1377,7 +1562,48 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
                               </div>
                             )
                           )}
-
+                          {showtaxes && (
+                            (selectedProperty?.taxes && selectedProperty?.taxes.length > 0) ? (
+                              <div className='w-full p-4 grid grid-cols-2 gap-4'>
+                                {selectedProperty?.taxes && selectedProperty?.taxes.length > 0 && selectedProperty.taxes.map((law, index) => (
+                                  <div className={`relative flex flex-col gap-2 p-4 border-l-4 ${bgMap[index]}`} >
+                                    <h1 className='font-semibold text-md'>{law.title}</h1>
+                                    <p className='text-sm font-normal '>{law.description}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className='w-full p-4 grid grid-cols-2 gap-4'>
+                                <div className='relative flex flex-col gap-2 p-4 border-l-4 border-[#2c53a3] bg-[#2c53a3]/10'>
+                                  <h1 className="font-semibold text-md">GST Act, 2017</h1>
+                                  <ul className="list-disc text-xs marker:text-purple-500 ml-5 mt-1 space-y-1">
+                                    <li>Applies to yarn, fabric, and garments (5%-12%).</li>
+                                   
+                                  </ul>
+                                </div>
+                                <div className='relative flex flex-col gap-2 p-4 border-l-4 border-[#e91e63] bg-[#e91e63]/10'>
+                                  <h1 className='font-semibold text-md'>Income Tax Act, 1961</h1>
+                                  <ul className='list-disc text-xs marker:text-purple-500 ml-5 mt-1 space-y-1'>
+                                    <li>Deductions on power, wages, and technology upgradation.</li>
+                              
+                                  </ul>
+                                </div>
+                                <div className='relative flex flex-col gap-2 p-4 border-l-4 border-[#673AB7] bg-[#673ab7]/10'>
+                                  <h1 className='font-semibold text-md'>Customs Act, 1962</h1>
+                                  <ul className='list-disc text-xs marker:text-purple-500 ml-5 mt-1 space-y-1'>
+                                    <li>On imported machines and raw materials.</li>
+                                 
+                                  </ul>
+                                </div>
+                                <div className='relative flex flex-col gap-2 p-4 border-l-4 border-[#4caf50] bg-[#4caf50]/10'>
+                                  <h1 className='font-semibold text-md'>TDS (Section 194C, 194H)</h1>
+                                  <ul className='list-disc text-xs marker:text-purple-500 ml-5 mt-1 space-y-1'>
+                                    <li>On processing contracts, agent commissions.</li>
+                                  </ul>
+                                </div>
+                              </div>
+                            )
+                          )}
 
                           {showMarketTrends && (
                             <div className='p-2'>
@@ -1430,7 +1656,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
           <div className='absolute top-6 right-6 h-8 w-8 cursor-pointer rounded-full bg-white shadow-md p-2 flex flex-row items-center justify-end z-[345] text-black' onClick={() => { setIncentivesWindow(false), setIncentivesToSend() }}>
             <FaXmark size={28} />
           </div>
-          <Incentiveresult result={incentivesToSend} source="FromScratch" rerender={1} />
+          <Incentiveresult res={incentivesToSend} source="FromScratch" rerender={1} />
         </div>
       )}
       {vendorsWindow && vendorsToSend && (

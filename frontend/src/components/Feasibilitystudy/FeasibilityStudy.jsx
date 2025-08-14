@@ -141,7 +141,7 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
 
             setUploadProgress(100);
             const fileUrl = result.message.file_url;
-            console.log("✅ File uploaded at:", fileUrl);
+            // console.log("✅ File uploaded at:", fileUrl);
 
             // 3. Process file
             setStatus('processing');
@@ -150,10 +150,10 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
                 { file_path: fileUrl }
             );
 
-            console.log("📊 AI Feasibility Result:", analysisResult.message);
+            // console.log("📊 AI Feasibility Result:", analysisResult.message);
 
         } catch (err) {
-            console.error("❌ Upload/Analysis Error:", err);
+            // console.error("❌ Upload/Analysis Error:", err);
             setStatus('error');
             setErrorMessage(err.message || 'An error occurred during processing. Please try again.');
         } finally {
@@ -162,9 +162,17 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
     };
 
     useEffect(() => {
-        console.log("fesibility json", resultJson);
+        // console.log("fesibility json", resultJson);
+        let isValidJsonWithData = false;
 
-        if (resultJson) {
+        try {
+            const parsed = JSON.parse(resultJson);
+            isValidJsonWithData = parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0;
+        } catch (e) {
+            isValidJsonWithData = false;
+        }
+
+        if (isValidJsonWithData) {
             try {
                 const results = JSON.parse(resultJson)
                 const validation = validateResultData(results);
@@ -242,7 +250,7 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
                     // Set hasUnseenReport to true for navbar indicator
                     setHasUnseenReport(true);
                 } catch (parseError) {
-                    console.error("Error parsing unseen report:", parseError);
+                    // console.error("Error parsing unseen report:", parseError);
                     setStatus('idle');
                 }
                 return;
@@ -253,7 +261,7 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
             setHasUnseenReport(false);
 
         } catch (error) {
-            console.error("Error checking existing records:", error);
+            // console.error("Error checking existing records:", error);
             setStatus('idle');
         }
     };
@@ -270,7 +278,7 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
             // Update hasUnseenReport state
             setHasUnseenReport(false);
         } catch (error) {
-            console.error("Error marking report as seen:", error);
+            // console.error("Error marking report as seen:", error);
         }
     };  
 
@@ -303,7 +311,7 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
     };
 
     const handleQuerySelect = (query) => {
-        console.log('This is the query', query)
+        // console.log('This is the query', query)
         if (query) {
             dispatch(addInputtext(query))
             onClose();
@@ -331,7 +339,7 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
                 try {
                     parsedResult = JSON.parse(res.message.result_data);
                 } catch (parseError) {
-                    console.error("❌ JSON Parse Error:", parseError);
+                    // console.error("❌ JSON Parse Error:", parseError);
                     throw new Error("Failed to parse result data. Invalid JSON format.");
                 }
 
@@ -347,13 +355,13 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
                 await markReportAsSeen(data.docname);
 
             } catch (err) {
-                console.error("❌ Error fetching result:", err);
+                // console.error("❌ Error fetching result:", err);
                 setErrorMessage(err.message || "Failed to fetch or process result");
                 setStatus("error");
                 await markReportAsSeen(data.docname);
             }
         } else {
-            console.error("❌ Invalid event data or processing failed:", data);
+            // console.error("❌ Invalid event data or processing failed:", data);
             setErrorMessage(data.message || "Processing failed");
             setStatus("error");
             await markReportAsSeen(data.docname);
@@ -613,9 +621,10 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
                                                                     <span className="text-sm font-medium text-[#2C53A3]">Product:</span>
                                                                     <p className="text-[#0B2152] font-medium mt-1">
                                                                         {resultData.structured_summary.product}
-                                                                        {resultData.structured_summary.product_capacity && (
+                                                                        {resultData.structured_summary.final_product_capacity && (
                                                                             <span className="ml-2">
-                                                                                ({resultData.structured_summary.product_capacity}{resultData.structured_summary.product_unit})
+                                                                                {/* ({resultData.structured_summary.product_capacity}{resultData.structured_summary.product_unit}) */}
+                                                                                {`(${resultData.structured_summary.final_product_capacity})`}
                                                                             </span>
                                                                         )}
                                                                     </p>

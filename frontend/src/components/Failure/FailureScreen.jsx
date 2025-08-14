@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom';
-import { useFrappeGetDocList, useFrappeAuth, useFrappeUpdateDoc } from 'frappe-react-sdk';
+// import { useNavigate } from 'react-router-dom';
+import { useFrappeGetDocList, useFrappeAuth, useFrappeUpdateDoc,useFrappeCreateDoc } from 'frappe-react-sdk';
 import { FaXmark } from 'react-icons/fa6';
 
 const FailureScreen = ({text}) => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
+  const { createDoc } = useFrappeCreateDoc('');
+
+  const createDiagnostic = (errType, logMsg,chatId)=> {
+      let log = ` ${logMsg}`
+      createDoc("AIX Diagnostics Hub", {
+      type: errType,
+      note: log,
+      chat_name: chatId
+      });
+  }
+
 
   const messages = "Oops! Something didn't go as planned. Sorry for the Inconvinience"
 
@@ -65,7 +76,8 @@ const FailureScreen = ({text}) => {
         session_states: []
       });
     } catch (error) {
-      console.error("Error updating session:", error);
+      createDiagnostic("Others", `Something went wrong while clearing the intensions from Failure Screen : ${JSON.stringify(error)}`,chatId)
+      // console.error("Error updating session:", error);
     }
   };
 

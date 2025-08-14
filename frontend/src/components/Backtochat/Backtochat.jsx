@@ -35,7 +35,7 @@ function Backtochat({text}) {
         try {
             await updateDoc("Session", chatId, { progress: [] });
         } catch (error) {
-            console.error("Error deleting child table records:", error);
+            // console.error("Error deleting child table records:", error);
         }
     };
 
@@ -47,7 +47,7 @@ function Backtochat({text}) {
                 session_states: []
             });
         } catch (error) {
-            console.error("Error updating session:", error);
+            // console.error("Error updating session:", error);
         }
     };
 
@@ -60,9 +60,9 @@ function Backtochat({text}) {
             await updateDoc("Session", chatId, {
                 user_intension: "",
             });
-            console.log("Updated Successfully");
+            // console.log("Updated Successfully");
         } catch (err) {
-            console.error("Error Updating:", err);
+            // console.error("Error Updating:", err);
         }
        sessionStorage.removeItem("guest_session_id");
        if (latestChatId && currentUser) {

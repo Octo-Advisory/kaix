@@ -90,15 +90,15 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
         insert_process(chatId,"Preparing Result","Preparing Result","Pending")
         time.sleep(1)   
         update_process(chatId,"Analyzing Your Query","Processing",0)
-        time.sleep(3)
+        time.sleep(2)
         update_process(chatId,"Analyzing Your Query","Complete",1)
         #get Employement status
         update_process(chatId,"Fetching Data","Processing",0)
         Employment_Status = get_employment_status()
-        time.sleep(3)
+        time.sleep(2)
         update_process(chatId,"Fetching Data","Complete",1)
         update_process(chatId,"Analyzing Data","Processing",0)
-        time.sleep(3)
+        time.sleep(2)
         with open("log.txt", "a") as file:
             file.write(f"\n I am here at this scenario DOWN: -> city and state: uushvjuicfgtvjvcv  IF {intention} Check {intention == 'Individual employment status'}")
         if intention == "Individual employment status":
@@ -113,6 +113,8 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                     "Is_Error" : True,
                     "intention" : intention
                 }
+                with open("log2.txt", "a") as file:
+                    file.write(f"\n {intention} No city and state found in ~ {response} ::")
                 return response
             
             elif state and not city:
@@ -126,6 +128,8 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                         "Is_Error" : True,
                         "intention" : intention
                     }
+                    with open("log2.txt", "a") as file:
+                        file.write(f"\n state data empty {intention} ~ {response} ::")
                     return response
                 
                 # Calculate aggregated employment type data
@@ -179,6 +183,8 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                         "Is_Error" : True,
                         "intention" : intention
                     }
+                    with open("log2.txt", "a") as file:
+                        file.write(f"\n {intention} :~ {response} ::")
                     update_process(chatId,"Analyzing Data","Fail",0)
                     return response
                 
@@ -215,7 +221,7 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                     }
                 update_process(chatId,"Analyzing Data","Complete",1)
                 update_process(chatId,"Preparing Result","Processing",0)
-                time.sleep(5)
+                time.sleep(3)
                 update_process(chatId,"Preparing Result","Complete",1)
                 return response
             
@@ -228,6 +234,8 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                         "Is_Error" : True,
                         "intention" : intention
                     }
+                with open("log2.txt", "a") as file:
+                    file.write(f"\n Comparison reqquired at least 2 cities {intention} :~ {response} ::")
                 update_process(chatId,"Analyzing Data","Fail",0)
                 return response
             
@@ -242,6 +250,8 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                         "Is_Error" : True,
                         "intention" : intention
                     }
+                with open("log2.txt", "a") as file:
+                    file.write(f"\n Comparison Citieis must belon to same state {intention} ~ {response} ::")
                 update_process(chatId,"Analyzing Data","Fail",0)
                 return response
             
@@ -268,7 +278,8 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                 # Compute grouped data
                 selected_comparison = selected_data.groupby(['city_name', 'employment_type'])["availability"].sum().unstack()
                 other_comparison = other_data.groupby(['city_name', 'employment_type'])["availability"].sum().unstack()
-
+                with open("log2.txt", "a") as file:
+                    file.write(f"\n Comparison Selected and Other ~ {selected_comparison} ::::: {other_comparison}")
                 # Convert "other" employment types into a single column
                 # other_comparison = other_comparison.to_frame(name="Other Employment Types")
 
@@ -289,11 +300,12 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                     "chart_base64": img_base64,
                     "intention" : intention
                 }
-
+                with open("log2.txt", "a") as file:
+                    file.write(f"\n Comparison Selected full comparison ~ {response} ::")
                 return response
             update_process(chatId,"Analyzing Data","Complete",1)
             update_process(chatId,"Preparing Result","Processing",0)
-            time.sleep(5)
+            time.sleep(3)
             update_process(chatId,"Preparing Result","Complete",1)
             return response
         
@@ -304,9 +316,13 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                         "Is_Error" : True,
                         "intention" : intention
                     }
+            with open("log2.txt", "a") as file:
+                file.write(f"\n Comparison Selected and Other else PArt~ {response} ::")
             update_process(chatId,"Analyzing Data","Fail",0)
             return response
     except Exception as e:
+        with open("log2.txt", "a") as file:
+            file.write(f"\n Comparison Selected and Other Exception~ {e} ::")
         return e
 
 

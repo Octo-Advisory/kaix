@@ -11,13 +11,14 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 const Navbar = () => {
+  const { currentUser, logout } = useFrappeAuth();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showFeasibilityModal, setShowFeasibilityModal] = useState(false);
   const [isOpenSettings, setIsOpenSettings] = useState(false);
   const [hasUnseenReport, setHasUnseenReport] = useState(false);
 
   const navigate = useNavigate();
-  const { currentUser, logout } = useFrappeAuth();
+  
   const { call } = useContext(FrappeContext);
   const { data: userDoc } = useFrappeGetDoc('User', currentUser || '');
 
@@ -52,7 +53,7 @@ const Navbar = () => {
         setHasUnseenReport(false);
       }
     } catch (error) {
-      console.error("Error checking for unseen reports:", error);
+      // console.error("Error checking for unseen reports:", error);
     }
   };
 
@@ -67,12 +68,12 @@ const Navbar = () => {
       sessionStorage.removeItem("guest_session_id")
       navigate('/login');
     } catch (error) {
-      console.error("Logout failed:", error);
+      // console.error("Logout failed:", error);
     }
   };
 
   useFrappeEventListener("feasibility_analysis_done", (data) => {
-    console.log("📡 Received event data:", data);
+    // console.log("📡 Received event data:", data);
     if(showFeasibilityModal) return;
 
     const toastId = toast.success("Feasibility Process is Completed! Check result.", {
@@ -110,7 +111,7 @@ const Navbar = () => {
 
                 {/* Enhanced Red Indicator with better styling */}
                 {hasUnseenReport && (
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-pulse shadow-lg"></span>
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full animate-pulse shadow-lg"></span>
                 )}
 
                 <div className="absolute hidden group-hover:block top-full mt-2 left-0 w-64 bg-white text-gray-800 p-3 rounded-lg shadow-lg z-50 border border-gray-200">

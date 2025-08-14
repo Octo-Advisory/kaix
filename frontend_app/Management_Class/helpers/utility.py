@@ -13,7 +13,8 @@ import ast
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 import configparser
-
+from math import radians, sin, cos, sqrt, atan2
+from geopy.distance import geodesic
 
 # from langchain_openai import ChatOpenAI
 config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
@@ -318,12 +319,12 @@ def generate_query_hints(query_list, input_industry_name):
    You are an intelligent assistant that helps users explore and plan key aspects of setting up an industry in India.
 
    Your task is to:
-   1. Generate 5–6 compact and properly framed follow-up questions based on the user's chat history  
+   1. Generate 6 compact and properly framed follow-up questions based on the user's chat history  
    2. Classify each question into the correct industrial planning module
 
    ---
 
-   📥 [User Query Sessions]:
+   [User Query Sessions]:
    You will be given a list of 5 session-wise query lists:
    • Session 1 – Least recent (oldest)
    • Session 5 – Most recent (latest)
@@ -336,13 +337,13 @@ def generate_query_hints(query_list, input_industry_name):
    Session 5: [ ... ]  
    {chat_history}
 
-   📥 [Fallback Industry Name]:
+   [Fallback Industry Name]:
    Used only when **all five sessions are empty**  
    {industry_name}
 
    ---
 
-   🎯 OBJECTIVE
+   OBJECTIVE
 
    Help the user explore realistic, decision-relevant aspects of setting up an industry such as:
    • Land availability  
@@ -353,7 +354,7 @@ def generate_query_hints(query_list, input_industry_name):
 
    ---
 
-   ✅ PHASE 1: QUERY GENERATION STRATEGY
+   PHASE 1: QUERY GENERATION STRATEGY
 
    1. *RELEVANCE CHECK FIRST (MANDATORY):*
       • Carefully evaluate each query across all five sessions.
@@ -377,7 +378,7 @@ def generate_query_hints(query_list, input_industry_name):
       • If all five sessions are empty, switch to fallback generation using the provided `industry_name`.
       • In fallback mode:
       – Use realistic city names from Gujarat (Ahmedabad, Surat, Vadodara, Rajkot, Bharuch)
-      – Generate 4–5 queries
+      – Generate 6 queries
       – Each query must include:
          ▸ The fallback `industry_name`
          ▸ A specific Gujarat city from the list above
@@ -391,24 +392,25 @@ def generate_query_hints(query_list, input_industry_name):
       – Named schemes or policy references
       → Include and reflect these meaningfully in generated queries.
 
-   7. *GRAMMATICAL FRAMING REQUIREMENT:*
-      • Each generated query **must be a well-formed, natural-sounding question**.
-      • Do **not** return fragment-style queries (e.g., “Vendor access for pharma in Vadodara”).
-      • Examples of valid queries:
-      – “What is the vendor availability for pharmaceutical industry in Vadodara?”
-      – “What are the government incentives for textile units in Rajkot?”
-      – “What labor options exist for toy manufacturing in Anand?”
+   7. *STRICT GOOD QUERY STRUCTURE RULE (MANDATORY):*
+      • Every generated query must **strictly** follow the structure and style of the examples in the "GOOD QUERY STRUCTURE EXAMPLES" section below.
+      • The query must:
+         – Start with a natural question form (e.g., "What is...", "Tell me...", "I want to...", "What are...")
+         – Explicitly include both the industry and the location
+         – Contain exactly one supported topic (land, vendor, labor, incentives, or approvals)
+         – Be grammatically correct, concise, and free of vague location phrases
+      • **Do not** produce fragment-style queries or deviate from the example structure.
 
    ---
 
-   📏 FORMATTING RULES FOR GENERATED QUERIES
+   FORMATTING RULES FOR GENERATED QUERIES
 
    • Each query must be 10–15 words or fewer  
    • Be compact, clear, and grammatically well-formed  
    • Each query must include both an industry and a location  
    • Allowed topics: land, vendor, labor, incentives, or approvals only  
 
-   🚫 DO NOT generate queries that involve:
+   DO NOT generate queries that involve:
    • Price or cost (e.g., land cost, labor cost)  
    • Land allocation process or policy  
    • Raw material quality checks  
@@ -417,7 +419,7 @@ def generate_query_hints(query_list, input_industry_name):
 
    ---
 
-   📦 MODULE DEFINITIONS FOR CLASSIFICATION
+   MODULE DEFINITIONS FOR CLASSIFICATION
 
    Each generated query must be classified into **exactly one** of the following five modules:
 
@@ -443,7 +445,7 @@ def generate_query_hints(query_list, input_industry_name):
 
    ---
 
-   📘 MODULE KEYWORDS (reference only – do not rely solely on these):
+   MODULE KEYWORDS (reference only – do not rely solely on these):
 
    • **Build from Scratch**: build, location, start  
    • **Incentives**: incentive, benefit, subsidy, grant  
@@ -453,7 +455,7 @@ def generate_query_hints(query_list, input_industry_name):
 
    ---
 
-   🧠 INTERNAL PROJECT AND MODULE SCOPE (REFERENCE ONLY)
+   INTERNAL PROJECT AND MODULE SCOPE (REFERENCE ONLY)
 
    — Project Capabilities:
    • Suggest land *availability* based on location and industry  
@@ -469,7 +471,7 @@ def generate_query_hints(query_list, input_industry_name):
    • **Incentives** – government schemes based on location and industry  
    • **Approval** – regulatory requirements and permits required for setup  
 
-   — GOOD QUERY STRUCTURE EXAMPLES:
+   — GOOD QUERY STRUCTURE EXAMPLES (STRICTLY FOLLOW THIS FORMAT):
    • What is the vendor availability for cement industry in Vadodara, Gujarat?  
    • Tell me all the incentives available for pharmaceutical industry in Surat city?  
    • What are the employment options around the Anand city?  
@@ -478,7 +480,7 @@ def generate_query_hints(query_list, input_industry_name):
 
    ---
 
-   🎯 FINAL OUTPUT FORMAT
+   FINAL OUTPUT FORMAT
 
    Return only a valid Python list of dictionaries:
    [
@@ -497,8 +499,6 @@ def generate_query_hints(query_list, input_industry_name):
     input_text = response.content
     results = extract_query_list(input_text) # FINAL OUTPUT TO BE SHOW(will return a list of queries along with their module names)
     return results
-
-
 
 def extract_query_list(text: str):
     """
@@ -636,3 +636,77 @@ def send_realtime_update(doc,method=None):
             },
             user=current_user  # Send only to that user
         )
+
+def haversine(coord1, coord2):
+    
+    R = 6371  # Earth radius in km
+    distance = geodesic(coord1, coord2).kilometers
+    lat1, lon1 = coord1
+    lat2, lon2 = coord2
+
+    # Convert degrees to radians
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+
+    # Differences
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    # Haversine formula
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    return R * c  # in kilometers
+
+@frappe.whitelist()
+def updateNearestConnectivity():
+    surveyNoList = frappe.db.get_list('Survey No', filters=[['name', '!=', "002"]], fields=['*'])
+    doctype_list  = ['Railway Station','Substation','Airport','Seaport']
+    distaceObj = {
+        'RailwayStationDist' :None,
+        'SubstationDist' :None,
+        'AirportDist' :None,
+        'SearportDist' :None
+    }
+    frappe.log_error("Total Property to Update",len(surveyNoList))
+    for surveyNo in surveyNoList:
+        frappe.log_error("Updating Property Started",surveyNo.get("name"))
+        # propertyCoord = surveyNo.get("latitude_longitude").replace(" ","")
+
+        if(surveyNo.get("latitude_longitude") != None and surveyNo.get("latitude_longitude") != "" and surveyNo.get("latitude_longitude") != " " and surveyNo.get("latitude_longitude") != "0.000000000"):
+            propertylat,propertLan = map(float, surveyNo.get("latitude_longitude").replace(" ","").split(',')) 
+            
+            updateValue = False
+            for doctype in doctype_list:
+                data = frappe.get_all(doctype,fields=['*'])
+                lowestDistance = float('inf')  # Start with infinity
+                
+                id = None
+                
+                for item in data:
+                    if(item.get("coordinates")):
+                        lat, lon =  map(float, item.get("coordinates").replace(" ","").split(','))                    
+                        dis = haversine([lat,lon],[propertylat,propertLan])
+                        if dis < lowestDistance:    
+                            id = item.get('name')
+                            lowestDistance = dis
+                            if doctype == "Railway Station":
+                                updateValue = True
+                                distaceObj['RailwayStationDist'] = id
+                            elif doctype == "Substation":
+                                updateValue = True
+                                distaceObj['SubstationDist'] = id
+                            elif doctype == "Airport":
+                                updateValue = True
+                                distaceObj['AirportDist'] = id
+                            else:
+                                updateValue = True
+                                distaceObj['SearportDist'] = id
+            if(updateValue):
+                # get an existing document
+                doc = frappe.get_doc('Survey No', surveyNo.get("name"))
+                doc.nearest_power_source = distaceObj['SubstationDist']
+                doc.nearest_railway_station = distaceObj['RailwayStationDist']
+                doc.nearest_airport = distaceObj['AirportDist']
+                doc.nearest_seaport = distaceObj['SearportDist']
+                doc.save()
+            frappe.log_error("Updating Property Ended",surveyNo.get("name"))

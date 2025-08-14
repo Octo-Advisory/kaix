@@ -100,7 +100,7 @@ def vendor_validation(param):
                 return f'Nothing provided in Industry Info'
             
         def verify_supply():
-            supplies_length = len(supplies)
+            # supplies_length = len(supplies)
             check_supplies = [a for a in supplies if str(a) != "Not Available in list" and a != '']
             if len(check_supplies) <= 0:
                 return 'Didnt got anything for supplies'
@@ -150,7 +150,8 @@ def vendor_validation(param):
                     # return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, industry_log: {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data
                     return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, industry_log: {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data
             else:
-                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':None, 'from_gujarat': False } #change the latitude longitude value to latitude_longidute variable once have data
+                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {industry_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':None, 'from_gujarat': False }  # for now Default lat long are set on validation fail
+
 
        
         def location_and_supply():
@@ -172,10 +173,10 @@ def vendor_validation(param):
                 if pass_to_analytics_location:
                     return {'pass_to_analytics': True, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat }
                 else:
-                    # return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data 
-                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat } #change the latitude longitude value to latitude_longidute variable once have data 
+                    # return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':location_name, 'from_gujarat': from_gujarat }  
+                    return {'pass_to_analytics': False, 'log': f'location_log: {location_log}, supply_log: {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':location_name, 'from_gujarat': from_gujarat } 
             else:
-                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': latitude_longitude, 'location_name':None, 'from_gujarat': False } #change the latitude longitude value to latitude_longidute variable once have data
+                return {'pass_to_analytics': False, 'log': f'Didnt executed location check because {supply_log}, supplies_with_no_vendors: {supplies_with_no_vendors} ', 'latitude_longitude': '21.7051358,72.9958748', 'location_name':None, 'from_gujarat': False } # for now default lat long is set at validation fail
 
         
         def geocode_check():
@@ -231,10 +232,10 @@ def vendor_validation(param):
                             log = geocode[1]
                             return {'pass_to_analytics_module': False, 'log': log, latitude_longitude: None,"location_name":None,  'from_gujarat': False}
                         else:
+                            lat_long = geocode[1]
+                            from_gujarat = geocode[2]
+                            location_name = geocode[3]
                             if len(state_check) == 1:
-                                lat_long = geocode[1]
-                                from_gujarat = geocode[2]
-                                location_name = geocode[3]
                                 updatequery = f"""UPDATE `tabState` SET latitude_longitude = '{lat_long}' where state_name = '{location}'"""
                                 frappe.db.sql(updatequery)
                                 #the above query needs to be executed
@@ -263,10 +264,10 @@ def vendor_validation(param):
                                 log = geocode[1]
                                 return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': None,"location_name":None, 'from_gujarat': False}
                             else:
+                                lat_long = geocode[1]
+                                from_gujarat = geocode[2]
+                                location_name = geocode[3]
                                 if len(city_check) == 1:
-                                    lat_long = geocode[1]
-                                    from_gujarat = geocode[2]
-                                    location_name = geocode[3]
                                     updatequery = f"""UPDATE `tabCity` SET latitude_longitude = '{lat_long}' where city_name = '{location}'"""
                                     frappe.db.sql(updatequery)
                                     #the above query needs to be executed
@@ -294,10 +295,10 @@ def vendor_validation(param):
                                     log = geocode[1]
                                     return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': None,"location_name":None, 'from_gujarat': False}
                                 else:
+                                    lat_long = geocode[1]
+                                    from_gujarat = geocode[2]
+                                    location_name = geocode[3]
                                     if len(area_check) == 1:
-                                        lat_long = geocode[1]
-                                        from_gujarat = geocode[2]
-                                        location_name = geocode[3]
                                         updatequery = f"""UPDATE `tabArea` SET latitude_longitude = '{lat_long}' where area_name = '{location}'"""
                                         frappe.db.sql(updatequery)
                                         #the above query needs to be executed
@@ -335,10 +336,10 @@ def vendor_validation(param):
                             log = geocode[1]
                             return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': None,"location_name":None, 'from_gujarat': False}
                         else:
+                            lat_long = geocode[1]
+                            from_gujarat = geocode[2]
+                            location_name = geocode[3]
                             if len(city_check) == 1:
-                                lat_long = geocode[1]
-                                from_gujarat = geocode[2]
-                                location_name = geocode[3]
                                 updatequery = f"""UPDATE `tabCity` SET latitude_longitude = '{lat_long}' where city_name = '{location}'"""
                                 frappe.db.sql(updatequery)
                                 #the above query needs to be executed
@@ -366,10 +367,10 @@ def vendor_validation(param):
                                 log = geocode[1]
                                 return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': None,"location_name":None, 'from_gujarat': False}
                             else:
+                                lat_long = geocode[1]
+                                from_gujarat = geocode[2]
+                                location_name = geocode[3]
                                 if len(area_check) == 1:
-                                    lat_long = geocode[1]
-                                    from_gujarat = geocode[2]
-                                    location_name = geocode[3]
                                     updatequery = f"""UPDATE `tabArea` SET latitude_longitude = '{lat_long}' where area_name = '{location}'"""
                                     frappe.db.sql(updatequery)
                                     #the above query needs to be executed
@@ -397,10 +398,10 @@ def vendor_validation(param):
                                     log = geocode[1]
                                     return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': None,"location_name":None, 'from_gujarat': False}
                                 else:
+                                    lat_long = geocode[1]
+                                    from_gujarat = geocode[2]
+                                    location_name = geocode[3]
                                     if len(state_check) == 1:
-                                        lat_long = geocode[1]
-                                        from_gujarat = geocode[2]
-                                        location_name = geocode[3]
                                         updatequery = f"""UPDATE `tabState` SET latitude_longitude = '{lat_long}' where state_name = '{location}'"""
                                         frappe.db.sql(updatequery)
                                         #the above query needs to be executed
@@ -438,10 +439,10 @@ def vendor_validation(param):
                             log = geocode[1]
                             return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': None,"location_name":None, 'from_gujarat': False}
                         else:
+                            lat_long = geocode[1]
+                            from_gujarat = geocode[2]
+                            location_name = geocode[3]
                             if len(area_check) == 1:
-                                lat_long = geocode[1]
-                                from_gujarat = geocode[2]
-                                location_name = geocode[3]
                                 updatequery = f"""UPDATE `tabArea` SET latitude_longitude = '{lat_long}' where area_name = '{location}'"""
                                 frappe.db.sql(updatequery)
                                 #the above query needs to be executed
@@ -469,9 +470,10 @@ def vendor_validation(param):
                                 log = geocode[1]
                                 return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': None,"location_name":None, 'from_gujarat': False}
                             else:
+                                lat_long = geocode[1]
+                                from_gujarat = geocode[2]
+                                location_name = geocode[3]
                                 if len(city_check) == 1:
-                                    lat_long = geocode[1]
-                                    from_gujarat = geocode[2]
                                     updatequery = f"""UPDATE `tabCity` SET latitude_longitude = '{lat_long}' where city_name = '{location}'"""
                                     frappe.db.sql(updatequery)
                                     #the above query needs to be executed
@@ -499,8 +501,10 @@ def vendor_validation(param):
                                     log = geocode[1]
                                     return {'pass_to_analytics_module': False, 'log': log, 'latitude_longitude': None,"location_name":None, 'from_gujarat': False}
                                 else:
+                                    lat_long = geocode[1]
+                                    from_gujarat = geocode[2]
+                                    location_name = geocode[3]
                                     if len(state_check) == 1:
-                                        lat_long = geocode[1]
                                         updatequery = f"""UPDATE `tabState` SET latitude_longitude = '{lat_long}' where state_name = '{location}'"""
                                         frappe.db.sql(updatequery)
                                         #the above query needs to be executed

@@ -125,6 +125,7 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
             ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
             OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
         )
+        AND extremity_record = 0
         AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment = '{segment_id}');
         """
         results = fetch_query_results(query)
@@ -143,6 +144,7 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
             ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
             OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
         )
+        AND extremity_record = 0
         AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment IS NULL);
         """
         results = fetch_query_results(query)
@@ -160,6 +162,7 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
             ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
             OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
         )
+        AND extremity_record = 0
         AND (industry = '{industry_id}');
         """
         results = fetch_query_results(query)
@@ -177,7 +180,9 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
         SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
             `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
         FROM `tabIndustry Capacity Rule`
-        WHERE industry = '{industry_id}'
+        WHERE
+        extremity_record = 0
+        AND industry = '{industry_id}'
         """
 
         if sub_sector_id is not None:

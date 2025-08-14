@@ -473,13 +473,18 @@ Markdown formatted and verified content only.
         # Store initial prompt reference
         if raw_prompt_reference is None:
             raw_prompt_reference = generation_prompt_1.format(**llm_input)
-    with open("log2.txt", "a") as file:
-        file.write(f"\n\n Final Markdowns :::::{final_markdowns}")
-    return {
-        "raw_prompt": raw_prompt_reference,
-        "initial_response": raw_responses,
-        "verified_summary": verified_summaries,
+    
+    import json
+
+    data = {
         "final_markdown": final_markdowns
     }
+
+    # Convert to valid JSON string
+    json_string = json.dumps(data, ensure_ascii=False)
+
+    # Now save `json_string` to DB
+
+    return json_string
 
 

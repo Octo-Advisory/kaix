@@ -4,7 +4,7 @@ import { PiCardsThreeBold } from "react-icons/pi";
 import { FiDownload } from "react-icons/fi";
 import { FaRegCircleCheck } from "react-icons/fa6";
 import '../ProgressScreen/ProgressScreen.css';
-import { FrappeContext, useFrappeEventListener, useFrappeGetDocList } from 'frappe-react-sdk';
+import { FrappeContext, useFrappeEventListener,useFrappeCreateDoc, useFrappeGetDocList,useFrappeUpdateDoc } from 'frappe-react-sdk';
 import { useSelector, useDispatch } from 'react-redux';
 import { addAnalyticsResult } from '../../Redux/Store/Featuresilces/analyticsResult';
 import { useNavigate, useParams } from "react-router-dom";
@@ -12,6 +12,7 @@ import LogoLoader from '../Responseloader/LogoLoader';
 import FailureScreen from '../Failure/FailureScreen';
 
 const ProgressScreen = () => {
+  const { createDoc, isLoading, error } = useFrappeCreateDoc('');
   const [steps, setSteps] = useState([
     {
       id: 1,
@@ -87,6 +88,7 @@ const ProgressScreen = () => {
   console.log("aiResponse", aiResponse);
   console.log("confirmationMsg", confirmationMsg);
   const dispatch = useDispatch();
+  const { updateDoc } = useFrappeUpdateDoc()
   const { sessionId } = useParams();
   const [isMounted, setIsMounted] = useState(false);
   
@@ -107,21 +109,32 @@ const ProgressScreen = () => {
 }));
 
   const fetchAnalyticsResponse = async () => {
+    // await clearProgressAndIntention(sessionId)
     try {
-      console.log("chat id in progress", sessionId); 
+      // console.log("chat id in progress", sessionId); 
       const result = await call.get("frontend_app.Management_Class.Analytics_management.Analytics.analytics_module_call", { aiResponse: updatedAiResponse, chatId: sessionId, validationResult: validationResult, selectedOption: selectedOption });
-      console.log("analytics message result", result);
+      // console.log("analytics message result", result);
       setresult(result.message)
       dispatch(addAnalyticsResult(result.message))
     } catch (err) {
-      console.log("error occurred 😂", err);
-      throw err;  // Rethrow the error if you want to catch it in the caller function.
+      let log = `Something went wrong while fetching the Analytics Response for ${JSON.stringify(updatedAiResponse)} ${JSON.stringify(selectedOption)}: ${JSON.stringify(err)}`
+      await createDoc("AIX Diagnostics Hub", {
+      type: "Analytics Error",
+      note: log,
+      session: sessionId,
+      }).then ((res)=>{
+        setLoading(false)
+        setShowfailure(true)
+      });
+      // console.log("error occurred 😂", err);
+      // throw err;  // Rethrow the error if you want to catch it in the caller function.
     }
   };
 
+
   const fetchData = async () => {
     try {
-      console.log("chatId", sessionId);
+      // console.log("chatId", sessionId);
 
       const response = await fetch(`api/resource/Session?fields=["progress.process_name","progress.process_value","progress.name","progress.status","progress.modified"]&filters=[["name","=","${sessionId}"]]&order_by=modified asc`, {
         method: 'GET',
@@ -130,7 +143,7 @@ const ProgressScreen = () => {
           'Content-Type': 'application/json'
         }
       });
-      console.log("response is", response);
+      // console.log("response is", response);
 
       // Check if the response is OK
       if (!response.ok) {
@@ -138,30 +151,59 @@ const ProgressScreen = () => {
       }
 
       const data = await response.json();
-      console.log("data is", data);
+      // console.log("data is", data);
       setMessages(data.data)
 
       // Optionally, store it in your state or handle further logic
     } catch (error) {
-      console.error('Error fetching data:', error); // Handles errors
+      // console.error('Error fetching data:', error); // Handles errors
     }
   }
 
-  useEffect(() => {
-    console.log("ai response is in progress", aiResponse);
-    if (aiResponse && aiResponse.length > 0) {
-      try {
-        fetchAnalyticsResponse(aiResponse[0]);
-      } catch (error) {
-        console.error("An error occurred:", error.message);
-      }
-    } else {
-      console.error("aiResponse is either null or empty");
+  const clearProgressAndIntention = async (chatId) => {
+    try {
+      await updateDoc('Session', chatId, {
+        progress: [],
+      });
+    } catch (error) {
+      // console.error("Error updating session:", error);
     }
+  };
+
+  useEffect(() => {
+    // console.log("ai response is in progress", aiResponse);
+    const analyticsResp = async ()=> {
+      if (aiResponse && aiResponse.length > 0) {
+        try {
+          fetchAnalyticsResponse(aiResponse[0]);
+        } catch (error) {
+          // console.error("An error occurred:", error.message);
+          let log = `Something went wrong while fetching the Analytics Response for ${JSON.stringify(updatedAiResponse)} ${JSON.stringify(selectedOption)}:  ${JSON.stringify(error.message)}`
+          await createDoc("AIX Diagnostics Hub", {
+          type: "Analytics Error",
+          note: log,
+          session: sessionId,
+        });
+          setLoading(true)
+          setShowfailure(true)
+        }
+      } else {
+        // console.error("aiResponse is either null or empty");
+        let log = `Something went wrong while fetching the Analytics Response for ${JSON.stringify(updatedAiResponse)} ${JSON.stringify(selectedOption)}: Ai Response is either null or empty`
+          await createDoc("AIX Diagnostics Hub", {
+          type: "Analytics Error",
+          note: log,
+          session: sessionId,
+        });
+        setLoading(true)
+        setShowfailure(true)
+      }
+    }
+    analyticsResp()
   }, []);
 
   useEffect(() => {
-    console.log("message is", messages);
+    // console.log("message is", messages);
 
     if (messages) {
       const noPending = messages.some((msg) => msg.status == 'Processing')
@@ -191,31 +233,65 @@ const ProgressScreen = () => {
   });
 
   // // Timout will set the failure true if the progress takes more then n amount of time 
+  // useEffect(() => {
+  //   const timeout = setTimeout(() => {
+  //     if(loading) {
+  //       setLoading(false)
+  //     }
+      
+  //     setFailure(true);
+  //     setShowfailure(true)
+  //   }, 30000);
+  //   // Optional: Cleanup on unmount
+  //   return () => clearTimeout(timeout);
+  // }, []);
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setFailure(true);
-      setShowfailure(true)
-    }, 30000);
+  const timeout = setTimeout(async () => {
+    if (loading) {
+      setLoading(false);
+    }
+    let log = `Process Timeout at Progress Screen for ${updatedAiResponse} ${selectedOption}`;
+    await createDoc("AIX Diagnostics Hub", {
+      type: "Process Timeout",
+      note: log,
+      session: sessionId,
+    });
+    setFailure(true);
+    setShowfailure(true);
+  }, 30000);
+  
+  return () => clearTimeout(timeout);
+}, []);
 
-    // Optional: Cleanup on unmount
-    return () => clearTimeout(timeout);
-  }, []);
+useEffect(()=>{
+  const method = async()=>{
+    let log = `Some Error Occured In Analytics Module and it thrown Status Fail `;
+    await createDoc("AIX Diagnostics Hub", {
+      type: "Analytics Error",
+      note: log,
+      session: sessionId,
+    });
+  }
+  if(showfailure) {
+    method()
+  }
+},[showfailure])
 
 
   useFrappeEventListener("progress_update", async (eventData) => {
-  console.log("Event triggered, event data:", eventData);
+  // console.log("Event triggered, event data:", eventData);
   if (!failure) {
-      console.log('Refetching the DATA Again ........')
+      // console.log('Refetching the DATA Again ........')
       await mutate();
   }
 });
 
   useEffect(() => {
-    console.log('now the data is called', data)
+    // console.log('now the data is called', data)
     if(failure) return;
     if (data) {
       setMessages(data)
-      console.log("Updated data after mutate:", data);
+      // console.log("Updated data after mutate:", data);
     }
   }, [data]);
   
@@ -239,6 +315,11 @@ const ProgressScreen = () => {
     });
     setSteps(mergedSteps);
   }, [messages])
+
+
+  // useEffect(()=>{
+  //    console.log(showfailure,'ShoeFailure')
+  // },[showfailure])
 
   // CSS animations
   const styles = `

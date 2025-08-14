@@ -7,17 +7,35 @@ import {
 import DOMPurify from 'dompurify';
 import LogoLoader from '../Responseloader/LogoLoader';
 import { useSelector } from 'react-redux';
-import { FrappeContext, useFrappeGetDoc, useFrappeUpdateDoc } from 'frappe-react-sdk';
+import { FrappeContext, useFrappeGetDoc, useFrappeUpdateDoc,useFrappeCreateDoc } from 'frappe-react-sdk';
 import FailureScreen from '../Failure/FailureScreen';
 import NoResultsFound from '../Failure/NoResultsFound';
 import { AdditionalDetailIcon, ApprovalNameIcon, ApprovalTitleIcon, BuildingIcon, InfoIcon, SearchIcon } from '../../Icons/icon';
 
 function Approvalresult({ result, source, rerender }) {
-
+    const lastChatId = useSelector((state) => state.chat.lastId);
+    const { createDoc } = useFrappeCreateDoc('');
+    const createDiagnostic = async(errType, logMsg,chatId)=> {
+      let log = ` ${logMsg}`
+       createDoc("AIX Diagnostics Hub", {
+      type: errType,
+      note: log,
+      chat_name: chatId
+      });
+    }
     const {call} = useContext(FrappeContext)
     const [tempFailure, setTempFailure] = useState(false)
     const [someError, setSomeError] = useState(false)
-    console.log("result in approvals", result);
+    // console.log("result in approvals", result);
+    if (
+    typeof result !== 'object' || 
+    result === null || 
+    typeof result === 'string'
+  ) {
+    // console.log('Invalid result:', result);
+    // createDiagnostic("Data Error", `Invalid Data was passed that couldn't be rendered due to ${result} IN Approvals`,lastChatId)
+    return <NoResultsFound diagnostics={true} type='Approvals' chatId={lastChatId} data={result} module='Approvals'/>;
+  }
     let approval_data = result["Approval Data"];
     if (typeof approval_data === "string") {
         approval_data = JSON.parse(approval_data);
@@ -27,7 +45,7 @@ function Approvalresult({ result, source, rerender }) {
     const [selectedApproval, setSelectedApproval] = useState(null);
     const [approvalsData, setApprovalsDataData] = useState([]);
     const [loading, setLoading] = useState(true);
-    const lastChatId = useSelector((state) => state.chat.lastId);
+  
     const { updateDoc } = useFrappeUpdateDoc()
     const { data: uiData } = useFrappeGetDoc("UI Configuration", "Approvals")
       const configurations = uiData?.configurations || [];
@@ -147,11 +165,12 @@ function Approvalresult({ result, source, rerender }) {
                     'no_of_approvals': no_of_approvals,
                     'stagewise_no_of_approvals': stageCounts
                 };
-                console.log(updatedResult, 'This are the results after prepared....', updatedResult)
+               
                 await storeResultData(lastChatId, updatedResult, 'Query to Get Approvals')
             }
         } catch (error) {
-            console.error("Error fetching approvals:", error);
+            // console.error("Error fetching approvals:", error);
+            createDiagnostic("Approvals", `Something Went wrong while fetching the approvals ${JSON.stringify(error)} IN Approvals`,lastChatId)
             setSomeError(true)
             setLoading(false);
         }
@@ -171,19 +190,21 @@ function Approvalresult({ result, source, rerender }) {
       'Expect': '' // 👈 Clear problematic header
     }
   });
-      console.log('This is the result we want ot store.... ', result.message)
+      
       return result.message || [];
     } catch (err) {
-      console.error("Error Storing Result json:", err);
+    //   console.error("Error Storing Result json:", err);
+      createDiagnostic("Approvals", `Something went wrong while storing the result json due to ${JSON.stringify(err)} IN Approvals`,lastChatId)
       return []; // Return empty for this batch on error
     }
 }
 
     useEffect(() => {
-        console.log('Entered the new log ...', rerender, result)
+        
         if (rerender === 1 || source === 'FromScratch') {
-            console.log('Entered the OKKKKK', source, result)
+           
             if(!approval_data) {
+                createDiagnostic("Data Error", `Invalid Data was passed that couldn't be rendered due to ${JSON.stringify(approval_data)} in Approvals `,lastChatId)
                 setTempFailure(true)
                 return
             }
@@ -280,7 +301,7 @@ function Approvalresult({ result, source, rerender }) {
                                 </div>
                             </div>
                         </div>
-                        {source === "SolutionScreen" && (
+                        {source === "SolutionScreen" && rerender!==1 &&  (
                             <Backtochat text='Back to Chat' />
                         )}
                     </div>
@@ -344,7 +365,7 @@ function Approvalresult({ result, source, rerender }) {
                 </div>
 
                 <div className="flex flex-1 min-h-0 overflow-hidden bg-white rounded-lg border border-[#B8D1F3]">
-                    <div className="w-1/3 border-r border-[#B8D1F3] flex flex-col">
+                    <div className={`${filteredApprovals.length>0 ? 'w-1/3' : 'w-full items-center justify-center'} border-r border-[#B8D1F3] flex flex-col`}>
                         <div className="overflow-y-auto flex-1 list-view bg-gradient-to-b from-[#E6F0FA]/10 to-transparent">
                             {filteredApprovals.length > 0 ? (
                                 <div className="space-y-2 p-2">
@@ -383,7 +404,7 @@ function Approvalresult({ result, source, rerender }) {
                     </div>
 
                     {selectedApproval && (
-                        <div className="w-2/3 flex flex-col">
+                        <div className={`${filteredApprovals.length >0 ? 'w-2/3' : 'w-0'} flex flex-col`}>
                             <div ref={containerRef} className="overflow-y-auto flex-1 p-6">
                                 <div className="mb-8">
                                     <div className="flex items-center mb-2">
@@ -417,14 +438,14 @@ function Approvalresult({ result, source, rerender }) {
                                             <h4 className="font-medium text-[#2C53A3] mb-2">{uiConfig?.['stage'] || "Stage"}</h4>
                                             <p className="text-[#5A7EC7]">{selectedApproval.stage}</p>
                                         </div>
-                                        <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
-                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiConfig?.['land_type'] || "Land Type"}</h4> {/* changed by jenith on 14/05/25 13:26 */}
+                                        {/* <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
+                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiConfig?.['land_type'] || "Land Type"}</h4> 
                                             <p className="text-[#5A7EC7]">{selectedApproval.land_type}</p>
                                         </div>
                                         <div className="p-4 rounded-lg border border-[#B8D1F3] bg-gradient-to-r from-[#E6F0FA]/10 to-white">
-                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiConfig?.['project_location'] || "Project Location"}</h4> {/* changed by jenith on 14/05/25 13:27 */}
+                                            <h4 className="font-medium text-[#2C53A3] mb-2">{uiConfig?.['project_location'] || "Project Location"}</h4> 
                                             <p className="text-[#5A7EC7]">{selectedApproval.business_location}</p>
-                                        </div>
+                                        </div> */}
                                     </div>
                                 </div>
 

@@ -66,6 +66,7 @@ def run_feasibility_analysis(file_path, result_docname, user):
         frappe.log_error("Feasibility Job Error",frappe.get_traceback())
         doc = frappe.get_doc("Feasibility Report", result_docname)
         doc.status = "Fail"
+        doc.feasibility_title = "Processing Error" #added By Jenith on 6/8/25
         doc.result_data = frappe.as_json({"error": str(e)})
         doc.save(ignore_permissions=True)
         frappe.db.commit()

@@ -1,30 +1,36 @@
 import os
 from dotenv import load_dotenv
 import mimetypes
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from langchain.schema import Document
-from langchain.document_loaders import (
+from langchain_community.document_loaders import (
     PyPDFLoader, Docx2txtLoader, UnstructuredExcelLoader,
     UnstructuredPowerPointLoader, CSVLoader, TextLoader,
-    UnstructuredHTMLLoader, UnstructuredFileLoader
+    UnstructuredHTMLLoader, UnstructuredFileLoader, UnstructuredPowerPointLoader
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import HuggingFaceBgeEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.retrievers import BM25Retriever, EnsembleRetriever
+from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain_groq import ChatGroq
+from langchain.retrievers import EnsembleRetriever
 from langchain.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain.document_transformers import EmbeddingsRedundantFilter, LongContextReorder
+from langchain_community.document_transformers import EmbeddingsRedundantFilter, LongContextReorder
 from langchain.retrievers.document_compressors import CohereRerank
 from langchain.retrievers import ContextualCompressionRetriever
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from transformers import pipeline
+import tiktoken
+from transformers import AutoTokenizer
+import fitz  # PyMuPDF
 from IPython.display import display, Markdown
 import warnings
 import re
 import ast
 import json
+import random
 from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers_creative,llm_maverik
 import configparser
 import frappe
@@ -34,6 +40,26 @@ config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_manage
 config = configparser.ConfigParser()
 config.read(config_file)
 api_key = config['Key']['groq_key']
+
+# TOKEN_THRESHOLD = 25000
+
+# # Load tokenizer (you can keep using BERT or switch to GPT-style for longer docs)
+# tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+# def extract_pdf_text(file_path):
+#     doc = fitz.open(file_path)
+#     full_text = ""
+#     for page in doc:
+#         full_text += page.get_text()
+#     return full_text
+
+# def count_tokens(prompt: str = "", text: str = ""):
+#     combined = prompt + "\n" + text if prompt else text
+#     tokens = tokenizer.encode(combined, add_special_tokens=False)  # No special tokens = no max limit warning
+#     return len(tokens), tokens
+
+# CHUNKS_STORAGE
+CHUNKS_STORAGE = {}
 
 class DocumentProcessor:
     """Handles document transformation pipeline"""
@@ -69,13 +95,13 @@ class AdvancedRAGSystem:
 # "What is the unit(eg:- if time taken for industrial construction is '12 to 30 months' the unit of time is months or if time taken for industrial construction is '4 to 5 years' the unit of time is years, etc) of time taken for industrial construction?Return 'unknown' if unit of time is unclear.",
 
         # Predefined questions for auto-analysis
-        self.predefined_questions = ["Give me the capacity range of the product to be manufactured?",
-                                    "What is the total estimated duration (in months/years) for completing the industrial project described in this document? Extract only the numerical timeframe (e.g., '24 months') and ignore preparatory phases.",  
-                                    "What is the unit(eg:- if time taken for industrial construction is '12 to 30 months' the unit of time is months or if time taken for industrial construction is '4 to 5 years' the unit of time is years, etc) of time taken for industrial construction?",                            
-                                    "Tell me which type of product is to be maufactured by analysing the given context?",
+        self.predefined_questions = ["Give me the capacity range of the product to be manufactured(include exact unit of the product mentioned in the context)?",
+                                    "What is the estimated production capacity or quantity described?",  
+                                    "What is the unit of time associated with the stated production capacity?",
+                                    "Tell me which type of product is to be manufactured by analysing the given context?",
                                     "Can you tell me the main-industry to which the document belongs to?",
                                     "Can you tell me the sub-sector to which the document belongs to?",
-                                    "Tell me specific 'AREA' or 'CITY' or 'STATE' from the document in which industry is planning to be built?",
+                                    "Tell me specific 'area' or 'city' or 'state' from the document in which industry is planning to be built?",
                                     "Tell me all the 'SUPPLIES' and 'EQUIPMENTS' required for the product which is planned to be built in the industry?"]
         # "What is the capacity unit of the product to  be manufactured?"
     def load_document(self, file_path: str) -> List[Document]:
@@ -101,6 +127,8 @@ class AdvancedRAGSystem:
                 return UnstructuredExcelLoader(file_path).load(), "successful loading"
             elif mime_type == "text/plain" or file_ext == ".txt":
                 return TextLoader(file_path).load(), "successful loading"
+            elif mime_type == "application/vnd.openxmlformats-officedocument.presentationml.presentation" or file_ext == ".pptx":
+                return UnstructuredPowerPointLoader(file_path).load(), "successful loading"
             else:
                 return UnstructuredFileLoader(file_path, mode="elements").load(), "successful loading"
         except Exception as e:
@@ -112,7 +140,7 @@ class AdvancedRAGSystem:
         # First-level chunking
         parent_splitter = RecursiveCharacterTextSplitter(
             chunk_size=2000,  # @@
-            chunk_overlap=200,
+            chunk_overlap=400,
             length_function=len
         )
         
@@ -144,11 +172,11 @@ class AdvancedRAGSystem:
         """Hybrid retrieval system with multiple strategies"""
         # 1. Dense Vector Retriever
         self.vector_store = FAISS.from_documents(docs, self.embedding_model)
-        dense_retriever = self.vector_store.as_retriever(search_kwargs={"k": 5}) # @@
+        dense_retriever = self.vector_store.as_retriever(search_kwargs={"k": 10}) # @@
         
         # 2. Sparse (BM25) Retriever
         bm25_retriever = BM25Retriever.from_documents(docs)
-        bm25_retriever.k = 5
+        bm25_retriever.k = 10
         
         # 3. Multi-Query Retriever
         query_prompt = PromptTemplate(
@@ -492,13 +520,16 @@ class AdvancedRAGSystem:
 
 def extract_time_unit(text: str) -> str:
     """Extracts 'months' or 'years' from text, returns 'unknown' if not found"""
-    text = text.lower()
-    if "month" in text:
-        return "months"
-    elif "year" in text:
-        return "years"
-    elif "days" in text:
-        return "days"
+    text_1 = text.lower()
+
+    if any(word in text_1 for word in ["month", "months", "per month", "monthly"]):
+        return "per month"
+    elif any(word in text_1 for word in ["year", "years", "annually", "pa", "per year", "per annum"]):
+        return "per annum"
+    elif any(word in text_1 for word in ["day", "days", "daily"]):
+        return "per day"
+    elif "quarter" in text_1:
+        return "per quarter"
     return "unknown"
 
 # Function to detect range from the text and calculate mean of the range
@@ -552,7 +583,7 @@ def extracting_unit_from_capacity_range_factor(capacity_range):
         'liters', 'liter',  'ml',
         'Hz', 'kHz', 'MHz', 'GHz',
         '°C', '°F', '%',
-        'bar', 'psi', 'Nm', 'units'
+        'bar', 'psi', 'Nm', 'units', 'MT'
     ]
 
     # Regex pattern: match a number range or single value followed by unit
@@ -625,18 +656,35 @@ def process_feasibility_report(file_path):
             # Replace the elif chain with:
             if question == rag.predefined_questions[0]:  # Capacity range
                 product_and_duration_dict["capacity"] = result['keyword']
+
+                time_unit_0 = extract_time_unit(result['keyword']) 
+                product_and_duration_dict["time_period_3"] = time_unit_0
             # elif question == rag.predefined_questions[1]:  # capacity unit
             #     product_and_duration_dict["capacity unit"] = result['keyword']
+
             elif question == rag.predefined_questions[1]:  # Duration
-                product_and_duration_dict["time period"] = result['keyword'] 
+                product_and_duration_dict["time_period_0"] = result['keyword'] 
                 # unit detection 
-                product_and_duration_dict["time unit"] = extract_time_unit(result['keyword'])       
+
+                print("time_period_1🍞",result['keyword'])
+                time_unit = extract_time_unit(result['keyword']) 
+                product_and_duration_dict["time_period_1"] = time_unit
+
+            elif question == rag.predefined_questions[2]: 
+                print("EXTRACTED TIME UNIT FROM DOCUMENT😊😊😊😊😊😊😊😊😊😊", result['keyword']) 
+                if result["keyword"] != "I don't know" :
+                # if result["keyword"] in ["per month",]
+                    product_and_duration_dict["time_period_2"] = extract_time_unit(result['keyword'])
+
             elif question == rag.predefined_questions[3]:  # product
                 product_and_duration_dict["product"] = result['keyword']  
+
             elif question == rag.predefined_questions[4]:  # Capacity range
                 industrial_dict["main_industry"] = result['keyword']
+
             elif question == rag.predefined_questions[5]:  # capacity unit
                 industrial_dict["sub-sector"] = result['keyword']
+
             elif question == rag.predefined_questions[6]:  # Duration
                 location_dict["area_or_city_or_state"] = result['keyword']       
     
@@ -656,7 +704,7 @@ def process_feasibility_report(file_path):
         supply_dict["equipments"] = equipments 
 
     updated_product_and_duration_dict = cleaning_and_range_cal(product_and_duration_dict)
-    unit_extraction = extracting_unit_from_capacity_range_factor(product_and_duration_dict['capacity'])
+    unit_extraction = extracting_unit_from_capacity_range_factor(product_and_duration_dict['time_period_0'])
     updated_product_and_duration_dict["product_unit"] = unit_extraction
 
     all_dicts = {f'dict_{i}': d for i, d in enumerate([updated_product_and_duration_dict,location_dict,supply_dict,industrial_dict], 1)}
@@ -874,23 +922,32 @@ def display_readable_summary(data):
 
     if product_info or industry_info:
         if product_info.get("product"):
-           
-            final_dict["product"] = product_info["product"]
+           final_dict["product"] = product_info["product"]
         elif industry_info.get("main_industry"):
-           
-            final_dict["main_industry"] = industry_info["main_industry"]
+           final_dict["main_industry"] = industry_info["main_industry"]
         elif industry_info.get("sub-sector"):
-            
             final_dict["sub-sector"] = industry_info["sub-sector"]
 
-        if product_info.get("capacity"):
-            final_dict["product_capacity"] = product_info["capacity"]
-        if product_info.get("product_unit"):    
-            final_dict["product_unit"] = product_info["product_unit"]
-        if product_info.get("time period"):    
-            final_dict["time period"] = product_info["time period"]
-        if product_info.get("time unit"):    
-            final_dict["time unit"] = product_info["time unit"]
+        if product_info.get("time_period_0") and product_info.get("time_period_2"):
+            # final_dict["product_capacity"] = product_info["capacity"]
+            # final_dict["product_capacity_1"] = product_info["time period_0"]
+            time_unit = extract_time_unit(product_info["time_period_0"])
+            if time_unit == "unknown":
+                pre_capacity = product_info["time_period_0"] + " " + product_info["time_period_2"]
+                final_dict["final_product_capacity"] = pre_capacity
+            elif time_unit != "unknown":
+                final_dict["final_product_capacity"] = product_info["time_period_0"]
+        elif product_info.get("capacity") and product_info.get("time_period_3"):
+            time_unit_0 = extract_time_unit(product_info["capacity"])
+            if time_unit_0 == "unknown":
+                pre_capacity = product_info["capacity"] + " " + product_info["time_period_3"]
+                final_dict["final_product_capacity"] = pre_capacity
+            elif time_unit_0 != "unknown":
+                final_dict["final_product_capacity"] = product_info["capacity"]
+        elif product_info.get("time_period_0"):
+            final_dict["final_product_capacity"] = product_info["time_period_0"]
+        elif product_info.get("capacity"):
+            final_dict["final_product_capacity"] = product_info["capacity"]
 
     if location_info:
         final_dict["Location"] = location_info["area_or_city_or_state"]
@@ -909,8 +966,43 @@ def display_readable_summary(data):
   
     return final_dict
 
-def relevant_document_or_not(file_path, llm_model=llm_70b_vers_creative):
+# def batch_check_relevance_llm(chunks: List[str], llm) -> List[bool]:
+def batch_check_relevance_llm(chunks: List[str], prompt_template, llm) -> Tuple[List[bool], List[int]]:
+    prompts = [
+        [
+            SystemMessage(content="You are a smart assistant that checks if PDF content is relevant to industrial setup feasibility."),
+            HumanMessage(content=prompt_template.format(pdf_text=chunk.strip()[:3000]))
+        ]
+        for chunk in chunks
+    ]
+
+    results = []
+    tokens = []
+    for message in prompts:
+        try:
+            response = llm.invoke(message)
+            print("RESPONSE", response)
+            token_count = response.response_metadata["token_usage"]["total_tokens"]
+            tokens.append(token_count)
+            answer = response.content.strip().lower()
+            print("answer", answer)
+            if "relevant pdf" in answer and "irrelevant" not in answer:
+                results.append(True)
+            elif "irrelevant pdf" in answer:
+                results.append(False)
+            else:
+                results.append(False)  # default to irrelevant if LLM gives unexpected output
+
+        except Exception as e:
+            print("Groq Chat error:", e)
+            results.append(False)
+    print(results)
+    print(sum(tokens))
+    return results, sum(tokens)
+
+def relevant_document_or_not(file_path: str, fallback_sample_size: int = 17, llm_model=llm_70b_vers_creative):
     for_document_text = AdvancedRAGSystem()
+    # token_threshold = 24000
 
     llm = llm_70b_vers_creative
     prompt_template = """
@@ -988,20 +1080,42 @@ def relevant_document_or_not(file_path, llm_model=llm_70b_vers_creative):
                 return document_text
                 
         
+        tokens_2 = {}
+
         # Combine all pages into one string
         doc_content = "\n\n".join([doc.page_content for doc in document_text])
-        
-        # construct the chain
-        # chain = RELEVANCE_CHECK_PROMPT | for_document_text.llm | StrOutputParser()
-        print("is it okay")
-        formatted_prompt = prompt_template.format(
-        pdf_text=doc_content
-        )
 
-        response = llm.invoke(formatted_prompt)
-        print("response",response)
-        print(response.content)
-        return response.content
+        # Chunk the text
+        splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=200)
+        chunks = splitter.split_text(doc_content)
+
+        # Random Sampling
+        sampled_chunks = random.sample(chunks, min(fallback_sample_size, len(chunks)))
+
+        # Batched LLM voting
+        relevance_flags_sampled, tokens = batch_check_relevance_llm(chunks=sampled_chunks, 
+                                                                    llm=for_document_text.llm, 
+                                                                    prompt_template=prompt_template)
+        relevance_ratio = sum(relevance_flags_sampled) / len(relevance_flags_sampled)
+        final_decision = "Relevant PDF" if relevance_ratio >= 0.6 else "Irrelevant PDF"
+        tokens_2["RANDOM SAMPLING TOKENS"] = tokens
+
+        # Token count
+        total_token_count = tokens
+
+        # Return result
+        final_result =  {
+            "final_decision": final_decision,
+            "decision_source": "LLM-random-vote",
+            "chunks_evaluated": len(sampled_chunks),
+            "chunks": sampled_chunks,
+            "fallback_used": True,
+            "confidence": round(relevance_ratio, 2),
+            "token_count": total_token_count,
+            "relevance_flags_sampled": relevance_flags_sampled
+        }
+        print("FINAL_RESULT👇👇👇👇👇👇👇", final_result, "👇👇👇👇👇👇👇")
+        return final_result
 
         # run the chain
         # response = chain.invoke({"pdf_text": doc_content})
@@ -1014,12 +1128,18 @@ def relevant_document_or_not(file_path, llm_model=llm_70b_vers_creative):
         return "Error loading PDF"
 
 def final_call(file_path):
-    relevance_or_not = relevant_document_or_not(file_path,llm_model=llm_70b_vers_creative)
+    relevance_or_not = relevant_document_or_not(file_path)
 
-    if relevance_or_not.lower() == "irrelevant pdf":
+    if isinstance(relevance_or_not, dict):
+        relevance_check = relevance_or_not["final_decision"]
+        token_count = relevance_or_not["final_decision"]
+        relevance_flags_sampled = relevance_or_not["relevance_flags_sampled"] 
+
+    # if relevance_or_not.lower() == "irrelevant pdf":
+    if relevance_check.lower() == "irrelevant pdf":
         return {}, "", []
     
-    elif relevance_or_not.lower() == "relevant pdf":
+    elif relevance_check.lower() == "relevant pdf":
         a, b, c= process_feasibility_report(file_path)
         print("a",a)
         print("b",b)
@@ -1046,12 +1166,12 @@ def final_call(file_path):
 
             return result, display_statement, uniques_list_of_queries
         
-    elif relevance_or_not == f"Error loading {file_path}: File has not been decrypted":
+    elif relevance_check == f"Error loading {file_path}: File has not been decrypted":
         error_message_for_password_protected_pdf = f"Error loading {file_path}: File has not been decrypted"
         return {}, error_message_for_password_protected_pdf,  []
         
     else:
-        return {}, relevance_or_not, []
+        return {}, relevance_check, []
 
 def extract_query_list(message):
     try:
@@ -1230,30 +1350,13 @@ def query_classification(file_path, llm_model=llm_maverik, temperature=0.5):
         "summary_display_statement": None,
         "classified_queries": None,
         "feasibility_title": None,
-        "error_message": None,
-        "user_friendly_error_message": "The uploaded document does not contain any valid information required for feasibility analysis. Please ensure the document includes relevant industry or project details.",
+        "error_message": """⚠️ The uploaded document does not contain relevant industrial setup information.
+                            Please upload a feasibility report with project details, land, labor, vendors, or approvals.""",
         "relevance": "irrelevant document"
         }
         return final_json_0
-        # return empty_json
 
-    elif doc_info == {} and questions_list == [] and questions_statement == f"Error loading {file_path}: File has not been decrypted":
-        print("password")
-        # error_message = f"Error loading {file_path}: File has not been decrypted"
-        error_message = questions_statement
-        final_json_0 = {
-        "structured_summary": empty_json, 
-        "user_comaptible_structured_summary": None,
-        "summary_display_statement": None,
-        "classified_queries": None,
-        "feasibility_title": None,
-        "error_message": error_message,
-        "user_friendly_error_message": "The uploaded document is password-protected and could not be read. Please upload an unprotected version of the file to proceed with feasibility analysis.",
-        "relevance": "irrelevant document"
-        }
 
-        return final_json_0
-    
     elif doc_info == {} and questions_list == [] and (questions_statement != f"Error loading {file_path}: File has not been decrypted" and questions_statement != ""):
         print("another_error")
         error_message = questions_statement
@@ -1267,7 +1370,7 @@ def query_classification(file_path, llm_model=llm_maverik, temperature=0.5):
         "user_friendly_error_message": "The document could not be processed due to a technical issue. Please check if the file is corrupted or in an unsupported format, and try uploading again.",
         "relevance": "irrelevant document"
         }
-
+ 
         return final_json_0
 
     else:
@@ -1283,11 +1386,20 @@ def query_classification(file_path, llm_model=llm_maverik, temperature=0.5):
         )
 
         response = llm.invoke(formatted_prompt)
+        # response, token_info = llm.invoke(formatted_prompt, return_token_count=True)
+        # print("🔢 Token usage (query_classification):", token_info)
+
+        print("response",response)
         # str_response = str(response)
         str_response = response.content
+        print("str_response",str_response)
         # Look for the list between triple backticks (```python\n ... \n```)
 
         response_1 = llm.invoke(formatted_prompt_1)
+        # response_1, token_info = llm.invoke(formatted_prompt_1, return_token_count=True)
+        # print("🔢 Token usage (title_generation_prompt):", token_info)
+
+        print("title for feasibility", response_1)
 
         extracting_query = extract_query_list(str_response)
         print("etracting_query",extracting_query)
@@ -1299,7 +1411,6 @@ def query_classification(file_path, llm_model=llm_maverik, temperature=0.5):
         "classified_queries": extracting_query,
         "feasibility_title": response_1.content,
         "error_message": None,
-        "user_friendly_error_message": None,
         "relevance": "relevant document"
         }
         return final_json_0

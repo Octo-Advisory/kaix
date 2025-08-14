@@ -20,7 +20,7 @@ import { FiX } from 'react-icons/fi';
 import { FiTrash2 } from "react-icons/fi";
 import { TiMessages } from "react-icons/ti";
 
-const SideBar = ({ setSideBar, sideBar }) => {
+const SideBar = ({ setSideBar, sideBar,newMessageSent, setNewMessageSent }) => {
     const { currentUser } = useFrappeAuth();
     const navigate = useNavigate()
     const [searchContainerOpen, setSearchContainerOpen] = useState(false)
@@ -40,6 +40,7 @@ const SideBar = ({ setSideBar, sideBar }) => {
     const [openDeleteModal, setOpenDeleteModal] = useState(false)
     const [openDeleteModalId, setOpenDeleteModalId] = useState(false)
     const { sessionId } = useParams();
+    
 
     const handleDelete = async () => {
         try {
@@ -53,13 +54,14 @@ const SideBar = ({ setSideBar, sideBar }) => {
             if (response) return;
 
         } catch (error) {
-            console.log("error occured while deleting", error);
+            // console.log("error occured while deleting", error);
 
         }
 
 
     }
 
+    // console.log(sessionId, 'This is the sesssion id fetched from URL')
     // Close dropdown on outside click
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -160,7 +162,7 @@ const SideBar = ({ setSideBar, sideBar }) => {
                         });
                         return fullDoc.message;
                     } catch (err) {
-                        console.error("Error fetching full report:", err);
+                        // console.error("Error fetching full report:", err);
                         return null;
                     }
                 })
@@ -168,9 +170,9 @@ const SideBar = ({ setSideBar, sideBar }) => {
 
             const validReports = fullReports.filter((r) => r !== null);
             setReports(validReports);
-            console.log(validReports, 'This are the Reports')
+            // console.log(validReports, 'This are the Reports')
         } catch (err) {
-            console.error("Error fetching reports:", err);
+            // console.error("Error fetching reports:", err);
         } finally {
             setLoading(false);
         }
@@ -188,13 +190,54 @@ const SideBar = ({ setSideBar, sideBar }) => {
     });
 
 
-    useEffect(() => {
-        if (data) {
+    // useEffect(() => {
+    //     if (data) {
 
-            const formattedHistory = groupMessagesByDate(data);
-            setHistory(formattedHistory);
+    //         const formattedHistory = groupMessagesByDate(data);
+    //         setHistory(formattedHistory);
+    //     }
+    // }, [data, sessionId]);
+
+    useEffect(() => {
+    const refreshHistory = async () => {
+        if (sessionId) {
+
+            const firstCall = await mutate()
+            if(firstCall) {
+                const formatted = groupMessagesByDate(firstCall);
+                    setHistory(formatted);
+            }
+            
+        } else if (data) {
+            // Use current data directly
+            const formatted = groupMessagesByDate(data);
+            setHistory(formatted);
         }
-    }, [data]);
+    };
+
+    refreshHistory();
+}, [data, sessionId]);
+
+
+useEffect(() => {
+    const updateSideBar = async ()=>  {
+        if (newMessageSent) {
+        //   console.log("🔄 Sidebar update triggered due to new message title");
+    
+          // Your custom logic here (e.g., refresh contacts, highlight active, fetch stats)
+          // Example:
+          const firstCall = await mutate()
+                if(firstCall) {
+                    const formatted = groupMessagesByDate(firstCall);
+                    setHistory(formatted);
+                }
+    
+          // Reset the trigger so it doesn’t keep firing
+          setNewMessageSent(false);
+        }
+    }
+    updateSideBar()
+  }, [newMessageSent]);
 
     // const groupMessagesByDate = (sessions) => {
     //     const today = new Date();
@@ -236,29 +279,36 @@ const SideBar = ({ setSideBar, sideBar }) => {
             { time: 'Previous', messages: [] },
         ];
 
-        sessions.forEach(session => {
-            const sessionDate = new Date(session.creation);
+        // 1. Find the earliest session
+let earliestSession = sessions.reduce((earliest, current) => {
+    return new Date(current.creation) < new Date(earliest.creation) ? current : earliest;
+}, sessions[0]);
 
-            if (sessionDate.toDateString() === today.toDateString()) {
-                groupedHistory[0].messages.push({
-                    id: session.name,
-                    text: session.name,
-                    title: session.title,
-                    date: session.modified,
-                    intension: session.user_intension
-                });
-            } else {
-                groupedHistory[1].messages.push({
-                    id: session.name,
-                    text: session.name,
-                    title: session.title,
-                    date: session.modified,
-                    intension: session.user_intension
+// 2. Filter out the earliest session
+let remainingSessions = sessions.filter(session => session.name !== earliestSession.name);
 
-                });
-            }
+// 3. Now group the rest by today's date
+remainingSessions.forEach(session => {
+    const sessionDate = new Date(session.creation);
+
+    if (sessionDate.toDateString() === today.toDateString()) {
+        groupedHistory[0].messages.push({
+            id: session.name,
+            text: session.name,
+            title: session.title,
+            date: session.modified,
+            intension: session.user_intension
         });
-
+    } else {
+        groupedHistory[1].messages.push({
+            id: session.name,
+            text: session.name,
+            title: session.title,
+            date: session.modified,
+            intension: session.user_intension
+        });
+    }
+});
         return groupedHistory;
     };
 
@@ -310,7 +360,7 @@ const SideBar = ({ setSideBar, sideBar }) => {
     // }
 
     const createNewChat = () => {
-        console.log("clicked but not working")
+        // console.log("clicked but not working")
         navigate('/chat', { replace: true });
     }
 
@@ -329,6 +379,15 @@ const SideBar = ({ setSideBar, sideBar }) => {
         return `${month}-${day}-${year}`;
     };
 
+    const [activeChat, setActiveChat] = useState()
+    // useEffect(()=>{
+    //     if(activeChat) {
+    //         document.title = activeChat
+    //     }
+    //     else {
+    //         document.title = 'MarsAIX'
+    //     }    
+    // },[[activeChat]])
     const [hovered, setHovered] = useState(false)
 
     return (
@@ -483,9 +542,12 @@ const SideBar = ({ setSideBar, sideBar }) => {
                                     return (
                                         <div key={messageKey} className="relative group" ref={el => (dropdownRefs.current[messageKey] = el)}>
                                             <div
-                                                className="flex items-center justify-between p-2 rounded-lg hover:bg-[#41b655] hover:bg-opacity-20 transition-colors cursor-pointer"
-                                                onClick={() =>
-                                                    navigate(`/chat/${message.text}`, { replace: true })
+                                                className={`flex items-center justify-between p-2 rounded-lg ${message.id === sessionId ? 'bg-[#41b655] bg-opacity-20' : 'bg-transparent'} hover:bg-[#41b655] hover:bg-opacity-20 transition-colors cursor-pointer`}
+                                                onClick={() =>{
+                                                    navigate(`/chat/${message.text}`, { replace: true }),
+                                                    setActiveChat(message.title)
+                                                    // setChatLoader(true)
+                                                }
                                                 }
                                             >
                                                 <p
@@ -607,7 +669,7 @@ const ChatListModal = ({ isOpen, onClose, chats, reportName }) => {
                             title: fullDoc.message.title
                         };
                     } catch (err) {
-                        console.error("Error fetching the title:", err);
+                        // console.error("Error fetching the title:", err);
                         return {
                             ...tempChat,
                             title: "New Chat"

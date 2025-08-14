@@ -3,7 +3,7 @@ import json
 from typing import List, Dict, Tuple, Union
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
-from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers, llm_70b_vers_creative,extract_location_from_query,extract_comparison_locations
+from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers, llm_70b_vers_creative,extract_location_from_query,extract_comparison_locations, LOCATION_NOT_AVAILABLE_MSG
 from langchain.schema import HumanMessage, AIMessage
 import pandas as pd
 import frappe
@@ -742,7 +742,8 @@ def handle_employment_query(
             "Validation Data": None,
             "User Intention": user_intention,
             "KEYWORDS": None,
-            "options": None
+            "options": None,
+            "Trigger_Lead_Generation":False
         }
         return response
     else:
@@ -776,13 +777,14 @@ def handle_employment_query(
 
                 if area == "Not Available in List":
                     response = {
-                        "Ai_response": "Not Available in List",
+                        "Ai_response": LOCATION_NOT_AVAILABLE_MSG,
                         "Is_confirmation" : None,
                         "Extracted Data": classification_data_to_send,
                         "Validation Data": validated_data_to_send,
                         "User Intention": user_intention,
                         "KEYWORDS": keyword_dict["KEYWORDS"],
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
                 
@@ -820,18 +822,20 @@ def handle_employment_query(
                         "User Intention": user_intention,
                         "KEYWORDS": keyword_dict["KEYWORDS"],
                         "options": confirmation_buttons,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
 
                 else:
                     response = {
-                        "Ai_response": "Not Available in List",
+                        "Ai_response": LOCATION_NOT_AVAILABLE_MSG,
                         "Is_confirmation" : None,
                         "Extracted Data": None,
                         "Validation Data": None,
                         "User Intention": user_intention,
                         "KEYWORDS": keyword_dict["KEYWORDS"],
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
 
@@ -844,13 +848,14 @@ def handle_employment_query(
                 # logging.info(f"state_to_city_mapping_val_list {state_to_city_mapping_val_list} and city {city}")
                 if city == "Not Available in List":
                     response = {
-                        "Ai_response": "Not Available in List",
+                        "Ai_response": LOCATION_NOT_AVAILABLE_MSG,
                         "Is_confirmation" : None,
                         "Extracted Data": classification_data_to_send,
                         "Validation Data": validated_data_to_send,
                         "User Intention": user_intention,
                         "KEYWORDS": keyword_dict["KEYWORDS"],
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
 
@@ -886,19 +891,21 @@ def handle_employment_query(
                         "Validation Data": validated_data_to_send,
                         "User Intention": user_intention,
                         "KEYWORDS": keyword_dict["KEYWORDS"], 
-                        "options": confirmation_buttons
+                        "options": confirmation_buttons,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
             
                 else:
                     response = {
-                        "Ai_response": "Not Available in List",
+                        "Ai_response": LOCATION_NOT_AVAILABLE_MSG,
                         "Is_confirmation" : None,
                         "Extracted Data": None,
                         "Validation Data": None,
                         "User Intention": user_intention,
                         "KEYWORDS": keyword_dict["KEYWORDS"],
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
 
@@ -907,13 +914,14 @@ def handle_employment_query(
             if state != "None":
                 if state == "Not Available in List":
                     response = {
-                        "Ai_response": "Not Available in List",
+                        "Ai_response": LOCATION_NOT_AVAILABLE_MSG,
                         "Is_confirmation" : None,
                         "Extracted Data": classification_data_to_send,
                         "Validation Data": validated_data_to_send,
                         "User Intention": user_intention,
                         "KEYWORDS": keyword_dict["KEYWORDS"],
-                        "options": None
+                        "options": None,
+                        "Trigger_Lead_Generation":True
                     }
                     return response
 
@@ -943,7 +951,8 @@ def handle_employment_query(
                         "Validation Data": validated_data_to_send,
                         "User Intention": user_intention,
                         "KEYWORDS": keyword_dict["KEYWORDS"],
-                        "options": confirmation_buttons
+                        "options": confirmation_buttons,
+                        "Trigger_Lead_Generation":False
                     }
                     return response
 
@@ -959,7 +968,8 @@ def handle_employment_query(
                     "Validation Data": None,
                     "User Intention": user_intention,
                     "KEYWORDS": keyword_dict["KEYWORDS"],
-                    "options": None
+                    "options": None,
+                    "Trigger_Lead_Generation":False
                 }
                 return response
             
@@ -982,7 +992,8 @@ def handle_employment_query(
                     "Validation Data": None,
                     "User Intention": user_intention,
                     "KEYWORDS": keyword_dict["KEYWORDS"],
-                    "options": None
+                    "options": None,
+                    "Trigger_Lead_Generation":False
                 }
                 return response
             
@@ -1030,7 +1041,8 @@ def handle_employment_query(
                     "Validation Data": validated_data_to_send,
                     "User Intention": user_intention,
                     "KEYWORDS": keyword_dict["KEYWORDS"],
-                    "options": confirmation_buttons
+                    "options": confirmation_buttons,
+                    "Trigger_Lead_Generation":False
                 }
                 return response
         
@@ -1044,7 +1056,8 @@ def handle_employment_query(
                     "Validation Data": None,
                     "User Intention": user_intention,
                     "KEYWORDS": keyword_dict["KEYWORDS"],
-                    "options": None
+                    "options": None,
+                    "Trigger_Lead_Generation":False
                 }
             return response
     

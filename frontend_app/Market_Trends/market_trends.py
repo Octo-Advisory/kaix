@@ -99,6 +99,8 @@ def get_market_trends(query,
         # elif deepdown_industry_info.lower() == "pan state" and deepdown_location_info.lower() == "segment":
         #     query = f"market trends for {segment} in {sub_sector} within the {main_industry} industry in {state} for 2024-2025" ##asd 2
     try:
+        # abc = None
+        # cde = abc["ABC"]
         logger.info("Checking cache for query: %s", query)
 
         # Initialize LLM
@@ -206,8 +208,11 @@ def get_market_trends(query,
             logger.info("Using fallback data scope: %s", "state" if state.lower() in output.lower() else "India")
         
         logger.info("Raw LLM output length: %d characters", len(output))
-        return output
+        # return output
+        return {"success": True, "data": output}
+
     
     except Exception as e:
         logger.error("Error in get_market_trends: %s", str(e))
-        return f"Error fetching market trends: {str(e)}"
+        # return f"Error fetching market trends: {str(e)}"
+        return {"success": False, "data": None,"error": f"Error fetching market trends: {str(e)}"}

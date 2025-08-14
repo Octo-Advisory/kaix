@@ -3,9 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { FrappeProvider } from 'frappe-react-sdk'
-import { store } from './Redux/Store/store.js'
+import { store,persistor } from './Redux/Store/store.js'
 import { Provider } from 'react-redux';
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary.jsx'
+import { PersistGate } from 'redux-persist/integration/react'
 
 
 const getSiteName = () => {
@@ -23,9 +24,11 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <FrappeProvider socketPort={import.meta.env.VITE_SOCKET_PORT} siteName={getSiteName()}>
       <Provider store={store}>
-        {/* <ErrorBoundary> */}
+        <PersistGate loading={null} persistor={persistor}>
+          <ErrorBoundary>
           <App />
-        {/* </ErrorBoundary> */}
+          </ErrorBoundary>
+        </PersistGate>
       </Provider>
     </FrappeProvider>
   </StrictMode>
