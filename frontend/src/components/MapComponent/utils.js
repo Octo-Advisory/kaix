@@ -96,7 +96,7 @@ export const getCurvedLine = (start, end, curvature = 0.4, numPoints = 150) => {
   return curve;
 }
 export const addInfoPopup = (mapboxgl,map, marker, name) => {
-  console.log("Map: ", map);
+  // console.log("Map: ", map);
   // Create a popup but don't add it yet
   const popup = new mapboxgl.Popup({
     closeButton: false,
@@ -104,8 +104,8 @@ export const addInfoPopup = (mapboxgl,map, marker, name) => {
     offset: 25,
     className: '' // Add a class for custom styling if needed
   }).setText(name);
-  console.log("Marker: ", marker);
-  console.log("Popup: ", popup);
+  // console.log("Marker: ", marker);
+  // console.log("Popup: ", popup);
   
   // Mouse enter event
   marker.getElement().addEventListener('mouseenter', () => {

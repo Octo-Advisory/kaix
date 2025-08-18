@@ -32,7 +32,7 @@ function Chatscreen() {
   const { currentUser } = useFrappeAuth();
   const { data: userDoc } = useFrappeGetDoc('User', currentUser || '');
   const { data: marsConf} = useFrappeGetDoc('Mars Configurations', 'Mars Configurations');
-  // console.log("Mars Configurations are",marsConf);
+  
   
   const [message, setMessage] = useState('');
   const dispatch = useDispatch();
@@ -192,7 +192,7 @@ function Chatscreen() {
       return result.message;  // Return the result so that the calling function gets it.
     } catch (err) {
         createDiagnostic("Others", `Something went wrong while calling the AI module in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
-      // console.log("error occurred 😂", err);
+      // console.log("error occurred ", err);
       // throw err;  // Rethrow the error if you want to catch it in the caller function.
     }
   };
@@ -224,7 +224,7 @@ function Chatscreen() {
       await createDoc("Chat history", chatDoc);
     } catch (error) {
       createDiagnostic("Others", `Something went wrong while creating a chat history record for ${JSON.stringify(chatDoc)} in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
-      // console.error('Error saving to child table:', error);
+    
     }
   };
 
@@ -234,11 +234,11 @@ function Chatscreen() {
         aiResponse: aiResponse,
         user_intension: user_intension
       });
-      console.log("validation result", result);
+      // console.log("validation result", result);
       return result.message
     } catch (error) {
       createDiagnostic("Others", `Something went wrong while calling validation for ${JSON.stringify(aiResponse)} ${JSON.stringify(user_intension)} in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
-      // console.log("error 🤣", error);
+    
     }
   }
 
@@ -322,7 +322,7 @@ function Chatscreen() {
       setSessionLoading(session, true);
 
       const res = await hanldeValidation();
-      console.log("validation result from chatscreen", res);
+      // console.log("validation result from chatscreen", res);
 
       let pass = false, log = null;
 
@@ -480,7 +480,7 @@ function Chatscreen() {
         }
 
       }
-      // console.log("come here !!!!!",currentSession,session)
+     
       // STEP 1: Save user's message with idx
       const idx = chatHistory.length + 1;
       const chatEntry = await createDoc("Chat history", {
@@ -505,7 +505,7 @@ function Chatscreen() {
       // STEP 2: Get AI response
       const resp = await fetchAIResponse(userMessage, "", currentSession);
       setAiResponses(resp)
-      console.log("ai response", resp)
+      // console.log("ai response", resp)
       const aiMsg = resp.Ai_response === "Not Available in List" ? noResultMsg : resp.Ai_response 
       const aiResponse = aiMsg;
       
@@ -549,7 +549,7 @@ function Chatscreen() {
       intensionMutate();
       // setLoading(false);
       // setLoadingSession(null)
-      // console.log("kkkkkkkkk",currentSession,session);
+ 
       
       setSessionLoading(currentSession, false);
       setSessionLoading(session, false);
@@ -655,7 +655,6 @@ function Chatscreen() {
     let industry = userDoc?.bio ? userDoc.bio : 'Cement'
   
     let responseHints = await fetchHints(allData, industry)
-
     if (session && responseHints) {
       try {
         const res = await updateDoc("Session", session, {
@@ -736,6 +735,15 @@ function Chatscreen() {
     }
   }
 
+  const { data: defaultHintData } = useFrappeGetDoc("UI Configuration", "ChatScreen")
+      const configurations = defaultHintData?.query_hints || [];
+      const uiHintsConfig = configurations.map((row) => ({
+        title: row.title,
+        subtitle: row.subtitle,
+        hint: row.hint,
+        type: row.type
+      }));
+
   useEffect(() => {
     //default hints
     if (!hintsLoading) {
@@ -748,7 +756,7 @@ function Chatscreen() {
        
           if (Array.isArray(parsed) && parsed.length > 0) {
             let allHaveQuery = parsed.every(item => item.hasOwnProperty('query'));
-            let tryingHints = allHaveQuery ? parsed : iconHints
+            let tryingHints = allHaveQuery ? parsed : uiHintsConfig
             
             foundHints = tryingHints;
             break;
@@ -760,9 +768,9 @@ function Chatscreen() {
       }
       // Set hintsArray in state
    
-      setHintsArray(foundHints || iconHints);
+      setHintsArray(foundHints || uiHintsConfig);
     }
-  }, [hintsLoading, queryHints])
+  }, [hintsLoading, queryHints,defaultHintData])
 
   function getLastMeaningfulMessage(chatArray) {
     if (!Array.isArray(chatArray)) return null;
@@ -790,18 +798,21 @@ function Chatscreen() {
       return result.message;
     } catch (err) {
       createDiagnostic("Others", `Something went wrong while calling generate_chat_title for History Title  in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
-      // console.log("error occurred 😂", err);
+      // console.log("error occurred ", err);
       // throw err;  // Rethrow the error if you want to catch it in the caller function.
     }
   }
 
   const fetchHints = async (queries, industry) => {
     try {
-      const result = await call.get("frontend_app.Management_Class.helpers.utility.generate_query_hints", {
+      const result = await call.get("frontend_app.Management_Class.helpers.utility.normalize_queries_with_known_cities", {
         'query_list': queries,
         'input_industry_name': industry
       });
-
+      // const result = await call.get("frontend_app.Management_Class.helpers.utility.generate_query_hints", {
+      //   'query_list': queries,
+      //   'input_industry_name': industry
+      // });
       let hints = result.message || [];
 
       let newHints = hints.map((hintObj, index) => {
@@ -816,12 +827,11 @@ function Chatscreen() {
       return newHints;
     } catch (err) {
       createDiagnostic("Others", `Something went wrong while calling generate_query_hints query: ${JSON.stringify(queries)} industry: ${JSON.stringify(industry)} in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
-      // console.log("error occurred in Hint Statment Function😂", err);
+      // console.log("error occurred in Hint Statment Function", err);
     }
   }
 
   useEffect(() => {
-    // console.log("ascdsdd", currentUser, sessionId);
 
     if (!currentUser && !session) {
       const guestSessionId = sessionStorage.getItem("guest_session_id");
@@ -901,7 +911,7 @@ function Chatscreen() {
   }, [sessionId, currentUser]);
 
   const validateSession = async (sessionId) => {
-    // console.log("comegere with", sessionId, currentUser);
+   
 
     if (sessionStorage.getItem("guest_session_id") && currentUser) {
       // Not logged in, redirect to /chat
@@ -941,7 +951,7 @@ function Chatscreen() {
 
     } catch (error) {
       createDiagnostic("Others", `Something went wrong while validating the session in ChatScreen : ${JSON.stringify(error)}`,chatId,sessionId)
-      // console.error("Error validating session:", error);
+
       setSession(null);
       navigate("/chat", { replace: true });
     }
@@ -965,6 +975,8 @@ function Chatscreen() {
   const handlerenderresult = (msg) => {
     window.open(`/frontend/result?session=${sessionId}&name=${msg.name}`, '_blank')
   }
+
+
 
   const iconHints = [
     {
@@ -1000,7 +1012,7 @@ function Chatscreen() {
     {
       title: "Approval Status",
       subtitle: "Licenses & permits overview",
-      hint: "What approvals are required for cement plant setup in Rajkot?",
+      hint: "What approvals are required for cement plant setup in Vadodara?",
       type: "Approval"
     }
   ];
@@ -1105,7 +1117,7 @@ function Chatscreen() {
                 </div>
               )}
             </div>
-          ) : (chatLoading && sessionId) ? <div className="chats flex flex-col w-[50%] mx-auto"><Responseloader /></div> : (
+          ) : (chatLoading && sessionId && currentUser) ? <div className="chats flex flex-col w-[50%] mx-auto"><Responseloader /></div> : (
             <div className="flex flex-col gap-2 items-center justify-center h-full w-full">
               <div className='relative text-4xl flex flex-row gap-3 items-center'>
                 <p className=" text-[#242f6a]">Welcome to</p>

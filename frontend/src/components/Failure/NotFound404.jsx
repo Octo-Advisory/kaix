@@ -22,27 +22,27 @@ const NotFound404 = () => {
             <div className="w-full md:w-1/2 mb-12 md:mb-0 md:pr-8">
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-green-900/30 text-green-400 text-sm font-medium mb-6 border border-green-800">
                 <div className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></div>
-                System Error
+               Invalid Route
               </div>
               
               <h1 className="text-8xl font-bold text-white mb-2 [text-shadow:_0_0_10px_rgba(76,_175,_80,_0.7)]">404</h1>
-              <h2 className="text-3xl font-bold text-green-400 mb-6">Connection Lost</h2>
+              <h2 className="text-3xl font-bold text-green-400 mb-6">Oops! Page not found.</h2>
               
               <div className="h-1 w-24 bg-green-500 mb-6"></div>
               
               <p className="text-gray-300 mb-8 text-lg">
-                The industrial system cannot locate the requested resource. Please verify your connection parameters or return to the main control panel.
+                The industrial system cannot locate the requested resource. Please verify your page route or return to the main control panel.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
                 <a 
-                  href="/" 
+                  href="/frontend" 
                   className="inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-black bg-green-500 hover:bg-green-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition shadow-lg shadow-green-500/30"
                 >
                   <svg className="mr-2 -ml-1 w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                   </svg>
-                  Control Panel
+                  Home
                 </a>
                 <button 
                   onClick={() => window.history.back()} 

@@ -8,7 +8,8 @@
  "engine": "InnoDB",
  "field_order": [
   "module_name",
-  "configurations"
+  "configurations",
+  "query_hints"
  ],
  "fields": [
   {
@@ -22,11 +23,17 @@
    "fieldtype": "Table",
    "label": "Configurations",
    "options": "UI Configurations"
+  },
+  {
+   "fieldname": "query_hints",
+   "fieldtype": "Table",
+   "label": "Query Hints",
+   "options": "Default Query Hints"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-08-06 12:59:24.125769",
+ "modified": "2025-08-18 12:25:05.851304",
  "modified_by": "Administrator",
  "module": "marsaix",
  "name": "UI Configuration",
@@ -54,6 +61,18 @@
    "read": 1,
    "report": 1,
    "role": "AIX User",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Guest",
    "share": 1,
    "write": 1
   }

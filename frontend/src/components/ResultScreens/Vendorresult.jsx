@@ -16,6 +16,7 @@ import { useFrappeUpdateDoc} from 'frappe-react-sdk';
 import { current } from '@reduxjs/toolkit';
 import NoResultsFound from '../Failure/NoResultsFound';
 import SingleMap from '../MapComponent/SingleMap';
+import { CertificateIcon, CheckIcon } from '../../Icons/icon';
 
 function Vendorresult({ result, source, rerender }) {
   const { createDoc } = useFrappeCreateDoc('');
@@ -698,7 +699,7 @@ function Vendorresult({ result, source, rerender }) {
                         <span className='p-3 rounded-lg flex items-center justify-center relative bg-blue-100'><FaStoreAlt className='text-blue-800' /></span>
                         <div className='relative flex flex-col justify-center gap-0.5'>
                           <h2 className="text-xl font-bold text-blue-700">{selectedVendor.name}</h2>
-                          {selectedVendor.category && (<h3 className='relative text-md'>{selectedVendor.category}</h3>)}
+                          {/* {selectedVendor.category && (<h3 className='relative text-md'>{selectedVendor.category}</h3>)} */}
                         </div>
                       </div>
                     </div>
@@ -774,16 +775,16 @@ function Vendorresult({ result, source, rerender }) {
 
                     {selectedVendor && selectedVendor.certifications && (<div className='relative flex flex-col gap-4'>
                       <h2 className="text-xl font-bold text-gray-800 flex items-center flex-row gap-3">
-                        <FaShieldAlt className="text-blue-700" />
+                        <CertificateIcon strokeWidth={2} className="text-blue-700" />
                         {uiConfig?.['certifications_label'] || "Certifications"}
                       </h2>
                       <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex flex-col">
-                        <div className="relative grid grid-cols-2 gap-2">
+                        <div className="relative grid grid-cols-2 gap-4">
                           {selectedVendor.certifications.split(',').filter(opt => opt.trim() !== "").map((opt, i) => (
                             <div key={i} className="flex flex-row gap-1 items-center col-span-1">
-                              <div className="bg-green-100 p-1 rounded-full">
-                                <FaCheckCircle className="text-green-700" />
-                              </div>
+                              {/* <div className="bg-green-100 p-1 rounded-full"> */}
+                                <CheckIcon size={20} className="text-green-700" />
+                              {/* </div> */}
                               <span className="text-gray-700 font-semibold">{opt}</span>
                             </div>))}
                         </div>

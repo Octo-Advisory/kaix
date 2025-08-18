@@ -96,42 +96,56 @@ nlp = spacy.load("en_core_web_lg")
 def refine_query_with_history(history, latest_query, llm):
     # Define retriever prompt
     retriever_prompt_template = """  
-    Given the chat history and the latest user input, reformulate a standalone query that maintains the intent and structure of the latest user input.  
-    Use the AI's messages for context only to understand the user's intent better, but do not take examples or suggestions from AI responses as the user's actual input unless the user explicitly agrees or repeats them.  
+Given the chat history and the latest user input, reformulate a standalone query that maintains the intent and structure of the latest user input.  
+Use the AI's messages for context only to understand the user's intent better, but do not take examples or suggestions from AI responses as the user's actual input unless the user explicitly agrees or repeats them.  
 
-    Instructions:  
-    1. Preserve the original structure of the user input.  
+Instructions:  
+1. Preserve the original structure of the user input.  
     - If the user’s latest input is a statement, the reformulated query must remain a statement.  
     - If the user’s latest input is a question, the reformulated query must remain a question.  
 
-    2. If the latest user input is completely different and unrelated to the past conversation, return it as-is without modification.  
+1.a NORMALIZE PUNCTUATION (before reformulation):
+    - Collapse any repeated sentence punctuation into a single character:
+        • "!!!" → "!"   • "???" → "?"   • "..." or ".." → "."
+    - Collapse runs of commas/semicolons/colons into a single character (",,,", ";;", "::" → ",", ";", ":").
+    - Remove leading/trailing punctuation and extra whitespace.
+    - Replace multiple spaces or tabs with a single space.
+    - DO NOT alter punctuation that is part of:
+        • Numbers, decimals, or digit-grouping (e.g., "1,000", "3.5", "₹2,50,00,000").  
+        • Ranges or comparisons (e.g., "10–12", "10-12", ">= 5").  
+        • Unit strings and symbols (e.g., "TPA", "MW", "%", "/", "-", "+").
+    - End the final query with a single appropriate terminator based on structure:
+        • Question → "?"  
+        • Statement/command → "." (omit the period only if the user’s style clearly omits it).
 
-    3. If the latest user input is related to the past conversation, refine it by integrating relevant details from the chat history while ensuring clarity.  
+2. If the latest user input is completely different and unrelated to the past conversation, return it as-is (after punctuation normalization) without modification.  
 
-    4. Strictly do NOT infer or modify any numerical values, units, or metrics.  
+3. If the latest user input is related to the past conversation, refine it by integrating relevant details from the chat history while ensuring clarity.  
+
+4. Strictly do NOT infer or modify any numerical values, units, or metrics.  
     - If the user provides a metric value (e.g., "1 TPA", "500 MW"), retain it exactly as it is.  
     - Do NOT expand, convert, or modify abbreviations of units (e.g., keep "TPA" as "TPA" and do not change it to "Ton Per Annum").  
     - If no metric is provided by the user, do NOT infer one.  
 
-    5. Strictly do not infer or carry forward any industries, products, or metrics from past AI responses unless the user explicitly acknowledges, agrees to, or repeats those industries, products, or metrics in their latest input.  
+5. Strictly do not infer or carry forward any industries, products, or metrics from past AI responses unless the user explicitly acknowledges, agrees to, or repeats those industries, products, or metrics in their latest input.  
 
-    6. Strictly do not infer or carry forward any industries, products, or metrics from past user inputs unless they are explicitly mentioned in the latest user input.  
+6. Strictly do not infer or carry forward any industries, products, or metrics from past user inputs unless they are explicitly mentioned in the latest user input.  
 
-    7. If the latest user input mentions only one industry or product, ensure only that industry or product appears in the reformulated query.  
+7. If the latest user input mentions only one industry or product, ensure only that industry or product appears in the reformulated query.  
     - Do not include multiple industries or products unless the user explicitly mentions multiple ones in their latest query.  
 
-    8. Do NOT add any explanations, reasoning, or justifications in the reformulated standalone query.  
+8. Do NOT add any explanations, reasoning, or justifications in the reformulated standalone query.  
     - The output must be a clean and direct reformulation of the user’s intent without unnecessary elaboration.  
 
-    Chat History:  
-    {history}  
+Chat History:  
+{history}  
 
-    Latest User Input:  
-    {latest_query}  
+Latest User Input:  
+{latest_query}  
 
-    Reformulated Standalone Query:  
+Reformulated Standalone Query:  
     """
-    
+
     prompt = PromptTemplate(
         input_variables=["history", "latest_query"],
         template=retriever_prompt_template

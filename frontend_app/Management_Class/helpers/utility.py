@@ -8,6 +8,7 @@ import time
 import gc
 import re
 import ast
+import spacy
 # from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers_creative
 
 from langchain_groq import ChatGroq
@@ -61,6 +62,10 @@ def get_docs_with_children(doctype, names):
     except Exception as e:
         frappe.throw(f"Error fetching {doctype} data: {str(e)}")
 
+
+def get_cities():
+    res = frappe.db.get_list('City',fields=['city_name'], limit=10000)
+    return res
  
 @frappe.whitelist()
 def checkApiThreshold(apiName):
@@ -495,29 +500,109 @@ def generate_query_hints(query_list, input_industry_name):
                 industry_name = input_industry_name
             )
 
+    # response = llm_70b_vers_creative.invoke(formatted_prompt)
+    # input_text = response.content
+    # results = extract_query_list(input_text) # FINAL OUTPUT TO BE SHOW(will return a list of queries along with their module names)
+    # return results
+
     response = llm_70b_vers_creative.invoke(formatted_prompt)
     input_text = response.content
-    results = extract_query_list(input_text) # FINAL OUTPUT TO BE SHOW(will return a list of queries along with their module names)
-    return results
+    return input_text
 
-def extract_query_list(text: str):
+
+
+# def extract_query_list(text: str):
+#     """
+#     Extract the first list of dictionaries (queries + modules) from raw text.
+#     """
+#     # Match a list of dictionaries like: [ { "query": ..., "module": ... }, {...} ]
+#     pattern = r"\[\s*\{[\s\S]*?\}\s*\]"
+
+#     match = re.search(pattern, text, re.DOTALL)
+#     if match:
+#         try:
+#             return ast.literal_eval(match.group(0))  # safely evaluate list of dicts
+#         except Exception as e:
+#             print("⚠️ Error evaluating list:", e)
+#     else:
+#         print("❌ No list of queries found in input text.")
+#     return []
+
+def extract_query_list(query_list, input_industry_name):
+
+    raw_query_hints = generate_query_hints(query_list = query_list, input_industry_name=input_industry_name)
+
     """
     Extract the first list of dictionaries (queries + modules) from raw text.
     """
     # Match a list of dictionaries like: [ { "query": ..., "module": ... }, {...} ]
     pattern = r"\[\s*\{[\s\S]*?\}\s*\]"
 
-    match = re.search(pattern, text, re.DOTALL)
+    match = re.search(pattern, raw_query_hints, re.DOTALL)
     if match:
         try:
             return ast.literal_eval(match.group(0))  # safely evaluate list of dicts
         except Exception as e:
             print("⚠️ Error evaluating list:", e)
+            return f"Error evaluating list:, {e}"
+            
     else:
         print("❌ No list of queries found in input text.")
-    return []
+    return "No relevant queries found in the input text"
 
+nlp = spacy.load("en_core_web_sm")  # run: python -m spacy download en_core_web_sm if not installed
 
+def extract_location(query):
+    """
+    Use spaCy NER to extract first GPE (location) if present.
+    Returns None if not present.
+    """
+    doc = nlp(query)
+    for ent in doc.ents:
+        if ent.label_ == "GPE":   # Geo-Political Entity
+            return ent.text
+    return None
+
+@frappe.whitelist(allow_guest=True)
+def normalize_queries_with_known_cities(query_list, input_industry_name):
+    city_list = get_cities()
+    known_locations = [k['city_name'] for k in city_list]
+    known_lower = [k.lower() for k in known_locations]
+    final_results = []
+
+    extracted_queries = extract_query_list(query_list=query_list, input_industry_name=input_industry_name)
+
+    if isinstance(extracted_queries, list):
+        for qd in extracted_queries:
+            query = qd['query']
+            detected = extract_location(query)
+
+            # Case 1: Valid location already present
+            if detected and detected.lower() in known_lower:
+                final_results.append(qd)
+                continue
+
+            # Case 2: Unknown location detected -> replace it with a random known city
+            if detected:
+                replacement = random.choice(known_locations)
+                pattern = re.compile(re.escape(detected), re.IGNORECASE)
+                new_query = pattern.sub(replacement, query)
+                final_results.append({"query": new_query, "module": qd["module"]})
+                continue
+
+            # Case 3: No location detected at all -> keep as-is
+            final_results.append(qd)
+
+        return final_results
+    
+    else:
+        return extracted_queries
+
+# if isinstance(results, list):
+#     normalized = normalize_queries(results, known_locations)
+#     print(normalized)
+# else:
+#     results
 
 def log_to_file(key,value):
     """

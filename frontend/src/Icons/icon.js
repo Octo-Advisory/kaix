@@ -24,7 +24,7 @@ import { FaHandHoldingUsd, FaRegLightbulb } from "react-icons/fa";
 import { LuUserRoundCheck } from "react-icons/lu";
 import { IoIosClose } from "react-icons/io";
 import { HiOutlineDocumentReport } from "react-icons/hi";
-import { FaUserLarge, FaArrowLeft, FaArrowRight, FaListCheck,FaLandmark, FaUserGroup, FaUser } from "react-icons/fa6";
+import { FaUserLarge, FaArrowLeft, FaArrowRight, FaListCheck,FaLandmark, FaUserGroup, FaUser, FaAward } from "react-icons/fa6";
 import { BsBuildingCheck, BsShop  } from "react-icons/bs";
 import { TbTriangleInvertedFilled, TbTriangleFilled } from "react-icons/tb";
 import { HiOutlineClipboardDocumentCheck, HiOutlineClipboardDocumentList,HiOutlineQuestionMarkCircle } from "react-icons/hi2";
@@ -37,7 +37,10 @@ import ApprovalName from './IconPNGs/approve.png'
 import ApprovalTitle from './IconPNGs/attestation.png'
 import { AiOutlineClear, AiOutlineDollar } from "react-icons/ai";
 import { RiBuilding2Line } from "react-icons/ri";
+import { PiCertificate } from "react-icons/pi";
+import { RiCheckDoubleFill } from "react-icons/ri";
 import { FiSend } from "react-icons/fi";
+import { FaCheck } from "react-icons/fa6";
 
 const DEFAULT_SIZE = 24;
 const DEFAULT_STROKE = 1;
@@ -140,6 +143,8 @@ export const ShopIcon = withDefaults(BsShop)
 export const UserGroupIcon = withDefaults(FaUserGroup)
 export const BuildingLineIcon = withDefaults(RiBuilding2Line)
 export const ClearIcon = withDefaults(AiOutlineClear)
+export const CertificateIcon = withDefaults(PiCertificate)
+export const CheckIcon = withDefaults(FaAward)
 
 
 

@@ -24,7 +24,7 @@ function Solutionscreen() {
   if (result.length === 0) {
     return null; // Prevents rendering if navigation happens
   }
-  console.log("resultin solution scdeen", result);
+  // console.log("resultin solution scdeen", result);
   const user_intension = result[0]["user_intension"]
   const Analytics_response = result[0]?.["Analytics_response"]
 

@@ -84,9 +84,9 @@ const ProgressScreen = () => {
   const [failure, setFailure] = useState(false);
   const validationResult = useSelector((state) => state.validate.validation_result)
   const selectedOption = useSelector((state)=>state.ai.selectedOption)
-  console.log("validation Result", validationResult);
-  console.log("aiResponse", aiResponse);
-  console.log("confirmationMsg", confirmationMsg);
+  // console.log("validation Result", validationResult);
+  // console.log("aiResponse", aiResponse);
+  // console.log("confirmationMsg", confirmationMsg);
   const dispatch = useDispatch();
   const { updateDoc } = useFrappeUpdateDoc()
   const { sessionId } = useParams();

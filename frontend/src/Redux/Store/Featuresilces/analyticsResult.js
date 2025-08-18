@@ -9,7 +9,7 @@ export const anayticsSlice = createSlice({
     initialState,
     reducers: {
         addAnalyticsResult: (state, action) => {
-            console.log("state and actoin for annalytics",state,action);
+            // console.log("state and actoin for annalytics",state,action);
             state.analyticsResult.push(action.payload)
         },
         clearAnalyticsResult : (state) => {

@@ -8,7 +8,7 @@ import { useFrappeUpdateDoc } from 'frappe-react-sdk';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 function Empresult({ result, rerender }) {
-  console.log("Emp result is", result);
+  // console.log("Emp result is", result);
   const lastChatId = useSelector((state) => state.chat.lastId);
   const { updateDoc } = useFrappeUpdateDoc()
   const [employment, setEmployment] = useState({});
@@ -16,7 +16,7 @@ function Empresult({ result, rerender }) {
   useEffect(() => {
     const handleEmpData = async () => {
       const parsedEmployment = JSON.parse(result?.Analytics_response?.city_summary || '{}');
-      console.log("employment is", parsedEmployment);
+      // console.log("employment is", parsedEmployment);
       setEmployment(parsedEmployment);
       
       if (rerender != 1) {

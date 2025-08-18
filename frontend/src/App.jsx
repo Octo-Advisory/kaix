@@ -60,12 +60,12 @@ function App() {
           <Route path="/progress/:sessionId" element={<ProgressScreen />} />
           <Route path="/solution" element={<Solutionscreen />} />
           <Route path="/build" element={<TestComponent />} />
-          <Route path="/test" element={<NotFound404 />} />
-          <Route path="/test" element={ <ChatApp />} />
+          {/* <Route path="/test" element={ <ChatApp />} /> */}
           <Route path="/map" element={<MapComponent />} />
           <Route path="/forgotpassword" element={<ForgotPassword />} />
           <Route path="/result" element={<Renderresult />} />
           <Route path="/property" element={<Propertycreation />} />
+          <Route path="*" element={<NotFound404 />} />
         </Routes>)}
         {/* </ErrorBoundary> */}
       </BrowserRouter>

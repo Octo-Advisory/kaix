@@ -107,7 +107,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
       analytics_response === null || 
       typeof analytics_response === 'string'
     ) {
-      console.log('Invalid analytics_response:', analytics_response);
+      // console.log('Invalid analytics_response:', analytics_response);
       // createDiagnostic("Data Error", `Invalid Data was passed that couldn't be rendered due to ${analytics_response} in Build From Scratch`,lastChatId)
       return <NoResultsFound diagnostics={true} type='Land & Approval' chatId={lastChatId} data={analytics_response} module='Build From Scratch'/>;
     }

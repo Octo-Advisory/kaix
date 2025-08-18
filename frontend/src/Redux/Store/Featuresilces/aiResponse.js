@@ -10,7 +10,7 @@ export const aiSlice = createSlice({
     initialState,
     reducers: {
         addAIresponse: (state, action) => {
-            console.log("action and state", action, state);
+            // console.log("action and state", action, state);
             state.aiReponse.push(action.payload)
         },
         clearAiresponse: (state) =>{
