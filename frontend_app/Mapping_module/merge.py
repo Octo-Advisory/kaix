@@ -30,7 +30,7 @@ def convertTo4326(coord):
     # Define projections
     proj_4326 = Proj(init='epsg:4326')  # WGS84 (lat, lon)
     proj_3857 = Proj(init='epsg:3857')  # Web Mercator (meters)
-    print("Inside convert")
+    
     polygon_4326 = []
     for ring in coord:
         x, y = ring  # Unpack the tuple to x, y
