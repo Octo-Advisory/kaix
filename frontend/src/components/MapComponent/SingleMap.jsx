@@ -20,6 +20,7 @@ import { FaPlus } from "react-icons/fa";
 import { FaMinus } from "react-icons/fa";
 import { useFrappeGetDoc } from 'frappe-react-sdk';
 import { getCurvedLine } from "./utils";
+import { nanoid } from "nanoid";
 mapboxgl.accessToken = 'pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ';
 
 const SingleMap = ({ selectedProperty, intension }) => {
@@ -97,7 +98,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
     const bounds = new mapboxgl.LngLatBounds();
     parsedBoundary.forEach((coord) => bounds.extend(coord));
 
-    const sourceId = `boundary-${crypto.randomUUID()}`;
+    const sourceId = `boundary-${nanoid()}`;
 
     mapRef.current.on('load', () => {
       document.querySelector('.accordion-header').click();

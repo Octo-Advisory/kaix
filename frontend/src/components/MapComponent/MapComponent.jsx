@@ -30,6 +30,7 @@ import { useFrappeGetDoc } from "frappe-react-sdk";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { HiOutlineBolt, HiOutlineMap } from "react-icons/hi2";
+import { nanoid } from "nanoid";
 
 function MapComponent({ solutions, toggleModal, source, intension }) {
   //var copyiedSelectedProperty = null;
@@ -161,7 +162,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         if (item.result_type === "Industry_Result") {
           //#region Draw boundry for properties
           let parsedCoord = JSON.parse(item.boundary_coordinates);
-          let sourceId = `Custom_Source_${crypto.randomUUID()}`;
+          let sourceId = `Custom_Source_${nanoid()}`;
 
           mapRef.current.addSource(sourceId, {
             type: "geojson",
@@ -175,8 +176,8 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
             },
           });
 
-          let layerId1 = `Custom_polygon_fill_${crypto.randomUUID()}`;
-          let layerId2 = `Custom_polygon_border_${crypto.randomUUID()}`;
+          let layerId1 = `Custom_polygon_fill_${nanoid()}`;
+          let layerId2 = `Custom_polygon_border_${nanoid()}`;
 
           mapRef.current.addLayer({
             id: layerId1,
@@ -240,7 +241,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       latLongArray.forEach(vendorCoord => {
         if (!isValidLatLng(vendorCoord)) return; // Skip invalid coordinates
         let sourceId = 'property-vendor-lines-' + count;
-        let layerId = `Custom_property_vendor_lines_layer_${crypto.randomUUID()}`;
+        let layerId = `Custom_property_vendor_lines_layer_${nanoid()}`;
         let curvedDirectionValue = null;
         if (direction == "right") {
           direction = "left";
@@ -314,7 +315,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     }
 
     //#region Add markers to map - Modified for vendors/properties
-    await addPointersToMap(elements, crypto.randomUUID());
+    await addPointersToMap(elements, nanoid());
 
     //#region set check icon manually
     document.documentElement.style.setProperty(
@@ -689,7 +690,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     });
 
     // Keep original layer click functionality as fallback
-    const sourceId = `polygon-${crypto.randomUUID()}`;
+    const sourceId = `polygon-${nanoid()}`;
     const layerId = "Custom_" + layerType;
 
     mapRef.current.addSource(sourceId, {
