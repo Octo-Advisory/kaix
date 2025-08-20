@@ -5,7 +5,7 @@ import { FaXmark } from "react-icons/fa6";
 const Failure = () => {
   const imageRef = useRef(null);
   const textRef = useRef(null);
-
+  console.log('..')
   useEffect(() => {
     // Animation for image
     gsap.fromTo(
