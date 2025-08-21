@@ -888,6 +888,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
             nearest_railway_station: data.nearest_railway_station,
             nearest_airport: data.nearest_airport,
             nearest_seaport: data.nearest_seaport,
+            nearest_highway: data.nearest_highway
           }
           preaparedSolutions.push(solution)
           // console.log(solution, 'This is the solution printed ......')
