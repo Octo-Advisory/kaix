@@ -40,6 +40,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   var nearestSeaportDetail = null;
   var nearestRailwayStationDetail = null;
   var highwayCoord = null;
+  var nearestHighwayDetail = null;
 
   const validation_result = useSelector((state) => state.validate.validation_result)
   let propertyCoord = validation_result?.[0]?.[1]?.latitude_longitude?.split(",").map(Number).reverse() ?? null;
@@ -949,7 +950,10 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
 
       if (copyiedSelectedProperty.current.nearest_highway_coord != null && copyiedSelectedProperty.current.nearest_highway_coord != "") {
         highwayCoord = copyiedSelectedProperty.current.nearest_highway_coord.replace(" ", "").split(",").map(Number);
-        addConnectivityLayer(LAYERS.DEFAULT_LAYER.HIGHWAY, [highwayCoord[1], highwayCoord[0]], [lng, lat], null, DIRECTIONS.LEFT);
+        nearestHighwayDetail = await getDataForSingleLayer("Highway", { "name": copyiedSelectedProperty?.nearest_highway });
+        if (nearestHighwayDetail.data.length > 0) {          
+          addConnectivityLayer(LAYERS.DEFAULT_LAYER.HIGHWAY, [highwayCoord[1], highwayCoord[0]], [lng, lat],nearestHighwayDetail.data[0] ,DIRECTIONS.LEFT);
+        }
       }
     } catch (error) {
       // console.error("Error in adding marker:", error);
@@ -1010,6 +1014,9 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
           break;
         case LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS:
           name = detail.name1 + " Railway Station";
+          break;
+        case LAYERS.DEFAULT_LAYER.HIGHWAY:
+          name = detail.title;
           break;
         default:
           break;
