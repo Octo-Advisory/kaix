@@ -55,7 +55,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   const mapContainerRef = useRef(null); // Create a ref for the map container
   const mapRef = useRef(null); // Store map instance
   const copyiedSelectedProperty = useRef(null); // Store the real solution object
-  mapboxgl.accessToken = 'pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ';
 
   const { data: uiData } = useFrappeGetDoc("UI Configuration", "Mapping")
   const configurations = uiData?.configurations || [];
@@ -87,6 +86,8 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     RIGHT: 0.4
   }
   useEffect(() => {
+    if (!uiData) return;
+    mapboxgl.accessToken = `${uiConfig?.['mapmobx_api_token']}`;
     // Initialize the map after the component mounts
     mapRef.current = new mapboxgl.Map({
       container: mapContainerRef.current, // Use the ref to attach the map
@@ -103,7 +104,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       document.querySelectorAll('.accordion-header')[1].click();
     });
     return () => mapRef.current.remove(); // Cleanup the map instance on unmount
-  }, []); // Empty dependency array to run only once
+  }, [uiData]); // Empty dependency array to run only once
 
   // Function to validate latitude and longitude
   function isValidLatLng(coord) {

@@ -5,15 +5,20 @@ import { FaStore } from 'react-icons/fa';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import './style.css';
 import { getDistance, getCurvedLine, addInfoPopup } from "./utils";
-mapboxgl.accessToken = 'pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ';
+import { useFrappeGetDoc } from "frappe-react-sdk";
 
 const MapBoxMap = ({ lat, lng, zoom = 10, source, vendorCoord, vendorName }) => {
   const mapContainer = useRef(null);
   const map = useRef(null);
-
+  const { data: uiData } = useFrappeGetDoc("UI Configuration", "Mapping")
+  const configurations = uiData?.configurations || [];
+  const uiConfig = configurations.reduce((acc, curr) => {
+    acc[curr.key] = curr.value;
+    return acc;
+  }, {});
   useEffect(() => {
-    if (!mapContainer.current) return;
-
+    if (!mapContainer.current || !uiData) return;
+    mapboxgl.accessToken = `${uiConfig?.['mapmobx_api_token']}`;
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
@@ -41,7 +46,7 @@ const MapBoxMap = ({ lat, lng, zoom = 10, source, vendorCoord, vendorName }) => 
     });
 
     return () => map.current.remove();
-  }, [lat, lng, zoom, source, vendorCoord, vendorName]);
+  }, [lat, lng, zoom, source, vendorCoord, vendorName, uiData]);
 
   const generateCurveLine = ({ sourceId = "", layerId = "", from = "", to = "", linecolor = "", curvature = 0.4, labelText = "" } = {}) => {
     let getCurvedLineCoord = getCurvedLine(from, to, curvature);
@@ -182,7 +187,7 @@ const MapBoxMap = ({ lat, lng, zoom = 10, source, vendorCoord, vendorName }) => 
     })
       .setLngLat(vendorCoord)
       .addTo(map);
-    
+
     addInfoPopup(mapboxgl,map, marker, vendorName);
 
     // vendorEl.addEventListener('mouseenter', () => {
