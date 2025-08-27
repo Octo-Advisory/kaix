@@ -7,9 +7,9 @@ import { useFrappeEventListener } from 'frappe-react-sdk';
 import LogoLoader from '../Responseloader/LogoLoader';
 import { FaXmark } from "react-icons/fa6";
 import './assets/style/propertycreationstyle.css';
+import { useFrappeGetDoc } from "frappe-react-sdk";
 
-mapboxgl.accessToken = 'pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ';
-const BASE_URL = 'https://marsinfraix.marsbazaar.com';
+const BASE_URL = window.location.origin;
 const API_TOKEN = 'd3de1e0e4e25846:51fd8e403a19045';
 
 function PropertyCreation() {
@@ -28,7 +28,16 @@ function PropertyCreation() {
     }
     console.log("Event data:", message);
   });
+
+  const { data: uiData } = useFrappeGetDoc("UI Configuration", "Mapping")
+  const configurations = uiData?.configurations || [];
+  const uiConfig = configurations.reduce((acc, curr) => {
+    acc[curr.key] = curr.value;
+    return acc;
+  }, {});
   useEffect(() => {
+    if (!uiData) return;
+    mapboxgl.accessToken = `${uiConfig?.['mapmobx_api_token']}`;
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/streets-v12',
@@ -78,7 +87,7 @@ function PropertyCreation() {
       mapRef.current.off('movestart', hideContextMenu);
       mapRef.current.off('contextmenu');
     };
-  }, []);
+  }, [uiData]);
 
   // Handle API call
   const getData = async (doctypeName, filters = null) => {

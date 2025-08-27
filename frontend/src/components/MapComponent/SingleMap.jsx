@@ -21,7 +21,6 @@ import { FaMinus } from "react-icons/fa";
 import { useFrappeGetDoc } from 'frappe-react-sdk';
 import { getCurvedLine } from "./utils";
 import { nanoid } from "nanoid";
-mapboxgl.accessToken = 'pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ';
 
 const SingleMap = ({ selectedProperty, intension }) => {
   const copyiedSelectedProperty = structuredClone(selectedProperty);
@@ -72,8 +71,9 @@ const SingleMap = ({ selectedProperty, intension }) => {
   var highwayCoord = null;
   var nearestHighwayDetail = null;
   useEffect(() => {
-    if (!mapContainer.current || !lat || !lng) return;
-
+    if (!mapContainer.current || !lat || !lng || !uiData) return;
+    mapboxgl.accessToken = `${uiConfig?.['mapmobx_api_token']}`;
+    
     mapRef.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
@@ -84,10 +84,10 @@ const SingleMap = ({ selectedProperty, intension }) => {
     });
 
     return () => mapRef.current?.remove();
-  }, [lat, lng]);
+  }, [lat, lng,uiData]);
 
   useEffect(() => {
-    if (!mapRef.current || !boundaryCoordinates) return;
+    if (!mapRef.current || !boundaryCoordinates || !uiData) return;
 
     const parsedBoundary =
       typeof boundaryCoordinates === 'string'
@@ -167,9 +167,10 @@ const SingleMap = ({ selectedProperty, intension }) => {
       // Apply margin-top or transform
       marker.getElement().style.marginTop = '20px'; // for visual downward shift 
     });
-  }, [boundaryCoordinates]);
+  }, [boundaryCoordinates,uiData]);
 
   useEffect(() => {
+    if (!mapRef.current || !uiData) return;
     const handleStyleLoad = () => {
       (async () => {
         await loadVendorlayer();
@@ -210,7 +211,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
         element.removeEventListener("change", handleCheckboxChange);
       });
     };
-  }, []);
+  }, [uiData]);
 
   const addConnectivityLayer = (layer, coord, propertyCoord, detail,direction = {}) => {
     // Custom Marker with MdFactory
