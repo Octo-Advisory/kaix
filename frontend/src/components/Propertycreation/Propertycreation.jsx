@@ -83,7 +83,7 @@ function PropertyCreation() {
   // Handle API call
   const getData = async (doctypeName, filters = null) => {
     try {
-      let url = `${BASE_URL}/api/resource/${doctypeName}?fields=["*"]&limit=1000`;
+      let url = `/api/resource/${doctypeName}?fields=["*"]&limit=1000`;
       if (filters) {
         url += `&filters=${encodeURIComponent(JSON.stringify(filters))}`;
       }
@@ -101,7 +101,7 @@ function PropertyCreation() {
 
   // Trigger property segmentation
   const triggerProSeg = (array, childBlockId) => {
-    fetch(`${BASE_URL}/api/method/StartPropertySegmentation`, {
+    fetch(`/api/method/StartPropertySegmentation`, {
       method: 'POST',
       headers: {
         'Authorization': `token ${API_TOKEN}`,
@@ -118,7 +118,7 @@ function PropertyCreation() {
   };
 
   const createMainBlock = (lat, lon) => {
-    fetch(`${BASE_URL}/api/method/CreateMainBlockRecord`, {
+    fetch(`/api/method/CreateMainBlockRecord`, {
       method: 'POST',
       headers: {
         'Authorization': `token ${API_TOKEN}`,
@@ -164,7 +164,7 @@ function PropertyCreation() {
         fillColor: "#088",
         leftOffset: "-38px",
         buttonClick: (_, id) => {
-          window.open(`${BASE_URL}/app/test-survey-no?child_block_id=${id}`, '_blank');
+          window.open(`/app/test-survey-no?child_block_id=${id}`, '_blank');
         }
       }
     };
