@@ -170,6 +170,8 @@ const ProgressScreen = () => {
     }
   };
 
+
+
   useEffect(() => {
     // console.log("ai response is in progress", aiResponse);
     const analyticsResp = async ()=> {
@@ -214,6 +216,18 @@ const ProgressScreen = () => {
       setShowfailure(hasFailure);
     }
   }, [messages])
+
+    useEffect(() => {
+      const intervalId = setInterval(() => {
+        // console.log("Interval running...");
+        mutate();
+        if (allsuccess) {
+          clearInterval(intervalId);
+          // console.log("Interval cleared!");
+        }
+      }, 3000);
+      return () => clearInterval(intervalId); // cleanup on unmount
+    }, [allsuccess]);
 
   useEffect(() => {
     let timer;
@@ -286,14 +300,39 @@ useEffect(()=>{
   }
 });
 
+function areProcessArraysEqual(arr1, arr2) {
+  if (arr1.length !== arr2.length) return false;
+
+  const map1 = Object.fromEntries(arr1.map(item => [item.process_name, item]));
+  const map2 = Object.fromEntries(arr2.map(item => [item.process_name, item]));
+
+  return Object.keys(map1).every(name => {
+    return JSON.stringify(map1[name]) === JSON.stringify(map2[name]);
+  });
+}
+
   useEffect(() => {
     // console.log('now the data is called', data)
     if(failure) return;
     if (data) {
-      setMessages(data)
+      // console.log(data, messages, 'This is the dataaaa')
+      const result =  areProcessArraysEqual(messages, data)
+      // console.log('Result to compare is ',result)
+      if(!result) {
+        setMessages(data)
+      }
       // console.log("Updated data after mutate:", data);
     }
   }, [data]);
+
+  // useEffect(() => {
+  //   // console.log('now the data is called', data)
+  //   if(failure) return;
+  //   if (data) {
+  //     setMessages(data)
+  //     // console.log("Updated data after mutate:", data);
+  //   }
+  // }, [data]);
   
   useEffect(() => {
     if (!messages || messages.length === 0) return;

@@ -52,6 +52,8 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         area_list = get_list_of_area_id(zone_id)
         city_list = get_list_of_city_list(area_list)
         state_list = get_state_list(city_list)
+        with open("log2.txt", "a") as file:
+            file.write(f"\n Unique list of areas cities state:::>>>:::>>>:::>>> {city_list}, {state_list}")
         property_employment_df,property_list = get_property_and_employement(zone_id,area_list,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user,found_property,found_employment,selectedOption = selectedOption)
         r_insights = {}
         for state in state_list:
