@@ -19,7 +19,8 @@ function PropertyCreation() {
   const [showLoader, setLoaderVisibility] = useState(false);
   const [showModal, setModalVisibility] = useState(false);
   const [loaderTitle, setLoaderTitle] = useState("Processing");
-
+  var childBlockData = null;
+  
   // Frappe event listener
   useFrappeEventListener("Property_Seg_Status_Update", async ({ message }) => {
     setLoaderTitle(message);
@@ -50,43 +51,14 @@ function PropertyCreation() {
 
     mapRef.current.on('style.load', draw);
 
-    // Context menu logic
-    const contextMenu = document.getElementById('contextMenu');
-    const createBtn = document.getElementById('createPropertyBtn');
-    let lngLat = null;
-
-    // Show custom context menu on right-click
-    mapRef.current.on('contextmenu', (e) => {
-      e.preventDefault();
-      lngLat = e.lngLat;
-
-      contextMenu.style.top = `${e.originalEvent.clientY}px`;
-      contextMenu.style.left = `${e.originalEvent.clientX}px`;
-      contextMenu.classList.remove('hidden');
-    });
-
-    // Hide menu on map click or move
-    const hideContextMenu = () => contextMenu.classList.add('hidden');
-    mapRef.current.on('click', hideContextMenu);
-    mapRef.current.on('movestart', hideContextMenu);
-
-    // Handle click on "Create Property here"
-    createBtn.onclick = () => {
-      contextMenu.classList.add('hidden');
-      console.log("Create Property at:", lngLat);
-      setModalVisibility(true);
-      // alert(`Create property at:\nLat: ${lngLat.lat}, Lng: ${lngLat.lng}`);
-      createMainBlock(lngLat.lat, lngLat.lng);
-      // 🔁 Replace this with triggerProSeg or other logic
-    };
 
     // Cleanup
-    return () => {
-      mapRef.current.remove();
-      mapRef.current.off('click', hideContextMenu);
-      mapRef.current.off('movestart', hideContextMenu);
-      mapRef.current.off('contextmenu');
-    };
+    // return () => {
+    //   mapRef.current.remove();
+    //   mapRef.current.off('click', hideContextMenu);
+    //   mapRef.current.off('movestart', hideContextMenu);
+    //   mapRef.current.off('contextmenu');
+    // };
   }, [uiData]);
 
   // Handle API call
@@ -144,8 +116,42 @@ function PropertyCreation() {
   };
   // Draw map content
   const draw = useCallback(async () => {
-    const res = await getData("Child Block");
+    childBlockData = await getData("Child Block");
 
+    // Context menu logic
+    const contextMenu = document.getElementById('contextMenu');
+    const createBtn = document.getElementById('createPropertyBtn');
+    let lngLat = null;
+
+    // Show custom context menu on right-click
+    mapRef.current.on('contextmenu', (e) => {
+      e.preventDefault();
+      lngLat = e.lngLat;
+      const isInside = checkPointInsideBoundingBoxes([lngLat.lng, lngLat.lat], childBlockData.data);
+      if (!isInside) {
+        contextMenu.style.top = `${e.originalEvent.clientY}px`;
+        contextMenu.style.left = `${e.originalEvent.clientX}px`;
+        contextMenu.classList.remove('hidden');
+      }
+    });
+
+    // Hide menu on map click or move
+    const hideContextMenu = () => contextMenu.classList.add('hidden');
+    mapRef.current.on('click', hideContextMenu);
+    mapRef.current.on('movestart', hideContextMenu);
+
+    // Handle click on "Create Property here"
+    createBtn.onclick = () => {
+      contextMenu.classList.add('hidden');
+      setModalVisibility(true);
+      // alert(`Create property at:\nLat: ${lngLat.lat}, Lng: ${lngLat.lng}`);
+      createMainBlock(lngLat.lat, lngLat.lng);
+      // 🔁 Replace this with triggerProSeg or other logic
+    };
+
+
+
+    const res = childBlockData;
     const statusConfig = {
       Pending: {
         label: "Create Properties",
@@ -194,7 +200,7 @@ function PropertyCreation() {
         border: 'none',
         borderRadius: '4px',
         cursor: 'pointer',
-        position: 'absolute',
+        // position: 'absolute',
         display: 'none'
       });
       btn.onclick = onClick;
@@ -221,72 +227,39 @@ function PropertyCreation() {
       if (!config) return;
 
       featuresByStatus[el.status].push(feature);
+      // Create a container div for holding both buttons
+      const container = document.createElement("div");
+      container.style.display = "flex";
+      container.style.flexDirection = "column"; // stack buttons vertically
+      container.style.gap = "6px"; // space between buttons
+      container.style.top = "24px";
+      container.style.left = "-42px";
 
-      const btn = createButton(
+      const btn1 = createButton(
         config.label,
         config.color,
         config.leftOffset,
         () => config.buttonClick(coordinates, el.name)
       );
 
-      new mapboxgl.Marker({ element: btn, anchor: 'bottom-left' })
+      // Append both buttons into container
+      container.appendChild(btn1);
+
+      if (el.status == "Complete") {
+        const btn2 = createButton(
+          "View Shape",
+          config.color,
+          config.leftOffset,
+          () => showLandBoundryForBlock(el.name)
+        );
+        container.appendChild(btn2);
+      }
+
+
+      new mapboxgl.Marker({ element: container, anchor: 'bottom-left' })
         .setLngLat([lat, lng])
         .addTo(mapRef.current);
     });
-    //Create property 
-    for (const element of res.data) {
-      if (element.status == "Complete") {
-        debugger
-        const res = await getData("Test Survey No", { "child_block_id": element.name });
-        const features = res.data.map(({ name, boundary_coordinates }) => {
-          try {
-            const coordinates = [JSON.parse(boundary_coordinates)];
-            return {
-              type: 'Feature',
-              properties: { name },
-              geometry: {
-                type: 'Polygon',
-                coordinates: coordinates
-              }
-            };
-          } catch (error) {
-            console.error(`Invalid coordinates for ${name}:`, boundary_coordinates, error);
-            return null; // skip invalid
-          }
-        }).filter(Boolean); // remove nulls
-        let sourceName = 'survey-polygons_' + element.name;
-        let fillLayerName = 'survey-fills_' + element.name;
-        let outLineLayerName = 'survey-outlines_' + element.name;
-        mapRef.current.addSource(sourceName, {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: features
-          }
-        });
-        // Fill layer
-        mapRef.current.addLayer({
-          id: fillLayerName,
-          type: 'fill',
-          source: sourceName,
-          paint: {
-            'fill-color': '#088',
-            'fill-opacity': 0.5
-          }
-        });
-
-        // Outline layer
-        mapRef.current.addLayer({
-          id: outLineLayerName,
-          type: 'line',
-          source: sourceName,
-          paint: {
-            'line-color': '#000',
-            'line-width': 2
-          }
-        });
-      }
-    }
 
     // Add status layers
     Object.keys(featuresByStatus).forEach(status => {
@@ -332,6 +305,172 @@ function PropertyCreation() {
     });
   }, []);
 
+  const showLandBoundryForBlock = async (childblockid) => {
+    var filteredRecord = childBlockData.data.filter((x) => x.name == childblockid);
+    if (filteredRecord.length > 0) {
+      if (filteredRecord[0].status == "Complete") {
+        setLoaderVisibility(true);        
+        const surveyNoData = await getData("Test Survey No", { "child_block_id": filteredRecord[0].name });
+        const features = surveyNoData.data.map(({ name, boundary_coordinates, latitude_longitude }) => {
+          try {
+            const coordinates = [JSON.parse(boundary_coordinates)];
+            return {
+              type: 'Feature',
+              properties: { name, latitude_longitude },
+              geometry: {
+                type: 'Polygon',
+                coordinates: coordinates
+              }
+            };
+          } catch (error) {
+            setLoaderVisibility(false);
+            console.error(`Invalid coordinates for ${name}:`, boundary_coordinates, error);
+            return null; // skip invalid
+          }
+        }).filter(Boolean); // remove nulls
+        let sourceName = 'survey-polygons_' + filteredRecord[0].name;
+        let fillLayerName = 'survey-fills_' + filteredRecord[0].name;
+        let outLineLayerName = 'survey-outlines_' + filteredRecord[0].name;
+        mapRef.current.addSource(sourceName, {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: features
+          }
+        });
+        // Fill layer
+        mapRef.current.addLayer({
+          id: fillLayerName,
+          type: 'fill',
+          source: sourceName,
+          paint: {
+            'fill-color': '#088',
+            'fill-opacity': 0.5
+          }
+        });
+
+        // Outline layer
+        mapRef.current.addLayer({
+          id: outLineLayerName,
+          type: 'line',
+          source: sourceName,
+          paint: {
+            'line-color': '#000',
+            'line-width': 2
+          }
+        });
+        // Load info icon explicitly (only once)
+        if (!mapRef.current.hasImage('info-icon')) {
+          mapRef.current.loadImage(
+            'https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png', // sample icon
+            (error, image) => {
+              if (error) throw error;
+              if (!mapRef.current.hasImage('info-icon')) {
+                mapRef.current.addImage('info-icon', image);
+              }
+            }
+          );
+        }
+
+
+        // Following code is to show icon when user hover on the shape
+
+        let iconLayerName = 'survey-icons_' + filteredRecord[0].name;
+
+        // Create a source for icon (initially empty)
+        mapRef.current.addSource(iconLayerName + '_src', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: []
+          }
+        });
+        mapRef.current.addLayer({
+          id: iconLayerName,
+          type: 'symbol',
+          source: iconLayerName + '_src',
+          layout: {
+            'icon-image': 'info-icon', // Mapbox built-in icon
+            'icon-size': 1.2,
+            'icon-allow-overlap': true
+          }
+        });
+
+        // --- Hover events to show/hide icon ---
+        mapRef.current.on('mouseenter', fillLayerName, (e) => {
+          const zoom = mapRef.current.getZoom();
+          if (zoom > 16) {
+            mapRef.current.getCanvas().style.cursor = 'pointer';
+
+            if (e.features.length > 0) {
+              let feature = e.features[0];
+
+              // Calculate centroid manually
+              var coordInString = feature.properties.latitude_longitude.replaceAll(" ", "").split(",");
+              // Add/update icon at centroid
+              mapRef.current.getSource(iconLayerName + '_src').setData({
+                type: 'FeatureCollection',
+                features: [{
+                  type: 'Feature',
+                  geometry: {
+                    type: 'Point',
+                    coordinates: [coordInString[1], coordInString[0]]
+                  },
+                  properties: { name: feature.properties.name }
+                }]
+              });
+            }
+          }
+
+        });
+
+        mapRef.current.on('mouseleave', fillLayerName, () => {
+          mapRef.current.getCanvas().style.cursor = '';
+          // Clear the icon when leaving
+          mapRef.current.getSource(iconLayerName + '_src').setData({
+            type: 'FeatureCollection',
+            features: []
+          });
+        });
+
+        mapRef.current.on('click', iconLayerName, (e) => {
+          if (e.features.length > 0) {
+            const { name } = e.features[0].properties;
+            // Redirect to another page
+            window.open(`/app/test-survey-no/${name}`, '_blank');
+          }
+        });
+
+        setLoaderVisibility(false);
+      }
+    }
+  }
+  const isPointInSquare = (point, squareCoords) => {
+    const [lng, lat] = point;
+
+    // squareCoords is a 2D array, take min/max
+    const lons = squareCoords.map(c => c[0]);
+    const lats = squareCoords.map(c => c[1]);
+
+    const minLng = Math.min(...lons);
+    const maxLng = Math.max(...lons);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+
+    return (
+      lng >= minLng &&
+      lng <= maxLng &&
+      lat >= minLat &&
+      lat <= maxLat
+    );
+  }
+
+  const checkPointInsideBoundingBoxes = (point, boxes) => {
+    return boxes.some(box => {
+      const coords = JSON.parse(box.bounding_box); // parse string
+      return isPointInSquare(point, coords);
+    });
+  }
   return (
     <div>
       {showLoader && (
@@ -364,7 +503,7 @@ function PropertyCreation() {
         className="context-menu hidden"
         style={{ position: 'absolute', zIndex: 1000 }}
       >
-        <div id="createPropertyBtn">Create Property here</div>
+        <div id="createPropertyBtn">Create Main Block Here</div>
       </div>
     </div>
   );
