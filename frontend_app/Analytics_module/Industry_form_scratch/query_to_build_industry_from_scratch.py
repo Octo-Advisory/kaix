@@ -47,11 +47,13 @@ def normalize_series(series, highest_is_worst=True):
     
 
 def get_industry(industry):
-    query = f"""
+    query = f""" 
     SELECT name
     FROM `tabIndustry`
     WHERE industry_name = '{industry}'
-    """
+        AND exclusion = 0;
+    """ # 👌
+
 
     # query = f"""
     # Show columns from `tabIndustry`
@@ -71,11 +73,22 @@ def get_industry(industry):
     
 def get_subsector(sub_Sector):
     if sub_Sector != None:
-        query = f"""
-            SELECT name, zone_id
-            FROM `tabSub Sector`
-            WHERE sub_sector_name = "{sub_Sector}"
-            """
+        # query = f"""
+        #     SELECT name, zone_id
+        #     FROM `tabSub Sector`
+        #     WHERE sub_sector_name = "{sub_Sector}"
+        #     """
+            # 👌
+        query = f"""SELECT
+        sst.name       AS sub_sector_id,
+        sst.zone_id
+        FROM `tabSub Sector` AS sst
+        JOIN `tabZone` AS zn
+        ON sst.zone_id = zn.name
+        AND COALESCE(zn.exclusion, 0) = 0
+        WHERE sst.sub_sector_name = "{sub_Sector}"
+        AND COALESCE(sst.exclusion, 0) = 0;
+        """
         results = fetch_query_results(query)
         if results:
             results = pd.DataFrame(results)
@@ -100,8 +113,9 @@ def get_segment(segment):
     SELECT name
     FROM `tabSegment`
     WHERE segment = "{segment}"
+        AND exclusion = 0;
     """
-
+# 👌
     results = fetch_query_results(query)
 
     if results:
@@ -117,17 +131,37 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
     """
     query = None
     if industry_id is not None and sub_sector_id is not None and segment_id is not None:
+        # query = f"""
+        # SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
+        #     `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
+        # FROM `tabIndustry Capacity Rule`
+        # WHERE (
+        #     ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
+        #     OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
+        # )
+        # AND extremity_record = 0
+        # AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment = '{segment_id}')
+        # """
         query = f"""
-        SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
-            `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
+        SELECT
+        `sub_sector`,
+        `minimum_capacity_value`,
+        `maximum_capacity_value`,
+        `minimum_land_requirement_in_acre`,
+        `maximum_land_requirement_in_acre`,
+        `capacity_unit`
         FROM `tabIndustry Capacity Rule`
         WHERE (
-            ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
-            OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
+            ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`)
+            OR (`minimum_capacity_value` < {required_capacity_by_user} AND `maximum_capacity_value` = 0)
         )
-        AND extremity_record = 0
-        AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment = '{segment_id}');
+        AND `extremity_record` = 0
+        AND `industry` = '{industry_id}'
+        AND `sub_sector` = '{sub_sector_id}'
+        AND `segment` = '{segment_id}'
+        AND COALESCE(`exclusion`, 0) = 0
         """
+        # 👌
         results = fetch_query_results(query)
         if results:
             df = pd.DataFrame(results)
@@ -136,17 +170,31 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
 
 
     elif industry_id is not None and sub_sector_id is not None and segment_id is None:
-        query = f"""
-        SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
-            `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
-        FROM `tabIndustry Capacity Rule`
-        WHERE (
-            ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
-            OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
-        )
-        AND extremity_record = 0
-        AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment IS NULL);
-        """
+        # query = f"""
+        # SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
+        #     `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
+        # FROM `tabIndustry Capacity Rule`
+        # WHERE (
+        #     ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
+        #     OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
+        # )
+        # AND extremity_record = 0
+        # AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment IS NULL)
+        # """
+
+        query = f"""SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`,
+       `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
+FROM `tabIndustry Capacity Rule`
+WHERE (
+        ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`)
+     OR (`minimum_capacity_value` < {required_capacity_by_user} AND `maximum_capacity_value` = 0)
+      )
+  AND `extremity_record` = 0
+  AND `industry` = '{industry_id}'
+  AND `sub_sector` = '{sub_sector_id}'
+  AND `segment` IS NULL
+  AND COALESCE(`exclusion`, 0) = 0"""
+        # 👌
         results = fetch_query_results(query)
         if results:
             df = pd.DataFrame(results)
@@ -154,17 +202,29 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
             return fetch_capacity_data(required_capacity_by_user, industry_id)
 
     elif industry_id is not None and sub_sector_id is None and segment_id is None:
-        query = f"""
-        SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
-            `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
+        # query = f"""
+        # SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
+        #     `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
+        # FROM `tabIndustry Capacity Rule`
+        # WHERE (
+        #     ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
+        #     OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
+        # )
+        # AND extremity_record = 0
+        # AND (industry = '{industry_id}');
+        # """
+
+        query = f"""SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`,
+       `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
         FROM `tabIndustry Capacity Rule`
         WHERE (
-            ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
-            OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
-        )
-        AND extremity_record = 0
-        AND (industry = '{industry_id}');
-        """
+                ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`)
+            OR (`minimum_capacity_value` < {required_capacity_by_user} AND `maximum_capacity_value` = 0)
+            )
+        AND `extremity_record` = 0
+        AND `industry` = '{industry_id}'
+        AND COALESCE(`exclusion`, 0) = 0"""
+        # 👌
         results = fetch_query_results(query)
         if results:
             df = pd.DataFrame(results)
@@ -176,14 +236,22 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
 
     # If no results, append the nearest capacity range query to each case
     if not results:
-        nearest_query = f"""
-        SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
-            `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
-        FROM `tabIndustry Capacity Rule`
-        WHERE
-        extremity_record = 0
-        AND industry = '{industry_id}'
-        """
+        # nearest_query = f"""
+        # SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`, 
+        #     `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
+        # FROM `tabIndustry Capacity Rule`
+        # WHERE
+        # extremity_record = 0
+        # AND industry = '{industry_id}';
+        # """
+
+        nearest_query = f"""SELECT `sub_sector`, `minimum_capacity_value`, `maximum_capacity_value`,
+       `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
+FROM `tabIndustry Capacity Rule`
+WHERE `extremity_record` = 0
+  AND `industry` = '{industry_id}'
+  AND COALESCE(`exclusion`, 0) = 0"""
+        # 👌
 
         if sub_sector_id is not None:
             nearest_query += f" AND sub_sector = '{sub_sector_id}'"
@@ -323,11 +391,25 @@ def log_to_file(key,value):
         file.write(json.dumps(log_entry) + "\n")
 
 def get_list_of_area_id(zone_id):
-    query = f"""
-    SELECT DISTINCT area
-    FROM `tabArea Zone Mapping`
-    WHERE zone = '{zone_id}'
+    # query = f"""
+    # SELECT DISTINCT area
+    # FROM `tabArea Zone Mapping`
+    # WHERE zone = '{zone_id}'
+    # """
+
+    query = f"""SELECT DISTINCT ar.name AS area_id
+    FROM `tabArea Zone Mapping` AS azm
+    JOIN `tabArea` AS ar
+    ON azm.area = ar.name
+    AND COALESCE(ar.exclusion, 0) = 0
+    JOIN `tabZone` AS zn
+    ON azm.zone = zn.name
+    AND COALESCE(zn.exclusion, 0) = 0
+    WHERE zn.name = '{zone_id}'
+    AND COALESCE(azm.exclusion, 0) = 0;
     """
+    # 👌
+
 
     # Call the function and assign results
     results = fetch_query_results(query)
@@ -342,11 +424,22 @@ def get_list_of_city_list(area_id_list):
     # Convert the list into a string format that can be used in SQL
     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
 
-    sql_query = f"""
-    SELECT DISTINCT city_id
-    FROM `tabArea`
-    WHERE name IN ({area_id_str});
-    """
+    # sql_query = f"""
+    # SELECT DISTINCT city_id
+    # FROM `tabArea`
+    # WHERE name IN ({area_id_str})
+    # AND exclusion = 0
+    # ;
+    # """
+
+    sql_query = f"""SELECT DISTINCT c.name AS city_id
+FROM `tabArea` AS a
+JOIN `tabCity` AS c
+  ON a.city_id = c.name         -- change to a.city if your column is named `city`
+ AND COALESCE(c.exclusion, 0) = 0
+WHERE a.name IN ({area_id_str})
+  AND COALESCE(a.exclusion, 0) = 0;
+  """
     
     # Call the fetch_query_results function to execute the query
     results = fetch_query_results(sql_query)
@@ -360,11 +453,21 @@ def get_list_of_city_list(area_id_list):
     
 def get_state_list(city_id_list):
     city_id_str = ', '.join(f"'{city_id}'" for city_id in city_id_list)
-    sql_query = f"""
-    SELECT DISTINCT state
-    FROM `tabCity`
-    WHERE name IN ({city_id_str});
-    """
+    # sql_query = f"""
+    # SELECT DISTINCT state
+    # FROM `tabCity`
+    # WHERE name IN ({city_id_str})
+    # AND exclusion = 0;
+    # """
+
+    sql_query = f"""SELECT DISTINCT s.name AS state
+FROM `tabCity` AS c
+JOIN `tabState` AS s
+  ON c.state = s.name           -- change to c.state_id if that’s your FK column
+ AND COALESCE(s.exclusion, 0) = 0
+WHERE c.name IN ({city_id_str})
+  AND COALESCE(c.exclusion, 0) = 0;
+"""
 
     # Call the fetch_query_results function to execute the query
     results = fetch_query_results(sql_query)
@@ -428,51 +531,114 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
     sql_query_for_property_and_employment = ""
 
     if selectedOption == "Intent to Build Industry from Scratch":
-        sql_query_for_property_and_employment = f"""
-            SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
-            FROM `tabSurvey No` p
-            JOIN `tabEmployment City Mapping` e ON p.area = e.area
-            JOIN `tabArea` a on p.area = a.name
-            WHERE (p.zone = '{zone_id}') 
-            AND (p.area IN ({area_id_str}))
-            AND p.status != "Sold"
-            AND p.area_acre >0
-            AND (p.property_type is NOT Null)
-            AND p.property_type != ''
-            AND p.property_type != 'Warehouse'
-            AND p.property_type != 'Industrial Plant'
-            AND p.property_type != 'Auction Property';
-            """
+        # sql_query_for_property_and_employment = f"""
+            # SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
+            # FROM `tabSurvey No` p
+            # JOIN `tabEmployment City Mapping` e ON p.area = e.area
+            # JOIN `tabArea` a on p.area = a.name
+            # WHERE (p.zone = '{zone_id}') 
+            # AND (p.area IN ({area_id_str}))
+            # AND p.status != "Sold"
+            # AND p.area_acre >0
+            # AND (p.property_type is NOT Null)
+            # AND p.property_type != ''
+            # AND p.property_type != 'Warehouse'
+            # AND p.property_type != 'Industrial Plant'
+            # AND p.property_type != 'Auction Property';
+        #     """
+
+        sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+        p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
+        p.distance_from_power_source, p.latitude_longitude, p.property_type,
+        p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
+        p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved,
+        p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport,
+        e.area, e.employment_type, e.availability, a.network_connectivity
+        FROM `tabSurvey No` p
+        JOIN `tabEmployment City Mapping` e
+        ON p.area = e.area
+        AND COALESCE(e.exclusion, 0) = 0
+        JOIN `tabArea` a
+        ON p.area = a.name
+        AND COALESCE(a.exclusion, 0) = 0
+        WHERE p.zone = '{zone_id}'
+        AND p.area IN ({area_id_str})
+        AND p.status <> 'Sold'
+        AND p.area_acre > 0
+        AND p.property_type IS NOT NULL
+        AND p.property_type <> ''
+        AND p.property_type <> 'Warehouse'
+        AND p.property_type <> 'Industrial Plant'
+        AND p.property_type <> 'Auction Property'
+        AND COALESCE(p.exclusion, 0) = 0;
+        """
+        # 👌👌
+
 
     elif selectedOption == "Intent to Acquire Existing Industrial Infrastructure":
-        sql_query_for_property_and_employment = f"""
-            SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
-            FROM `tabSurvey No` p
-            JOIN `tabEmployment City Mapping` e ON p.area = e.area
-            JOIN `tabArea` a on p.area = a.name  
-            WHERE (p.zone = '{zone_id}') 
-            AND (p.area IN ({area_id_str}))
-            AND p.status != "Sold"
-            AND p.area_acre >0
-            AND (p.property_type is NOT Null)
-            AND p.property_type != ''
-            AND p.property_type != 'Warehouse'
-            AND (p.property_type = 'Industrial Plant'
-            OR p.property_type = 'Auction Property');
-            """
+        # sql_query_for_property_and_employment = f""" SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity FROM tabSurvey No p JOIN tabEmployment City Mapping e ON p.area = e.area JOIN tabArea a on p.area = a.name WHERE (p.zone = '{zone_id}') AND (p.area IN ({area_id_str})) AND p.status != "Sold" AND p.area_acre >0 AND (p.property_type is NOT Null) AND p.property_type != '' AND p.property_type != 'Warehouse' AND (p.property_type = 'Industrial Plant' OR p.property_type = 'Auction Property'); """
+
+        sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+        p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
+        p.distance_from_power_source, p.latitude_longitude, p.property_type,
+        p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
+        p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved,
+        p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport,
+        e.area, e.employment_type, e.availability, a.network_connectivity
+        FROM `tabSurvey No` p
+        JOIN `tabEmployment City Mapping` e
+        ON p.area = e.area
+        AND COALESCE(e.exclusion, 0) = 0
+        JOIN `tabArea` a
+        ON p.area = a.name
+        AND COALESCE(a.exclusion, 0) = 0
+        WHERE p.zone = '{zone_id}'
+        AND p.area IN ({area_id_str})
+        AND p.status <> 'Sold'
+        AND p.area_acre > 0
+        AND p.property_type IS NOT NULL
+        AND p.property_type <> ''
+        AND (p.property_type = 'Industrial Plant'
+            OR p.property_type = 'Auction Property')
+        AND COALESCE(p.exclusion, 0) = 0;
+        """
+        # 👌👌
 
     elif selectedOption == "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure":
-        sql_query_for_property_and_employment = f"""
-            SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
-            FROM `tabSurvey No` p
-            JOIN `tabEmployment City Mapping` e ON p.area = e.area
-            JOIN `tabArea` a on p.area = a.name
-            WHERE (p.zone = '{zone_id}') 
-            AND (p.area IN ({area_id_str}))
-            AND p.status != "Sold"
-            AND p.area_acre >0
-            AND (p.property_type != 'Warehouse');
-            """
+        # sql_query_for_property_and_employment = f"""
+        #     SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
+        #     FROM `tabSurvey No` p
+        #     JOIN `tabEmployment City Mapping` e ON p.area = e.area
+        #     JOIN `tabArea` a on p.area = a.name
+        #     WHERE (p.zone = '{zone_id}') 
+        #     AND (p.area IN ({area_id_str}))
+        #     AND p.status != "Sold"
+        #     AND p.area_acre >0
+        #     AND (p.property_type != 'Warehouse');
+        #     """
+
+        sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+       p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
+       p.distance_from_power_source, p.latitude_longitude, p.property_type,
+       p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
+       p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved,
+       p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport,
+       e.area, e.employment_type, e.availability, a.network_connectivity
+        FROM `tabSurvey No` p
+        JOIN `tabEmployment City Mapping` e
+        ON p.area = e.area
+        AND COALESCE(e.exclusion, 0) = 0
+        JOIN `tabArea` a
+        ON p.area = a.name
+        AND COALESCE(a.exclusion, 0) = 0
+        WHERE p.zone = '{zone_id}'
+        AND p.area IN ({area_id_str})
+        AND p.status <> 'Sold'
+        AND p.area_acre > 0
+        AND p.property_type <> 'Warehouse'
+        AND COALESCE(p.exclusion, 0) = 0;
+        """
+        # 👌👌
     frappe.log_error("sql_query_for_property_and_employment",sql_query_for_property_and_employment)
     # Call the function and assign results
     results = fetch_query_results(sql_query_for_property_and_employment)
@@ -498,6 +664,7 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
         WHERE (pzone = '{zone_id}') 
         AND (parea IN ({area_id_str}));
         """
+        # 👌👌
         
         fallback_results = fetch_query_results(sql_query_for_connected_property_and_employment)
         
@@ -536,42 +703,80 @@ def get_property_incentive_mapped(industry_id,sub_sector_id,area_id_list,city_id
     log_to_file("property_id_list",str(property_id_list))
     property_id_list_str = ', '.join(f"'{property_id}'" for property_id in property_id_list)
     today_date = datetime.now().strftime('%Y-%m-%d 00:00:00')
-    sql_query = f"""
-SELECT 
+#     sql_query = f"""
+# SELECT 
+#     i.name, i.incentive_name, i.incentive_type, 
+#     i.incentive_operation_start_date, i.incentive_operation_end_date, 
+#     i.quantum_of_assistance, 
+#     iim.sub_sector, iim.area, iim.city, iim.state, i.incentive_rank,
+#     p.name, p.area AS property_area_id
+# FROM `tabIncentive Industry Mapping` iim
+# JOIN `tabIncentive` i
+#     ON i.name = iim.incentive
+# JOIN `tabSurvey No` p
+#     ON (
+#         (iim.area = p.area)
+#         OR (iim.area IS NULL AND iim.city = p.city)
+#         OR (iim.area IS NULL AND iim.city IS NULL AND iim.state = p.state)
+#         OR (iim.country_level = 1)
+#     )
+# WHERE
+#     (
+#         (iim.sub_sector = '{sub_sector_id}')
+#         OR (iim.sub_sector IS NULL AND iim.industry = '{industry_id}')
+#         OR (iim.pan_industries = 1)
+#     )
+#     AND (
+#         (iim.area IN ({area_id_str}))
+#         OR (iim.area IS NULL AND iim.city IN ({city_id_str}))
+#         OR (iim.area IS NULL AND iim.city IS NULL AND iim.state IN ({state_id_str}))
+#         OR (iim.country_level = 1)
+#     )
+#     AND (
+#         p.name IN ({property_id_list_str})
+#     )
+#     AND (
+#         '{today_date}' BETWEEN i.incentive_operation_start_date AND i.incentive_operation_end_date
+#     );
+# """
+
+    sql_query = f"""SELECT 
     i.name, i.incentive_name, i.incentive_type, 
     i.incentive_operation_start_date, i.incentive_operation_end_date, 
     i.quantum_of_assistance, 
     iim.sub_sector, iim.area, iim.city, iim.state, i.incentive_rank,
     p.name, p.area AS property_area_id
-FROM `tabIncentive Industry Mapping` iim
-JOIN `tabIncentive` i
-    ON i.name = iim.incentive
-JOIN `tabSurvey No` p
-    ON (
+FROM `tabIncentive Industry Mapping` AS iim
+JOIN `tabIncentive` AS i
+  ON i.name = iim.incentive
+ AND COALESCE(i.exclusion, 0) = 0
+JOIN `tabSurvey No` AS p
+  ON (
         (iim.area = p.area)
-        OR (iim.area IS NULL AND iim.city = p.city)
-        OR (iim.area IS NULL AND iim.city IS NULL AND iim.state = p.state)
-        OR (iim.country_level = 1)
-    )
-WHERE
-    (
+     OR (iim.area IS NULL AND iim.city = p.city)
+     OR (iim.area IS NULL AND iim.city IS NULL AND iim.state = p.state)
+     OR (iim.country_level = 1)
+     )
+ AND COALESCE(p.exclusion, 0) = 0
+WHERE COALESCE(iim.exclusion, 0) = 0
+  AND (
         (iim.sub_sector = '{sub_sector_id}')
-        OR (iim.sub_sector IS NULL AND iim.industry = '{industry_id}')
-        OR (iim.pan_industries = 1)
-    )
-    AND (
+     OR (iim.sub_sector IS NULL AND iim.industry = '{industry_id}')
+     OR (iim.pan_industries = 1)
+      )
+  AND (
         (iim.area IN ({area_id_str}))
-        OR (iim.area IS NULL AND iim.city IN ({city_id_str}))
-        OR (iim.area IS NULL AND iim.city IS NULL AND iim.state IN ({state_id_str}))
-        OR (iim.country_level = 1)
-    )
-    AND (
-        p.name IN ({property_id_list_str})
-    )
-    AND (
-        '{today_date}' BETWEEN i.incentive_operation_start_date AND i.incentive_operation_end_date
-    );
-"""
+     OR (iim.area IS NULL AND iim.city IN ({city_id_str}))
+     OR (iim.area IS NULL AND iim.city IS NULL AND iim.state IN ({state_id_str}))
+     OR (iim.country_level = 1)
+      )
+  AND p.name IN ({property_id_list_str})
+  AND '{today_date}' BETWEEN i.incentive_operation_start_date
+                         AND i.incentive_operation_end_date;
+                         """
+                         # 👌👌
+                         
+
 
     # Execute the query using the provided fetch_query_results function
     results = fetch_query_results(sql_query)
@@ -713,7 +918,7 @@ def calculate_employment_availability_score(df, sub_sector_id):
     query = f"""
         SELECT majorly_required_skill_type, moderately_required_skill_type, least_required_skill_type
         FROM `tabIndustry Specific Info`
-        WHERE sub_sector = "{sub_sector_id}"
+        WHERE sub_sector = "{sub_sector_id}";
     """
 
     result = fetch_query_results (query)
@@ -911,60 +1116,115 @@ def get_property_approval_mapped(industry_id,sub_sector_id,area_id_list,city_id_
     city_id_str = ', '.join(f"'{area_id}'" for area_id in city_id_list)
     state_id_str = ', '.join(f"'{state_id}'" for state_id in state_id_list)
     property_id_list_str = ', '.join(f"'{property_id}'" for property_id in property_id_list)
+#     query = f"""
+# SELECT 
+#     a.name, a.license_approval, a.government_department, 
+#     a.business_location_type as ABLT, a.land_type as ALT, 
+#     a.vicinity_detail as AVD, a.cross_following_details as ACFD,
+#     a.road_cutting, a.delivery_schedule_in_working_days, 
+#     a.mode_of_application, a.stage, a.is_dependent, a.depends_on, 
+#     a.area, 
+#     p.name,  p.business_location_type, p.land_type, 
+#     p.require_shifting_of_any_electricity_line_or_pole, 
+#     p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, 
+#     p.will_your_industry_cross_the_following.
+# FROM `tabLicenses and Approvals Type` a
+# JOIN `tabSurvey No` p
+#     ON (
+#         (a.area = p.area)
+#         OR (a.area IS NULL AND a.city = p.city)
+#         OR (a.area IS NULL AND a.city IS NULL AND a.state = p.state)
+#         OR (a.country_level = 1)
+#     )
+# WHERE
+#     (
+#         (a.sub_sector = '{sub_sector_id}')
+#         OR (a.sub_sector IS NULL AND a.industry = '{industry_id}')
+#         OR (a.pan_industries = "Yes")
+#     )
+#     AND (
+#         (a.area IN ({area_id_str}))
+#         OR (a.area IS NULL AND a.city IN ({city_id_str}))
+#         OR (a.area IS NULL AND a.city IS NULL AND a.state IN ({state_id_str}))
+#         OR (a.country_level = 1)
+#     )
+#     AND (
+#         (
+#             (a.cross_following_details = 'None of the above')
+#             AND (a.vicinity_detail = 'None of the above')
+#             AND (a.road_cutting = "No")
+#             AND (a.tree_cutting = "No")
+#             AND (a.business_location_type IS NULL)
+#             AND (a.land_type IS NULL)
+#             AND (a.require_pole_shifting = "No")
+#         )
+#         OR (a.cross_following_details = p.will_your_industry_cross_the_following)
+#         OR (a.vicinity_detail = p.vicinity_of)
+#         OR (a.road_cutting = "Yes" AND p.road_cutting_involved = "Yes")
+#         OR (a.tree_cutting = "Yes" AND p.tree_cutting_involved = "Yes")
+#         OR (a.business_location_type = p.business_location_type AND a.land_type = p.land_type)
+#         OR ((a.business_location_type = p.business_location_type) AND (a.land_type IS NULL))
+#         OR (a.require_pole_shifting = "Yes" AND p.require_shifting_of_any_electricity_line_or_pole = "Yes")
+#     )
+#     AND (
+#         p.name IN ({property_id_list_str})
+#     )
+# """
+
     query = f"""
 SELECT 
     a.name, a.license_approval, a.government_department, 
-    a.business_location_type as ABLT, a.land_type as ALT, 
-    a.vicinity_detail as AVD, a.cross_following_details as ACFD,
+    a.business_location_type AS ABLT, a.land_type AS ALT, 
+    a.vicinity_detail AS AVD, a.cross_following_details AS ACFD,
     a.road_cutting, a.delivery_schedule_in_working_days, 
     a.mode_of_application, a.stage, a.is_dependent, a.depends_on, 
     a.area, 
-    p.name,  p.business_location_type, p.land_type, 
+    p.name, p.business_location_type, p.land_type, 
     p.require_shifting_of_any_electricity_line_or_pole, 
     p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, 
     p.will_your_industry_cross_the_following
-FROM `tabLicenses and Approvals Type` a
-JOIN `tabSurvey No` p
-    ON (
+FROM `tabLicenses and Approvals Type` AS a
+JOIN `tabSurvey No` AS p
+  ON (
         (a.area = p.area)
-        OR (a.area IS NULL AND a.city = p.city)
-        OR (a.area IS NULL AND a.city IS NULL AND a.state = p.state)
-        OR (a.country_level = 1)
-    )
-WHERE
-    (
+     OR (a.area IS NULL AND a.city = p.city)
+     OR (a.area IS NULL AND a.city IS NULL AND a.state = p.state)
+     OR (a.country_level = 1)
+     )
+ AND COALESCE(p.exclusion, 0) = 0
+WHERE COALESCE(a.exclusion, 0) = 0
+  AND (
         (a.sub_sector = '{sub_sector_id}')
-        OR (a.sub_sector IS NULL AND a.industry = '{industry_id}')
-        OR (a.pan_industries = "Yes")
-    )
-    AND (
+     OR (a.sub_sector IS NULL AND a.industry = '{industry_id}')
+     OR (a.pan_industries = 'Yes')
+      )
+  AND (
         (a.area IN ({area_id_str}))
-        OR (a.area IS NULL AND a.city IN ({city_id_str}))
-        OR (a.area IS NULL AND a.city IS NULL AND a.state IN ({state_id_str}))
-        OR (a.country_level = 1)
-    )
-    AND (
+     OR (a.area IS NULL AND a.city IN ({city_id_str}))
+     OR (a.area IS NULL AND a.city IS NULL AND a.state IN ({state_id_str}))
+     OR (a.country_level = 1)
+      )
+  AND (
         (
-            (a.cross_following_details = 'None of the above')
-            AND (a.vicinity_detail = 'None of the above')
-            AND (a.road_cutting = "No")
-            AND (a.tree_cutting = "No")
-            AND (a.business_location_type IS NULL)
-            AND (a.land_type IS NULL)
-            AND (a.require_pole_shifting = "No")
+            a.cross_following_details = 'None of the above'
+        AND a.vicinity_detail        = 'None of the above'
+        AND a.road_cutting           = 'No'
+        AND a.tree_cutting           = 'No'
+        AND a.business_location_type IS NULL
+        AND a.land_type              IS NULL
+        AND a.require_pole_shifting  = 'No'
         )
-        OR (a.cross_following_details = p.will_your_industry_cross_the_following)
-        OR (a.vicinity_detail = p.vicinity_of)
-        OR (a.road_cutting = "Yes" AND p.road_cutting_involved = "Yes")
-        OR (a.tree_cutting = "Yes" AND p.tree_cutting_involved = "Yes")
-        OR (a.business_location_type = p.business_location_type AND a.land_type = p.land_type)
-        OR ((a.business_location_type = p.business_location_type) AND (a.land_type IS NULL))
-        OR (a.require_pole_shifting = "Yes" AND p.require_shifting_of_any_electricity_line_or_pole = "Yes")
-    )
-    AND (
-        p.name IN ({property_id_list_str})
-    )
+     OR (a.cross_following_details = p.will_your_industry_cross_the_following)
+     OR (a.vicinity_detail = p.vicinity_of)
+     OR (a.road_cutting = 'Yes' AND p.road_cutting_involved = 'Yes')
+     OR (a.tree_cutting = 'Yes' AND p.tree_cutting_involved = 'Yes')
+     OR (a.business_location_type = p.business_location_type AND a.land_type = p.land_type)
+     OR (a.business_location_type = p.business_location_type AND a.land_type IS NULL)
+     OR (a.require_pole_shifting = 'Yes' AND p.require_shifting_of_any_electricity_line_or_pole = 'Yes')
+      )
+  AND p.name IN ({property_id_list_str});
 """
+
     # Call the fetch_query_results function to get the results from the query
     results = fetch_query_results(query)
     # Check if there are results
@@ -1283,11 +1543,28 @@ def fetch_supply_data(industry_id, sub_sector_id=None, segment_id=None):
 
     if industry_id is not None and sub_sector_id is not None and segment_id is not None:
 
+        # supply_rules_query = f"""
+        # SELECT supply, minimum_supply_requirement, essential_items
+        # FROM `tabSupply Rules`
+        # WHERE (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment = '{segment_id}')
+        # """
+
         supply_rules_query = f"""
-        SELECT supply, minimum_supply_requirement, essential_items
-        FROM `tabSupply Rules`
-        WHERE (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment = '{segment_id}')
+        SELECT
+        sr.supply,
+        sr.minimum_supply_requirement,
+        sr.essential_items,
+        FROM `tabSupply Rules` AS sr
+        JOIN `tabSupply` AS s
+        ON sr.supply = s.name
+        AND COALESCE(s.exclusion, 0) = 0
+        WHERE sr.industry   = '{industry_id}'
+        AND sr.sub_sector = '{sub_sector_id}'
+        AND sr.segment    = '{segment_id}'
+        AND COALESCE(sr.exclusion, 0) = 0
         """
+
+        #👌👌
         results = fetch_query_results(supply_rules_query)
 
         if not results:
@@ -1295,11 +1572,32 @@ def fetch_supply_data(industry_id, sub_sector_id=None, segment_id=None):
 
     elif industry_id is not None and sub_sector_id is not None and segment_id is None:
         
-        supply_rules_query = f"""
-        SELECT supply, minimum_supply_requirement, essential_items
-        FROM `tabSupply Rules`
-        WHERE (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment IS NULL)
-        """
+        # supply_rules_query = f"""
+        # SELECT supply, minimum_supply_requirement, essential_items
+        # FROM `tabSupply Rules`
+        # WHERE (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment IS NULL)
+        # """
+
+#         supply_rules_query = f"""
+#     SELECT supply, minimum_supply_requirement, essential_items
+#     FROM `tabSupply Rules`
+#     WHERE industry = '{industry_id}'
+#       AND sub_sector = '{sub_sector_id}'
+#       AND segment IS NULL
+#       AND COALESCE(exclusion, 0) = 0
+# """
+
+        supply_rules_query = f"""SELECT sr.supply, sr.minimum_supply_requirement, sr.essential_items
+FROM `tabSupply Rules` AS sr
+JOIN `tabSupply` AS s
+  ON sr.supply = s.name
+ AND COALESCE(s.exclusion, 0) = 0
+WHERE sr.industry   = '{industry_id}'
+  AND sr.sub_sector = '{sub_sector_id}'
+  AND sr.segment IS NULL
+  AND COALESCE(sr.exclusion, 0) = 0;
+  """
+  #👌👌
         results = fetch_query_results(supply_rules_query)
 
         if not results:
@@ -1307,11 +1605,21 @@ def fetch_supply_data(industry_id, sub_sector_id=None, segment_id=None):
         
     elif industry_id is not None and sub_sector_id is None and segment_id is None:
 
-        supply_rules_query = f"""
-        SELECT supply, minimum_supply_requirement, essential_items
-        FROM `tabSupply Rules`
-        WHERE (industry = '{industry_id}')
-        """
+        # supply_rules_query = f"""
+        # SELECT supply, minimum_supply_requirement, essential_items
+        # FROM `tabSupply Rules`
+        # WHERE industry = '{industry_id}'
+        # AND COALESCE(exclusion, 0) = 0
+        # """
+
+        supply_rules_query = f"""SELECT sr.supply, sr.minimum_supply_requirement, sr.essential_items
+FROM `tabSupply Rules` AS sr
+JOIN `tabSupply` AS s
+  ON sr.supply = s.name
+ AND COALESCE(s.exclusion, 0) = 0
+WHERE sr.industry = '{industry_id}'
+  AND COALESCE(sr.exclusion, 0) = 0;"""
+
         results = fetch_query_results(supply_rules_query)
         if not results:
             return None
@@ -1358,15 +1666,33 @@ def get_supply_rule(industry_id, sub_sector_id, segment_id,required_capacity_by_
 def get_vendor_df(supply_rules_df):
     all_supply_id_list = list(supply_rules_df["supply_id"].values)
     supply_id_str = ', '.join(f"'{supply_id}'" for supply_id in all_supply_id_list)
-    vendor_fetching_query = f""" 
-    select VSC.parent, VSC.supply, VSC.maximum_supply_capacity, 
-        V.years_of_experience, V.no_of_location, V.no_of_past_clients, 
-        V.no_of_services, V.no_of_employees, V.latitude_longitude
-    From `tabVendor` AS V
-    Join `tabVendor Supply Capacity` as VSC
+    # vendor_fetching_query = f""" 
+    # select VSC.parent, VSC.supply, VSC.maximum_supply_capacity, 
+    #     V.years_of_experience, V.no_of_location, V.no_of_past_clients, 
+    #     V.no_of_services, V.no_of_employees, V.latitude_longitude
+    # From `tabVendor` AS V
+    # Join `tabVendor Supply Capacity` as VSC
+    # ON V.name = VSC.parent
+    # WHERE supply IN ({supply_id_str})
+    # """
+
+    vendor_fetching_query = f"""SELECT
+    VSC.parent,
+    VSC.supply,
+    VSC.maximum_supply_capacity,
+    V.years_of_experience,
+    V.no_of_location,
+    V.no_of_past_clients,
+    V.no_of_services,
+    V.no_of_employees,
+    V.latitude_longitude
+    FROM `tabVendor` AS V
+    JOIN `tabVendor Supply Capacity` AS VSC
     ON V.name = VSC.parent
-    WHERE supply IN ({supply_id_str})
-    """
+    WHERE VSC.supply IN ({supply_id_str})
+    AND COALESCE(V.exclusion, 0) = 0;
+  """
+
     log_to_file("vendor_fetching_query",vendor_fetching_query)
     log_to_file("supply_id_str",supply_id_str)
     # Execute the query using the fetch_query_results function

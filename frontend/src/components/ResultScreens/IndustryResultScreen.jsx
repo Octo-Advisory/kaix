@@ -888,6 +888,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
             nearest_railway_station: data.nearest_railway_station,
             nearest_airport: data.nearest_airport,
             nearest_seaport: data.nearest_seaport,
+            nearest_highway: data.nearest_highway
           }
           preaparedSolutions.push(solution)
           // console.log(solution, 'This is the solution printed ......')
@@ -1318,11 +1319,11 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
                             </>
                           )}
                         </div>
-
+                        {selectedProperty.approvals.length > 0 && (
                         <div className='absolute flex flex-row gap-2 items-center text-sm justify-center p-2 bottom-3 self-center cursor-pointer' onClick={handleShowApprovals}>
                           {uiConfig?.['approval_list_button_title'] || "View Approvals"} <FaArrowRight />
                         </div>
-
+                        )}
                       </div>
 
                     </div>
@@ -1438,7 +1439,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
                             </div>
                           )}
                         </div>
-                        {selectedProperty.incentives.length > 5 && (
+                        {selectedProperty.incentives.length > 0 && (
                           <div className='flex flex-row gap-2 items-center text-sm justify-center p-2 absolute bottom-3 self-center cursor-pointer' onClick={handleShowIncentive}>
                             {uiConfig?.['incentives_list_button_title'] || "View Incentives"} <FaArrowRight />
                           </div>

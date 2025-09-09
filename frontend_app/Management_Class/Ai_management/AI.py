@@ -321,7 +321,7 @@ def ai_module_call(input,confirmationMessage,chatId):
             response = polish_ai_response_if_possible(
             raw_response=response,
             chat_history_messages=chat_history,            # LangChain objects
-            chat_history_strings=None,      # or None if you don't want to use this path
+            chat_history_strings=None,      # orf None if you don't want to use this path
             latest_user=input
             )
             chat_history = chat_history[:-1] + [AIMessage(content=response["Ai_response"])]

@@ -14,7 +14,8 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
             ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
             OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
         )
-        AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment = '{segment_id}');
+        AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment = '{segment_id}')
+        AND extremity_record = 0;
         """
         results = frappe.db.sql(query)
         if results:
@@ -32,7 +33,8 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
             ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
             OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
         )
-        AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment IS NULL);
+        AND (industry = '{industry_id}' AND sub_sector = '{sub_sector_id}' AND segment IS NULL)
+        AND extremity_record = 0;
         """
         results = frappe.db.sql(query)
         if results:
@@ -49,7 +51,8 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
             ({required_capacity_by_user} BETWEEN `minimum_capacity_value` AND `maximum_capacity_value`) 
             OR ((`minimum_capacity_value` < {required_capacity_by_user}) AND (`maximum_capacity_value` = 0))
         )
-        AND (industry = '{industry_id}');
+        AND (industry = '{industry_id}')
+        AND extremity_record = 0;
         """
         results = frappe.db.sql(query)
         if results:
@@ -67,6 +70,7 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
             `minimum_land_requirement_in_acre`, `maximum_land_requirement_in_acre`, `capacity_unit`
         FROM `tabIndustry Capacity Rule`
         WHERE industry = '{industry_id}'
+        AND extremity_record = 0
         """
 
         if sub_sector_id is not None:

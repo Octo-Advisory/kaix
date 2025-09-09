@@ -20,7 +20,7 @@ import { FaPlus } from "react-icons/fa";
 import { FaMinus } from "react-icons/fa";
 import { useFrappeGetDoc } from 'frappe-react-sdk';
 import { getCurvedLine } from "./utils";
-mapboxgl.accessToken = 'pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ';
+import { nanoid } from "nanoid";
 
 const SingleMap = ({ selectedProperty, intension }) => {
   const copyiedSelectedProperty = structuredClone(selectedProperty);
@@ -69,9 +69,11 @@ const SingleMap = ({ selectedProperty, intension }) => {
   var nearestSeaportDetail = null;
   var nearestRailwayStationDetail = null;
   var highwayCoord = null;
+  var nearestHighwayDetail = null;
   useEffect(() => {
-    if (!mapContainer.current || !lat || !lng) return;
-
+    if (!mapContainer.current || !lat || !lng || !uiData) return;
+    mapboxgl.accessToken = `${uiConfig?.['mapmobx_api_token']}`;
+    
     mapRef.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
@@ -82,10 +84,10 @@ const SingleMap = ({ selectedProperty, intension }) => {
     });
 
     return () => mapRef.current?.remove();
-  }, [lat, lng]);
+  }, [lat, lng,uiData]);
 
   useEffect(() => {
-    if (!mapRef.current || !boundaryCoordinates) return;
+    if (!mapRef.current || !boundaryCoordinates || !uiData) return;
 
     const parsedBoundary =
       typeof boundaryCoordinates === 'string'
@@ -97,7 +99,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
     const bounds = new mapboxgl.LngLatBounds();
     parsedBoundary.forEach((coord) => bounds.extend(coord));
 
-    const sourceId = `boundary-${crypto.randomUUID()}`;
+    const sourceId = `boundary-${nanoid()}`;
 
     mapRef.current.on('load', () => {
       document.querySelector('.accordion-header').click();
@@ -165,9 +167,10 @@ const SingleMap = ({ selectedProperty, intension }) => {
       // Apply margin-top or transform
       marker.getElement().style.marginTop = '20px'; // for visual downward shift 
     });
-  }, [boundaryCoordinates]);
+  }, [boundaryCoordinates,uiData]);
 
   useEffect(() => {
+    if (!mapRef.current || !uiData) return;
     const handleStyleLoad = () => {
       (async () => {
         await loadVendorlayer();
@@ -208,7 +211,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
         element.removeEventListener("change", handleCheckboxChange);
       });
     };
-  }, []);
+  }, [uiData]);
 
   const addConnectivityLayer = (layer, coord, propertyCoord, detail,direction = {}) => {
     // Custom Marker with MdFactory
@@ -263,6 +266,9 @@ const SingleMap = ({ selectedProperty, intension }) => {
           break;
         case LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS:
           name = detail.name1+" Railway Station";
+          break;
+        case LAYERS.DEFAULT_LAYER.HIGHWAY:
+          name = detail.title;
           break;
         default:
           break;
@@ -477,7 +483,10 @@ const SingleMap = ({ selectedProperty, intension }) => {
 
       if (copyiedSelectedProperty.nearest_highway_coord != null && copyiedSelectedProperty.nearest_highway_coord != "") {
         highwayCoord = copyiedSelectedProperty.nearest_highway_coord.replace(" ", "").split(",").map(Number);
-        addConnectivityLayer(LAYERS.DEFAULT_LAYER.HIGHWAY, [highwayCoord[1], highwayCoord[0]], [lng, lat],null,DIRECTIONS.LEFT);
+        nearestHighwayDetail = await getDataForSingleLayer("Highway", { "name": copyiedSelectedProperty?.nearest_highway });
+        if (nearestHighwayDetail.data.length > 0) {          
+          addConnectivityLayer(LAYERS.DEFAULT_LAYER.HIGHWAY, [highwayCoord[1], highwayCoord[0]], [lng, lat],nearestHighwayDetail.data[0] ,DIRECTIONS.LEFT);
+        }    
       }
     } catch (error) {
       // console.error("Error in adding marker:", error);

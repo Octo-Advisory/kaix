@@ -30,6 +30,7 @@ import { useFrappeGetDoc } from "frappe-react-sdk";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { HiOutlineBolt, HiOutlineMap } from "react-icons/hi2";
+import { nanoid } from "nanoid";
 
 function MapComponent({ solutions, toggleModal, source, intension }) {
   //var copyiedSelectedProperty = null;
@@ -39,6 +40,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   var nearestSeaportDetail = null;
   var nearestRailwayStationDetail = null;
   var highwayCoord = null;
+  var nearestHighwayDetail = null;
 
   const validation_result = useSelector((state) => state.validate.validation_result)
   let propertyCoord = validation_result?.[0]?.[1]?.latitude_longitude?.split(",").map(Number).reverse() ?? null;
@@ -53,7 +55,6 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   const mapContainerRef = useRef(null); // Create a ref for the map container
   const mapRef = useRef(null); // Store map instance
   const copyiedSelectedProperty = useRef(null); // Store the real solution object
-  mapboxgl.accessToken = 'pk.eyJ1IjoiYW5hbnRhY2hhcnlhbWFycyIsImEiOiJjbTdtemhyZjUwb2xlMmtyMHlsZXR4cXN5In0.QykgfaU-rz_SP4Hz_UsufQ';
 
   const { data: uiData } = useFrappeGetDoc("UI Configuration", "Mapping")
   const configurations = uiData?.configurations || [];
@@ -85,6 +86,8 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     RIGHT: 0.4
   }
   useEffect(() => {
+    if (!uiData) return;
+    mapboxgl.accessToken = `${uiConfig?.['mapmobx_api_token']}`;
     // Initialize the map after the component mounts
     mapRef.current = new mapboxgl.Map({
       container: mapContainerRef.current, // Use the ref to attach the map
@@ -101,7 +104,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       document.querySelectorAll('.accordion-header')[1].click();
     });
     return () => mapRef.current.remove(); // Cleanup the map instance on unmount
-  }, []); // Empty dependency array to run only once
+  }, [uiData]); // Empty dependency array to run only once
 
   // Function to validate latitude and longitude
   function isValidLatLng(coord) {
@@ -161,7 +164,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         if (item.result_type === "Industry_Result") {
           //#region Draw boundry for properties
           let parsedCoord = JSON.parse(item.boundary_coordinates);
-          let sourceId = `Custom_Source_${crypto.randomUUID()}`;
+          let sourceId = `Custom_Source_${nanoid()}`;
 
           mapRef.current.addSource(sourceId, {
             type: "geojson",
@@ -175,8 +178,8 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
             },
           });
 
-          let layerId1 = `Custom_polygon_fill_${crypto.randomUUID()}`;
-          let layerId2 = `Custom_polygon_border_${crypto.randomUUID()}`;
+          let layerId1 = `Custom_polygon_fill_${nanoid()}`;
+          let layerId2 = `Custom_polygon_border_${nanoid()}`;
 
           mapRef.current.addLayer({
             id: layerId1,
@@ -240,7 +243,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       latLongArray.forEach(vendorCoord => {
         if (!isValidLatLng(vendorCoord)) return; // Skip invalid coordinates
         let sourceId = 'property-vendor-lines-' + count;
-        let layerId = `Custom_property_vendor_lines_layer_${crypto.randomUUID()}`;
+        let layerId = `Custom_property_vendor_lines_layer_${nanoid()}`;
         let curvedDirectionValue = null;
         if (direction == "right") {
           direction = "left";
@@ -314,7 +317,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     }
 
     //#region Add markers to map - Modified for vendors/properties
-    await addPointersToMap(elements, crypto.randomUUID());
+    await addPointersToMap(elements, nanoid());
 
     //#region set check icon manually
     document.documentElement.style.setProperty(
@@ -689,7 +692,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     });
 
     // Keep original layer click functionality as fallback
-    const sourceId = `polygon-${crypto.randomUUID()}`;
+    const sourceId = `polygon-${nanoid()}`;
     const layerId = "Custom_" + layerType;
 
     mapRef.current.addSource(sourceId, {
@@ -948,7 +951,10 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
 
       if (copyiedSelectedProperty.current.nearest_highway_coord != null && copyiedSelectedProperty.current.nearest_highway_coord != "") {
         highwayCoord = copyiedSelectedProperty.current.nearest_highway_coord.replace(" ", "").split(",").map(Number);
-        addConnectivityLayer(LAYERS.DEFAULT_LAYER.HIGHWAY, [highwayCoord[1], highwayCoord[0]], [lng, lat], null, DIRECTIONS.LEFT);
+        nearestHighwayDetail = await getDataForSingleLayer("Highway", { "name": copyiedSelectedProperty?.nearest_highway });
+        if (nearestHighwayDetail.data.length > 0) {          
+          addConnectivityLayer(LAYERS.DEFAULT_LAYER.HIGHWAY, [highwayCoord[1], highwayCoord[0]], [lng, lat],nearestHighwayDetail.data[0] ,DIRECTIONS.LEFT);
+        }
       }
     } catch (error) {
       // console.error("Error in adding marker:", error);
@@ -1009,6 +1015,9 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
           break;
         case LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS:
           name = detail.name1 + " Railway Station";
+          break;
+        case LAYERS.DEFAULT_LAYER.HIGHWAY:
+          name = detail.title;
           break;
         default:
           break;
