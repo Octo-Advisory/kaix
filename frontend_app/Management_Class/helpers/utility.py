@@ -18,7 +18,7 @@ from math import radians, sin, cos, sqrt, atan2
 from geopy.distance import geodesic
 
 # from langchain_openai import ChatOpenAI
-config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 config = configparser.ConfigParser()
 config.read(config_file)
 groq_api_key = config['Key']['groq_key']
@@ -673,8 +673,8 @@ def insert_solution_result():
 
 @frappe.whitelist()
 def excute_Property_Creation(method_name=None,param=None,childBlockId=None):
-    python_exe = "/home/mars/property_seg_env/bin/python"
-    script_path = "/home/mars/frappe-bench/AeroShape/FinalCode.py"
+    python_exe = "/home/marsaiae/property_seg_env/bin/python"
+    script_path = "/home/marsaiae/frappe-bench/AeroShape/FinalCode.py"
 
     # Build args safely
     args = [python_exe, script_path, method_name]
@@ -689,7 +689,7 @@ def excute_Property_Creation(method_name=None,param=None,childBlockId=None):
             check=True,
             capture_output=True,
             text=True,
-            cwd="/home/mars/frappe-bench/AeroShape"  # set working directory
+            cwd="/home/marsaiae/frappe-bench/AeroShape"  # set working directory
         )
         return result.stdout
     except subprocess.CalledProcessError as e:

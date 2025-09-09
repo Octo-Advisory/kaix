@@ -19,7 +19,7 @@ import frappe
 import random
 
 # from langchain_openai import ChatOpenAI
-config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 config = configparser.ConfigParser()
 config.read(config_file)
 groq_api_key = config['Key']['groq_key']

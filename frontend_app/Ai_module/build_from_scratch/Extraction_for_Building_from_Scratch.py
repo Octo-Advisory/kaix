@@ -1970,17 +1970,35 @@ def entry_build_from_scratch(input,chatId, additional_class_response = None):
 
 def get_json_for_industry():
     final_json = {}
-    query = """
-            SELECT sgt.segment, indmappedsst.sub_sector_name, indmappedsst.industry_name
-            FROM `tabSegment` AS sgt
-            JOIN (
-                SELECT sst.name, sst.sub_sector_name, indt.industry_name
-                FROM `tabSub Sector` AS sst
-                JOIN `tabIndustry` AS indt
-                ON sst.industry_id = indt.name
-            ) AS indmappedsst
-            ON sgt.sub_sector = indmappedsst.name
-            """
+    # query = """
+    #         SELECT sgt.segment, indmappedsst.sub_sector_name, indmappedsst.industry_name
+    #         FROM `tabSegment` AS sgt
+    #         JOIN (
+    #             SELECT sst.name, sst.sub_sector_name, indt.industry_name
+    #             FROM `tabSub Sector` AS sst
+    #             JOIN `tabIndustry` AS indt
+    #             ON sst.industry_id = indt.name
+    #         ) AS indmappedsst............................
+    #         ON sgt.sub_sector = indmappedsst.name
+    #         """
+
+    query = f"""
+SELECT
+  sgt.segment,
+  sst.sub_sector_name,
+  indt.industry_name
+FROM `tabSegment` AS sgt
+JOIN `tabSub Sector` AS sst
+  ON sgt.sub_sector = sst.name
+ AND COALESCE(sst.exclusion, 0) = 0
+JOIN `tabZone` AS z
+  ON z.name = sst.zone_id
+ AND COALESCE(z.exclusion, 0) = 0
+JOIN `tabIndustry` AS indt
+  ON sst.industry_id = indt.name
+ AND COALESCE(indt.exclusion, 0) = 0
+WHERE COALESCE(sgt.exclusion, 0) = 0;
+        """
     s = frappe.db.sql(query,as_dict=True)
     for item in s:
         industry = item['industry_name']
@@ -2026,55 +2044,123 @@ def do_unit_conversion(state):
     level_check = None
 
     if state.get("Segment"):
+        # query = f"""
+        # select distinct jcrla.capacity_unit
+        # from (
+        #     select crla.capacity_unit, crla.sub_sector, crla.extremity_record, sst.sub_sector_name, seg.segment, IT.industry_name
+        #     from `tabIndustry Capacity Rule` as crla
+        #     join `tabSub Sector` as sst on crla.sub_sector = sst.name
+        #     join `tabSegment`   as seg on crla.segment   = seg.name
+        #     join `tabIndustry`  as IT  on crla.industry  = IT.name
+        # ) as jcrla
+        # where (jcrla.segment = '{state['Segment']}' and jcrla.sub_sector_name = '{state['Sub-Sector']}' and jcrla.industry_name = '{state['Main-Industry']}')
+        # AND extremity_record = 0
+        # limit 1
+        # """
+
         query = f"""
-        select distinct jcrla.capacity_unit
-        from (
-            select crla.capacity_unit, crla.sub_sector, crla.extremity_record, sst.sub_sector_name, seg.segment, IT.industry_name
-            from `tabIndustry Capacity Rule` as crla
-            join `tabSub Sector` as sst on crla.sub_sector = sst.name
-            join `tabSegment`   as seg on crla.segment   = seg.name
-            join `tabIndustry`  as IT  on crla.industry  = IT.name
-        ) as jcrla
-        where (jcrla.segment = '{state['Segment']}' and jcrla.sub_sector_name = '{state['Sub-Sector']}' and jcrla.industry_name = '{state['Main-Industry']}')
-        AND extremity_record = 0
-        limit 1
+        SELECT DISTINCT jcrla.capacity_unit
+        FROM (
+            SELECT
+                crla.capacity_unit,
+                crla.sub_sector,
+                crla.extremity_record,
+                sst.sub_sector_name,
+                seg.segment,
+                IT.industry_name
+            FROM `tabIndustry Capacity Rule` AS crla
+            JOIN `tabSub Sector` AS sst
+            ON crla.sub_sector = sst.name
+            AND COALESCE(sst.exclusion, 0) = 0
+            JOIN `tabSegment` AS seg
+            ON crla.segment = seg.name
+            AND COALESCE(seg.exclusion, 0) = 0
+            JOIN `tabIndustry` AS IT
+            ON crla.industry = IT.name
+            AND COALESCE(IT.exclusion, 0) = 0
+            WHERE COALESCE(crla.exclusion, 0) = 0
+        ) AS jcrla
+        WHERE jcrla.segment = '{state['Segment']}'
+        AND jcrla.sub_sector_name = '{state['Sub-Sector']}'
+        AND jcrla.industry_name = '{state['Main-Industry']}'
+        AND jcrla.extremity_record = 0
+        LIMIT 1
         """
+
+
         results = frappe.db.sql(query)
         if results:
             level_check = "Segment"
 
     # 2) Fallback: SUB-SECTOR
     if not results:
-        query = f"""
-        select distinct jcrla.capacity_unit
-        from (
-            select crla.capacity_unit, crla.sub_sector, crla.extremity_record, sst.sub_sector_name, sst.industry_id, IT.industry_name
-            from `tabIndustry Capacity Rule` as crla
-            join `tabSub Sector` as sst on crla.sub_sector = sst.name
-            join `tabIndustry`  as IT  on crla.industry  = IT.name
-        ) as jcrla
-        where (jcrla.sub_sector_name = '{state['Sub-Sector']}' and jcrla.industry_name = '{state['Main-Industry']}')
-        AND extremity_record = 0
-        limit 1
-        """
+    #     query = f"""
+    #     select distinct jcrla.capacity_unit
+    #     from (
+    #         select crla.capacity_unit, crla.sub_sector, crla.extremity_record, sst.sub_sector_name, sst.industry_id, IT.industry_name
+    #         from `tabIndustry Capacity Rule` as crla
+    #         join `tabSub Sector` as sst on crla.sub_sector = sst.name
+    #         join `tabIndustry`  as IT  on crla.industry  = IT.name
+    #     ) as jcrla
+    #     where (jcrla.sub_sector_name = '{state['Sub-Sector']}' and jcrla.industry_name = '{state['Main-Industry']}')
+    #     AND extremity_record = 0
+    #     limit 1
+    #     """
+
+        query = f"""SELECT DISTINCT jcrla.capacity_unit
+        FROM (
+            SELECT
+                crla.capacity_unit,
+                crla.sub_sector,
+                crla.extremity_record,
+                sst.sub_sector_name,
+                sst.industry_id,
+                IT.industry_name
+            FROM `tabIndustry Capacity Rule` AS crla
+            JOIN `tabSub Sector` AS sst ON crla.sub_sector = sst.name
+            JOIN `tabIndustry`  AS IT  ON crla.industry  = IT.name
+            WHERE COALESCE(sst.exclusion, 0) = 0
+            AND COALESCE(IT.exclusion, 0) = 0
+            AND COALESCE(crla.exclusion, 0) = 0
+        ) AS jcrla
+        WHERE jcrla.sub_sector_name = '{state['Sub-Sector']}'
+        AND jcrla.industry_name   = '{state['Main-Industry']}'
+        AND jcrla.extremity_record = 0
+        LIMIT 1;"""
         results = frappe.db.sql(query)
         if results:
             level_check = "Sub-Sector"
 
     # 3) Fallback: INDUSTRY (pick most frequent capacity_unit)
     if not results:
-        query = f"""
-        select jcrla.capacity_unit
-        from (
-            select crla.capacity_unit, crla.extremity_record, IT.industry_name
-            from `tabIndustry Capacity Rule` as crla
-            join `tabIndustry` as IT on crla.industry = IT.name
-        ) as jcrla
-        where jcrla.industry_name = '{state['Main-Industry']}'
-        AND extremity_record = 0
-        group by jcrla.capacity_unit
-        order by count(*) desc
-        limit 1
+        # query = f"""
+        # select jcrla.capacity_unit
+        # from (
+        #     select crla.capacity_unit, crla.extremity_record, IT.industry_name
+        #     from `tabIndustry Capacity Rule` as crla
+        #     join `tabIndustry` as IT on crla.industry = IT.name
+        # ) as jcrla
+        # where jcrla.industry_name = '{state['Main-Industry']}'
+        # AND extremity_record = 0
+        # group by jcrla.capacity_unit
+        # order by count(*) desc
+        # limit 1
+        # """
+
+        query = f"""SELECT jcrla.capacity_unit
+        FROM (
+            SELECT crla.capacity_unit, crla.extremity_record, IT.industry_name
+            FROM `tabIndustry Capacity Rule` AS crla
+            JOIN `tabIndustry` AS IT
+            ON crla.industry = IT.name
+            AND COALESCE(IT.exclusion, 0) = 0        
+            AND COALESCE(crla.exclusion, 0) = 0
+        ) AS jcrla
+        WHERE jcrla.industry_name = '{state['Main-Industry']}'
+        AND jcrla.extremity_record = 0
+        GROUP BY jcrla.capacity_unit
+        ORDER BY COUNT(*) DESC
+        LIMIT 1;
         """
         results = frappe.db.sql(query)
         if results:
@@ -2131,43 +2217,97 @@ def do_unit_conversion(state):
     def _build_ext_query(level, include_unit):
         unit_clause = " and crla.capacity_unit = %s" if include_unit else ""
         if level == "Segment":
+            # q = f"""
+            #     select crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
+            #     from `tabIndustry Capacity Rule` as crla
+            #     join `tabSub Sector` as sst on crla.sub_sector = sst.name
+            #     join `tabSegment`   as seg on crla.segment   = seg.name
+            #     join `tabIndustry`  as IT  on crla.industry  = IT.name
+            #     where seg.segment = %s
+            #       and sst.sub_sector_name = %s
+            #       and IT.industry_name    = %s
+            #       and crla.extremity_record = 1
+            #       {unit_clause}
+            #     limit 1
+            # """
+
             q = f"""
-                select crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
-                from `tabIndustry Capacity Rule` as crla
-                join `tabSub Sector` as sst on crla.sub_sector = sst.name
-                join `tabSegment`   as seg on crla.segment   = seg.name
-                join `tabIndustry`  as IT  on crla.industry  = IT.name
-                where seg.segment = %s
-                  and sst.sub_sector_name = %s
-                  and IT.industry_name    = %s
-                  and crla.extremity_record = 1
-                  {unit_clause}
-                limit 1
-            """
+            SELECT crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
+            FROM `tabIndustry Capacity Rule` AS crla
+            JOIN `tabSub Sector` AS sst
+            ON crla.sub_sector = sst.name
+            AND COALESCE(sst.exclusion, 0) = 0
+            JOIN `tabSegment` AS seg
+            ON crla.segment = seg.name
+            AND COALESCE(seg.exclusion, 0) = 0
+            JOIN `tabIndustry` AS IT
+            ON crla.industry = IT.name
+            AND COALESCE(IT.exclusion, 0) = 0
+            WHERE seg.segment = %s
+            AND sst.sub_sector_name = %s
+            AND IT.industry_name = %s
+            AND crla.extremity_record = 1
+            AND COALESCE(crla.exclusion, 0) = 0
+            {unit_clause}
+            LIMIT 1
+        """
+
             args = [state["Segment"], state["Sub-Sector"], state["Main-Industry"]]
         elif level == "Sub-Sector":
+
+            # q = f"""
+            #     select crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
+            #     from `tabIndustry Capacity Rule` as crla
+            #     join `tabSub Sector` as sst on crla.sub_sector = sst.name
+            #     join `tabIndustry`  as IT  on crla.industry  = IT.name
+            #     where sst.sub_sector_name = %s
+            #       and IT.industry_name    = %s
+            #       and crla.extremity_record = 1
+            #       {unit_clause}
+            #     limit 1
+            # """
             q = f"""
-                select crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
-                from `tabIndustry Capacity Rule` as crla
-                join `tabSub Sector` as sst on crla.sub_sector = sst.name
-                join `tabIndustry`  as IT  on crla.industry  = IT.name
-                where sst.sub_sector_name = %s
-                  and IT.industry_name    = %s
-                  and crla.extremity_record = 1
-                  {unit_clause}
-                limit 1
-            """
+            SELECT crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
+            FROM `tabIndustry Capacity Rule` AS crla
+            JOIN `tabSub Sector` AS sst
+            ON crla.sub_sector = sst.name
+            AND COALESCE(sst.exclusion, 0) = 0
+            JOIN `tabIndustry` AS IT
+            ON crla.industry = IT.name
+            AND COALESCE(IT.exclusion, 0) = 0
+            WHERE sst.sub_sector_name = %s
+            AND IT.industry_name = %s
+            AND crla.extremity_record = 1
+            AND COALESCE(crla.exclusion, 0) = 0
+            {unit_clause}
+            LIMIT 1
+        """
+
             args = [state["Sub-Sector"], state["Main-Industry"]]
         else:  # Industry
+            # q = f"""
+            #     select crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
+            #     from `tabIndustry Capacity Rule` as crla
+            #     join `tabIndustry` as IT on crla.industry = IT.name
+            #     where IT.industry_name = %s
+            #       and crla.extremity_record = 1
+            #       {unit_clause}
+            #     limit 1
+            # """
+
             q = f"""
-                select crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
-                from `tabIndustry Capacity Rule` as crla
-                join `tabIndustry` as IT on crla.industry = IT.name
-                where IT.industry_name = %s
-                  and crla.extremity_record = 1
-                  {unit_clause}
-                limit 1
-            """
+            SELECT crla.capacity_unit, crla.minimum_extremity_value, crla.maximum_extremity_value
+            FROM `tabIndustry Capacity Rule` AS crla
+            JOIN `tabIndustry` AS IT
+            ON crla.industry = IT.name
+            AND COALESCE(IT.exclusion, 0) = 0
+            WHERE IT.industry_name = %s
+            AND crla.extremity_record = 1
+            AND COALESCE(crla.exclusion, 0) = 0
+            {unit_clause}
+            LIMIT 1
+        """
+
             args = [state["Main-Industry"]]
         if include_unit:
             args.append(cap_unit_for_check)
