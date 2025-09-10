@@ -23,7 +23,7 @@ config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_manage
 config = configparser.ConfigParser()
 config.read(config_file)
 groq_api_key = config['Key']['groq_key']
-openai_key = config['Key']['OPENAI_API_KEY']
+openai_key = config['Key']['openai_api_key']
 
 # Initialize LLM    
 llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.0)

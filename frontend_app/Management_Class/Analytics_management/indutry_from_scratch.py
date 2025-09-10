@@ -46,6 +46,8 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         industry = get_industry(main_industry)
         sub_sector,zone_id = get_subsector(sub_sector)
         segment = get_segment(segment)
+        with open("log2.txt", "a") as file:
+            file.write(f"\n Industry, Sub-sector, Segment:::>>>:::>>>:::>>> {industry},{sub_sector}, {segment}, Zone: {zone_id}")
         # min_land ,max_land = get_land_requirements(industry,sub_sector,segment,capacity)
         result = integrate_land_calculation(capacity,industry,sub_sector,segment)
         required_exact_land_by_user, required_LowerMargin_land_for_user, required_UpperMargin_land_for_user = result["Land_size"], result["Lower_limit_land_size"], result["Upper_limit_land_size"]
@@ -53,7 +55,7 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         city_list = get_list_of_city_list(area_list)
         state_list = get_state_list(city_list)
         with open("log2.txt", "a") as file:
-            file.write(f"\n Unique list of areas cities state:::>>>:::>>>:::>>> {city_list}, {state_list}")
+            file.write(f"\n Unique list of areas cities state:::>>>:::>>>:::>>> {area_list},{city_list}, {state_list}")
         property_employment_df,property_list = get_property_and_employement(zone_id,area_list,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user,found_property,found_employment,selectedOption = selectedOption)
         with open("log2.txt", "a") as file:
             file.write(f"\n PROPERTY DATAAA:::>>>:::>>>:::>>> {property_employment_df.to_string(index=False)}")
@@ -67,11 +69,11 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
             }
             r_insights[state] = filtered_data
 
+        with open("log2.txt", "a") as file:
+            file.write(f"\n Regulatory Insights Data Final version ][[][][][]] {r_insights}")
         # Convert dictionary to DataFrame for merging
         market_info_df = pd.DataFrame.from_dict(r_insights, orient='index').reset_index()
         market_info_df.rename(columns={'index': 'state'}, inplace=True)
-        with open("log2.txt", "a") as file:
-            file.write(f"\n Market treand, market info df DATAAA:::>>>:::>>>:::>>> {market_info_df.to_string(index=False)}")
         # Merge on the 'state' column
         property_employment_df = property_employment_df.merge(market_info_df, on='state', how='left')
 
