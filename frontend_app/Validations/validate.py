@@ -30,7 +30,10 @@ def validation(aiResponse,user_intension):
              main_industry = state.get('Main-Industry')
              sub_sector = state.get('Sub-Sector')
              segment = state.get('Segment')
-             return search_industry(main_industry,sub_sector,segment,capacity)
+             result_of_val_from_val_for_BFS = search_industry(main_industry,sub_sector,segment,capacity)
+             with open("log30.txt", "a") as file:
+                file.write(f"\nData VALIDATION BFS LOG ::::::>>>>>>>>><<<<<<<<<<>>>>>>> {result_of_val_from_val_for_BFS}")
+             return result_of_val_from_val_for_BFS
         elif user_intension == "Query to search Vendors":
             param = aiResponse.get('Validation Data')
             with open("log.txt", "a") as file:

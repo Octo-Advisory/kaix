@@ -519,7 +519,7 @@ def search_industry(INDUSTRY_NAME, SUB_SECTOR, SEGMENT, user_cap):
                     return (False,"Couldn't Find Proper Employement Data For Even One Land." )
             
             else:
-                return (False,"Couldn't Find Any Property Which Saticificed User Requirements.")  
+                return (False,"Couldn't Find Any Property Which Satisfy User Requirements.")  
         else:
             return (False,f"Couldn't Find Given {INDUSTRY_NAME} Industry In Either Capacity Rules or Supply Rulles.")  
     else:

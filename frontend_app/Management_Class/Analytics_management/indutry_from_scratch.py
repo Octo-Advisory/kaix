@@ -55,6 +55,8 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         with open("log2.txt", "a") as file:
             file.write(f"\n Unique list of areas cities state:::>>>:::>>>:::>>> {city_list}, {state_list}")
         property_employment_df,property_list = get_property_and_employement(zone_id,area_list,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user,found_property,found_employment,selectedOption = selectedOption)
+        with open("log2.txt", "a") as file:
+            file.write(f"\n PROPERTY DATAAA:::>>>:::>>>:::>>> {property_employment_df.to_string(index=False)}")
         r_insights = {}
         for state in state_list:
             _, r_insights_dict = retrieving_market_trends(industry, industry, industry, state, state, "pan_industry", "pan_state") 
@@ -68,6 +70,8 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         # Convert dictionary to DataFrame for merging
         market_info_df = pd.DataFrame.from_dict(r_insights, orient='index').reset_index()
         market_info_df.rename(columns={'index': 'state'}, inplace=True)
+        with open("log2.txt", "a") as file:
+            file.write(f"\n Market treand, market info df DATAAA:::>>>:::>>>:::>>> {market_info_df.to_string(index=False)}")
         # Merge on the 'state' column
         property_employment_df = property_employment_df.merge(market_info_df, on='state', how='left')
 

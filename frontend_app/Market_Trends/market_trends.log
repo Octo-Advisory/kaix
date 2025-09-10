@@ -1,0 +1,145 @@
+2025-09-08 12:50:45,879 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:50:57,150 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Chicago city, Illinois for 2024-2025
+2025-09-08 12:50:57,151 - INFO - Performing async web search: market trends for Electronic Appliances industry in Chicago city, Illinois for 2024-2025
+2025-09-08 12:50:57,152 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Chicago city, Illinois for 2024-2025
+2025-09-08 12:50:57,152 - INFO - Pruned 1 expired cache entries
+2025-09-08 12:50:57,154 - INFO - Cache saved to /home/mars/frappe-bench/apps/usaix/usaix/Market_Trends/search_cache.json, size: 18 entries
+2025-09-08 12:50:57,154 - INFO - Loaded cache, size: 18 entries
+2025-09-08 12:50:57,154 - INFO - Cache hit, result length: 2083 characters
+2025-09-08 12:50:57,154 - INFO - Returning cached search result
+2025-09-08 12:50:57,155 - INFO - Deciding trend allocation for query
+2025-09-08 12:50:57,502 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:50:57,505 - INFO - Trend allocation from LLM: {'city': 1, 'state': 1, 'country': 2, 'global': 1}
+2025-09-08 12:50:57,505 - INFO - Trend allocation: {'city': 1, 'state': 1, 'country': 2, 'global': 1}
+2025-09-08 12:50:57,506 - INFO - Detected data scope: city for query: market trends for Electronic Appliances industry in Chicago city, Illinois for 2024-2025
+2025-09-08 12:50:57,506 - INFO - Search results excerpt: Electrical Appliances Market Size and Forecast 2025 to 2034: The global electrical appliances market
+2025-09-08 12:51:00,684 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:51:00,686 - INFO - Trend types: No trends identified
+2025-09-08 12:51:03,544 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:51:03,547 - INFO - Extracted entities and metrics: In Chicago-Chicago-Chicago, Electronic Appliances Manufacturing Surges, 91% surge, 28%, growing demand, In Illinois, Moderate Economic Growth Drives Electronic Appliances Job Market, Moderate economic growth, Job market growth, expanding industries, Globally, Electronic Appliances Market Size Expected to Reach USD 1,346.07 Billion, USD 1,346.07 billion, USD 661.70 billion, 8.21% CAGR, increasing demand, technological advancements, In the US, Electronic Appliances Market to Witness Significant Growth, USD 141.74 Billion, USD 97.8 Billion, 3.8% CAGR, increasing demand, Can Chicago-Chicago-Chicago Overcome Electronic Appliances Supply Chain Challenges?, USD 12.58 billion, 3.7% CAGR, growing demand, expanding industries
+2025-09-08 12:51:03,547 - INFO - Raw LLM output length: 1510 characters
+2025-09-08 12:51:03,559 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Fremont city, California for 2024-2025
+2025-09-08 12:51:03,559 - INFO - Performing async web search: market trends for Electronic Appliances industry in Fremont city, California for 2024-2025
+2025-09-08 12:51:03,559 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Fremont city, California for 2024-2025
+2025-09-08 12:51:03,559 - INFO - Loaded cache, size: 18 entries
+2025-09-08 12:51:03,559 - INFO - Cache hit, result length: 2071 characters
+2025-09-08 12:51:03,560 - INFO - Returning cached search result
+2025-09-08 12:51:03,560 - INFO - Deciding trend allocation for query
+2025-09-08 12:51:03,992 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:51:03,994 - INFO - Trend allocation from LLM: {'city': 0, 'state': 1, 'country': 3, 'global': 1}
+2025-09-08 12:51:03,995 - INFO - Trend allocation: {'city': 0, 'state': 1, 'country': 3, 'global': 1}
+2025-09-08 12:51:03,995 - INFO - Detected data scope: state for query: market trends for Electronic Appliances industry in Fremont city, California for 2024-2025
+2025-09-08 12:51:03,995 - INFO - Search results excerpt: US Major Appliance Market Share: Q1 2025 Trends & ...: The Major Appliance market is evolving faster
+2025-09-08 12:51:07,265 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:51:07,267 - INFO - Trend types: No trends identified
+2025-09-08 12:51:11,740 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:51:11,743 - INFO - Extracted entities and metrics: Globally, Electronic Appliances Market Ignites 8.21% Growth, global electrical appliances market, USD 661.70 billion, USD 1,346.07 billion, CAGR of 8.21%, global small domestic appliances market, $212.30 billion, $301.24 billion, CAGR of 5.13%, Electrical Appliances Market, USD 668.54 Bn, USD 1253.86 Bn, 9.40%, In California, Consumer Electronics Stores Industry Grows 3.1%, California, 3.1%, U.S. household appliances market, USD 99.34 billion, CAGR of 3.8%, North America Household Appliance market, USD 272333.68 million, 4.3%, In the U.S., Household Appliances Market Expands 12.81%, U.S. household appliances market, 12.81%, $70 billion, U.S. Major Appliance market, North America Household Appliances market, 3.29%, US$86.77bn, Can North America Overcome Charging Constraints in Electronic Appliances?, North America Household Appliances market, USD 1 billion, smart charging systems, Globally, Small Domestic Appliances Market Pioneers 5.13% CAGR, global small domestic appliances market, $212.30 billion, $301.24 billion, CAGR of 5.13%, Electrical Appliances Market, USD 668.54 Bn, USD 1253.86 Bn, 9.40%, global electrical appliances market, USD 661.70 billion, USD 1,346.07 billion, CAGR of 8.21%
+2025-09-08 12:51:11,743 - INFO - Raw LLM output length: 2701 characters
+2025-09-08 12:51:11,753 - INFO - Checking cache for query: market trends for Electronic Appliances industry in San Jose city, California for 2024-2025
+2025-09-08 12:51:11,754 - INFO - Performing async web search: market trends for Electronic Appliances industry in San Jose city, California for 2024-2025
+2025-09-08 12:51:11,754 - INFO - Checking cache for query: market trends for Electronic Appliances industry in San Jose city, California for 2024-2025
+2025-09-08 12:51:11,754 - INFO - Loaded cache, size: 18 entries
+2025-09-08 12:51:11,754 - INFO - Cache hit, result length: 2073 characters
+2025-09-08 12:51:11,754 - INFO - Returning cached search result
+2025-09-08 12:51:11,754 - INFO - Deciding trend allocation for query
+2025-09-08 12:51:12,230 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:51:12,231 - INFO - Trend allocation from LLM: {'city': 0, 'state': 0, 'country': 0, 'global': 5}
+2025-09-08 12:51:12,231 - INFO - Trend allocation: {'city': 0, 'state': 0, 'country': 0, 'global': 5}
+2025-09-08 12:51:12,231 - INFO - Detected data scope: global for query: market trends for Electronic Appliances industry in San Jose city, California for 2024-2025
+2025-09-08 12:51:12,231 - INFO - Search results excerpt: Electrical Appliances Market Size and Forecast 2025 to 2034: The global electrical appliances market
+2025-09-08 12:51:15,440 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:51:15,443 - INFO - Trend types: No trends identified
+2025-09-08 12:51:18,994 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:51:18,997 - INFO - Extracted entities and metrics: Globally Expanding Electronic Appliances Market, USD 661.70 billion, USD 1,346.07 billion, USD 503.03 billion, USD 675.73 billion, USD 668.54 Bn, USD 1253.86 Bn, USD 611.2 billion, USD 945.5 billion, $972.74 billion, $1039.43 billion, Driving Global Industry Expansion, 5.6%, energy-efficient appliances, smart home devices, emerging economies, Global Revenue Growth Trends, 3.29%, USD 1,346.07 billion, high-end appliances, innovative products, connected appliances, sustainable products, San Jose-Santa Clara-Santa Clara Market Opportunities, electronic appliances, innovative products, tech industry, startup ecosystem, young professionals, families, smart home solutions, California Electronic Appliances Challenges, competition, regulatory requirements, energy efficiency standards, environmental regulations, consumer awareness, sustainability, environmental issues
+2025-09-08 12:51:18,997 - INFO - Raw LLM output length: 2548 characters
+2025-09-08 12:51:19,003 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Las Vegas city, Nevada for 2024-2025
+2025-09-08 12:51:19,003 - INFO - Performing async web search: market trends for Electronic Appliances industry in Las Vegas city, Nevada for 2024-2025
+2025-09-08 12:51:19,003 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Las Vegas city, Nevada for 2024-2025
+2025-09-08 12:51:19,003 - INFO - Loaded cache, size: 18 entries
+2025-09-08 12:51:19,003 - INFO - Cache hit, result length: 1985 characters
+2025-09-08 12:51:19,003 - INFO - Returning cached search result
+2025-09-08 12:51:19,003 - INFO - Deciding trend allocation for query
+2025-09-08 12:51:19,506 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:51:19,509 - INFO - Trend allocation from LLM: {'city': 1, 'state': 1, 'country': 2, 'global': 1}
+2025-09-08 12:51:19,510 - INFO - Trend allocation: {'city': 1, 'state': 1, 'country': 2, 'global': 1}
+2025-09-08 12:51:19,510 - INFO - Detected data scope: city for query: market trends for Electronic Appliances industry in Las Vegas city, Nevada for 2024-2025
+2025-09-08 12:51:19,510 - INFO - Search results excerpt: Electrical Appliances Market Size and Forecast 2025 to 2034: The global electrical appliances market
+2025-09-08 12:51:23,582 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:51:23,585 - INFO - Trend types: No trends identified
+2025-09-08 12:51:27,192 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 12:51:27,193 - INFO - Extracted entities and metrics: In Nevada, Electronic Appliances Market Ignites 4.3% Growth, Nevada's economy, household appliances market, Household Appliances market size, USD 272333.68 million, CAGR of 4.3%, North America Household Appliance market, 3.29%, State-level growth, household appliances market, Economic overview, Globally, Electrical Appliances Market Pioneers 8.21% CAGR, Global electrical appliances market, USD 661.70 billion, USD 1,346.07 billion, CAGR of 8.21%, Electrical Appliances Market, USD 668.54 Bn, USD 1253.86 Bn, 9.40%, Global market size, Market opportunities, global electrical appliances market, Growth prospects, electrical appliances, In North America, Commercial Kitchen Appliances Market Drives 7.4% Growth, Commercial kitchen appliances market size, USD 99.28 billion, CAGR of 7.4%, North America Household Appliances market, 3.29%, Commercial Kitchen Appliances market, Market forecast, North America commercial kitchen appliances market, Industry report, commercial kitchen appliances market, In Las Vegas, Electronic Appliances Market Faces Challenges, Las Vegas Convention Center, Kitchen & Bath Industry Show, economic overview, Emerging real estate trends, economic overview, challenges, Nevada's economy, challenges, In US, Household Appliances Market Offers Opportunities with 3.8% CAGR, US Major Appliance market, CAGR of 3.8%, North America Household Appliances market size, USD 117.56 billion, CAGR of 3.8%, Household Appliances market, US$86.77bn, 3.29%, Market forecast, Industry report, North America Household Appliances market
+2025-09-08 12:51:27,193 - INFO - Raw LLM output length: 3158 characters
+2025-09-08 13:05:00,378 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:14,152 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:14,767 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:15,333 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:15,554 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:16,014 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:16,382 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:16,744 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:17,154 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:17,492 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:17,847 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:18,931 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:20,811 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:22,151 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:22,557 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:22,967 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:15:29,406 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:19:12,456 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:22:39,580 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:21,849 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:22,643 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:23,198 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:23,401 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:23,607 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:23,927 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:24,320 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:24,570 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:24,901 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:25,166 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:26,247 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:28,437 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:30,177 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:31,209 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:32,742 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:33,809 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:35,186 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:36,048 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:36,767 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:26:37,112 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:30:02,077 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:02,410 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:03,002 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:03,682 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:03,928 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:04,423 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:04,767 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:05,155 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:05,453 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:05,822 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:06,411 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:07,783 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:09,551 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:11,088 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:12,367 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:13,589 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:15,201 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:17,256 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:18,965 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:31:19,477 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-08 15:33:28,493 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:28,726 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:29,335 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:30,068 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:30,502 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:30,739 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:31,050 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:31,367 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:31,605 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:31,928 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:32,262 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:33,337 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:35,607 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:37,354 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-09-10 10:14:37,936 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
