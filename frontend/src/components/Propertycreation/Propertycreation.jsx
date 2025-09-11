@@ -20,7 +20,7 @@ function PropertyCreation() {
   const [showModal, setModalVisibility] = useState(false);
   const [loaderTitle, setLoaderTitle] = useState("Processing");
   var childBlockData = null;
-  
+
   // Frappe event listener
   useFrappeEventListener("Property_Seg_Status_Update", async ({ message }) => {
     setLoaderTitle(message);
@@ -42,6 +42,7 @@ function PropertyCreation() {
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/streets-v12',
+      // style:'mapbox://styles/mapbox/standard-satellite',
       center: [73.133661788180035, 22.308428225686328],
       zoom: 8,
       attributionControl: false
@@ -311,6 +312,12 @@ function PropertyCreation() {
       if (filteredRecord[0].status == "Complete") {
         setLoaderVisibility(true);        
         const surveyNoData = await getData("Test Survey No", { "child_block_id": filteredRecord[0].name });
+        var centerCoord = filteredRecord[0].center_coordinate.replaceAll(" ","").split(",");
+        mapRef.current.flyTo({
+          center: [centerCoord[0],centerCoord[1]],
+          zoom: 15,
+          speed: 1.5
+        });
         const features = surveyNoData.data.map(({ name, boundary_coordinates, latitude_longitude }) => {
           try {
             const coordinates = [JSON.parse(boundary_coordinates)];
@@ -375,65 +382,59 @@ function PropertyCreation() {
 
         // Following code is to show icon when user hover on the shape
 
-        let iconLayerName = 'survey-icons_' + filteredRecord[0].name;
+        let highlightLayerName = 'highlight-boundary_' + filteredRecord[0].name;
 
-        // Create a source for icon (initially empty)
-        mapRef.current.addSource(iconLayerName + '_src', {
+        // --- Add highlight source ---
+        mapRef.current.addSource(highlightLayerName + '_src', {
           type: 'geojson',
           data: {
             type: 'FeatureCollection',
             features: []
           }
         });
+
+        // --- Add highlight line layer ---
         mapRef.current.addLayer({
-          id: iconLayerName,
-          type: 'symbol',
-          source: iconLayerName + '_src',
-          layout: {
-            'icon-image': 'info-icon', // Mapbox built-in icon
-            'icon-size': 1.2,
-            'icon-allow-overlap': true
+          id: highlightLayerName,
+          type: 'line',
+          source: highlightLayerName + '_src',
+          paint: {
+            'line-color': '#ff0000',   // Highlight color
+            'line-width': 4            // Highlight thickness
           }
         });
 
-        // --- Hover events to show/hide icon ---
+        // --- Hover events ---
         mapRef.current.on('mouseenter', fillLayerName, (e) => {
           const zoom = mapRef.current.getZoom();
-          if (zoom > 16) {
+          if (zoom > 14) {
             mapRef.current.getCanvas().style.cursor = 'pointer';
 
             if (e.features.length > 0) {
-              let feature = e.features[0];
+              const feature = e.features[0];
 
-              // Calculate centroid manually
-              var coordInString = feature.properties.latitude_longitude.replaceAll(" ", "").split(",");
-              // Add/update icon at centroid
-              mapRef.current.getSource(iconLayerName + '_src').setData({
+              // Highlight this boundary
+              mapRef.current.getSource(highlightLayerName + '_src').setData({
                 type: 'FeatureCollection',
-                features: [{
-                  type: 'Feature',
-                  geometry: {
-                    type: 'Point',
-                    coordinates: [coordInString[1], coordInString[0]]
-                  },
-                  properties: { name: feature.properties.name }
-                }]
+                features: [feature]
               });
             }
           }
-
+          
         });
 
         mapRef.current.on('mouseleave', fillLayerName, () => {
           mapRef.current.getCanvas().style.cursor = '';
-          // Clear the icon when leaving
-          mapRef.current.getSource(iconLayerName + '_src').setData({
+
+          // Remove highlight
+          mapRef.current.getSource(highlightLayerName + '_src').setData({
             type: 'FeatureCollection',
             features: []
           });
         });
 
-        mapRef.current.on('click', iconLayerName, (e) => {
+        // --- Click event ---
+        mapRef.current.on('click', fillLayerName, (e) => {
           if (e.features.length > 0) {
             const { name } = e.features[0].properties;
             // Redirect to another page
