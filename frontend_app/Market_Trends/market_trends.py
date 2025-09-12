@@ -16,7 +16,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/market_trends.log", encoding="utf-8"),
+        logging.FileHandler("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/market_trends.log", encoding="utf-8"),
         logging.StreamHandler()
     ]
 )

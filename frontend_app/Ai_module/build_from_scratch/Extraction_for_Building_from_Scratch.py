@@ -1920,22 +1920,121 @@ def split_unit_and_time_period(input_string, llm):
         dict: A dictionary with keys "unit" and "time_period".
     """
     split_unit_prompt = """
-    You are an expert in understanding units of measure and identifying time periods associated with them.
+You are an expert at parsing capacity strings into:
+- unit (the physical/commercial unit ONLY), and
+- time_period (e.g., per day, per annum).
 
-    Instructions:
-    1. Analyze the given input string and split it into:
-       - "unit": The actual unit without the time period (e.g., "TPA (Ton per Annum)" -> "Ton").
-       - "time_period": The time period if specified (e.g., "per annum"). If no time period is present, set it to "per annum".
-    2. Ensure the output is always a valid JSON object.
+### Non-negotiable rules
+1) **Preserve the unit EXACTLY as written** in the input (keep words, casing, spaces, hyphens, parentheses, and qualifiers like "Million", "Metric", etc.). 
+   - Never drop magnitude words (e.g., Million, Thousand, Lakh, Crore).
+   - Never normalize/singularize or translate (e.g., do NOT change “Tonne” to “Ton” or “m3” to “m³”).
+   - Keep hyphens and bracketed text (e.g., “Tonne-Force(Metric)”) inside the unit.
 
-    Input:
-    - Unit String: {input_string}
+2) Extract the **time_period** from any explicit time tokens. If none are present, set time_period to **"per annum"**.
 
-    Output:
-    {{
-        "unit": "<unit>",
-        "time_period": "<time_period>"
-    }}
+3) Return **ONLY** valid JSON with exactly these keys: 
+   {{"unit": "...", "time_period": "..."}}
+
+### How to detect time_period
+A) Explicit words:
+   - Yearly terms → "per annum": {{"per annum","per year","annum","annual","yearly","p.a.","pa","/y"}}
+   - Daily terms → "per day":    {{"per day","daily","/day","/d","d^-1"}}
+   - Hourly terms → "per hour":  {{"per hour","hourly","/hour","/h","h^-1"}}
+   - Monthly → "per month":      {{"per month","monthly","/month","/mo"}}
+   - Weekly → "per week":        {{"per week","weekly","/week","/wk"}}
+   - Per minute/second/shift/batch follow the same pattern: {{"per minute","/min"}}, {{"per second","/s"}}, {{"per shift"}}, {{"per batch"}}.
+   Pick the single canonical label above (e.g., "per day").
+
+B) Slash forms:
+   If the string contains "unit/time" (e.g., "kg/day", "m3/h"), everything **after the slash** defines time_period 
+   ("/day"→"per day", "/h"→"per hour"), and everything **before the slash** is the unit (preserve as-is).
+
+C) Common industrial acronyms that embed time:
+   - TPA/TPY → time_period = "per annum"; unit base = "Tonne" **only if** no explicit unit text exists before/around it.
+   - TPD → "per day";   TPH → "per hour";  TPM → "per month";  TPW → "per week".
+   - MTPA → "per annum" with magnitude "Million" + "Tonne" **only if** no explicit unit text exists.
+   - KTPA → "per annum" with "Thousand Tonne" **only if** no explicit unit text exists.
+   - MMTPA → "per annum" with "Million Metric Tonne" **only if** no explicit unit text exists.
+   - BPD → "per day" with "Barrel" **only if** no explicit unit text exists.
+   Rule for these acronyms: 
+     • If the input ALREADY provides a written unit (e.g., "Million Tonne", "Tonne-Force(Metric)"), DO NOT replace or alter it—just set time_period.
+     • Only expand to a base unit (e.g., "Tonne", "Million Tonne") when the acronym is the **only** clue to the unit.
+
+### Edge-case safeguards
+- If both a written unit and an acronym appear, prefer the written unit text exactly as-is for "unit", and use the acronym **only** to infer time_period.
+- Do NOT infer conversions or add/remove words. Keep the unit substring exactly as it appears **after removing** any time tokens.
+- If multiple time hints appear, choose the most explicit one (e.g., "per day" beats an implied annual default).
+
+### Output format
+Return ONLY:
+{{
+  "unit": "<exact unit text>",
+  "time_period": "<canonical time period>"
+}}
+
+### Examples
+Input: "Million Tonne"
+Output:
+{{"unit":"Million Tonne","time_period":"per annum"}}
+
+Input: "Tonne-Force(Metric)"
+Output:
+{{"unit":"Tonne-Force(Metric)","time_period":"per annum"}}
+
+Input: "kg per hour"
+Output:
+{{"unit":"kg","time_period":"per hour"}}
+
+Input: "m3/day"
+Output:
+{{"unit":"m3","time_period":"per day"}}
+
+Input: "TPA"
+Output:
+{{"unit":"Tonne","time_period":"per annum"}}
+
+Input: "MTPA"
+Output:
+{{"unit":"Million Tonne","time_period":"per annum"}}
+
+Input: "MMTPA"
+Output:
+{{"unit":"Million Metric Tonne","time_period":"per annum"}}
+
+Input: "KTPA"
+Output:
+{{"unit":"Thousand Tonne","time_period":"per annum"}}
+
+Input: "BPD"
+Output:
+{{"unit":"Barrel","time_period":"per day"}}
+
+Input: "Million Tonne per annum"
+Output:
+{{"unit":"Million Tonne","time_period":"per annum"}}
+
+Input: "Million Tonne / year"
+Output:
+{{"unit":"Million Tonne","time_period":"per annum"}}
+
+Input: "Standard Cubic Meter/hour"
+Output:
+{{"unit":"Standard Cubic Meter","time_period":"per hour"}}
+
+Input: "TPD (Tonne per day)"
+Output:
+{{"unit":"Tonne","time_period":"per day"}}
+
+Input: "capacity-Unit: Tonne-Force(Metric)"
+Output:
+{{"unit":"Tonne-Force(Metric)","time_period":"per annum"}}
+
+---
+
+Input:
+- Unit String: {input_string}
+
+Return ONLY the JSON as specified.
     """
     
     # Use PromptTemplate to format the input for the LLM

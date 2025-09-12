@@ -52,6 +52,8 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         result = integrate_land_calculation(capacity,industry,sub_sector,segment)
         required_exact_land_by_user, required_LowerMargin_land_for_user, required_UpperMargin_land_for_user = result["Land_size"], result["Lower_limit_land_size"], result["Upper_limit_land_size"]
         area_list = get_list_of_area_id(zone_id)
+        with open("log2.txt", "a") as file:
+            file.write(f"\n Unique list of areas cities state:::>>>:::>>>:::>>> {area_list}, {zone_id}")
         city_list = get_list_of_city_list(area_list)
         state_list = get_state_list(city_list)
         with open("log2.txt", "a") as file:

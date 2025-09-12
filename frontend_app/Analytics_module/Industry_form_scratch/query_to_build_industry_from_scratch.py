@@ -52,7 +52,7 @@ def get_industry(industry):
     FROM `tabIndustry`
     WHERE industry_name = '{industry}'
         AND exclusion = 0;
-    """ # 👌
+    """ 
 
 
     # query = f"""
@@ -78,7 +78,6 @@ def get_subsector(sub_Sector):
         #     FROM `tabSub Sector`
         #     WHERE sub_sector_name = "{sub_Sector}"
         #     """
-            # 👌
         query = f"""SELECT
         sst.name       AS sub_sector_id,
         sst.zone_id
@@ -115,7 +114,6 @@ def get_segment(segment):
     WHERE segment = "{segment}"
         AND exclusion = 0;
     """
-# 👌
     results = fetch_query_results(query)
 
     if results:
@@ -161,7 +159,6 @@ def fetch_capacity_data(required_capacity_by_user, industry_id, sub_sector_id=No
         AND `segment` = '{segment_id}'
         AND COALESCE(`exclusion`, 0) = 0
         """
-        # 👌
         results = fetch_query_results(query)
         if results:
             df = pd.DataFrame(results)
@@ -194,7 +191,7 @@ WHERE (
   AND `sub_sector` = '{sub_sector_id}'
   AND `segment` IS NULL
   AND COALESCE(`exclusion`, 0) = 0"""
-        # 👌
+
         results = fetch_query_results(query)
         if results:
             df = pd.DataFrame(results)
@@ -224,7 +221,7 @@ WHERE (
         AND `extremity_record` = 0
         AND `industry` = '{industry_id}'
         AND COALESCE(`exclusion`, 0) = 0"""
-        # 👌
+        
         results = fetch_query_results(query)
         if results:
             df = pd.DataFrame(results)
@@ -251,7 +248,7 @@ FROM `tabIndustry Capacity Rule`
 WHERE `extremity_record` = 0
   AND `industry` = '{industry_id}'
   AND COALESCE(`exclusion`, 0) = 0"""
-        # 👌
+        
 
         if sub_sector_id is not None:
             nearest_query += f" AND sub_sector = '{sub_sector_id}'"
@@ -408,8 +405,6 @@ def get_list_of_area_id(zone_id):
     WHERE zn.name = '{zone_id}'
     AND COALESCE(azm.exclusion, 0) = 0;
     """
-    # 👌
-
 
     # Call the function and assign results
     results = fetch_query_results(query)
