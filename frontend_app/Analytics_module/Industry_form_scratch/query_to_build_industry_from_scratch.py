@@ -2266,6 +2266,7 @@ def process_supply_vendor_df_to_send_solution_screen(df, all_vendor = False):
                 })
                 .reset_index()
             )
+            
             return grouped_essential_df, grouped_non_essential_df
         else:
             def build_property_vendor_map(property_mapped_all_vendor_df: pd.DataFrame) -> pd.DataFrame:

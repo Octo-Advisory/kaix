@@ -83,14 +83,7 @@ embedding_model = HuggingFaceBgeEmbeddings(
  
 api_key = config['Key']['frappe_doctype_api_key']
 api_secret = config['Key']['frappe_doctype_api_secret']
-base_url = "https://marsaix.marsbazaar.com"
-# BASE_URL = "http://172.17.242.222"
-# load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
-# api_key = os.getenv("GROQ_API_KEY")
-# api_key = os.getenv("GROQ_API_KEY")
-# print(api_key)
-# print("Loaded API Key:", api_key is not None)  # Should print: True
-# print("API KEY:", os.getenv("GROQ_API_KEY"))
+base_url = config['Key']['local_mars_url']
 
 # this code is to retrieve the values of the fields namely'storage limit' and 'time period for deletion' which are stored in 'Mars Configurations' doctype.
 
@@ -228,8 +221,6 @@ def make_headers():
 def fetch_pdf_to_temp(file_url: str, is_private: bool | None = None) -> str:
     # normalize
     # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
-    # base_url = "https://marsaix.marsbazaar.com"
-    # base_url = "http://172.17.242.222"
     # # api_key    = os.getenv("API_KEY")
     # api_key = "d3de1e0e4e25846"
     # # api_secret = os.getenv("API_SECRET")
