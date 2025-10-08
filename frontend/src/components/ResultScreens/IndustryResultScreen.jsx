@@ -443,6 +443,85 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     }).filter(Boolean);
   }
 
+// const parseSuppliers = (supplierData) => {
+//   console.log("Thsi is in parseSuuppliers", supplierData);
+  
+//     if (!supplierData?.vendor_id) return [];
+
+//     // Create a Map to handle duplicates (last entry wins)
+//     const vendorMap = new Map();
+
+//     Object.keys(supplierData.vendor_id).forEach(key => {
+//       const vendorId = supplierData.vendor_id[key];
+//       const vendorData = {
+//         supply_id: supplierData.supply_id?.[key],
+//         Final_Score_With_Features: supplierData.Final_Score_With_Features?.[key],
+//         vendor_id: vendorId,
+//         // aggregated_score: supplierData.aggregated_score?.[key],
+//         // Add all other properties dynamically
+//         ...Object.fromEntries(
+//           Object.entries(supplierData)
+//             .filter(([k]) => !['vendor_id', 'supply_id', 'Final_Score_With_Features'].includes(k))
+//             .map(([k, v]) => [k, v[key]])
+//         )
+//       };
+
+//       // This will automatically override previous entries with same vendor_id
+//       vendorMap.set(vendorId, vendorData);
+//     });
+
+//     return Array.from(vendorMap.values());
+//   };
+
+const parseSinglePropertySuppliers = (supplyIds, vendorIds) => {
+  const vendorMap = new Map(); // Store vendors as keys and their associated supplies as values
+
+  // For each supply in the given property
+  supplyIds.forEach((supply, supplyIndex) => {
+    // Handle vendor(s) for this supply index
+    const currentVendors = vendorIds[supplyIndex];
+
+    // If vendor(s) is an array, loop through each vendor
+    if (Array.isArray(currentVendors)) {
+      currentVendors.forEach(vendor => {
+        // If vendor already exists in the map, add the supply_id to its best_supply
+        if (vendorMap.has(vendor)) {
+          vendorMap.get(vendor).best_supply.push(supply);
+        } else {
+          // If vendor doesn't exist, create a new entry with the current supply
+          vendorMap.set(vendor, { vendor_id: vendor, best_supply: [supply] });
+        }
+      });
+    } else if (typeof currentVendors === 'string') {
+      // If vendor(s) is a single string, push it directly to the best_suppliers list
+      if (vendorMap.has(currentVendors)) {
+        vendorMap.get(currentVendors).best_supply.push(supply);
+      } else {
+        vendorMap.set(currentVendors, { vendor_id: currentVendors, best_supply: [supply] });
+      }
+    }
+  });
+
+  // Convert the map to an array and remove duplicates by using Set
+  const result = Array.from(vendorMap.values()).map(vendor => {
+    // Convert best_supply array to Set to remove duplicates and then back to an array
+    vendor.best_supply = [...new Set(vendor.best_supply)];
+    return vendor;
+  });
+
+  return result;
+};
+
+  
+  const parseAllSupplies = (supplies) => {
+    const allsupplies = []
+    Object.keys(supplies.supply_id).forEach(key=> {
+      const supply = supplies.supply_id[key]
+      allsupplies.push(supply)
+    })
+
+    return allsupplies
+  }
   function parseLegalOrTaxText(rawText) {
   // Normalize line breaks
   rawText = rawText.replace(/\r/g, "").trim();
@@ -484,6 +563,51 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     };
   });
 }
+
+function mapVendorsToSupply(supplies, vendors) {
+  // console.log(supplies, vendors, "This is in the function");
+  let result = [];
+
+  supplies.forEach((supply, index) => {
+    const currentVendor = vendors[index];
+
+    if (Array.isArray(currentVendor)) {
+      // case: array of vendors
+      currentVendor.forEach(vendor => {
+        result.push({
+          vendor_id: vendor,
+          supply_id: supply
+        });
+      });
+    } else if (typeof currentVendor === "string") {
+      // case: single vendor string
+      result.push({
+        vendor_id: currentVendor,
+        supply_id: supply
+      });
+    }
+    // else do nothing (null/undefined)
+  });
+
+  return result;
+}
+
+
+const attachBestSuppliesToVendorData = (vendorData, parsedSuppliersData) => {
+  // console.log(vendorData, parsedSuppliersData, 'Okay this is last second data');
+  return vendorData.map(vendor => {
+    // Find the supplier data with matching vendor_id
+    const supplier = parsedSuppliersData.find(s => s.vendor_id === vendor.name);
+    
+    // If supplier exists, add best_supply to vendor data, else return the vendor as is
+    return supplier 
+      ? { ...vendor, best_supply: supplier.best_supply, vendor_id: supplier.vendor_id, supply_id: supplier.supply_id }
+      : vendor;
+  });
+};
+
+
+
 
 const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6.5% Real GDP**
 
@@ -625,7 +749,23 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
         const essential_vendor_all_id_data = Essential_supply_all_vendor_lookup_df?.['vendor_id']?.[essential_all_index] ? await getAllVendorsData("Vendor", Essential_supply_all_vendor_lookup_df?.['vendor_id']?.[essential_all_index]) : []
         const non_essential_vendor_id_data = nonEssential_supply_vendor_lookup_df?.['vendor_id']?.[non_essential_index] ? await getAllVendorsData("Vendor", nonEssential_supply_vendor_lookup_df?.['vendor_id']?.[non_essential_index]) : []
         const non_essential_vendor_all_id_data = nonEssential_supply_all_vendor_lookup_df?.['vendor_id']?.[non_essential_all_index] ? await getAllVendorsData("Vendor", nonEssential_supply_all_vendor_lookup_df?.['vendor_id']?.[non_essential_all_index]) : []
+        
+        const parsed_essential_all = parseSinglePropertySuppliers(Essential_supply_all_vendor_lookup_df.supply_id[essential_all_index], Essential_supply_all_vendor_lookup_df.vendor_id[essential_all_index])
+        const parsed_essential = parseSinglePropertySuppliers(Essential_supply_vendor_lookup_df.supply_id[essential_index],Essential_supply_vendor_lookup_df.vendor_id[essential_index])
+        const parsed_nonessential_all = parseSinglePropertySuppliers(nonEssential_supply_all_vendor_lookup_df.supply_id[non_essential_all_index],nonEssential_supply_all_vendor_lookup_df.vendor_id[non_essential_all_index])
+        const parsed_nonessential = parseSinglePropertySuppliers(nonEssential_supply_vendor_lookup_df.supply_id[non_essential_index],nonEssential_supply_vendor_lookup_df.vendor_id[non_essential_index])
 
+        // const mapped_essential_supply_all = parseSuppliersAndBestSupplies(parsed_essential_all[essential_all_index])
+        // console.log(mapped_essential_supply_all, 'This is okay mapped essential')
+        // const mapped_essential_supply = parseSuppliersAndBestSupplies(parsed_essential[essential_index])
+        // const mapped_non_essential_supply = parseSuppliersAndBestSupplies(parsed_nonessential[non_essential_index])
+        // const mapped_non_essential_supply_all = parseSuppliersAndBestSupplies(parsed_nonessential_all[non_essential_all_index])
+        // const mapped_essential_supply_all = mapVendorsToSupply(parsed_essential_all[essential_all_index]?.supply_id, parsed_essential_all[essential_all_index]?.vendor_id)
+        // console.log(mapped_essential_supply_all, 'This is okay mapped essential')
+        // const mapped_essential_supply = mapVendorsToSupply(parsed_essential[essential_index]?.supply_id, parsed_essential[essential_index]?.vendor_id)
+        // const mapped_non_essential_supply = mapVendorsToSupply(parsed_nonessential[non_essential_index]?.supply_id, parsed_nonessential[non_essential_index]?.vendor_id)
+        // const mapped_non_essential_supply_all = mapVendorsToSupply(parsed_nonessential_all[non_essential_all_index]?.supply_id, parsed_nonessential_all[non_essential_all_index]?.vendor_id)
+    
         essential_vendor_id_data.forEach(v => renameKey(v, "table_podq", "supplies"));
         essential_vendor_all_id_data.forEach(v => renameKey(v, "table_podq", "supplies"));
         non_essential_vendor_id_data.forEach(v => renameKey(v, "table_podq", "supplies"));
@@ -646,11 +786,20 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
           });
         };
 
+        // const temp_essential_data = removeDuplicates(essential_vendor_id_data)
+        // const temp_essential_data_all = removeDuplicates(essential_vendor_all_id_data)
+        // const temp_non_essential_data = removeDuplicates(non_essential_vendor_id_data)
+        // const temp_non_essential_data_all = removeDuplicates(non_essential_vendor_all_id_data)
+
         // Create deduplicated versions
-        const unique_essential_vendor_id_data = removeDuplicates(essential_vendor_id_data);
-        const unique_essential_vendor_all_id_data = removeDuplicates(essential_vendor_all_id_data);
-        const unique_non_essential_vendor_id_data = removeDuplicates(non_essential_vendor_id_data);
-        const unique_non_essential_vendor_all_id_data = removeDuplicates(non_essential_vendor_all_id_data);
+        const unique_essential_vendor_id_data = attachBestSuppliesToVendorData(essential_vendor_id_data,parsed_essential);
+        const unique_essential_vendor_all_id_data = attachBestSuppliesToVendorData(essential_vendor_all_id_data, parsed_essential_all);
+        const unique_non_essential_vendor_id_data = attachBestSuppliesToVendorData(non_essential_vendor_id_data, parsed_nonessential);
+        const unique_non_essential_vendor_all_id_data = attachBestSuppliesToVendorData(non_essential_vendor_all_id_data, parsed_nonessential_all);
+        // const unique_essential_vendor_id_data = removeDuplicates(essential_vendor_id_data);
+        // const unique_essential_vendor_all_id_data = removeDuplicates(essential_vendor_all_id_data);
+        // const unique_non_essential_vendor_id_data = removeDuplicates(non_essential_vendor_id_data);
+        // const unique_non_essential_vendor_all_id_data = removeDuplicates(non_essential_vendor_all_id_data);
 
         if (data) {
           const nearest_airport_coord = data.nearest_airport_coord;
@@ -932,6 +1081,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
     }
     else {
       if (source === 'SolutionScreen' && rerender == 1) {
+        // console.log(analytics_response, 'This ist he Solutions')
         setSolutions(analytics_response)
         setIsLoading(false);
       }
@@ -1148,7 +1298,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
                           <span className="text-sm font-bold text-black flex flex-row items-center gap-2"><span className='h-6 w-6 p-2 rounded-full flex items-center font-semibold shadow-md justify-center border-2 border-black text-black bg-transparent'>{selectedProperty?.propertyIndex}</span> {uiConfig?.['property_title']} {selectedProperty.area}</span>
                         </div>
                         <div className="bg-gray-100 h-48 w-full rounded relative overflow-hidden ">
-                          <MapBoxMap lat={selectedProperty?.latitude_longitude[0]} lng={selectedProperty?.latitude_longitude[1]} source='FromProperty' />
+                          <MapBoxMap lat={selectedProperty?.latitude_longitude[0]} lng={selectedProperty?.latitude_longitude[1]} source='FromProperty' solutions={solutions} />
                         </div>
                         <div className="text-xs text-gray-600 flex justify-between relative w-full flex-row">
                           <span>{selectedProperty.address}</span>
@@ -1348,7 +1498,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
                             </div>
                             <div className='flex flex-col gap-1'>
                               <p className="text-sm font-medium">{uiConfig?.['location_summary_highway_title'] || "Highway"}</p>
-                              <p className="text-xs text-gray-600 flex flex-row gap-1 items-center">{selectedProperty.road_connectivity.distance} km {selectedProperty.road_connectivity.status === 'good' ? (<BsPatchCheckFill size={12} className='text-green-500' />) : selectedProperty.road_connectivity.status === 'warning' ? (<FaTriangleExclamation size={12} className='text-yellow-500' />) : (<FaCircleXmark size={12} className='text-red-500' />)}</p>
+                              <p className="text-xs text-gray-600 flex flex-row gap-1 items-center">{selectedProperty.road_connectivity.distance.toFixed(2)} km {selectedProperty.road_connectivity.status === 'good' ? (<BsPatchCheckFill size={12} className='text-green-500' />) : selectedProperty.road_connectivity.status === 'warning' ? (<FaTriangleExclamation size={12} className='text-yellow-500' />) : (<FaCircleXmark size={12} className='text-red-500' />)}</p>
                             </div>
                           </div>
                           <div className="flex items-center col-span-1 flex-row gap-2">
@@ -1357,7 +1507,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
                             </div>
                             <div className='flex flex-col gap-1'>
                               <p className="text-sm font-medium">{uiConfig?.['location_summary_railway_title'] || "Railway"}</p>
-                              <p className="text-xs text-gray-600 flex flex-row gap-1 items-center">{selectedProperty.railway.distance} km {selectedProperty.railway.status === 'good' ? (<BsPatchCheckFill size={12} className='text-green-500' />) : selectedProperty.railway.status === 'warning' ? (<FaTriangleExclamation size={12} className='text-yellow-500' />) : (<FaCircleXmark size={12} className='text-red-500' />)}</p>
+                              <p className="text-xs text-gray-600 flex flex-row gap-1 items-center">{selectedProperty.railway.distance.toFixed(2)} km {selectedProperty.railway.status === 'good' ? (<BsPatchCheckFill size={12} className='text-green-500' />) : selectedProperty.railway.status === 'warning' ? (<FaTriangleExclamation size={12} className='text-yellow-500' />) : (<FaCircleXmark size={12} className='text-red-500' />)}</p>
                             </div>
                           </div>
                           <div className="flex items-center col-span-1 flex-row gap-2">
@@ -1366,7 +1516,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
                             </div>
                             <div className='flex flex-col gap-1'>
                               <p className="text-sm font-medium">{uiConfig?.['location_summary_seaport_title'] || "Seaport"}</p>
-                              <p className="text-xs text-gray-600 flex flex-row gap-1 items-center">{selectedProperty.seaport.distance} km {selectedProperty.seaport.status === 'good' ? (<BsPatchCheckFill size={12} className='text-green-500' />) : selectedProperty.seaport.status === 'warning' ? (<FaTriangleExclamation size={12} className='text-yellow-500' />) : (<FaCircleXmark size={12} className='text-red-500' />)}</p>
+                              <p className="text-xs text-gray-600 flex flex-row gap-1 items-center">{selectedProperty.seaport.distance.toFixed(2)} km {selectedProperty.seaport.status === 'good' ? (<BsPatchCheckFill size={12} className='text-green-500' />) : selectedProperty.seaport.status === 'warning' ? (<FaTriangleExclamation size={12} className='text-yellow-500' />) : (<FaCircleXmark size={12} className='text-red-500' />)}</p>
                             </div>
                           </div>
                           <div className="flex items-center col-span-1 flex-row gap-2">
@@ -1375,7 +1525,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
                             </div>
                             <div className='flex flex-col gap-1'>
                               <p className="text-sm font-medium">{uiConfig?.['location_summary_airport_title'] || "Airport"}</p>
-                              <p className="text-xs text-gray-600 flex flex-row gap-1 items-center">{selectedProperty.airport.distance} km {selectedProperty.airport.status === 'good' ? (<BsPatchCheckFill size={12} className='text-green-500' />) : selectedProperty.airport.status === 'warning' ? (<FaTriangleExclamation size={12} className='text-yellow-500' />) : (<FaCircleXmark size={12} className='text-red-500' />)}</p>
+                              <p className="text-xs text-gray-600 flex flex-row gap-1 items-center">{selectedProperty.airport.distance.toFixed(2)} km {selectedProperty.airport.status === 'good' ? (<BsPatchCheckFill size={12} className='text-green-500' />) : selectedProperty.airport.status === 'warning' ? (<FaTriangleExclamation size={12} className='text-yellow-500' />) : (<FaCircleXmark size={12} className='text-red-500' />)}</p>
                             </div>
                           </div>
                           <div className="flex items-center col-span-2 flex-row gap-2">
@@ -1384,7 +1534,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
                             </div>
                             <div className='flex flex-col gap-1'>
                               <p className="text-sm font-medium">{uiConfig?.['location_summary_power_source_title'] || "Power Source"}</p>
-                              <p className="text-xs text-gray-600 flex flex-row gap-1 items-center">{selectedProperty.power.distance} km {selectedProperty.power.status === 'good' ? (<BsPatchCheckFill size={12} className='text-green-500' />) : selectedProperty.power.status === 'warning' ? (<FaTriangleExclamation size={12} className='text-yellow-500' />) : (<FaCircleXmark size={12} className='text-red-500' />)}</p>
+                              <p className="text-xs text-gray-600 flex flex-row gap-1 items-center">{selectedProperty.power.distance.toFixed(2)} km {selectedProperty.power.status === 'good' ? (<BsPatchCheckFill size={12} className='text-green-500' />) : selectedProperty.power.status === 'warning' ? (<FaTriangleExclamation size={12} className='text-yellow-500' />) : (<FaCircleXmark size={12} className='text-red-500' />)}</p>
                             </div>
                           </div>
                           <div className="flex items-center col-span-2 flex-row gap-2">

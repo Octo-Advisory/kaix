@@ -62,7 +62,7 @@ def get_docs_with_children(doctype, names):
     except Exception as e:
         frappe.throw(f"Error fetching {doctype} data: {str(e)}")
 
-
+@frappe.whitelist()
 def get_cities():
     res = frappe.db.get_list('City',fields=['city_name'], limit=10000)
     return res
@@ -528,6 +528,7 @@ def generate_query_hints(query_list, input_industry_name):
 #         print("❌ No list of queries found in input text.")
 #     return []
 
+@frappe.whitelist()
 def extract_query_list(query_list, input_industry_name):
 
     raw_query_hints = generate_query_hints(query_list = query_list, input_industry_name=input_industry_name)
@@ -776,22 +777,22 @@ def updateNearestConnectivity():
                             lowestDistance = dis
                             if doctype == "Railway Station":
                                 updateValue = True
-                                distaceObj['RailwayStationDist'] = id
+                                distaceObj['RailwayStationDist'] = lowestDistance
                             elif doctype == "Substation":
                                 updateValue = True
-                                distaceObj['SubstationDist'] = id
+                                distaceObj['SubstationDist'] = lowestDistance
                             elif doctype == "Airport":
                                 updateValue = True
-                                distaceObj['AirportDist'] = id
+                                distaceObj['AirportDist'] = lowestDistance
                             else:
                                 updateValue = True
-                                distaceObj['SearportDist'] = id
+                                distaceObj['SearportDist'] = lowestDistance
             if(updateValue):
                 # get an existing document
                 doc = frappe.get_doc('Survey No', surveyNo.get("name"))
-                doc.nearest_power_source = distaceObj['SubstationDist']
-                doc.nearest_railway_station = distaceObj['RailwayStationDist']
-                doc.nearest_airport = distaceObj['AirportDist']
-                doc.nearest_seaport = distaceObj['SearportDist']
+                doc.distance_from_power_source = distaceObj['SubstationDist']
+                doc.distance_from_nearest_railway_station = distaceObj['RailwayStationDist']
+                doc.distance_from_nearest_airport = distaceObj['AirportDist']
+                doc.distance_from_nearest_seaport = distaceObj['SearportDist']
                 doc.save()
             frappe.log_error("Updating Property Ended",surveyNo.get("name"))

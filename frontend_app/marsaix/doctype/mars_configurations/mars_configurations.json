@@ -51,7 +51,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-08-11 11:49:26.085523",
+ "modified": "2025-10-01 20:31:58.243152",
  "modified_by": "Administrator",
  "module": "marsaix",
  "name": "Mars Configurations",
@@ -76,6 +76,13 @@
    "role": "Guest",
    "share": 1,
    "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "AIX User",
+   "share": 1
   }
  ],
  "sort_field": "modified",

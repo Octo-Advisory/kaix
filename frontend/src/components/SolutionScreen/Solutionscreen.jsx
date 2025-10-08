@@ -8,25 +8,60 @@ import { useSelector } from 'react-redux';
 import { useNavigate } from "react-router-dom";
 import FailureScreen from '../Failure/FailureScreen';
 import NoResultsFound from '../Failure/NoResultsFound';
+import LogoLoader from '../Responseloader/LogoLoader';
 
 
 function Solutionscreen() {
   const navigate = useNavigate();
   const result = useSelector((state) => state.analytics.analyticsResult);
   // console.log("resultr",result);
-  
+
+  const [timeoutReached, setTimeoutReached] = useState(false);
+
   useEffect(() => {
+    // If result is empty, start a timeout
+    let timeoutId;
+
     if (result.length === 0) {
-      navigate("/");
+      // Set the timeout to check after 5 seconds
+      timeoutId = setTimeout(() => {
+        setTimeoutReached(true); // Set the timeoutReached state to true after 5 seconds
+      }, 5000);
+    } else {
+      // If result is not empty, clear any previous timeout and reset timeoutReached
+      clearTimeout(timeoutId);
+      setTimeoutReached(false);
     }
-  }, [result, navigate]); // Dependencies ensure effect runs when result changes
+
+    // Cleanup function to clear the timeout if the component unmounts or result changes
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [result]);
+
+
+  if (timeoutReached) {
+    return <NoResultsFound />; // Return "No Results" if the timeout is reached
+  }
 
   if (result.length === 0) {
-    return null; // Prevents rendering if navigation happens
+    return <LogoLoader/>; // Optional: show a loading message until the timeout
   }
+
+  
+  // useEffect(() => {
+  //   if (result.length === 0) {
+  //     navigate("/");
+  //   }
+  // }, [result, navigate]); // Dependencies ensure effect runs when result changes
+
+  // if (result.length === 0) {
+  //   return null; // Prevents rendering if navigation happens
+  // }
   // console.log("resultin solution scdeen", result);
   const user_intension = result[0]["user_intension"]
   const Analytics_response = result[0]?.["Analytics_response"]
+  // console.log(Analytics_response, 'Okay its Analytics Response')
 
 //Check if the incentive Stringis valid json after pasrsing .. if not show now result .. Reminain 
   return (

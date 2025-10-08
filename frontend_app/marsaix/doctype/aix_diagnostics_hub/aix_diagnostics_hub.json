@@ -52,7 +52,7 @@
    "fieldname": "type",
    "fieldtype": "Select",
    "label": "Type",
-   "options": "\nLand\nApprovals\nLand & Approvals\nIT\nWebsite\nResearch\nOthers\nEmployment\nSuppliers\nData Missing\nTechnical Error\nValidation Error\nAi Error\nIncentive\nAnalytics Error\nProcess Timeout\nData Error"
+   "options": "\nLand\nApprovals\nLand & Approvals\nIT\nWebsite\nResearch\nOthers\nEmployment\nSuppliers\nData Missing\nTechnical Error\nValidation Error\nAi Error\nIncentive\nRegistration\nAnalytics Error\nProcess Timeout\nData Error"
   },
   {
    "fieldname": "note",
@@ -72,7 +72,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-08-11 15:54:17.428221",
+ "modified": "2025-10-01 18:12:45.045835",
  "modified_by": "Administrator",
  "module": "marsaix",
  "name": "AIX Diagnostics Hub",

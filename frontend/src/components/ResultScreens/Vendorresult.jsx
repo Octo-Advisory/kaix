@@ -17,6 +17,22 @@ import { current } from '@reduxjs/toolkit';
 import NoResultsFound from '../Failure/NoResultsFound';
 import SingleMap from '../MapComponent/SingleMap';
 import { CertificateIcon, CheckIcon } from '../../Icons/icon';
+import { IoIosArrowDown, IoIosArrowUp } from "react-icons/io";
+
+
+const useClickOutside = (ref, handler) => {
+    useEffect(() => {
+      const maybeHandler = (event) => {
+        if (ref.current && !ref.current.contains(event.target)) {
+          handler();
+        }
+      };
+      document.addEventListener("mousedown", maybeHandler);
+      return () => {
+        document.removeEventListener("mousedown", maybeHandler);
+      };
+    }, [ref, handler]);
+  };
 
 function Vendorresult({ result, source, rerender }) {
   const { createDoc } = useFrappeCreateDoc('');
@@ -59,6 +75,7 @@ function Vendorresult({ result, source, rerender }) {
   
 
   const IndividualQuery = analytics_response?.['Unfiltered All IS Supplier'] ? true : false
+  // console.log(IndividualQuery, analytics_response, 'This is the first check ')
   
   if(!IndividualQuery && source!=='MapComponent') {
     let essential_all = analytics_response?.['Unfiltered Essential Supplier']
@@ -104,6 +121,15 @@ function Vendorresult({ result, source, rerender }) {
   const [updNonEssentialAllSupplier, setUpdNonEssentialAllSupplier] = useState([])
   const [updNonEssentialBestSupplier, setUpdNonEssentialBestSupplier] = useState([])
 
+  const [individualAllSupply, setIndividualAllSupply] = useState([])
+  const [essentialAllSupply, setEssentialAllSupply] = useState([])
+  const [nonessentialAllSupply, setNonEssentialAllSupply] = useState([])
+  const supplyNode = useRef(null)
+  const [supplydropdownopen, setSupplyDropdownOpen] = useState(false)
+  const [supplyname, setSupplyName] = useState()
+  const [supplyList, setSupplyList] = useState([])
+  useClickOutside(supplyNode, ()=> setSupplyDropdownOpen(false));
+
   const { data: uiData } = useFrappeGetDoc("UI Configuration", "Vendors")
     const configurations = uiData?.configurations || [];
     const uiConfig = configurations.reduce((acc, curr) => {
@@ -116,51 +142,140 @@ function Vendorresult({ result, source, rerender }) {
   
   const { updateDoc } = useFrappeUpdateDoc()
 
-  const parseSuppliers = (supplierData) => {
-    if (!supplierData?.vendor_id) return [];
+  // const parseSuppliers = (supplierData) => {
+  //   if (!supplierData?.vendor_id) return [];
 
-    // Create a Map to handle duplicates (last entry wins)
-    const vendorMap = new Map();
+  //   // Create a Map to handle duplicates (last entry wins)
+  //   const vendorMap = new Map();
 
-    Object.keys(supplierData.vendor_id).forEach(key => {
-      const vendorId = supplierData.vendor_id[key];
-      const vendorData = {
-        supply_id: supplierData.supply_id?.[key],
-        Final_Score_With_Features: supplierData.Final_Score_With_Features?.[key],
-        vendor_id: vendorId,
-        // aggregated_score: supplierData.aggregated_score?.[key],
-        // Add all other properties dynamically
-        ...Object.fromEntries(
-          Object.entries(supplierData)
-            .filter(([k]) => !['vendor_id', 'supply_id', 'Final_Score_With_Features'].includes(k))
-            .map(([k, v]) => [k, v[key]])
-        )
-      };
+  //   Object.keys(supplierData.vendor_id).forEach(key => {
+  //     const vendorId = supplierData.vendor_id[key];
+  //     const vendorData = {
+  //       supply_id: supplierData.supply_id?.[key],
+  //       Final_Score_With_Features: supplierData.Final_Score_With_Features?.[key],
+  //       vendor_id: vendorId,
+  //       // aggregated_score: supplierData.aggregated_score?.[key],
+  //       // Add all other properties dynamically
+  //       ...Object.fromEntries(
+  //         Object.entries(supplierData)
+  //           .filter(([k]) => !['vendor_id', 'supply_id', 'Final_Score_With_Features'].includes(k))
+  //           .map(([k, v]) => [k, v[key]])
+  //       )
+  //     };
 
-      // This will automatically override previous entries with same vendor_id
-      vendorMap.set(vendorId, vendorData);
+  //     // This will automatically override previous entries with same vendor_id
+  //     vendorMap.set(vendorId, vendorData);
+  //   });
+
+  //   return Array.from(vendorMap.values());
+  // };
+  
+const parseAllSupplies = (supplies) => {
+  // console.log('this are the supplies', supplies)
+  if (!supplies || supplies.length===0) return []
+    const allsupplies = [] 
+    Object.keys(supplies.supply_id).forEach(key=> { 
+      const supply = supplies.supply_id[key] 
+      allsupplies.push(supply) 
+    }) 
+    return allsupplies 
+  }
+
+const parseAllTempSupplies = (vendors) => {
+  // console.log(vendors,'This are the vendors Supplies')
+  if (!vendors || vendors.length===0) return []
+  const allsupplies = [];
+  // Iterate over each vendor in the input data
+  vendors.forEach(vendor => {
+    // Iterate over the best_supply array for each vendor
+    vendor.best_supply.forEach(supply => {
+      allsupplies.push(supply);
     });
+  });
 
-    return Array.from(vendorMap.values());
-  };
+  return allsupplies;
+};
+
+
+   const parseSuppliers = (supplierData) => {
+    // console.log("Here comes the suplyData", supplierData)
+    if (!supplierData) return [];
+  if (!supplierData?.vendor_id) return [];
+   
+  const vendorMap = new Map();
+
+  Object.keys(supplierData.vendor_id).forEach(key => {
+    const vendorId = supplierData.vendor_id[key];
+
+    const vendorData = {
+      supply_id: supplierData.supply_id?.[key],
+      Final_Score_With_Features: supplierData.Final_Score_With_Features?.[key],
+      vendor_id: vendorId,
+      // Add all other properties dynamically
+      ...Object.fromEntries(
+        Object.entries(supplierData)
+          .filter(([k]) => !['vendor_id', 'supply_id', 'Final_Score_With_Features'].includes(k))
+          .map(([k, v]) => [k, v[key]])
+      )
+    };
+
+    if (!vendorMap.has(vendorId)) {
+      // First time: create entry with best_supply Set
+      vendorMap.set(vendorId, {
+        ...vendorData,
+        best_supply: new Set([vendorData.supply_id])
+      });
+    } else {
+      // Already exists: add supply_id into best_supply Set
+      const existing = vendorMap.get(vendorId);
+      existing.best_supply.add(vendorData.supply_id);
+
+      vendorMap.set(vendorId, { ...existing, ...vendorData, best_supply: existing.best_supply });
+    }
+  });
+
+  // Convert Sets to arrays before returning
+  return Array.from(vendorMap.values()).map(v => ({
+    ...v,
+    best_supply: Array.from(v.best_supply)
+  }))
+};
 
   useEffect(() => {
     if (source !== "MapComponent") {
       if (IndividualQuery) {
+        
         setBestIndividualSuppliers(((source === "SolutionScreen") && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Best IS Supplier"] || "{}")) : analytics_response?.["Best IS Supplier"] || "{}")
         setBetterIndividualSuppliers(((source === "SolutionScreen") && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Better Supplier"] || "{}")) : analytics_response?.["Better Supplier"] || "{}")
         setAllIndividualSuppliers(((source === "SolutionScreen") && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Unfiltered All IS Supplier"] || "{}")) : analytics_response?.["Unfiltered All IS Supplier"] || "{}")
+        let temp_supply = ((source=== "SolutionScreen") && rerender !==1) ? JSON.parse(analytics_response["Unfiltered All IS Supplier"] || "{}") : analytics_response?.["Unfiltered All IS Supplier"] || "{}"
+        let all_supply = parseAllSupplies(temp_supply)
+        let uniqueSupplies = [...new Set(all_supply)];
+        setIndividualAllSupply(uniqueSupplies)
+        setSupplyName(uniqueSupplies[0])
       }
 
       if (!IndividualQuery) {
         setEssentialBestSuppliers((source === 'SolutionScreen' && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Best Essential Supplier"] || "[]")) : analytics_response["Best Essential Supplier"] || "[]");
         setEssentialAllSuppliers((source === 'SolutionScreen' && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Unfiltered Essential Supplier"] || "[]")) : analytics_response["Unfiltered Essential Supplier"] || "[]");
+        // console.log(parseSuppliers(JSON.parse(analytics_response["Unfiltered Essential Supplier"] || "[]")),' Okay this is something new ')
+        let temp_essential_supply = (source === 'SolutionScreen' && rerender !== 1) ? JSON.parse(analytics_response["Unfiltered Essential Supplier"] || "[]") : analytics_response["Unfiltered Essential Supplier"] || "[]"
+        let all_supply = (source === 'SolutionScreen' && rerender !== 1) ? parseAllSupplies(temp_essential_supply) : parseAllTempSupplies(temp_essential_supply)
+        let uniqueEssentialSupplies = [...new Set(all_supply)]
+        // console.log(uniqueEssentialSupplies, 'This are all the supplies that are essential')
+        setEssentialAllSupply(uniqueEssentialSupplies)
+        
         setNonEssentialBestSuppliers((source === 'SolutionScreen' && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Best Non-Essential Supplier"] || "[]")) : analytics_response["Best Non-Essential Supplier"] || "[]");
         setNonEssentialAllSuppliers((source === 'SolutionScreen' && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Unfiltered Non-Essential Supplier"] || "[]")) : analytics_response["Unfiltered Non-Essential Supplier"] || "[]");
-      }
+        let temp_nonEssential_supply = (source === 'SolutionScreen' && rerender !== 1) ? JSON.parse(analytics_response["Unfiltered Non-Essential Supplier"] || "[]") : analytics_response["Unfiltered Non-Essential Supplier"] || "[]"
+        let all_non_essential_supply = (source === 'SolutionScreen' && rerender !== 1) ? parseAllSupplies(temp_nonEssential_supply) : parseAllTempSupplies(temp_nonEssential_supply)
+        let uniquenonEssentialSupplies = [...new Set(all_non_essential_supply)]
+        setNonEssentialAllSupply(uniquenonEssentialSupplies)
 
+      }
     }
   }, [analytics_response])
+
 
   const allVendorNames = [...(nonEssentialAllSuppliers || []).map(f => f?.vendor_id), ...(essentialAllSuppliers || []).map(f => f?.vendor_id), ...(nonEssentialBestSuppliers || []).map(f => f?.vendor_id), ...(essentialBestSuppliers || []).map(f => f?.vendor_id)];
   const allSupplyNames = [...(nonEssentialAllSuppliers || []).map(f => f?.supply_id), ...(essentialAllSuppliers || []).map(f => f?.supply_id)];
@@ -318,9 +433,13 @@ function Vendorresult({ result, source, rerender }) {
     if ((source === "SolutionScreen" || source === 'FromScratch')) {
       let currentypeAll = supplierType === "Essential" ? updEssentialAllSupplier : updNonEssentialAllSupplier
       let currentypeBest = supplierType === "Essential" ? updEssentialBestSupplier : updNonEssentialBestSupplier
+      setSupplyList(IndividualQuery ? individualAllSupply : (supplierType === "Essential" ? essentialAllSupply : nonessentialAllSupply))
       let all = IndividualQuery ? updatedAllIndividualSupplier : currentypeAll
       let best = IndividualQuery ? updatedBestIndividualSupplier : currentypeBest
-      const sourceList = currentData === 'All Suppliers' ? all : best
+      // const filteredSuppliers = currentData==='All Suppliers' ? all.filter((s) => s.supply_id === supplyname) : best.filter((s) => s.supply_id === supplyname)
+      const filteredSuppliers = currentData==='All Suppliers' ? all.filter((s) => s.best_supply.includes(supplyname)) : best.filter((s) => s.best_supply.includes(supplyname))
+      // const sourceList = currentData === 'All Suppliers' ? all : best
+      const sourceList = filteredSuppliers
 
       if (!sourceList || sourceList.length === 0) {
         setSupplierList([]);
@@ -336,7 +455,16 @@ function Vendorresult({ result, source, rerender }) {
       setSupplierList(filtered);
       setLoading(false)
     }
-  }, [currentData, supplierType, groupedData, searchQuery, updEssentialAllSupplier, updEssentialBestSupplier, updNonEssentialAllSupplier, updNonEssentialBestSupplier, updatedAllIndividualSupplier, updatedBestIndividualSupplier]);
+  }, [currentData, supplierType, groupedData,supplyname, searchQuery, updEssentialAllSupplier, updEssentialBestSupplier, updNonEssentialAllSupplier, updNonEssentialBestSupplier, updatedAllIndividualSupplier, updatedBestIndividualSupplier]);
+
+  useEffect(()=>{
+    if(supplyList.length>0) {
+      setSupplyName(supplyList[0])
+    }
+    else {
+      setSupplyName('No Supplies Found')
+    }
+  },[supplyList])
 
   useEffect(()=>{
     if(!IndividualQuery) {
@@ -635,11 +763,19 @@ function Vendorresult({ result, source, rerender }) {
                 <div className={`${supplierType === "Non-Essential" ? 'bg-blue-500 w-full' : 'bg-transparent w-0'} ' h-[2px] bg-blue-500 rounded-full transition-width duration-300`}></div>
               </div>
             </div>)}
+            <div className='relative inline-block border-b p-2' ref={supplyNode}>
+                <div onClick={() => setSupplyDropdownOpen(!supplydropdownopen)} className={` ${supplyList.length>0 ? "" : "pointer-events-none opacity-50"} flex rounded-md  justify-center items-center gap-3 py-1  w-full`}><span className='text-sm select-none font-semibold'>{supplyname}</span><span className='text-md font-bold absolute top-4 right-2'>{!supplydropdownopen ? (<IoIosArrowDown/>) : (<IoIosArrowUp/>)}</span></div>
+                <div className={`absolute border overflow-y-auto max-h-[350px] border-black p-2 flex flex-col gap-2 left-0 z-40 mt-1  w-full rounded-md bg-white  transition-all ${supplydropdownopen ? 'top-full opacity-100 visible': 'top-[110%] invisible opacity-0'}`}>
+                    {supplyList.map((supply, index) => (
+                        <div key={`supply${index}`}  className={`rounded-lg  py-2 px-5 flex items-center text justify-center transition-all text-xs md:text-md col-span-1 border border-black text-center font-semibold tracking-wide whitespace-nowrap hover:bg-[#0e2044] cursor-pointer hover:text-white ${supplyname === supply ? "bg-[#0e2044] text-white" : "bg-[#f2f2f2]"}`} onClick={(e)=> {setSupplyName(e.currentTarget.textContent), setSupplyDropdownOpen(false)}}>{supply}</div>
+                    ))}                    
+                </div>
+            </div>
             <div className="relative flex justify-center border-b border-gray-200 flex-row gap-2 pt-2 w-full">
               <div className='relative flex flex-col gap-1 cursor-pointer items-center w-full' onClick={() => { setCurrentData('Best Suppliers') }}>
                 <button
                   onClick={() => { setCurrentData('Best Suppliers') }}
-                  className={`px-3 py-1 text-xs cursor-pointer flex flex-row gap-2 items-center text-green-500 font-semibold transition-all`}
+                  className={`px-3 py-1 text-xs select-none cursor-pointer flex flex-row gap-2 items-center text-green-500 font-semibold transition-all`}
                 >
                   <FaAward size={20} />{uiConfig?.['vendor_best_suppliers_tab'] || "Best Suppliers"}
                 </button>
@@ -648,7 +784,7 @@ function Vendorresult({ result, source, rerender }) {
               <div className='relative flex flex-col gap-1 cursor-pointer items-center w-full' onClick={() => { setCurrentData('All Suppliers') }}>
                 <button
                   onClick={() => { setCurrentData('All Suppliers') }}
-                  className={`px-3 py-1 text-xs cursor-pointer flex flex-row gap-2 items-center text-orange-500 font-semibold transition-all`}
+                  className={`px-3 py-1 text-xs select-none cursor-pointer flex flex-row gap-2 items-center text-orange-500 font-semibold transition-all`}
                 >
                   <FaList size={20} />{uiConfig?.['vendor_all_suppliers_tab'] || "All Suppliers"}
                 </button>
@@ -761,7 +897,7 @@ function Vendorresult({ result, source, rerender }) {
                       </h2>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {selectedVendor.supplies && selectedVendor.supplies.map((data, index) => (
-                          <div key={index} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                          <div key={index} className={`bg-white rounded-lg border border-gray-200 overflow-hidden ${data.supply===supplyname ? 'shadow-[0px_0px_10px_0px_rgba(0,0,0,0.98)] transform scale-[1.03]' : ''}`}>
                             <div className="bg-blue-50 p-3 border-b border-gray-200">
                               <div className="flex justify-between items-center">
                                 <span className="font-medium text-gray-800">{data.supply}</span>
