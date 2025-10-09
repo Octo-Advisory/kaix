@@ -153,7 +153,7 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
             // console.log("📊 AI Feasibility Result:", analysisResult.message);
 
         } catch (err) {
-            // console.error("❌ Upload/Analysis Error:", err);
+            console.error("❌ Upload/Analysis Error:", err);
             setStatus('error');
             setErrorMessage(err.message || 'An error occurred during processing. Please try again.');
         } finally {
@@ -290,6 +290,8 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
                 setStatus('success');
             }
             else{
+                console.log(pendingResultData,'okay');
+                
                 setStatus('error');
             }
             await markReportAsSeen(pendingReport.name);
