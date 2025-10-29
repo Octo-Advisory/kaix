@@ -61,7 +61,9 @@ const SingleMap = ({ selectedProperty, intension }) => {
     AIRPORTS: `${uiConfig?.['checkbox_airports'] || 'Airports'}`,
     SEAPORTS: `${uiConfig?.['checkbox_seaports'] || 'Seaports'}`,
     HIGHWAY: `${uiConfig?.['checkbox_highway'] || 'Highway'}`,
-    VENDOR: `${uiConfig?.['checkbox_all_vendors'] || 'All Vendors'}`
+    VENDOR: `${uiConfig?.['checkbox_all_vendors'] || 'All Vendors'}`,
+    ESSENTIAL_VENDORS: `${uiConfig?.['checkbox_all_essential_vendors'] || 'All Essential Vendors'}`,
+    NON_ESSENTIAL_VENDORS: `${uiConfig?.['checkbox_all_non_essential_vendors'] || 'All Non Essential Vendors'}`,
   }
   var allVendors = [];
   var nearestAirportDetail = null;
@@ -70,6 +72,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
   var nearestRailwayStationDetail = null;
   var highwayCoord = null;
   var nearestHighwayDetail = null;
+  var essentialVendors = null;
   useEffect(() => {
     if (!mapContainer.current || !lat || !lng || !uiData) return;
     mapboxgl.accessToken = `${uiConfig?.['mapmobx_api_token']}`;
@@ -348,51 +351,123 @@ const SingleMap = ({ selectedProperty, intension }) => {
   };
   const loadVendorlayer = async () => {
 
-    copyiedSelectedProperty.essential_vendors.forEach((item) => {
-      if (!item.vendor_name || !item.supply) return;
+    let essentialVenorData = copyiedSelectedProperty.essential_vendors.slice(0, 5);
+    // Group by vendor_name and join supply names
+    const groupedEssentialVendorData = Object.values(
+      essentialVenorData.reduce((acc, item) => {
+        if (!acc[item.vendor_name]) {
+          acc[item.vendor_name] = { vendor_name: item.vendor_name, supplies: [] };
+        }
+        acc[item.vendor_name].supplies.push(item.supply);
+        return acc;
+      }, {})
+    ).map(vendor => ({
+      vendor_name: vendor.vendor_name,
+      supplies: vendor.supplies.join(', ')
+    }));
 
-      var filteredItem = copyiedSelectedProperty.essential_vendor_details.filter(
-        (detail) => detail.name?.trim() === item.vendor_name.trim()
+    let nonessentialVenorData = copyiedSelectedProperty.nonessential_vendors.slice(0, 5);
+    // Group by vendor_name and join supply names
+    const groupedNonEssentialVendorData = Object.values(
+      nonessentialVenorData.reduce((acc, item) => {
+        if (!acc[item.vendor_name]) {
+          acc[item.vendor_name] = { vendor_name: item.vendor_name, supplies: [] };
+        }
+        acc[item.vendor_name].supplies.push(item.supply);
+        return acc;
+      }, {})
+    ).map(vendor => ({
+      vendor_name: vendor.vendor_name,
+      supplies: vendor.supplies.join(', ')
+    }));
+    
+    const essentialVendorNames = Array.isArray(essentialVenorData) ? essentialVenorData.map(vendor => vendor.vendor_name) : [];
+    const nonEssentialVendorNames = Array.isArray(groupedNonEssentialVendorData) ? groupedNonEssentialVendorData.map(vendor => vendor.vendor_name) : [];
+    
+    var finalEVData = await getVendors(JSON.stringify(essentialVendorNames));
+    var finalNEVData = await getVendors(JSON.stringify(nonEssentialVendorNames));
+    
+    finalEVData.data.forEach((item) => {
+      if (!item.vendor_name) return;
+      
+      var filteredItem = groupedEssentialVendorData.filter(
+        (detail) => detail.vendor_name?.trim() === item.vendor_name.trim()
       );
-      filteredItem.forEach((detail) => {
-        if (typeof detail.supplyName !== 'undefined') {
-          detail.supplyName = "";
-        }
-      });
-      filteredItem.forEach((detail) => {
-        if (!detail.supplyName) {
-          detail.supplyName = item.supply;
-        } else {
-          detail.supplyName = `${detail.supplyName}, ${item.supply}`;
-        }
-      });
+      
+      if(filteredItem.length<=0)
+        return;
+      
+      // Join all supply names with commas if more than one match
+      const supplyNames = filteredItem[0].supplies;     
+
+      item.supplyName = supplyNames;
     });
-
-
-    copyiedSelectedProperty.nonessential_vendors.forEach((item) => {
-      if (!item.vendor_name || !item.supply) return; // skip if missing
-
-      var filteredItem = copyiedSelectedProperty.non_essential_vendor_details.filter(
-        (detail) => detail.name?.trim() === item.vendor_name.trim()
+    
+    finalNEVData.data.forEach((item) => {
+      if (!item.vendor_name) return;
+      
+      var filteredItem = groupedNonEssentialVendorData.filter(
+        (detail) => detail.vendor_name?.trim() === item.vendor_name.trim()
       );
-      filteredItem.forEach((detail) => {
-        if (typeof detail.supplyName !== 'undefined') {
-          detail.supplyName = "";
-        }
-      });
-      filteredItem.forEach((detail) => {
-        if (!detail.supplyName) {
-          detail.supplyName = item.supply;
-        } else {
-          detail.supplyName += ", " + item.supply;
-        }
-      });
-    });
+      
+      if(filteredItem.length<=0)
+        return;
+      
+      // Join all supply names with commas if more than one match
+      const supplyNames = filteredItem[0].supplies;     
 
+      item.supplyName = supplyNames;
+    });
+    essentialVendors = finalEVData.data;    
+    // copyiedSelectedProperty.essential_vendors.forEach((item) => {
+    //   if (!item.vendor_name || !item.supply) return;
+
+    //   var filteredItem = copyiedSelectedProperty.essential_vendor_details.filter(
+    //     (detail) => detail.name?.trim() === item.vendor_name.trim()
+    //   );
+    //   filteredItem.forEach((detail) => {
+    //     if (typeof detail.supplyName !== 'undefined') {
+    //       detail.supplyName = "";
+    //     }
+    //   });
+    //   filteredItem.forEach((detail) => {
+    //     if (!detail.supplyName) {
+    //       detail.supplyName = item.supply;
+    //     } else {
+    //       detail.supplyName = `${detail.supplyName}, ${item.supply}`;
+    //     }
+    //   });
+    // });
+
+
+    // copyiedSelectedProperty.nonessential_vendors.forEach((item) => {
+    //   if (!item.vendor_name || !item.supply) return; // skip if missing
+
+    //   var filteredItem = copyiedSelectedProperty.non_essential_vendor_details.filter(
+    //     (detail) => detail.name?.trim() === item.vendor_name.trim()
+    //   );
+    //   filteredItem.forEach((detail) => {
+    //     if (typeof detail.supplyName !== 'undefined') {
+    //       detail.supplyName = "";
+    //     }
+    //   });
+    //   filteredItem.forEach((detail) => {
+    //     if (!detail.supplyName) {
+    //       detail.supplyName = item.supply;
+    //     } else {
+    //       detail.supplyName += ", " + item.supply;
+    //     }
+    //   });
+    // });
     let data = [
-      ...copyiedSelectedProperty.essential_vendor_details,
-      ...copyiedSelectedProperty.non_essential_vendor_details
-    ];
+      ...finalEVData.data,
+      // ...finalNEVData.data
+    ]
+    
+    // let data = [
+    //   ...copyiedSelectedProperty.essential_vendor_details,
+    //   ...copyiedSelectedProperty.non_essential_vendor_details
+    // ];
     // selectedProperty.essential_vendor_details.forEach((item,index) => {
     //   item.supplyName = selectedProperty.essential_vendors[index].vendor_name;
     // });
@@ -575,6 +650,35 @@ const SingleMap = ({ selectedProperty, intension }) => {
       }
       bindDataOnMap(data, LAYERS.VENDOR);
     }
+    else if (layerType === LAYERS.ESSENTIAL_VENDORS) {
+      const filteredEssentialVendors = copyiedSelectedProperty.essential_vendor_all_details.filter(
+          item2 => !essentialVendors.some(
+            item1 => item1.vendor_name === item2.vendor_name
+          )
+        );
+      let data = filteredEssentialVendors;
+
+      if (data.length > 0) {
+        data.forEach((item) => {
+          if (item.latitude_longitude != null && item.latitude_longitude != "") {
+            item.coordinates = item.latitude_longitude;
+          }
+        });
+      }
+      bindDataOnMap(data, LAYERS.ESSENTIAL_VENDORS);
+    }
+    else if (layerType === LAYERS.NON_ESSENTIAL_VENDORS) {
+      let data = copyiedSelectedProperty.non_essential_vendor_all_details;
+
+      if (data.length > 0) {
+        data.forEach((item) => {
+          if (item.latitude_longitude != null && item.latitude_longitude != "") {
+            item.coordinates = item.latitude_longitude;
+          }
+        });
+      }
+      bindDataOnMap(data, LAYERS.NON_ESSENTIAL_VENDORS);
+    }
     else {
       const docTypeName = layerMapping[layerType];
       if (!docTypeName) return;
@@ -737,6 +841,8 @@ const SingleMap = ({ selectedProperty, intension }) => {
                       (layer === LAYERS.RAILWAY_STATIONS || layer === LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS) ? <MdDirectionsRailwayFilled size={20} color="#5f2abb" /> :
                         (layer === LAYERS.HIGHWAY || layer === LAYERS.DEFAULT_LAYER.HIGHWAY) ? <FaRoad size={20} color="#5f2abb" /> :
                           (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) ? <FaStore size={20} color="#5b96d8" /> :
+                          (layer === LAYERS.ESSENTIAL_VENDORS ) ? <FaStore size={20} color="#5b96d8" /> :
+                          (layer === LAYERS.NON_ESSENTIAL_VENDORS ) ? <FaStore size={20} color="#5b96d8" /> :
                             ""
               }
 
@@ -752,7 +858,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
             .addTo(mapRef.current);
 
           //If All vendor or Defualt layer is selected
-          if (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) {
+          if (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR || layer === LAYERS.ESSENTIAL_VENDORS || layer === LAYERS.NON_ESSENTIAL_VENDORS) {
             //Show label on the marker            
             addInfoPoupp(marker, data.name);
 
@@ -805,6 +911,12 @@ const SingleMap = ({ selectedProperty, intension }) => {
                 break;
               case LAYERS.RAILWAY_STATIONS:
                 name = data.name1;
+                break;
+              case LAYERS.ESSENTIAL_VENDORS:
+                name = data.vendor_name;
+                break; 
+              case LAYERS.NON_ESSENTIAL_VENDORS:
+                name = data.vendor_name;
                 break;
               default:
                 break;
@@ -986,6 +1098,27 @@ const SingleMap = ({ selectedProperty, intension }) => {
       let midPoinnt = getMidpointByLength(getCurvedLineCoord);
       addDistanceLabel(midPoinnt, labelText, layerId + " lable");
 
+    }
+  }
+  //#endregion
+
+  //#region Helper Methods
+    const getVendors = async (filters) => {
+    try {
+      const response = await fetch(`/api/resource/Vendor?fields=["*"]&limit=1000&filters=[["name","in",`+filters+`]]`, {
+        method: 'GET',
+        headers: {
+          'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) throw new Error(`Error: ${response.statusText}`);
+      const data = await response.json();
+      return data
+    } catch (error) {
+      // console.error('Error fetching data:', error);
+      createDiagnostic("Land & Approvals", `Something went wrong while fetching Area Name ${JSON.stringify(error)} in Build From Scratch`,lastChatId)
+      setSomeError(true)
     }
   }
   //#endregion
@@ -1172,7 +1305,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                               </span>
                             </label>
                           </li>
-                          <li className="li-container">
+                          {/* <li className="li-container">
 
                             <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
@@ -1185,6 +1318,38 @@ const SingleMap = ({ selectedProperty, intension }) => {
                               </span>
                               <span className="text-sm font-medium">
                                 {LAYERS.VENDOR}
+                              </span>
+                            </label>
+                          </li> */}
+                          <li className="li-container">
+
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
+                              <input
+                                type="checkbox"
+                                name={LAYERS.ESSENTIAL_VENDORS}
+                              />
+                              <span className="checkmark"></span>
+                              <span>
+                                <FaStore size={20} className="text-[#5f2abb]" />
+                              </span>
+                              <span className="text-sm font-medium">
+                                {LAYERS.ESSENTIAL_VENDORS}
+                              </span>
+                            </label>
+                          </li>
+                          <li className="li-container">
+
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
+                              <input
+                                type="checkbox"
+                                name={LAYERS.NON_ESSENTIAL_VENDORS}
+                              />
+                              <span className="checkmark"></span>
+                              <span>
+                                <FaStore size={20} className="text-[#5f2abb]" />
+                              </span>
+                              <span className="text-sm font-medium">
+                                {LAYERS.NON_ESSENTIAL_VENDORS}
                               </span>
                             </label>
                           </li>

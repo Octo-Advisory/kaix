@@ -48,7 +48,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMapoptionVisible, setMapOptionVisible] = useState(true);
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
-
+  const essentialVendors = useRef(null);
   const latLongArray = Object.values(solutions).map(item => [...item.latitude_longitude].reverse());
 
   var map = null;
@@ -78,7 +78,9 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     AIRPORTS: `${uiConfig?.['checkbox_airports'] || 'Airports'}`,
     SEAPORTS: `${uiConfig?.['checkbox_seaports'] || 'Seaports'}`,
     HIGHWAY: `${uiConfig?.['checkbox_highway'] || 'Highway'}`,
-    VENDOR: `${uiConfig?.['checkbox_all_vendors'] || 'All Vendors'}`
+    VENDOR: `${uiConfig?.['checkbox_all_vendors'] || 'All Vendors'}`,
+    ESSENTIAL_VENDORS: `${uiConfig?.['checkbox_all_essential_vendors'] || 'All Essential Vendors'}`,
+    NON_ESSENTIAL_VENDORS: `${uiConfig?.['checkbox_all_non_essential_vendors'] || 'All Non Essential Vendors'}`,
   }
 
   const DIRECTIONS = {
@@ -356,6 +358,35 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         bindDataOnMap(uniqueVendorNames, LAYERS.VENDOR);
         }
       }
+      else if (layerType === LAYERS.ESSENTIAL_VENDORS) {
+        const filteredEssentialVendors = copyiedSelectedProperty.current.essential_vendor_all_details.filter(
+            item2 => !essentialVendors.current.some(
+              item1 => item1.vendor_name === item2.vendor_name
+            )
+          );
+          let data = filteredEssentialVendors;
+          
+        if (data.length > 0) {
+          data.forEach((item) => {
+            if (item.latitude_longitude != null && item.latitude_longitude != "") {
+              item.coordinates = item.latitude_longitude;
+            }
+          });
+        }
+        bindDataOnMap(data, LAYERS.ESSENTIAL_VENDORS);
+      }
+      else if (layerType === LAYERS.NON_ESSENTIAL_VENDORS) {
+        let data = copyiedSelectedProperty.current.non_essential_vendor_all_details;
+
+        if (data.length > 0) {
+          data.forEach((item) => {
+            if (item.latitude_longitude != null && item.latitude_longitude != "") {
+              item.coordinates = item.latitude_longitude;
+            }
+          });
+        }
+        bindDataOnMap(data, LAYERS.NON_ESSENTIAL_VENDORS);
+      }
       else {
         const docTypeName = layerMapping[layerType];
         if (!docTypeName) return;
@@ -450,7 +481,9 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                     (layer === LAYERS.RAILWAY_STATIONS || layer === LAYERS.DEFAULT_LAYER.RAILWAY_STATIONS) ? <MdDirectionsRailwayFilled size={20} color="#5f2abb" /> :
                       (layer === LAYERS.HIGHWAY || layer === LAYERS.DEFAULT_LAYER.HIGHWAY) ? <FaRoad size={20} color="#5f2abb" /> :
                         (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) ? <FaStore size={20} color="#5b96d8" /> :
-                          ""
+                          (layer === LAYERS.ESSENTIAL_VENDORS ) ? <FaStore size={20} color="#5b96d8" /> :
+                          (layer === LAYERS.NON_ESSENTIAL_VENDORS ) ? <FaStore size={20} color="#5b96d8" /> :
+                            ""
             }
           </div>
           <div className="absolute z-[9] left-1/2 bg-white pin-tip"></div>
@@ -486,7 +519,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       }).setLngLat([lng, lat])
         .addTo(mapRef.current);
       //If All vendor or Defualt layer is selected
-      if (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) {
+      if (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR || layer === LAYERS.ESSENTIAL_VENDORS || layer === LAYERS.NON_ESSENTIAL_VENDORS) {
         //Show label on the marker
         addInfoPoupp(marker, data.name);
         //clicking on the vendor marker a vendor detail modal will open
@@ -513,6 +546,12 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
             break;
           case LAYERS.RAILWAY_STATIONS:
             name = data.name1;
+            break;
+          case LAYERS.ESSENTIAL_VENDORS:
+            name = data.vendor_name;
+            break; 
+          case LAYERS.NON_ESSENTIAL_VENDORS:
+            name = data.vendor_name;
             break;
           default:
             break;
@@ -824,6 +863,20 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
   }
   const loadDefaultLayer = async () => {
     copyiedSelectedProperty.current = structuredClone(solution);
+    let essentialVenorData = copyiedSelectedProperty.current.essential_vendors.slice(0, 5);
+    // Group by vendor_name and join supply names
+    const groupedEssentialVendorData = Object.values(
+      essentialVenorData.reduce((acc, item) => {
+        if (!acc[item.vendor_name]) {
+          acc[item.vendor_name] = { vendor_name: item.vendor_name, supplies: [] };
+        }
+        acc[item.vendor_name].supplies.push(item.supply);
+        return acc;
+      }, {})
+    ).map(vendor => ({
+      vendor_name: vendor.vendor_name,
+      supplies: vendor.supplies.join(', ')
+    }));
     copyiedSelectedProperty.current.essential_vendors.forEach((item) => {
       if (!item.vendor_name || !item.supply) return;
 
@@ -864,11 +917,33 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         }
       });
     });
+    const essentialVendorNames = Array.isArray(essentialVenorData) ? essentialVenorData.map(vendor => vendor.vendor_name) : [];
+    var finalEVData = await getVendors(JSON.stringify(essentialVendorNames));
+    finalEVData.data.forEach((item) => {
+      if (!item.vendor_name) return;
+      
+      var filteredItem = groupedEssentialVendorData.filter(
+        (detail) => detail.vendor_name?.trim() === item.vendor_name.trim()
+      );
+      
+      if(filteredItem.length<=0)
+        return;
+      
+      // Join all supply names with commas if more than one match
+      const supplyNames = filteredItem[0].supplies;     
+
+      item.supplyName = supplyNames;
+    });
+    essentialVendors.current  = finalEVData.data; 
 
     let data = [
-      ...copyiedSelectedProperty.current.essential_vendor_details,
-      ...copyiedSelectedProperty.current.non_essential_vendor_details
-    ];
+      ...finalEVData.data,
+      // ...finalNEVData.data
+    ]
+    // let data = [
+    //   ...copyiedSelectedProperty.current.essential_vendor_details,
+    //   ...copyiedSelectedProperty.current.non_essential_vendor_details
+    // ];
 
     if (data.length > 0) {
       data.forEach((item) => {
@@ -1134,7 +1209,9 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     removeMarker(LAYERS.DEFAULT_LAYER.LABEL);
     await loadDefaultLayer();
     resetZoomlevel();
-    document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.display = "flex"; //Disable the vendor layer checkbox
+    // document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.display = "flex"; //Disable the vendor layer checkbox
+    document.querySelector("[data-name='checkbox-container-" + LAYERS.ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
+    document.querySelector("[data-name='checkbox-container-" + LAYERS.NON_ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
     // document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.flexDirection = "flex-row"; //Disable the vendor layer checkbox
     // document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.gap = "5px"; //Disable the vendor layer checkbox
     changeMarkerOpacity();
@@ -1147,7 +1224,9 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     removeMarker(LAYERS.DEFAULT_LAYER.LABEL);
     await loadDefaultLayer();
     resetZoomlevel();
-    document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.display = "flex"; //Disable the vendor layer checkbox
+    // document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.display = "flex"; //Disable the vendor layer checkbox
+    document.querySelector("[data-name='checkbox-container-" + LAYERS.ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
+    document.querySelector("[data-name='checkbox-container-" + LAYERS.NON_ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
     changeMarkerOpacity();
     setIsModalOpen(true);
     increaseSelectedPropertyMarkerSize(solution.property_id);
@@ -1241,7 +1320,26 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       });
     }
   }, { dependencies: [isConfirmationModalOpen], scope: optionPopup });
-
+  //#region Helper Methods
+    const getVendors = async (filters) => {
+    try {
+      const response = await fetch(`/api/resource/Vendor?fields=["*"]&limit=1000&filters=[["name","in",`+filters+`]]`, {
+        method: 'GET',
+        headers: {
+          'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) throw new Error(`Error: ${response.statusText}`);
+      const data = await response.json();
+      return data
+    } catch (error) {
+      // console.error('Error fetching data:', error);
+      createDiagnostic("Land & Approvals", `Something went wrong while fetching Area Name ${JSON.stringify(error)} in Build From Scratch`,lastChatId)
+      setSomeError(true)
+    }
+  }
+  //#endregion
   return (
     <div className="main-map h-screen w-screen flex items-center justify-center">
       <div
@@ -1428,7 +1526,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                               </span>
                             </label>
                           </li>
-                          <li className="li-container" style={{ display: "none" }} data-name={"checkbox-container-" + LAYERS.VENDOR}>
+                          {/* <li className="li-container" style={{ display: "none" }} data-name={"checkbox-container-" + LAYERS.VENDOR}>
                             <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
@@ -1441,6 +1539,40 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                               </span>
                               <span className="text-sm font-medium">
                                 {LAYERS.VENDOR}
+                              </span>
+                            </label>
+                          </li> */}
+                          <li className="li-container" style={{ display: "none" }}  data-name={"checkbox-container-" + LAYERS.ESSENTIAL_VENDORS}>
+                          
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
+                              <input
+                                type="checkbox"
+                                name={LAYERS.ESSENTIAL_VENDORS}
+                                onChange={(e) => handleSingleCheckbox(e)}
+                              />
+                              <span className="checkmark"></span>
+                              <span>
+                                <FaStore size={20} className="text-[#5f2abb]" />
+                              </span>
+                              <span className="text-sm font-medium">
+                                {LAYERS.ESSENTIAL_VENDORS}
+                              </span>
+                            </label>
+                          </li>
+                          <li className="li-container" style={{ display: "none" }}  data-name={"checkbox-container-" + LAYERS.NON_ESSENTIAL_VENDORS}>
+
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
+                              <input
+                                type="checkbox"
+                                name={LAYERS.NON_ESSENTIAL_VENDORS}
+                                onChange={(e) => handleSingleCheckbox(e)}
+                              />
+                              <span className="checkmark"></span>
+                              <span>
+                                <FaStore size={20} className="text-[#5f2abb]" />
+                              </span>
+                              <span className="text-sm font-medium">
+                                {LAYERS.NON_ESSENTIAL_VENDORS}
                               </span>
                             </label>
                           </li>
