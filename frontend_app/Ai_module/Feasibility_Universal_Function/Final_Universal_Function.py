@@ -96,14 +96,7 @@ def fetch_doc_fields_by_name(
     timeout: int = 30,
     debug: bool = False,
 ):
-    # load_dotenv("D:/work_folder/mars_rag_qna/.env")
-    # base_url   = os.getenv("BASE_URL")
-    # base_url = "https://marsaix.marsbazaar.com"
-    # base_url = "http://172.17.242.222"
-    # # api_key    = os.getenv("API_KEY")
-    # api_key = "d3de1e0e4e25846"
-    # # api_secret = os.getenv("API_SECRET")
-    # api_secret = "51fd8e403a19045"
+
     if not (base_url and api_key and api_secret):
         raise ValueError("Missing BASE_URL / API_KEY / API_SECRET")
 
@@ -154,12 +147,6 @@ def fetch_single_doc_by_name(
     # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
 
     # ---- fallbacks to environment ----
-    # base_url = "https://marsaix.marsbazaar.com"
-    # base_url = "http://172.17.242.222"
-    # # api_key    = os.getenv("API_KEY")
-    # api_key = "d3de1e0e4e25846"
-    # # api_secret = os.getenv("API_SECRET")
-    # api_secret = "51fd8e403a19045"
 
     if not base_url:
         raise ValueError("Missing base_url (pass base_url=... or set BASE_URL env var)")
@@ -211,20 +198,11 @@ def fetch_single_doc_by_name(
     return data
 
 def make_headers():
-    # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
 
-    # # ---- fallbacks to environment ----
-    # api_key    = os.getenv("API_KEY")
-    # api_secret = os.getenv("API_SECRET")
     return {"Authorization": f"token {api_key}:{api_secret}", "Expect": ""}
 
 def fetch_pdf_to_temp(file_url: str, is_private: bool | None = None) -> str:
     # normalize
-    # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
-    # # api_key    = os.getenv("API_KEY")
-    # api_key = "d3de1e0e4e25846"
-    # # api_secret = os.getenv("API_SECRET")
-    # api_secret = "51fd8e403a19045"
 
     path = file_url if file_url.startswith("/") else f"/{file_url}"
     if is_private is None:
@@ -949,15 +927,6 @@ def ensure_vector_and_update_record(doctype, doc_name):
         folder_name = LABEL_FEASIBILITY
     elif doctype == FOLL_DOCTYPE:
         folder_name = LABEL_FOLLOW
-
-    # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
-
-    # base_url = "https://marsaix.marsbazaar.com"
-    # base_url = "http://172.17.242.222"
-    # # api_key    = os.getenv("API_KEY")
-    # api_key = "d3de1e0e4e25846"
-    # # api_secret = os.getenv("API_SECRET")
-    # api_secret = "51fd8e403a19045"
 
     def make_headers():
         return {

@@ -1114,9 +1114,8 @@ def relevant_document_or_not(file_path: str, fallback_sample_size: int = 17, llm
             "fallback_used": True,
             "confidence": round(relevance_ratio, 2),
             "token_count": total_token_count,
-            "relevance_flags_sampled": relevance_flags_sampled
-        }
-        print("FINAL_RESULT👇👇👇👇👇👇👇", final_result, "👇👇👇👇👇👇👇")
+            "relevance_flags_sampled": relevance_flags_sampled}
+        
         return final_result
 
         # run the chain

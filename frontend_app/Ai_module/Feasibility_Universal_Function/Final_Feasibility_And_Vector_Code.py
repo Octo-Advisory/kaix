@@ -63,14 +63,12 @@ warnings.filterwarnings("ignore")
 # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
 # api_key = os.getenv("GROQ_API_KEY")
 
-base_url = "https://marsaix.marsbazaar.com"
+base_url = config['Key']['local_mars_url']
 # base_url = "http://172.17.242.222"
 # api_key    = os.getenv("API_KEY")
 api_key = config['Key']['frappe_doctype_api_key']
 # api_secret = os.getenv("API_SECRET")
-api_secret = config['Key']['frappe_doctype_api_secret']
-print(api_key)
-print("Loaded API Key:", api_key is not None)  # Should print: True
+api_secret = config['Key']['frappe_doctype_api_secret']  
 # print("API KEY:", os.getenv("GROQ_API_KEY"))
 
 # CHUNKS_STORAGE

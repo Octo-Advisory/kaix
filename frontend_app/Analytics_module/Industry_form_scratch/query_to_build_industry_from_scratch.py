@@ -736,7 +736,7 @@ def get_property_incentive_mapped(industry_id,sub_sector_id,area_id_list,city_id
 # """
 
     sql_query = f"""SELECT 
-    i.name,i.incentive_name, i.incentive_type, i.incentive_operation_start_date, i.incentive_operation_end_date,
+    i.name, i.incentive_operation_start_date, i.incentive_operation_end_date,
     iim.sub_sector, iim.area, iim.city, iim.state, i.incentive_rank,
     p.name, p.area AS property_area_id
 FROM `tabIncentive Industry Mapping` AS iim
@@ -775,7 +775,7 @@ WHERE COALESCE(iim.exclusion, 0) = 0
     results = fetch_query_results(sql_query)
 
     if results:
-        property_incentive_mapped_df = pd.DataFrame(results, columns=['incentive_id', "incentive_name", "incentive_type", "incentive_operation_start_date", 'incentive_operation_end_date', 'sub_sector_id', 'area_id', 
+        property_incentive_mapped_df = pd.DataFrame(results, columns=['incentive_id', "incentive_operation_start_date", 'incentive_operation_end_date', 'sub_sector_id', 'area_id', 
                                         'city_id', 'state_id', 'incentive_rank',
                                         'property_id', 'property_area_id'])
         found_incentive = True
@@ -893,6 +893,7 @@ def calculate_property_suitability(
     df['property_suitability_score'] = 0.5 * df['prximity_suitability_score'] + 0.5 * (df['land_size_score'] / 10)
 
     return df
+
 
 def calculate_employment_availability_score(df, sub_sector_id):
     """
@@ -1166,7 +1167,7 @@ def get_property_approval_mapped(industry_id,sub_sector_id,area_id_list,city_id_
 
     query = f"""
 SELECT 
-    a.name,                                        a.license_approval, a.government_department, 
+    a.name, a.license_approval, a.government_department, 
     a.business_location_type AS ABLT, a.land_type AS ALT, 
     a.vicinity_detail AS AVD, a.cross_following_details AS ACFD,
     a.road_cutting, a.delivery_schedule_in_working_days, 
@@ -2146,10 +2147,10 @@ def process_incentive_df_to_send_solution_screen(df):
         df.sort_values(by=['property_id', 'incentive_rank'], ascending=[True, False])
         .groupby('property_id')
         .agg({
-            'incentive_id': lambda x: list(x) , # List of incentives
-            'incentive_name': lambda x: list(x),
+            'incentive_id': lambda x: list(x)  # List of incentives
             # 'incentive_name': lambda x: list(x),
-            'incentive_type': lambda x: list(x),
+            # 'incentive_name': lambda x: list(x),
+            # 'incentive_type': lambda x: list(x),
             # 'incentive_operation_start_date': lambda x: list(x),
             # 'incentive_operation_end_date': lambda x: list(x),
             # 'quantum_of_assistance': lambda x: list(x),
@@ -2184,12 +2185,12 @@ def process_approval_df_to_send_solution_screen(df):
         df.sort_values(by=['property_id', 'stage_order', "time_taken"], ascending=[True, True, True])
         .groupby('property_id')
         .agg({
-            'approval_id': lambda x: list(x),  # List of incentives
-            'approval_name': lambda x: list(x),
-            'government_department': lambda x: list(x),
-            'time_taken': lambda x: list(x),
+            'approval_id': lambda x: list(x)  # List of incentives
+            # 'approval_name': lambda x: list(x),
+            # 'government_department': lambda x: list(x),
+            # 'time_taken': lambda x: list(x),
             # 'online_or_offline': lambda x: list(x),
-            'stages': lambda x: list(x),
+            # 'stages': lambda x: list(x),
         })
         .reset_index()
     )

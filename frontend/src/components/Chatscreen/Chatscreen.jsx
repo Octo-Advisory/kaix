@@ -189,21 +189,47 @@ useEffect(() => {
     if (addInput) {
       // console.log(addInput,feasibilityId, 'This is the addInput Value 2nd level ')
       // console.log('-----',addInput , 'ADDD INPUTT ------');
-      handleNewChat(addInput)
-      // handleSendbtn(addInput); // this will internally set the sessionId
+      
+      handleSendbtn(addInput); // this will internally set the sessionId
     }
   }, [addInput]);
 
 
   useEffect(() => {
 
-    
+    const handleNewChat = async()=> {
+      if(!feasibilityId) return
+      if(!addInput) return
+      console.log('Making New Chat...')
+
+      setSessionLoading('new-chat', true);
+      const nowTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const sessionResp = await createDoc("Session", { time: nowTime, user: currentUser || '', });
+      if (!sessionResp.name) throw new Error("Failed to create session");
+      setSession(sessionResp.name);
+      // dispatch(addChatId(sessionResp.name))
+
+      mutate();
+      setSessionLoading('new-chat', false);
+      setSessionLoading(sessionResp.name, true);
+      hintsMutate()
+      intensionMutate();
+
+      if (currentUser) {
+        setTimeout(() => {
+          navigate(`/chat/${sessionResp.name}`, { replace: true })
+        }, 200);
+      } else {
+        sessionStorage.setItem("guest_session_id", sessionResp.name);
+      }
+
+    }
     // Second: once sessionId is available, add to child table if not already present
-    const handleFeasibilityChatLink = async () => {
-      console.log("In Chat Link", feasibilityId, addInput, sessionId);
+    const handleFeasibilityChatLink = async (feasibilityId, addInput, sessionID) => {
+      console.log("In Chat Link", feasibilityId, addInput, sessionID);
 
       if (!addInput) return;
-      if (!feasibilityId || !sessionId) return;
+      if (!feasibilityId || !sessionID) return;
 
       try {
         const response = await call.get("frappe.client.get", {
@@ -213,13 +239,13 @@ useEffect(() => {
 
         const chats = response?.message?.chats || [];
 
-        const alreadyExists = chats.some(chat => chat.session === sessionId);
+        const alreadyExists = chats.some(chat => chat.session === sessionID);
         // console.log("raw feasibility id", feasibilityId, alreadyExists);
 
         if (!alreadyExists) {
           console.log('we are here now!!!! to remove the addInput')
           await createDoc("Linked Chats", {
-            session: sessionId,
+            session: sessionID,
             parent: feasibilityId,
             parenttype: "Feasibility Report",
             parentfield: "chats",
@@ -493,20 +519,14 @@ useEffect(() => {
       setSessionLoading('new-chat', false);
       setSessionLoading(sessionResp.name, true);
       hintsMutate()
-      intensionMutate();  
+      intensionMutate();
+      addInput = null;
       if (currentUser) {
-        console.log(response, label, 'Okay we want to check this')
         setTimeout(() => {
-          navigate(`/chat/${sessionResp.name}`, { 
-            replace: true,
-            state: {
-              from: "new-chat-redirect",
-              sendMsg: true,
-              messageToSet: AiResponses.UserQuery,
-            }, 
-          })
+          navigate(`/chat/${sessionResp.name}`, { replace: true })
         }, 200);
-        // handleSendbtn(label)
+        handleSendbtn(label)
+        
       } else {
         sessionStorage.setItem("guest_session_id", sessionResp.name);
       }
