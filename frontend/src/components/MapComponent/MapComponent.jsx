@@ -87,6 +87,12 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     LEFT: - 0.4,
     RIGHT: 0.4
   }
+  const [isShowEVUpIcon,setShowEVUpIcon] = useState(false);
+  const [isShowEVDownIcon,setShowEVDownIcon] = useState(true);
+  const [isShowEVCC,setShowEVCC] = useState(false);
+  const [isShowNEVUpIcon,setShowNEVUpIcon] = useState(false);
+  const [isShowNEVDownIcon,setShowNEVDownIcon] = useState(true);
+  const [isShowNEVCC,setShowNEVCC] = useState(false);
   useEffect(() => {
     if (!uiData) return;
     mapboxgl.accessToken = `${uiConfig?.['mapmobx_api_token']}`;
@@ -483,7 +489,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                         (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) ? <FaStore size={20} color="#5b96d8" /> :
                           (layer === LAYERS.ESSENTIAL_VENDORS ) ? <FaStore size={20} color="#5b96d8" /> :
                           (layer === LAYERS.NON_ESSENTIAL_VENDORS ) ? <FaStore size={20} color="#5b96d8" /> :
-                            ""
+                            <FaStore size={20} color="#5b96d8" />
             }
           </div>
           <div className="absolute z-[9] left-1/2 bg-white pin-tip"></div>
@@ -1209,7 +1215,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     removeMarker(LAYERS.DEFAULT_LAYER.LABEL);
     await loadDefaultLayer();
     resetZoomlevel();
-    // document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.display = "flex"; //Disable the vendor layer checkbox
+    // document.querySelector("[data-name='checkbox-container-supply']").style.display = "block"; //Disable the vendor layer checkbox
     document.querySelector("[data-name='checkbox-container-" + LAYERS.ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
     document.querySelector("[data-name='checkbox-container-" + LAYERS.NON_ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
     // document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.flexDirection = "flex-row"; //Disable the vendor layer checkbox
@@ -1224,7 +1230,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     removeMarker(LAYERS.DEFAULT_LAYER.LABEL);
     await loadDefaultLayer();
     resetZoomlevel();
-    // document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.display = "flex"; //Disable the vendor layer checkbox
+    document.querySelector("[data-name='checkbox-container-supply']").style.display = "block"; //Disable the vendor layer checkbox
     document.querySelector("[data-name='checkbox-container-" + LAYERS.ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
     document.querySelector("[data-name='checkbox-container-" + LAYERS.NON_ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
     changeMarkerOpacity();
@@ -1320,6 +1326,87 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       });
     }
   }, { dependencies: [isConfirmationModalOpen], scope: optionPopup });
+  const handleVendorCheckboxClick = (event, vendorType, isFallAllVendor) => {
+    const { checked, name } = event.target;
+
+    const getVendorData = (type) => {
+      if (type === LAYERS.ESSENTIAL_VENDORS)
+        return {
+          main: copyiedSelectedProperty.current.essential_vendor_all_details,
+          supplies: copyiedSelectedProperty.current.essential_vendors
+        };
+      if (type === LAYERS.NON_ESSENTIAL_VENDORS)
+        return {
+          main: copyiedSelectedProperty.current.non_essential_vendor_all_details,
+          supplies: copyiedSelectedProperty.current.nonessential_vendors
+        };
+      return { main: [], supplies: [] };
+    };
+
+    // 🔹 Handle "Select All Vendors"
+    if (isFallAllVendor) {
+      const { main, supplies } = getVendorData(name);
+      const supplyNames = Array.isArray(supplies)
+        ? supplies.map(v => v.supply)
+        : [];
+
+      supplyNames.forEach(supplyName => {
+        const checkboxes = document.querySelectorAll(
+          `[name='${supplyName}'][type='checkbox']`
+        );
+
+        if (checked) {
+          // Filter and bind matching vendors
+          const filteredVendors = main
+            .filter(v => v.best_supply?.includes(supplyName))
+            .map(v => ({
+              ...v,
+              coordinates:
+                v.latitude_longitude?.trim() || v.coordinates || ""
+            }));
+
+          if (filteredVendors.length > 0) {
+            bindDataOnMap(filteredVendors, supplyName);
+          }
+
+          // ✅ Check all matching checkboxes
+          checkboxes.forEach(cb => (cb.checked = true));
+        } else {
+          // ❌ Remove markers and uncheck
+          removeMarker(supplyName);
+          checkboxes.forEach(cb => (cb.checked = false));
+        }
+      });
+    }
+
+    // 🔹 Handle single checkbox (non-"All Vendors")
+    else {
+      if (checked) {
+        loadSelectedSupplyVendorDetails(name, vendorType);
+      } else {
+        removeMarker(name);
+      }
+    }
+};
+
+
+const loadSelectedSupplyVendorDetails = (supply,vendorType) =>{    
+    let data = vendorType == LAYERS.ESSENTIAL_VENDORS ? copyiedSelectedProperty.current.essential_vendor_all_details : copyiedSelectedProperty.current.non_essential_vendor_all_details;
+    
+    // Filter vendors where best_supply includes 'Nylon'
+    const filteredVendors = data.filter(vendor =>
+      vendor.best_supply?.includes(supply)
+    );
+    if (filteredVendors.length > 0) {
+        filteredVendors.forEach((item) => {
+          if (item.latitude_longitude != null && item.latitude_longitude != "") {
+            item.coordinates = item.latitude_longitude;
+          }
+        });
+      }
+    bindDataOnMap(filteredVendors, supply);
+}
+
   //#region Helper Methods
     const getVendors = async (filters) => {
     try {
@@ -1542,7 +1629,163 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                               </span>
                             </label>
                           </li> */}
-                          <li className="li-container" style={{ display: "none" }}  data-name={"checkbox-container-" + LAYERS.ESSENTIAL_VENDORS}>
+                          </ul>
+                          <ul>
+                            <li className="li-container" style={{ display: "none" }}  data-name={"checkbox-container-" + LAYERS.ESSENTIAL_VENDORS}>
+                             <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
+                               <input
+                                 type="checkbox"
+                                 name={LAYERS.ESSENTIAL_VENDORS}
+                                 onChange={(e) => handleVendorCheckboxClick(e,LAYERS.ESSENTIAL_VENDORS,true)}
+                               />
+                               <span className="checkmark"></span>
+                               <span>
+                                 <FaStore size={20} className="text-[#5f2abb]" />
+                               </span>
+                               <span className="text-sm font-medium">
+                                 {LAYERS.ESSENTIAL_VENDORS}
+                               </span>
+                             </label>
+                             <span className="icon">
+                               {isShowEVUpIcon && (
+                                 <img
+                                   src={upimage}
+                                   margin={10}
+                                   id="essential-vendor-upicon"
+                                   style={{
+                                     position: 'relative',
+                                     width: '25px',
+                                     height: '25px',
+                                     cursor: 'pointer',
+                                   }}
+                                   
+                                   alt="Icon"
+                                   onClick={() => {
+                                     setShowEVDownIcon(true);
+                                     setShowEVUpIcon(false);
+                                     setShowEVCC(false);
+                                   }}
+                                 />
+                               )}
+  
+                               {isShowEVDownIcon && (
+                                 <img
+                                   src={downimage}
+                                   style={{
+                                     position: 'relative',
+                                     width: '25px',
+                                     height: '25px',
+                                     cursor: 'pointer',
+                                   }}
+                                   alt="Icon"
+                                   id="essential-vendor-downicon"
+                                   onClick={() => {
+                                     setShowEVDownIcon(false);
+                                     setShowEVUpIcon(true);
+                                     setShowEVCC(true);
+                                   }}
+                                 />
+                               )}
+                             </span>
+                           </li>
+                           <li style={{overflowY:'scroll',maxHeight:'140px', display:isShowEVCC?'block':'none'}} data-name={"checkbox-container-supply"}>
+                             {copyiedSelectedProperty?.current?.essential_vendors.map((vendor, index) => (
+                               <li className="li-container" style={{paddingLeft:'25px'}}>
+                                 <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
+                                   <input
+                                     type="checkbox"
+                                     name={vendor.supply}
+                                     onChange={(e) => handleVendorCheckboxClick(e,LAYERS.ESSENTIAL_VENDORS,false)}
+                                   />
+                                   <span className="checkmark"></span>
+                                   <span>
+                                     <FaStore size={20} className="text-[#5f2abb]" />
+                                   </span>
+                                   <span className="text-sm font-medium">
+                                     {vendor.supply}
+                                   </span>
+                                 </label>
+                               </li>
+                                   ))}
+                           </li>
+                          <li className="li-container"  style={{ display: "none" }}  data-name={"checkbox-container-" + LAYERS.NON_ESSENTIAL_VENDORS}>                          
+                            <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
+                                <input
+                                  type="checkbox"
+                                  name={LAYERS.NON_ESSENTIAL_VENDORS}
+                                  onChange={(e) => handleVendorCheckboxClick(e,LAYERS.NON_ESSENTIAL_VENDORS,true)}
+                                />
+                                <span className="checkmark"></span>
+                                <span>
+                                  <FaStore size={20} className="text-[#5f2abb]" />
+                                </span>
+                                <span className="text-sm font-medium">
+                                  {LAYERS.NON_ESSENTIAL_VENDORS}
+                                </span>
+                              </label>
+                              <span className="icon">
+                                {isShowNEVUpIcon && (
+                                  <img
+                                    src={upimage}
+                                    margin={10}
+                                    id="essential-vendor-upicon"
+                                    style={{
+                                      position: 'relative',
+                                      width: '25px',
+                                      height: '25px',
+                                      cursor: 'pointer',
+                                    }}
+                                    
+                                    alt="Icon"
+                                    onClick={() => {
+                                      setShowNEVDownIcon(true);
+                                      setShowNEVUpIcon(false);
+                                      setShowNEVCC(false);
+                                    }}
+                                  />
+                                )}
+  
+                                {isShowNEVDownIcon && (
+                                  <img
+                                    src={downimage}
+                                    style={{
+                                      position: 'relative',
+                                      width: '25px',
+                                      height: '25px',
+                                      cursor: 'pointer',
+                                    }}
+                                    alt="Icon"
+                                    id="essential-vendor-downicon"
+                                    onClick={() => {
+                                      setShowNEVDownIcon(false);
+                                      setShowNEVUpIcon(true);
+                                      setShowNEVCC(true);
+                                    }}
+                                  />
+                                )}
+                              </span>
+                            </li>
+                            <li style={{overflowY:'scroll',maxHeight:'140px', display:isShowNEVCC?'block':'none'}}>
+                              {copyiedSelectedProperty?.current?.nonessential_vendors.map((vendor, index) => (
+                                <li className="li-container" style={{paddingLeft:'25px'}}>
+                                  <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
+                                    <input
+                                      type="checkbox"
+                                      name={vendor.supply}
+                                      onChange={(e) => handleVendorCheckboxClick(e,LAYERS.NON_ESSENTIAL_VENDORS,false)}
+                                    />
+                                    <span className="checkmark"></span>
+                                    <span>
+                                      <FaStore size={20} className="text-[#5f2abb]" />
+                                    </span>
+                                    <span className="text-sm font-medium">
+                                      {vendor.supply}
+                                    </span>
+                                  </label>
+                                </li>
+                                    ))}
+                            </li>
+                          {/* <li className="li-container" style={{ display: "none" }}  data-name={"checkbox-container-" + LAYERS.ESSENTIAL_VENDORS}>
                           
                             <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
@@ -1575,7 +1818,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
                                 {LAYERS.NON_ESSENTIAL_VENDORS}
                               </span>
                             </label>
-                          </li>
+                          </li> */}
                         </ul>
                       </div>
                     </div>

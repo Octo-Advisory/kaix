@@ -241,6 +241,7 @@
   height: 24px !important;
   accent-color: #008a11 !important;
   border-radius: 4px !important;
+  min-width: 24px;
 }
 
 #map-ui input.search {

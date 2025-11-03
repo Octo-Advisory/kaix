@@ -30,6 +30,12 @@ const SingleMap = ({ selectedProperty, intension }) => {
   let boundaryCoordinates = copyiedSelectedProperty?.boundary_coordinates;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isShowEVUpIcon,setShowEVUpIcon] = useState(false);
+  const [isShowEVDownIcon,setShowEVDownIcon] = useState(true);
+  const [isShowEVCC,setShowEVCC] = useState(false);
+  const [isShowNEVUpIcon,setShowNEVUpIcon] = useState(false);
+  const [isShowNEVDownIcon,setShowNEVDownIcon] = useState(true);
+  const [isShowNEVCC,setShowNEVCC] = useState(false);
   const mapRef = useRef(null);
   const mapContainer = useRef(null);
   const [vendorsToSend, setVendorsToSend] = useState([]);
@@ -72,7 +78,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
   var nearestRailwayStationDetail = null;
   var highwayCoord = null;
   var nearestHighwayDetail = null;
-  var essentialVendors = null;
+  const essentialVendors = useRef(null);
   useEffect(() => {
     if (!mapContainer.current || !lat || !lng || !uiData) return;
     mapboxgl.accessToken = `${uiConfig?.['mapmobx_api_token']}`;
@@ -385,7 +391,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
     const nonEssentialVendorNames = Array.isArray(groupedNonEssentialVendorData) ? groupedNonEssentialVendorData.map(vendor => vendor.vendor_name) : [];
     
     var finalEVData = await getVendors(JSON.stringify(essentialVendorNames));
-    var finalNEVData = await getVendors(JSON.stringify(nonEssentialVendorNames));
+    // var fi0nalNEVData = await getVendors(JSON.stringify(nonEssentialVendorNames));
     
     finalEVData.data.forEach((item) => {
       if (!item.vendor_name) return;
@@ -403,22 +409,22 @@ const SingleMap = ({ selectedProperty, intension }) => {
       item.supplyName = supplyNames;
     });
     
-    finalNEVData.data.forEach((item) => {
-      if (!item.vendor_name) return;
+    // finalNEVData.data.forEach((item) => {
+    //   if (!item.vendor_name) return;
       
-      var filteredItem = groupedNonEssentialVendorData.filter(
-        (detail) => detail.vendor_name?.trim() === item.vendor_name.trim()
-      );
+    //   var filteredItem = groupedNonEssentialVendorData.filter(
+    //     (detail) => detail.vendor_name?.trim() === item.vendor_name.trim()
+    //   );
       
-      if(filteredItem.length<=0)
-        return;
+    //   if(filteredItem.length<=0)
+    //     return;
       
-      // Join all supply names with commas if more than one match
-      const supplyNames = filteredItem[0].supplies;     
+    //   // Join all supply names with commas if more than one match
+    //   const supplyNames = filteredItem[0].supplies;     
 
-      item.supplyName = supplyNames;
-    });
-    essentialVendors = finalEVData.data;    
+    //   item.supplyName = supplyNames;
+    // });
+    essentialVendors.current = finalEVData.data;    
     // copyiedSelectedProperty.essential_vendors.forEach((item) => {
     //   if (!item.vendor_name || !item.supply) return;
 
@@ -652,7 +658,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
     }
     else if (layerType === LAYERS.ESSENTIAL_VENDORS) {
       const filteredEssentialVendors = copyiedSelectedProperty.essential_vendor_all_details.filter(
-          item2 => !essentialVendors.some(
+          item2 => !essentialVendors.current.some(
             item1 => item1.vendor_name === item2.vendor_name
           )
         );
@@ -843,7 +849,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                           (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR) ? <FaStore size={20} color="#5b96d8" /> :
                           (layer === LAYERS.ESSENTIAL_VENDORS ) ? <FaStore size={20} color="#5b96d8" /> :
                           (layer === LAYERS.NON_ESSENTIAL_VENDORS ) ? <FaStore size={20} color="#5b96d8" /> :
-                            ""
+                            <FaStore size={20} color="#5b96d8" />
               }
 
             </div>
@@ -919,6 +925,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                 name = data.vendor_name;
                 break;
               default:
+                name = data.vendor_name;
                 break;
             }
             if (name !== "") {
@@ -1040,6 +1047,88 @@ const SingleMap = ({ selectedProperty, intension }) => {
       });
     }
   }
+
+  const handleVendorCheckboxClick = (event, vendorType, isFallAllVendor) => {
+  const { checked, name } = event.target;
+
+  const getVendorData = (type) => {
+    if (type === LAYERS.ESSENTIAL_VENDORS)
+      return {
+        main: copyiedSelectedProperty.essential_vendor_all_details,
+        supplies: copyiedSelectedProperty.essential_vendors
+      };
+    if (type === LAYERS.NON_ESSENTIAL_VENDORS)
+      return {
+        main: copyiedSelectedProperty.non_essential_vendor_all_details,
+        supplies: copyiedSelectedProperty.nonessential_vendors
+      };
+    return { main: [], supplies: [] };
+  };
+
+  // 🔹 Handle "Select All Vendors"
+  if (isFallAllVendor) {
+    const { main, supplies } = getVendorData(name);
+    const supplyNames = Array.isArray(supplies)
+      ? supplies.map(v => v.supply)
+      : [];
+
+    supplyNames.forEach(supplyName => {
+      const checkboxes = document.querySelectorAll(
+        `[name='${supplyName}'][type='checkbox']`
+      );
+
+      if (checked) {
+        // Filter and bind matching vendors
+        const filteredVendors = main
+          .filter(v => v.best_supply?.includes(supplyName))
+          .map(v => ({
+            ...v,
+            coordinates:
+              v.latitude_longitude?.trim() || v.coordinates || ""
+          }));
+
+        if (filteredVendors.length > 0) {
+          bindDataOnMap(filteredVendors, supplyName);
+        }
+
+        // ✅ Check all matching checkboxes
+        checkboxes.forEach(cb => (cb.checked = true));
+      } else {
+        // ❌ Remove markers and uncheck
+        removeMarker(supplyName);
+        checkboxes.forEach(cb => (cb.checked = false));
+      }
+    });
+  }
+
+  // 🔹 Handle single checkbox (non-"All Vendors")
+  else {
+    if (checked) {
+      loadSelectedSupplyVendorDetails(name, vendorType);
+    } else {
+      removeMarker(name);
+    }
+  }
+};
+
+
+  const loadSelectedSupplyVendorDetails = (supply,vendorType) =>{    
+    let data = vendorType == LAYERS.ESSENTIAL_VENDORS ? copyiedSelectedProperty.essential_vendor_all_details : copyiedSelectedProperty.non_essential_vendor_all_details;
+    
+    // Filter vendors where best_supply includes 'Nylon'
+    const filteredVendors = data.filter(vendor =>
+      vendor.best_supply?.includes(supply)
+    );
+    if (filteredVendors.length > 0) {
+        filteredVendors.forEach((item) => {
+          if (item.latitude_longitude != null && item.latitude_longitude != "") {
+            item.coordinates = item.latitude_longitude;
+          }
+        });
+      }
+    bindDataOnMap(filteredVendors, supply);
+  }
+
   //Sets the default map location
   const setDefaultMapPosition = () => {
     // Fly the map to the default location
@@ -1175,7 +1264,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                   </div>
 
                   <div className="accordion-content">
-                    <div className="accordion-sub-item" name="traffic-section">
+                    <div className="accordion-sub-item">
                       <div
                         className="accordion-header"
                         onClick={(e) => toggleAccordion(e)}
@@ -1221,7 +1310,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                           </span>
                           {/* <a href="#">Select: All</a> | <a href="#">None</a> */}
                         </div>
-                        <ul>
+                        <ul name="traffic-section">
                           <li className="li-container">
                             <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
@@ -1321,12 +1410,14 @@ const SingleMap = ({ selectedProperty, intension }) => {
                               </span>
                             </label>
                           </li> */}
+                          </ul>
+                          <ul>
                           <li className="li-container">
-
                             <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
                               <input
                                 type="checkbox"
                                 name={LAYERS.ESSENTIAL_VENDORS}
+                                onChange={(e) => handleVendorCheckboxClick(e,LAYERS.ESSENTIAL_VENDORS,true)}
                               />
                               <span className="checkmark"></span>
                               <span>
@@ -1336,6 +1427,68 @@ const SingleMap = ({ selectedProperty, intension }) => {
                                 {LAYERS.ESSENTIAL_VENDORS}
                               </span>
                             </label>
+                            <span className="icon">
+                              {isShowEVUpIcon && (
+                                <img
+                                  src={upimage}
+                                  margin={10}
+                                  id="essential-vendor-upicon"
+                                  style={{
+                                    position: 'relative',
+                                    width: '25px',
+                                    height: '25px',
+                                    cursor: 'pointer',
+                                  }}
+                                  
+                                  alt="Icon"
+                                  onClick={() => {
+                                    setShowEVDownIcon(true);
+                                    setShowEVUpIcon(false);
+                                    setShowEVCC(false);
+                                  }}
+                                />
+                              )}
+
+                              {isShowEVDownIcon && (
+                                <img
+                                  src={downimage}
+                                  style={{
+                                    position: 'relative',
+                                    width: '25px',
+                                    height: '25px',
+                                    cursor: 'pointer',
+                                  }}
+                                  alt="Icon"
+                                  id="essential-vendor-downicon"
+                                  onClick={() => {
+                                    setShowEVDownIcon(false);
+                                    setShowEVUpIcon(true);
+                                    setShowEVCC(true);
+                                  }}
+                                />
+                              )}
+                            </span>
+
+                          </li>
+                            <li style={{overflowY:'scroll',maxHeight:'140px', display:isShowEVCC?'block':'none'}} id='essential-vendor-checkbox-constainer'>
+                            {selectedProperty.essential_vendors.map((vendor, index) => (
+                              <li className="li-container" style={{paddingLeft:'25px'}}>
+                                <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
+                                  <input
+                                    type="checkbox"
+                                    name={vendor.supply}
+                                    onChange={(e) => handleVendorCheckboxClick(e,LAYERS.ESSENTIAL_VENDORS,false)}
+                                  />
+                                  <span className="checkmark"></span>
+                                  <span>
+                                    <FaStore size={20} className="text-[#5f2abb]" />
+                                  </span>
+                                  <span className="text-sm font-medium">
+                                    {vendor.supply}
+                                  </span>
+                                </label>
+                              </li>
+                                  ))}
                           </li>
                           <li className="li-container">
 
@@ -1343,6 +1496,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                               <input
                                 type="checkbox"
                                 name={LAYERS.NON_ESSENTIAL_VENDORS}
+                                onChange={(e) => handleVendorCheckboxClick(e,LAYERS.NON_ESSENTIAL_VENDORS,true)}
                               />
                               <span className="checkmark"></span>
                               <span>
@@ -1352,7 +1506,68 @@ const SingleMap = ({ selectedProperty, intension }) => {
                                 {LAYERS.NON_ESSENTIAL_VENDORS}
                               </span>
                             </label>
+                            <span className="icon">
+                              {isShowNEVUpIcon && (
+                                <img
+                                  src={upimage}
+                                  margin={10}
+                                  id="essential-vendor-upicon"
+                                  style={{
+                                    position: 'relative',
+                                    width: '25px',
+                                    height: '25px',
+                                    cursor: 'pointer',
+                                  }}
+                                  
+                                  alt="Icon"
+                                  onClick={() => {
+                                    setShowNEVDownIcon(true);
+                                    setShowNEVUpIcon(false);
+                                    setShowNEVCC(false);
+                                  }}
+                                />
+                              )}
+
+                              {isShowNEVDownIcon && (
+                                <img
+                                  src={downimage}
+                                  style={{
+                                    position: 'relative',
+                                    width: '25px',
+                                    height: '25px',
+                                    cursor: 'pointer',
+                                  }}
+                                  alt="Icon"
+                                  id="essential-vendor-downicon"
+                                  onClick={() => {
+                                    setShowNEVDownIcon(false);
+                                    setShowNEVUpIcon(true);
+                                    setShowNEVCC(true);
+                                  }}
+                                />
+                              )}
+                            </span>
                           </li>
+                            <li style={{overflowY:'scroll',maxHeight:'140px', display:isShowNEVCC?'block':'none'}}>
+                            {selectedProperty.nonessential_vendors.map((vendor, index) => (
+                              <li className="li-container" style={{paddingLeft:'25px'}}>
+                                <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
+                                  <input
+                                    type="checkbox"
+                                    name={vendor.supply}
+                                    onChange={(e) => handleVendorCheckboxClick(e,LAYERS.NON_ESSENTIAL_VENDORS,false)}
+                                  />
+                                  <span className="checkmark"></span>
+                                  <span>
+                                    <FaStore size={20} className="text-[#5f2abb]" />
+                                  </span>
+                                  <span className="text-sm font-medium">
+                                    {vendor.supply}
+                                  </span>
+                                </label>
+                              </li>
+                                  ))}
+                          </li>                          
                         </ul>
                       </div>
                     </div>
