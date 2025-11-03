@@ -19,7 +19,9 @@ import frappe
 import random
 
 # from langchain_openai import ChatOpenAI
-config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+
+base_dir = os.path.expanduser("~")
+config_file = os.path.join(base_dir, "frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini")
 config = configparser.ConfigParser()
 config.read(config_file)
 groq_api_key = config['Key']['groq_key']
@@ -29,7 +31,7 @@ openai_key = config['Key']['openai_api_key']
 llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.0)
 llm_70b_vers_creative = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.7)
 llm_8b_inst=ChatGroq(groq_api_key=groq_api_key,model_name="llama-3.3-8b-instant", temperature=0.0)
-llm_deepseek = ChatGroq(groq_api_key=groq_api_key, model_name="deepseek-r1-distill-llama-70b", temperature=0.0)
+llm_gpt_oos_120b = ChatGroq(groq_api_key=groq_api_key, model_name="openai/gpt-oss-120b", temperature=0.0)
 llm_maverik = ChatGroq(groq_api_key=groq_api_key, model_name="meta-llama/llama-4-maverick-17b-128e-instruct", temperature=0.5)
 # llm_openai = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_mini = ChatOpenAI(model="gpt-4o-mini", temperature=0.0, api_key=openai_key)
@@ -93,76 +95,374 @@ SUPPLIES_NOT_AVAILABLE_MSG = (
 nlp = spacy.load("en_core_web_lg")
 
 # Define a function to refine the query using history
-def refine_query_with_history(history, latest_query, llm):
-    # Define retriever prompt
-    retriever_prompt_template = """  
-Given the chat history and the latest user input, reformulate a standalone query that maintains the intent and structure of the latest user input.  
-Use the AI's messages for context only to understand the user's intent better, but do not take examples or suggestions from AI responses as the user's actual input unless the user explicitly agrees or repeats them.  
-
-Instructions:  
-1. Preserve the original structure of the user input.  
-    - If the user’s latest input is a statement, the reformulated query must remain a statement.  
-    - If the user’s latest input is a question, the reformulated query must remain a question.  
-
-1.a NORMALIZE PUNCTUATION (before reformulation):
-    - Collapse any repeated sentence punctuation into a single character:
-        • "!!!" → "!"   • "???" → "?"   • "..." or ".." → "."
-    - Collapse runs of commas/semicolons/colons into a single character (",,,", ";;", "::" → ",", ";", ":").
-    - Remove leading/trailing punctuation and extra whitespace.
-    - Replace multiple spaces or tabs with a single space.
-    - DO NOT alter punctuation that is part of:
-        • Numbers, decimals, or digit-grouping (e.g., "1,000", "3.5", "₹2,50,00,000").  
-        • Ranges or comparisons (e.g., "10–12", "10-12", ">= 5").  
-        • Unit strings and symbols (e.g., "TPA", "MW", "%", "/", "-", "+").
-    - End the final query with a single appropriate terminator based on structure:
-        • Question → "?"  
-        • Statement/command → "." (omit the period only if the user’s style clearly omits it).
-
-2. If the latest user input is completely different and unrelated to the past conversation, return it as-is (after punctuation normalization) without modification.  
-
-3. If the latest user input is related to the past conversation, refine it by integrating relevant details from the chat history while ensuring clarity.  
-
-4. Strictly do NOT infer or modify any numerical values, units, or metrics.  
-    - If the user provides a metric value (e.g., "1 TPA", "500 MW"), retain it exactly as it is.  
-    - Do NOT expand, convert, or modify abbreviations of units (e.g., keep "TPA" as "TPA" and do not change it to "Ton Per Annum").  
-    - If no metric is provided by the user, do NOT infer one.  
-
-5. Strictly do not infer or carry forward any industries, products, or metrics from past AI responses unless the user explicitly acknowledges, agrees to, or repeats those industries, products, or metrics in their latest input.  
-
-6. Strictly do not infer or carry forward any industries, products, or metrics from past user inputs unless they are explicitly mentioned in the latest user input.  
-
-7. If the latest user input mentions only one industry or product, ensure only that industry or product appears in the reformulated query.  
-    - Do not include multiple industries or products unless the user explicitly mentions multiple ones in their latest query.  
-
-8. Do NOT add any explanations, reasoning, or justifications in the reformulated standalone query.  
-    - The output must be a clean and direct reformulation of the user’s intent without unnecessary elaboration.  
-
-Chat History:  
-{history}  
-
-Latest User Input:  
-{latest_query}  
-
-Reformulated Standalone Query:  
+def refine_query_with_history(
+    history, 
+    latest_query, 
+    llm,
+    context_freshness_config=None,
+    feasibility_json: dict | None = None,   # NEW (structured_summary object or whole feasibility payload)
+    feasibility_mode: bool = False  
+):
     """
+    Refines user query using chat history with intelligent context handling.
+    
+    Parameters:
+    -----------
+    history : list
+        List of previous conversation turns (alternating User/AI messages)
+    latest_query : str
+        The user's latest input query
+    llm : LLM instance
+        Language model instance (e.g., ChatOpenAI)
+    context_freshness_config : dict, optional
+        Configuration for context freshness windows. Default values if not provided:
+        {
+            'fresh_turns': 2,      # 0-2 turns ago = FRESH
+            'recent_turns': 4,     # 3-4 turns ago = RECENT
+            'aging_turns': 7,      # 5-7 turns ago = AGING
+            'stale_turns': 8       # 8+ turns ago = STALE
+        }
+    
+    Returns:
+    --------
+    str
+        The refined standalone query
+    
+    Examples:
+    ---------
+    # Use default freshness windows
+    refined = refine_query_with_history(history, query, llm)
+    
+    # Use custom freshness windows (more aggressive context retention)
+    config = {
+        'fresh_turns': 3,
+        'recent_turns': 6,
+        'aging_turns': 10,
+        'stale_turns': 12
+    }
+    refined = refine_query_with_history(history, query, llm, config)
+    
+    # Use custom freshness windows (more conservative context retention)
+    config = {
+        'fresh_turns': 1,
+        'recent_turns': 2,
+        'aging_turns': 4,
+        'stale_turns': 5
+    }
+    refined = refine_query_with_history(history, query, llm, config)
+    """
+    
+    # Set default freshness configuration if not provided
+    if context_freshness_config is None:
+        context_freshness_config = {
+            'fresh_turns': 2,
+            'recent_turns': 4,
+            'aging_turns': 7,
+            'stale_turns': 8
+        }
+    
+    # Extract configuration values
+    fresh_turns = context_freshness_config.get('fresh_turns', 2)
+    recent_turns_lower = fresh_turns+1
+    recent_turns = context_freshness_config.get('recent_turns', 4)
+    aging_turns_lower = recent_turns+1
+    aging_turns = context_freshness_config.get('aging_turns', 7)
+    stale_turns = context_freshness_config.get('stale_turns', 8)
+    
+    # Validate configuration (ensure logical ordering)
+    if not (0 < fresh_turns < recent_turns < aging_turns < stale_turns):
+        raise ValueError(
+            f"Context freshness configuration must follow: "
+            f"0 < fresh_turns < recent_turns < aging_turns < stale_turns. "
+            f"Got: fresh={fresh_turns}, recent={recent_turns}, "
+            f"aging={aging_turns}, stale={stale_turns}"
+        )
+    
+    retriever_prompt_template = """
+You are an intelligent Query Refiner Agent. Your task is to transform the latest user input into a clear, standalone query by intelligently leveraging chat history while preserving the user's exact intent and communication style.
 
+## CORE PHILOSOPHY
+Apply contextual intelligence, not rigid rules. Think like a human conversation partner who remembers what was discussed and understands when context should be carried forward versus when the topic has shifted.
+
+## CONTEXT INTELLIGENCE FRAMEWORK
+
+### Context Classification (Priority System)
+**TIER 1 - ESTABLISHED CONTEXT** (Carry Forward with High Confidence):
+- Information explicitly stated by the user in their own messages
+- Information confirmed or acknowledged by the user (e.g., "Yes, that's correct")
+- Information consistently used across multiple user messages
+- Information the user is clearly building upon (not contradicting)
+
+**TIER 2 - WORKING CONTEXT** (Carry Forward with Moderate Confidence):
+- Information mentioned once by user and is recent (within last 2–3 turns)
+- Implied context from user's questions that's still active
+- Context that hasn't been contradicted but also hasn't been reinforced
+
+**TIER 3 - AI-SUGGESTED CONTEXT** (Carry Forward ONLY if User Explicitly Confirms):
+- Examples, options, or suggestions provided by AI are NON-AUTHORITATIVE.
+- DO NOT carry forward any AI-suggested phrases, options, or branches unless the user explicitly confirms in their latest input (e.g., “I choose land options”, “Show me existing facilities”).
+- Generic acknowledgments like “okay”, “got it”, or silence are NOT confirmation.
+- If the user indicates a mis-tap/undo (e.g., “I mistakenly pressed no”), treat it as NO SELECTION.
+
+**TIER 4 - STALE/CONTRADICTED CONTEXT** (DO NOT Carry Forward):
+- Information explicitly contradicted by user
+- Information from old conversation threads ({stale_turns}+ turns ago) without recent reinforcement
+- Information the user has clearly moved away from
+
+### Context Freshness & Reinforcement
+- **0–{fresh_turns} turns ago**: FRESH — carry forward if relevant.
+- **{recent_turns_lower}–{recent_turns} turns ago**: RECENT — carry forward if still relevant and not contradicted.
+- **{aging_turns_lower}–{aging_turns} turns ago**: AGING — carry forward only if reinforced or consistently used.
+- **{stale_turns}+ turns ago**: STALE — generally do not carry forward unless it is a core established fact.
+
+**Reinforcement Signals**: user repeats/confirms, builds upon, or corrects AI (correction becomes ESTABLISHED).
+**Decay Signals**: different info, explicit contradiction, long silence (3+ turns), or topic shift.
+
+## FEASIBILITY CONTEXT (applies only when feasibility_mode = "true")
+When a feasibility study is attached, treat it as the **primary grounding source for missing facts**. Use it for gap-filling, and **never invent** details.
+
+### Inputs
+- `feasibility_mode`: "true" | "false"
+- `feasibility_json`: structured object that may contain:
+  - `product`, `sub-sector`, `main_industry` (any may be missing)
+  - Optional: `Location`, `final_product_capacity`, `supplies`, `equipments`
+
+### Industry Allow/Block Detection (chat-history governance)
+- From the chat history, infer two sets:
+  - **blocked_industries**: any industry/product for which the AI has **recommended starting a new chat** (redirect/“move to a new chat”) in this thread.  
+    **Important:** once recommended, that industry/product is **blocked for this chat regardless of user response**.
+  - **allowed_industries**: user-established industries/products from recent turns **that are not in blocked_industries**.
+- Never pull context from **blocked_industries** for this thread unless the **latest user message** explicitly and unambiguously selects that industry again **and** states an intent to proceed here despite the prior redirect advice.
+
+### Precedence & Conflict Rules (UPDATED)
+1) **Allowed-History First**: When a needed field is missing/ambiguous in the latest user message, first attempt to fill it using **allowed_industries** and other allowed, user-established context from the recent chat (respect tiers/freshness).  
+2) **Feasibility as Fallback** (only if feasibility_mode = "true"): If still missing, pull the field from `feasibility_json`.  
+3) **Omit if Unknown**: If the field remains unknown after (1) and (2), **omit it** (do not guess).  
+4) **Latest User Overrides**: If the latest user message explicitly contradicts previously established context or feasibility, prefer the **latest user value**.  
+5) **No AI-Option Leakage**: Do not import AI-proposed option labels (e.g., “land / facilities / both”) unless explicitly selected by the user in their latest turn.  
+6) **Main Industry Inference (only if needed)**: If feasibility lacks `main_industry` but has `product` or `sub-sector`, you may infer a main industry **only when reasonably confident**; otherwise leave it unspecified.
+
+### Required Fields Matrix (Ideal Query Shape) — applies in BOTH modes
+(If a required field is missing from the latest user message, fill from **Allowed-History → Feasibility (if on) → Omit**.)
+
+- **Build from Scratch (BFS)** — Must ideally include:
+  - `product_or_industry` (latest user → allowed history → feasibility.product/sub-sector/main_industry)
+  - `capacity` **and** `unit` **and** `time_period`
+    - If missing in the user message and not available from allowed history, **parse from** `feasibility_json.final_product_capacity` **when present** (feasibility_mode = "true").
+    - Keep exact formatting (e.g., “17,253.3 metric tons per month”).
+  - Optional: `location` (latest user → allowed history → feasibility.Location)
+
+- **Incentives / Approvals** — **Required**:
+  - `industry_or_product` (latest user → allowed history → feasibility)
+  - `location` (latest user → allowed history → feasibility.Location)
+  - Do **not** add capacity unless the latest message includes it for the same intent.
+
+- **Employment** — **Required**:
+  - `location` (latest user → allowed history → feasibility.Location)
+  - Ignore capacity unless provided with employment intent.
+
+- **Vendors** — **Required**:
+  - EITHER (`product_or_industry`) OR (`raw_material/equipment/service`)
+  - AND `location`
+  - For gaps, use allowed history first; else feasibility `supplies`/`equipments` and `Location`.
+  - Do **not** add capacity unless provided with vendor intent.
+
+### Capacity Parsing Guidance (for BFS)
+- If `final_product_capacity` exists (e.g., “17,253.3 metric tons per month”), treat it as:
+  - `capacity_value` = the numeric quantity (preserve commas/decimals),
+  - `capacity_unit` = the unit phrase (e.g., “metric tons”),
+  - `time_period` = the cadence (e.g., “per month”).
+- **Never** convert or re-express units; keep the original string intact in the refined query.
+
+### Feasibility vs History — Final Rule (UPDATED)
+- **Precedence:** Allowed history → Feasibility (if on) → Omit.  
+- Prefer the latest user value when explicit.  
+- Never draw from **blocked_industries** in this thread.
+
+## DECISION FRAMEWORK
+
+### Message Type Detection (decide how to refine)
+Classify the latest USER input into exactly one:
+- **ACTIONABLE**: business request (ask/search/show/compare/find/proceed/plan/etc.)
+- **META-CONTROL**: chat control/correction (e.g., “I mistakenly pressed no”, “undo”, “continue”, “refine requirements”)
+- **SMALL-TALK/OTHER**: greetings/thanks/emojis/etc.
+
+**Rules**
+- ACTIONABLE → refine into a clear, standalone actionable query using the Required Fields Matrix and the **Allowed history → Feasibility (if on) → Omit** precedence.
+- META-CONTROL → DO NOT echo meta text. Convert it into a clean actionable query using the last **user-confirmed** context from **allowed history** and feasibility (if available) for missing fields.
+- SMALL-TALK/OTHER:
+  - If it contains a **continuation signal** (“continue”, “go ahead”, “proceed”, “next”, “let’s move on”), treat as META-CONTROL and synthesize an action.
+  - Otherwise, do **not** convert; return the small-talk text itself (normalized).
+
+### Step 1: Analyze Latest User Input
+- Is it a question, statement, or command? (Preserve this structure.)
+- Does it contain all necessary information?
+- Does it contain pronouns/references (it, that, there, them, this)?
+- Does it signal continuation or a topic shift?
+
+### Step 2: Analyze Chat History
+- What context has been established by the **user** (industry, location, metrics, products, services)?
+- How fresh is this context?
+- Reinforced or contradicted?
+- **Is it allowed or blocked?** (Respect the **Industry Allow/Block Detection** rule above.)
+- Continuation or shift?
+
+### Step 3: Context Carry-Forward Decision (per element)
+**CARRY FORWARD IF:** TIER 1, relevant, not contradicted, **and not blocked**, and reasonably fresh/consistent.  
+**OVERRIDE WITH LATEST USER IF:** explicitly different/contradictory.  
+**DO NOT CARRY FORWARD IF:** TIER 3 unconfirmed, TIER 4 stale/contradicted, **blocked**, unrelated, or latest input is already standalone.
+
+### Step 4: Intelligent Synthesis
+- Integrate carried-forward context naturally.
+- Preserve input structure (question stays question; statement stays statement).
+- Output must be standalone.
+- Do not add explanations/justifications (“Based on your previous…” etc.).
+
+## CRITICAL INSTRUCTIONS
+
+### Structure Preservation
+- Preserve question/statement/command for ACTIONABLE inputs.
+- For META-CONTROL, convert to a minimal, clean ACTIONABLE query (do not echo meta text).
+- For SMALL-TALK/OTHER without continuation signals, return the small-talk text verbatim (normalized).
+1) QUESTION → end with “?”
+2) STATEMENT / COMMAND → end with “.” (omit only if the user’s style clearly omits)
+
+### Punctuation Normalization (Apply First)
+- Collapse repeated punctuation: "!!!"→"!", "???"→"?", "..."→"."
+- Collapse repeated commas/semicolons/colons
+- Trim extra whitespace; collapse multiple spaces
+- Do **not** alter punctuation in numbers/units/ranges
+- Respect terminators per structure above
+
+### Mis-tap / Undo Policy
+- If the user says they mis-clicked/pressed wrong/undo: discard implied selections from prior AI turns.
+- Carry forward only explicitly confirmed **neutral** facts (e.g., capacity, industry, location).
+- Do not include AI-proposed options unless newly and explicitly confirmed in the latest message.
+
+### Repair / Undo Resolution Ladder (META-CONTROL)
+1) Use the **last user-stated actionable request**, if any.
+2) Else use **last user-confirmed neutral facts** + feasibility (when available) to form the minimal canonical query for the ongoing intent.
+3) Never include AI-proposed options unless the user confirms them.
+4) Do **not** echo meta phrases like “I mistakenly pressed no”.
+
+### Numerical Values & Units (CRITICAL)
+- **NEVER** modify/convert/expand numbers or units.
+- Keep exact formats (e.g., “15,400,000 kwh per annum” stays as is).
+- If the user provides a metric, retain it exactly.
+- If absent, do not invent.
+
+### Intent Separation — DO NOT MIX
+Primary intents: **Build from Scratch**, **Vendor Search**, **Incentive Search**, **Approval Search**, **Employee Search**.
+- Keep intent-specific elements isolated across history unless the latest query explicitly mentions multiple intents.
+- Always carry forward **neutral** context (industry, location, metrics) from **allowed** history only.
+
+### Option Adoption Gate (Block AI-Suggestion Leakage)
+- NEVER include AI-proposed lists/buttons/branches (“land options / existing facilities / both”) unless the user explicitly confirms a choice in their **latest** message.
+- If the user cancels/undoes a prior click, then **no option is selected**.
+- When uncertain, omit all AI-proposed options and return only user-confirmed content.
+
+### Module-Specific Context Elements
+- **Industry/Sector** (neutral; carry across intents; must be **allowed**, not blocked)
+- **Location** (neutral)
+- **Metrics/Specifications** (neutral)
+- **Supply Details** (vendor-specific)
+- **Job/Employment** (employment-specific)
+- **Incentive Type** (incentives-specific)
+- **Approval Type** (approvals-specific)
+
+### Canonical Query Templates (for synthesis)
+- **BFS**: “Show details / plan for <product/industry> at <capacity> [in <location>].”
+- **INCENTIVES**: “Show incentives for <industry/product> [in <location>].”
+- **APPROVALS**: “Show approvals required for <industry/product> [in <location>].”
+- **VENDORS**: “Find vendors for <supply or product> [in <location>].”
+- **EMPLOYMENT**: “Show workforce availability for <role/skill> [in <location>].”
+- Ambiguous but capacity/industry known → prefer BFS template.
+
+## SELF-CHECK — MODULE GATE (must execute silently before final output)
+- Identify the active module intent.
+- Verify the **Required Fields Matrix** is satisfied using **Allowed history → Feasibility (if on) → Omit**:
+  - **BFS**: If `final_product_capacity` exists in feasibility and the user didn’t override capacity with an **allowed** value, ensure the refined query **includes that full string** (value + unit + period). If it’s absent, **STOP**, add it, and re-check.
+  - **Incentives/Approvals**: Ensure **both** `industry_or_product` **and** `location` are present (from latest user → allowed history → feasibility). If either is missing after those steps, **omit it** rather than guessing and keep the query otherwise standalone.
+  - **Employment**: Ensure `location` is present (latest user → allowed history → feasibility).
+  - **Vendors**: Ensure either `product_or_industry` or `raw_material/equipment/service` **and** `location` are present (latest user → allowed history → feasibility).
+- Never include context from **blocked_industries** in this thread.
+- If any required field remains unknown after allowed history + feasibility (if on), **omit it rather than guessing**.
+
+## Micro Examples (Feasibility Mode)
+- User: “Show me the land options.”  | Feasibility: product="Specialty Chemicals", final_product_capacity="17,253.3 metric tons per month", Location="Gujarat"
+  → **Refined**: “Show land options for Specialty Chemicals **at 17,253.3 metric tons per month** in Gujarat.”
+- User: “What incentives are there?”  | Feasibility: product="Solar PV Power Plant", Location="Low-veld"
+  → **Refined**: “Show incentives for Solar PV Power Plant in Low-veld.”
+- User: “Need suppliers near me.”     | Feasibility: supplies=["Solar panels","Invertors"], Location="Low-veld"
+  → **Refined**: “Find vendors for Solar panels in Low-veld.”
+
+## OUTPUT REQUIREMENTS
+1) Output **ONLY** the reformulated standalone query.
+2) No explanations, reasoning, or meta phrases.
+3) Clean, direct reformulation only.
+4) The query must be standalone.
+5) Structure must match the user’s input (question→question, statement→statement).
+6) If latest input is **META-CONTROL**, output a single clean **ACTIONABLE** query (do not echo meta text).
+7) If latest input is **SMALL-TALK/OTHER** (no continuation signal), output the **small-talk text itself** (normalized).
+8) When `feasibility_mode = "true"`, apply the Allowed history → Feasibility (if on) → Omit precedence and pass the SELF-CHECK — MODULE GATE before emitting the final query.
+
+## INPUT
+Feasibility Mode: {feasibility_mode}            # "true" or "false"
+Feasibility JSON: {feasibility_json_str}        # may be empty when mode=false
+Chat History:
+{history}
+
+Latest User Input:
+{latest_query}
+
+Before you output, RE-CHECK: if the refined query contains any phrase that appears only in prior AI messages and is NOT explicitly confirmed in the latest USER input, remove it. If any required field is still unknown after allowed history + feasibility (if on), **omit it** rather than guessing.
+
+Reformulated Standalone Query:
+    """
+   
     prompt = PromptTemplate(
-        input_variables=["history", "latest_query"],
+        input_variables=["fresh_turns", "recent_turns_lower", "recent_turns", "aging_turns_lower", "aging_turns", "stale_turns", "history", "latest_query"],
         template=retriever_prompt_template
     )
+    # print(prompt)
+
+
     chain = prompt | llm
-    refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
-    update_llm_token(refined_query)
+    
+    refined_query = chain.invoke({
+        "fresh_turns": fresh_turns, 
+        "recent_turns_lower": recent_turns_lower, 
+        "recent_turns": recent_turns, 
+        "aging_turns_lower": aging_turns_lower, 
+        "aging_turns": aging_turns, 
+        "stale_turns": stale_turns,
+        "history": "\n".join(history), 
+        "latest_query": latest_query,
+        "feasibility_mode": feasibility_mode,
+        "feasibility_json_str": feasibility_json
+    })
+    with open("testlog.txt", "a") as file:
+        file.write(f"\n &&&&&&&&&&&&&&&&&&&&&&&& Prompt:\n{refined_query}")
+    
+    # Uncomment if you have this function
+    # update_llm_token(refined_query)
+    
     refined_text = refined_query.content.strip()
     
     # Extract the reformulated standalone query
-    match = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', refined_text, re.IGNORECASE)
+    match = re.search(
+        r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', 
+        refined_text, 
+        re.IGNORECASE
+    )
+    
     if match:
         # Return the captured group that is not None
         return next(group for group in match.groups() if group)
     
     # Fallback to the entire response if no match is found
     return refined_text
+
 
 # # Define the function
 # @frappe.whitelist()
@@ -2204,7 +2504,7 @@ def generate_followup_response(
     chat_history = get_chat(f"chat_{chatId}") or []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
 
-    chat_history.append(HumanMessage(content=user_query))
+    
 
     # Step 2: Create prompt
     prompt_template = """
@@ -2256,8 +2556,7 @@ Return ONLY the appropriate message (based on the 2 cases above). Do NOT include
     # Step 3: Call LLM
     response = chain.invoke({"user_query": user_query, "Chat_history_normal":Chat_history_normal})
     message_from_ai = response.content.strip()
-    chat_history.append(AIMessage(content=message_from_ai))
-    save_chat(chat_history,f"chat_{chatId}")
+    
 
     return message_from_ai
 
@@ -4129,8 +4428,352 @@ def detect_module_switch_intent(
     })
 
     response = result.content.strip().lower()
+    with open("testlog.txt", "a") as file:
+        file.write(f"\n%%%%%%%% I am inside the module change dection: {response} ====> {result}")
     switch_flag = response == "true"
 
     return {
         "switch_module": switch_flag
     }
+
+
+def check_industry_scope_with_feasibility(
+    latest_query: str,
+    feasibility_structured_summary: dict,
+    llm,
+    chat_history: list[str] | None = None,
+):
+    """
+    Runs *before* any other routing. Uses an LLM to decide if the latest query
+    belongs to the same MAIN INDUSTRY as the feasibility context.
+
+    Returns a minimal dict:
+      {
+        "redirect": bool,          # True => UI should redirect to new chat
+        "reason": str,             # one of: "industry_changed", "small_talk", "within_industry", "insufficient_signal", "vendors_cross_industry_ok", "raw_material_unrelated"
+        "confidence": float        # 0.0 - 1.0
+      }
+
+    Behavior highlights:
+    - If SMALL-TALK/GREETING or query lacks industry/product context => allow flow (redirect=False).
+    - If feasibility JSON is missing main_industry/sub-sector/product (any or all):
+        - Try to infer MAIN INDUSTRY from whatever is present (product or sub-sector).
+        - If inference is uncertain => allow flow (no redirect).
+    - If user clearly switches MAIN INDUSTRY => redirect=True (reason="industry_changed").
+    - Vendor/raw-material/equipment queries: allow flow even if cross-industry is plausible,
+      unless the raw material is *clearly* 100% unrelated to the feasibility main industry
+      (then redirect=True, reason="raw_material_unrelated").
+    """
+    
+    INDUSTRY_SCOPE_GUARD_PROMPT = """
+You are an Industry-Scope Guard. Your ONLY job is to decide whether the user's latest query belongs to the SAME MAIN INDUSTRY as the feasibility context provided.
+
+## Core Goals
+- Keep the chat within the feasibility's MAIN INDUSTRY. If the user clearly switches to a different MAIN INDUSTRY, signal redirect.
+- If the latest query is small talk/greetings/acknowledgment, DO NOT redirect.
+- If the latest query lacks industry/product signals, DO NOT redirect.
+- Vendor/Raw-material/Equipment queries MAY cross industries; DO NOT redirect unless they are clearly 100% unrelated.
+
+## Inputs (JSON from user message)
+- latest_query: str
+- feasibility_context: JSON object with ANY of:
+  - main_industry (may be null)
+  - sub_sector (may be null)
+  - product (may be null)
+  - optional: location, capacity, supplies, equipments
+- chat_history_excerpt: optional text
+
+## Key Rules
+1) FEASIBILITY CONTEXT MINIMUMS
+   - At least one of {main_industry, sub_sector, product} may be present; others may be null.
+   - If main_industry is missing:
+       • Map sub_sector or product to a MAIN INDUSTRY using general industrial knowledge.
+       • If you are NOT confident in the mapping, treat it as UNKNOWN main industry.
+
+2) DECISION SCOPE (compare MAIN INDUSTRIES)
+   - Determine feasibility_main_industry:
+       • If main_industry present, use it.
+       • Else infer from sub_sector or product (only if reasonably confident).
+       • Else feasibility_main_industry = UNKNOWN.
+   - Determine user_turn_main_industry from the latest_query:
+       • If the latest query explicitly names an industry, use that.
+       • If it names only a product/sub-sector, map to a main industry when reasonably confident.
+       • If no industry/product signals, then user_turn_main_industry = UNSPECIFIED.
+
+3) SMALL TALK / ACKS
+   - If the latest query is greeting/thanks/acknowledgment/emojis or general chatter → redirect = False.
+
+4) LACK OF SIGNALS
+   - If user_turn_main_industry = UNSPECIFIED → redirect = False.
+
+5) SAME INDUSTRY
+   - If user_turn_main_industry matches feasibility_main_industry (or falls under it), → redirect = False.
+
+6) VENDOR / RAW-MATERIAL / EQUIPMENT QUERIES
+   - Cross-industry materials/equipment are allowed. If plausibly relevant or uncertain → redirect = False (reason="vendors_cross_industry_ok" when you detect such a case).
+   - ONLY if the material/equipment is clearly 100% unrelated to the feasibility main industry → redirect = True (reason="raw_material_unrelated").
+
+7) CLEAR SWITCH
+   - If user_turn_main_industry is CLEARLY DIFFERENT than feasibility_main_industry with high confidence → redirect = True (reason="industry_changed").
+
+8) CONSERVATISM
+   - When uncertain about mappings or similarity → DO NOT redirect.
+
+## Output (STRICT JSON, nothing else)
+Return exactly this JSON object with primitive fields only:
+{
+  "redirect": boolean,
+  "reason": "industry_changed" | "small_talk" | "within_industry" | "insufficient_signal" | "vendors_cross_industry_ok" | "raw_material_unrelated",
+  "confidence": number,             // 0.0 - 1.0
+  "expected_industry": string|null, // feasibility main industry (use feasibility main_industry if present; else infer from 'product' or 'sub-sector' only if reasonably confident; else null)
+  "detected_industry": string|null  // main industry inferred from latest query (explicit mention or via product/sub-sector mapping); null if no clear signal
+}
+
+
+## Examples (think silently; output only the JSON)
+
+### Example A: Same industry via product mapping
+- Feasibility: product="Solar PV Power Plant" (main industry implied: "Power/Energy - Solar")
+- Latest: "What incentives are available for Solar PV Power Plant in Low-veld?"
+→ {"redirect": false, "reason": "within_industry", "confidence": 0.90}
+
+### Example B: Location-only click (no product/industry in query)
+- Feasibility: product="Solar PV Power Plant"
+- Latest: "Show land options in Low-veld."
+→ {"redirect": false, "reason": "insufficient_signal", "confidence": 0.70}
+
+### Example C: Clear switch of industry
+- Feasibility: product="Solar PV Power Plant"
+- Latest: "What subsidies are there for semiconductor chip fabrication in Dholera?"
+→ {"redirect": true, "reason": "industry_changed", "confidence": 0.92}
+
+### Example D: Vendors/Raw material plausibly related or uncertain
+- Feasibility: product="Solar PV Power Plant"
+- Latest: "Find vendors for high-capacity transformers near Vadodara."
+→ {"redirect": false, "reason": "vendors_cross_industry_ok", "confidence": 0.75}
+
+### Example E: Vendors for an obviously unrelated item
+- Feasibility: product="Solar PV Power Plant"
+- Latest: "Find vendors for deep-sea trawler engines in Kochi."
+→ {"redirect": true, "reason": "raw_material_unrelated", "confidence": 0.85}
+
+### Example F: Small talk
+- Latest: "Thanks!"
+→ {"redirect": false, "reason": "small_talk", "confidence": 0.99}
+
+### Example G: Feasibility missing main_industry; infer from product
+- Feasibility: main_industry=null, product="H2SO4"
+- Latest: "Show approvals for specialty chemicals in Dahej."
+→ {"redirect": false, "reason": "within_industry", "confidence": 0.80}
+    """
+
+
+    # Prepare feasibility context safely (at least one of "product", "sub-sector", "main_industry" may exist)
+    fea = feasibility_structured_summary.get('structured_summary', {})
+    fco_min = {
+        "main_industry": fea.get("main_industry"),          # may be None
+        "sub_sector": fea.get("sub-sector"),                # may be None
+        "product": fea.get("product"),                      # may be None
+        # Optional extras that can help the model reason (don’t *depend* on them)
+        "location": fea.get("Location"),
+        "final_product_capacity": fea.get("final_product_capacity"),
+        "supplies": fea.get("supplies"),
+        "equipments": fea.get("equipments"),
+    }
+
+    # Compact history (optional)
+    history_text = "\n".join(chat_history or [])
+
+    system_prompt = INDUSTRY_SCOPE_GUARD_PROMPT  # defined below
+
+    user_payload = {
+        "latest_query": latest_query,
+        "feasibility_context": fco_min,
+        "chat_history_excerpt": history_text[-4000:] if history_text else ""  # keep prompt tight
+    }
+
+    # Call LLM
+    resp = llm.invoke([
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)}
+    ])
+
+    text = resp.content if hasattr(resp, "content") else str(resp)
+
+    # Try to parse strict JSON
+    try:
+        gate = json.loads(text)
+    except Exception:
+        # Lenient fallback: attempt to extract JSON object
+        import re
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        if m:
+            try:
+                gate = json.loads(m.group(0))
+            except Exception:
+                gate = {"redirect": False, "reason": "insufficient_signal", "confidence": 0.25}
+        else:
+            gate = {"redirect": False, "reason": "insufficient_signal", "confidence": 0.25}
+
+    # Normalize + conservative exposure of industry strings
+    redirect = bool(gate.get("redirect", False))
+    reason = str(gate.get("reason", "insufficient_signal"))
+    confidence = float(gate.get("confidence", 0.0))
+    expected_industry = gate.get("expected_industry")
+    detected_industry = gate.get("detected_industry")
+
+    if confidence < 0.60:
+        expected_industry = None
+        detected_industry = None
+
+    # --- Compose confirmation message & options (only when redirecting) ---
+    if redirect:
+        exp = expected_industry or "the industry in your feasibility study"
+        det = detected_industry or "a different industry"
+        confirmation_message_static = (
+            "This chat thread is specifically connected to the industry given in your feasibility study "
+            f"(**{exp}**). Your latest query appears to be about **{det}**. "
+            "For a better experience, we recommend starting a new chat with your latest query. "
+            "If you press **Yes**, we'll redirect you to a new chat thread; if you press **No**, you can "
+            f"continue here regarding **{exp}**. Please choose from the options below."
+        )
+        confirmation_message_options = [
+            {"label": "Yes, start new chat", "value": "RedirectToNewChat"},
+            {"label": "No, stay here", "value": "StayInCurrentChat"}
+        ]
+        is_confirmation = True
+        ai_response = confirmation_message_static
+        options = confirmation_message_options
+        fallback =  f"Okay — we’ll continue in this chat for **{exp}** (the industry from your feasibility study) and proceed with your latest query here."
+    else:
+        # Let normal flow decide message & UI; keep clean
+        ai_response = None
+        is_confirmation = None
+        options = None
+        fallback = None
+
+    # --- Final response JSON (compatible + extended) ---
+    response = {
+        "Ai_response": ai_response,
+        "Is_confirmation": is_confirmation,
+        "options": options, 
+        "Trigger_Lead_Generation": False,
+
+        # existing routing/telemetry flags
+        "RedirectRequired": redirect,
+        "RedirectReason": reason,
+        "on_stay_fallback_message": fallback,
+        "Confidence": confidence,
+        "UserQuery": latest_query,
+        "ExpectedIndustry": expected_industry,
+        "DetectedIndustry": detected_industry,
+        "UsedFeasibilityDefaults": []
+    }
+    return response
+
+def generate_redirect_message(
+    llm,
+    latest_user: str,
+    chat_history: list[str],
+    feasibility_industry: str | None,
+    detected_industry: str | None,
+    mode: str,  # "redirect_notice" or "stay_fallback"
+    options: list[dict],  # [{"label": "...", "value": "..."}]
+) -> str:
+    from json import dumps
+
+    REDIRECT_RESPONDER_SYSTEM_PROMPT = """
+You are MarsAIX’s expert industrial consultant.
+
+PERSONA & TONE
+- Sound like a seasoned, client-facing consultant (10+ years). Warm, confident, helpful.
+- Short sentences. Clear wording. Human rhythm. One exclamation max if truly warranted.
+- Open with one short, natural acknowledgment line that RESPONDS to the user (do NOT repeat their words verbatim or paraphrase their message).
+
+CONTEXT YOU WILL RECEIVE
+- LATEST_USER_MESSAGE: the user’s most recent text.
+- CHAT_HISTORY: recent turns for tone/continuity cues.
+- FEASIBILITY_INDUSTRY: the industry tied to this chat’s feasibility.
+- DETECTED_INDUSTRY: the industry implied in the latest user message (may differ or be unknown).
+- MODE: either "redirect_notice" (we recommend new chat) or "stay_fallback" (user chose to stay).
+- OPTIONS: the UI will render action buttons. You may reference them by label, but do not invent new ones.
+
+WHAT TO WRITE (STRICT)
+- One concise Markdown message, nothing else, **as a single paragraph** (no lists, no line breaks), target ~40–60 words.
+- Be explicit that this chat is connected to the **Feasibility Study** feature.
+- If industries differ, name both (bold them) and briefly explain why we recommend moving the query: **to keep each thread within a single industry and aligned with the uploaded study**. (Regular chats may span topics; feasibility threads should stay scoped.)
+- Use natural connectors (“but”, “however”) for flow; avoid robotic pivots like “so you can:”.
+- Do not add promises or timelines. Never ask for details already decided upstream.
+
+MODE BEHAVIOR
+- redirect_notice:
+  • Start with a short, friendly response (no parroting).
+  • In the same paragraph, say this chat is linked to the **Feasibility Study** for **{FEASIBILITY_INDUSTRY}**, **but** the latest request appears to be about **{DETECTED_INDUSTRY}** (or “a different industry”). Recommend **moving this query to a new chat so each thread stays within a single industry and aligns with the uploaded study**.
+  • In the same flow, guide action with Yes/No (do not list buttons): tell the user they can choose **Yes** to start a new chat to run this **{DETECTED_INDUSTRY}** query, or **No** to stay here and continue with **{FEASIBILITY_INDUSTRY}**.
+  • End with: **Please choose from below.**
+
+- stay_fallback:
+  • One warm, single-paragraph line confirming we’ll continue in **{FEASIBILITY_INDUSTRY}** and proceed with the request here, ending with a natural forward-looking close (no confirmation phrase).
+
+LANGUAGE GUARDRAILS
+- Avoid: “note”, “please note”, “as an AI”, “based on your query”, “assist you better”.
+- Use Indian number formatting only if INR appears.
+- Output must be valid Markdown.
+- Avoid robotic pivots like “so you can:”; weave actions naturally into the sentence.
+
+STYLE EXAMPLE (redirect_notice, single paragraph — do not copy verbatim):
+“Thanks for the update. This chat is tied to the **Feasibility Study** for **{FEASIBILITY_INDUSTRY}**, but your latest request concerns **{DETECTED_INDUSTRY}**; we recommend moving this query to a new chat so each thread stays within a single industry and aligns with your uploaded study. Choose **Yes** to start that chat, or **No** to continue here with **{FEASIBILITY_INDUSTRY}**. **Please choose from below.**”
+
+OUTPUT
+- Return exactly one concise Markdown message and nothing else.
+    """
+
+
+    REDIRECT_RESPONDER_USER_TEMPLATE = """<CHAT_HISTORY>
+{chat_history}
+</CHAT_HISTORY>
+
+<LATEST_USER_MESSAGE>
+{latest_user}
+</LATEST_USER_MESSAGE>
+
+<FEASIBILITY_INDUSTRY>
+{feasibility_industry}
+</FEASIBILITY_INDUSTRY>
+
+<DETECTED_INDUSTRY>
+{detected_industry}
+</DETECTED_INDUSTRY>
+
+<MODE>
+{mode}   <!-- "redirect_notice" or "stay_fallback" -->
+</MODE>
+
+<OPTIONS>
+{options_json}
+</OPTIONS>
+    """
+
+
+    def _brace_escape(s: str) -> str:
+        # Double all braces so str.format() won't treat them as placeholders
+        return s.replace("{", "{{").replace("}", "}}")
+
+    # ...inside generate_redirect_message (before .format):
+    options_json = json.dumps(options, ensure_ascii=False)   # 1) to string
+    options_json_escaped = _brace_escape(options_json)       # 2) escape braces
+
+    user_prompt = REDIRECT_RESPONDER_USER_TEMPLATE.format(
+        chat_history="\n".join(chat_history or []),
+        latest_user=latest_user,
+        feasibility_industry=feasibility_industry or "the industry in your feasibility study",
+        detected_industry=detected_industry or "a different industry",
+        mode=mode,  # "redirect_notice" or "stay_fallback"
+        options_json=options_json_escaped,                   # <-- use escaped value
+    )
+    resp = llm.invoke([
+        {"role": "system", "content": REDIRECT_RESPONDER_SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt},
+    ])
+    return getattr(resp, "content", str(resp)).strip()
+
