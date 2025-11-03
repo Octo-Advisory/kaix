@@ -87,6 +87,12 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     LEFT: - 0.4,
     RIGHT: 0.4
   }
+  const [isShowEVUpIcon,setShowEVUpIcon] = useState(false);
+  const [isShowEVDownIcon,setShowEVDownIcon] = useState(true);
+  const [isShowEVCC,setShowEVCC] = useState(false);
+  const [isShowNEVUpIcon,setShowNEVUpIcon] = useState(false);
+  const [isShowNEVDownIcon,setShowNEVDownIcon] = useState(true);
+  const [isShowNEVCC,setShowNEVCC] = useState(false);
   useEffect(() => {
     if (!uiData) return;
     mapboxgl.accessToken = `${uiConfig?.['mapmobx_api_token']}`;
@@ -1209,7 +1215,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     removeMarker(LAYERS.DEFAULT_LAYER.LABEL);
     await loadDefaultLayer();
     resetZoomlevel();
-    document.querySelector("[data-name='checkbox-container-supply']").style.display = "block"; //Disable the vendor layer checkbox
+    // document.querySelector("[data-name='checkbox-container-supply']").style.display = "block"; //Disable the vendor layer checkbox
     document.querySelector("[data-name='checkbox-container-" + LAYERS.ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
     document.querySelector("[data-name='checkbox-container-" + LAYERS.NON_ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
     // document.querySelector("[data-name='checkbox-container-" + LAYERS.VENDOR + "']").style.flexDirection = "flex-row"; //Disable the vendor layer checkbox
@@ -1640,8 +1646,49 @@ const loadSelectedSupplyVendorDetails = (supply,vendorType) =>{
                                  {LAYERS.ESSENTIAL_VENDORS}
                                </span>
                              </label>
+                             <span className="icon">
+                               {isShowEVUpIcon && (
+                                 <img
+                                   src={upimage}
+                                   margin={10}
+                                   id="essential-vendor-upicon"
+                                   style={{
+                                     position: 'relative',
+                                     width: '25px',
+                                     height: '25px',
+                                     cursor: 'pointer',
+                                   }}
+                                   
+                                   alt="Icon"
+                                   onClick={() => {
+                                     setShowEVDownIcon(true);
+                                     setShowEVUpIcon(false);
+                                     setShowEVCC(false);
+                                   }}
+                                 />
+                               )}
+  
+                               {isShowEVDownIcon && (
+                                 <img
+                                   src={downimage}
+                                   style={{
+                                     position: 'relative',
+                                     width: '25px',
+                                     height: '25px',
+                                     cursor: 'pointer',
+                                   }}
+                                   alt="Icon"
+                                   id="essential-vendor-downicon"
+                                   onClick={() => {
+                                     setShowEVDownIcon(false);
+                                     setShowEVUpIcon(true);
+                                     setShowEVCC(true);
+                                   }}
+                                 />
+                               )}
+                             </span>
                            </li>
-                           <li style={{overflowY:'scroll',maxHeight:'140px',display:'none'}} data-name={"checkbox-container-supply"}>
+                           <li style={{overflowY:'scroll',maxHeight:'140px', display:isShowEVCC?'block':'none'}} data-name={"checkbox-container-supply"}>
                              {copyiedSelectedProperty?.current?.essential_vendors.map((vendor, index) => (
                                <li className="li-container" style={{paddingLeft:'25px'}}>
                                  <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
@@ -1676,8 +1723,49 @@ const loadSelectedSupplyVendorDetails = (supply,vendorType) =>{
                                   {LAYERS.NON_ESSENTIAL_VENDORS}
                                 </span>
                               </label>
+                              <span className="icon">
+                                {isShowNEVUpIcon && (
+                                  <img
+                                    src={upimage}
+                                    margin={10}
+                                    id="essential-vendor-upicon"
+                                    style={{
+                                      position: 'relative',
+                                      width: '25px',
+                                      height: '25px',
+                                      cursor: 'pointer',
+                                    }}
+                                    
+                                    alt="Icon"
+                                    onClick={() => {
+                                      setShowNEVDownIcon(true);
+                                      setShowNEVUpIcon(false);
+                                      setShowNEVCC(false);
+                                    }}
+                                  />
+                                )}
+  
+                                {isShowNEVDownIcon && (
+                                  <img
+                                    src={downimage}
+                                    style={{
+                                      position: 'relative',
+                                      width: '25px',
+                                      height: '25px',
+                                      cursor: 'pointer',
+                                    }}
+                                    alt="Icon"
+                                    id="essential-vendor-downicon"
+                                    onClick={() => {
+                                      setShowNEVDownIcon(false);
+                                      setShowNEVUpIcon(true);
+                                      setShowNEVCC(true);
+                                    }}
+                                  />
+                                )}
+                              </span>
                             </li>
-                            <li style={{overflowY:'scroll',maxHeight:'140px'}}>
+                            <li style={{overflowY:'scroll',maxHeight:'140px', display:isShowNEVCC?'block':'none'}}>
                               {copyiedSelectedProperty?.current?.nonessential_vendors.map((vendor, index) => (
                                 <li className="li-container" style={{paddingLeft:'25px'}}>
                                   <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>

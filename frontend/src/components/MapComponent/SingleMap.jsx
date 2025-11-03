@@ -1470,8 +1470,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                             </span>
 
                           </li>
-                          {isShowEVCC && (
-                            <li style={{overflowY:'scroll',maxHeight:'140px'}} id='essential-vendor-checkbox-constainer'>
+                            <li style={{overflowY:'scroll',maxHeight:'140px', display:isShowEVCC?'block':'none'}} id='essential-vendor-checkbox-constainer'>
                             {selectedProperty.essential_vendors.map((vendor, index) => (
                               <li className="li-container" style={{paddingLeft:'25px'}}>
                                 <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
@@ -1491,8 +1490,6 @@ const SingleMap = ({ selectedProperty, intension }) => {
                               </li>
                                   ))}
                           </li>
-                          )}
-                          
                           <li className="li-container">
 
                             <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
@@ -1551,8 +1548,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                               )}
                             </span>
                           </li>
-                          {isShowNEVCC && (
-                            <li style={{overflowY:'scroll',maxHeight:'140px'}}>
+                            <li style={{overflowY:'scroll',maxHeight:'140px', display:isShowNEVCC?'block':'none'}}>
                             {selectedProperty.nonessential_vendors.map((vendor, index) => (
                               <li className="li-container" style={{paddingLeft:'25px'}}>
                                 <label style={{ display: 'flex', gap: '5px', flexDirection: 'row' }}>
@@ -1571,9 +1567,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
                                 </label>
                               </li>
                                   ))}
-                          </li>
-                          )}
-                          
+                          </li>                          
                         </ul>
                       </div>
                     </div>
