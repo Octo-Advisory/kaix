@@ -1,7 +1,7 @@
 // import React, { useEffect, useState } from 'react'
 // import { useDispatch, useSelector } from 'react-redux';
 // import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FrappeContext, useFrappeAuth, useFrappeGetDoc } from 'frappe-react-sdk';
+import { useFrappeAuth, useFrappeGetDoc } from 'frappe-react-sdk';
 import Incentiveresult from '../ResultScreens/Incentiveresult';
 import Approvalresult from '../ResultScreens/Approvalresult';
 import IndustryResultScreen from '../ResultScreens/IndustryResultScreen';
@@ -59,7 +59,7 @@ import Empresult from '../ResultScreens/Empresult';
 // }
 
 // export default Renderresult
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FaExclamationTriangle, FaSignInAlt, FaHome, FaArrowLeft, FaInfoCircle } from 'react-icons/fa';
 import { MdOutlineEmojiObjects } from 'react-icons/md';
@@ -69,7 +69,7 @@ function Renderresult() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const name = params.get('name');
-  const { call } = useContext(FrappeContext)
+
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [chatDoc, setChatDoc] = useState(null);
@@ -137,26 +137,8 @@ function Renderresult() {
         }
 
         // 5. Parse and set result component (original unchanged)
-        // console.log(doc?.result, 'Top check',JSON.parse(doc.result), doc?.intension)
-        let final_data;
-        if(doc?.intension ==='Query to build industry from Scratch' && doc?.result) {
-          const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.retrieve_and_decompress", {
-            converted_data: JSON.parse(doc.result).encoded_data
-          },{
-            headers: {
-              'Expect': ''
-            }
-          })
-          // console.log(convertJson.message,convertJson,  'Okay herer comes the result ')
-          if(convertJson.message) {
-            final_data = convertJson.message
-            // console.log(final_data, 'this is respone')
-          }
-        }
-
         const parsedResult = JSON.parse(doc.result);
-        const temp_final = final_data ? final_data : ''
-        // console.log(temp_final, parsedResult,final_data, 'this is result')
+
         switch (doc.intension) {
           case 'Query to search Incentives':
             setRenderResult(<Incentiveresult res={parsedResult} source="SolutionScreen" rerender={1} />);
@@ -165,7 +147,7 @@ function Renderresult() {
             setRenderResult(<Approvalresult result={parsedResult.result} source="SolutionScreen" rerender={1} />);
             break;
           case 'Query to build industry from Scratch':
-            setRenderResult(<IndustryResultScreen result={temp_final} source="SolutionScreen" rerender={1} />);
+            setRenderResult(<IndustryResultScreen result={parsedResult.result} source="SolutionScreen" rerender={1} />);
             break;
           case 'Query to Search Vendors':
             setRenderResult(<Vendorresult result={parsedResult.result} source="SolutionScreen" rerender={1} />);

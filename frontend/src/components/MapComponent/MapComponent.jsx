@@ -622,7 +622,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
         solutionLookup[coordsString] = solution;
 
         if (solution.result_type === "Vendor") {
-          vendorNameLookup[coordsString] = solution.vendor_id || 'Vendor';
+          vendorNameLookup[coordsString] = solution.vendor_name || solution.name || 'Vendor';
         }
       }
     });

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState,useMemo } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import {  FaPlayCircle, FaStopCircle, FaArrowRight, FaClock, FaSync, FaCheckCircle, FaRunning } from 'react-icons/fa';
 import Details from "../Details/Details";
 import { HiMiniArrowPath } from "react-icons/hi2";
@@ -35,39 +35,6 @@ function Incentiveresult({ res, source, rerender }) {
       });
   }
 
-  function mapIncentivesToTypes(incentivesObj, typesObj,namesObj,scoreObj) {
-  if(!incentivesObj || !typesObj) return []
-    return Object.keys(incentivesObj).map(key => ({
-        id: incentivesObj[key],
-        name: namesObj[key],
-        type: typesObj[key],  // Fallback in case type doesn't exist
-        aggregated_score: scoreObj[key]
-    }));
-}
-
- const storeResultData = async (lastChat,solutions,intension) => {
-  if(!lastChat || !solutions) return 
-
-  try {
-      const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
-      child_row_id: lastChat,
-      updated_solutions: solutions,
-      intension: intension
-      },
-    {
-    headers: {
-      'Expect': '' // 👈 Clear problematic header
-    }
-  });
-      // console.log('This is the result we want ot store.... ', result.message)
-      return result.message || [];
-    } catch (err) {
-      // console.error("Error Storing Result json:", err);
-      createDiagnostic("Incentive", `Error Storing Result Json ${JSON.stringify(err)} in Incentives`, lastChatId)
-      return []; // Return empty for this batch on error
-    }
-}
-
   let Analytics_response = rerender!==1 ?  res['Analytics_response'] : {}
   if ((
     typeof Analytics_response !== 'object' || 
@@ -78,27 +45,10 @@ function Incentiveresult({ res, source, rerender }) {
     return <NoResultsFound diagnostics={true} type='Incentive' chatId={lastChatId} data={Analytics_response} module='Incentives'/>;
   }
   const result = rerender!==1 ?  JSON.parse(Analytics_response["Incentive Data"]) : {}
-  // console.log(result)
-  
+
   const { call } = useContext(FrappeContext)
   const [tempFailure, setTempFailure] = useState(false)
   const [someError, setSomeError] = useState(false)
-  const [fetchedIncentive, setFetchedIncentive] = useState([]);
-  const [selectedIncentive, setSelectedIncentive] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [incentives, setIncentives] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const { updateDoc } = useFrappeUpdateDoc()
-  const [activeContext, setActiveContext] = useState()
-  const [incentivesMap, setIncentivesMap] = useState([])
-  const [showFull, setShowFull] = useState(false);
-  const [testJson, setTestJson] = useState({
-    "Small": "## Incentives under Gujarat Industrial Policy 2020 for Small Businesses\n### Core Benefit Overview\nThe incentive provides assistance to Micro, Small, and Medium Enterprises (MSEs) for sheds developed by private developers. It offers a proportional benefit of **15%** of the total cost of land, building, other infrastructure facilities, Technical Consultancy fees, and TPQA charges.\n\n### Illustrative Financial Details\nAssuming a total investment of **\u20b95,00,00,000**, the benefit calculation is as follows:\n- Total Investment: **\u20b95,00,00,000**\n- Benefit: **15%** of **\u20b95,00,00,000** = **\u20b975,00,000**\n- Net Cost: **\u20b95,00,00,000** - **\u20b975,00,000** = **\u20b94,25,00,000**\n\n### Key Financial Insights\n- The benefit is calculated as **15%** of the total investment in eligible costs.\n- There is no explicit cap mentioned for this benefit.\n- This incentive is particularly beneficial for small businesses as it provides significant support for infrastructure development, reducing the net investment burden.\n\n### Conclusion\nThis incentive is highly beneficial for small businesses under the Gujarat Industrial Policy 2020, as it provides substantial financial assistance for infrastructure development, thereby reducing the overall investment burden and fostering business growth.",
-    "Medium": "## Incentives under Gujarat Industrial Policy 2020 - Medium Scale\n### Core Benefit Overview\nThe incentive provides assistance to Medium Scale Enterprises (MSEs) for infrastructure development, specifically supporting costs related to land, building, other infrastructure facilities, technical consultancy fees, and TPQA charges. The support is structured as a proportional benefit, offering up to **15%** of the total investment in these areas.\n\n### Illustrative Financial Details\nFor a medium-scale investment of **\u20b930,00,00,000**, the benefit calculation is as follows:\n- Total Investment: **\u20b930,00,00,000**\n- Benefit: **15%** of **\u20b930,00,00,000** = **\u20b94,50,00,000**\n- Net Cost: **\u20b930,00,00,000** - **\u20b94,50,00,000** = **\u20b925,50,00,000**\n\nThis results in a significant reduction in the net cost of the project, making the investment more feasible for MSEs.\n\n### Key Financial Insights\n* The benefit is capped at **15%** of the total investment, ensuring alignment with the scale of the project.\n* The incentive is particularly advantageous for medium-scale businesses, as it provides a substantial proportion of the total investment cost, thereby reducing the financial burden on the enterprise.\n\n### Conclusion\nThe incentive under the Gujarat Industrial Policy 2020 is highly beneficial for medium-scale enterprises, offering significant financial support for infrastructure development. This makes it an attractive option for businesses looking to expand or establish their operations in the state."
-  })
-
-
-
  
 //    if (typeof result === 'object' && result !== null) {
  
@@ -112,195 +62,12 @@ function Incentiveresult({ res, source, rerender }) {
 // }
 // const analytics_response = result['Analytics_response']
 
-  // const incentivesMap = mapIncentivesToTypes(result['Incentive ID'], result['Incentive Type'], result['Incentive Name'])
-  // useEffect(() => {
-  //   const initializeFirstIncentive = async () => {
-  //     if (incentivesMap && loading && incentivesMap.length > 0) {
-  //       if (lastChatId) {
-  //         if (source !== "FromScratch") {
-  //           const updatedResult = {
-  //             ...incentivesMap,
-  //             "no_of_incentives": incentivesMap?.length
-  //           }
-  //           if(!isResultStored) {
-  //             await storeResultData(lastChatId, incentivesMap, 'Query to search Incentives')
-  //           }
-  //           setIsResultStored(true)
-  //           console.log('Storedd...')
-  //         } 
-  //       }
-  //       await handleIncentiveSelection(incentivesMap[0].id);
-  //       setLoading(false);
-  //     }
-  //   };
 
-  //   initializeFirstIncentive();
-  // }, [incentivesMap]); 
-
-
-const handleIncentiveSelection = async (incentiveName) => {
-  // console.log(incentiveName, 'this is the incentive');
-
-  // 1️⃣ Check if we already have this incentive cached
-  const existingIncentive = fetchedIncentive.find(
-    (item) => item.id === incentiveName
-  );
-
-  if (existingIncentive) {
-    // console.log('Using cached incentive:', existingIncentive);
-    setSelectedIncentive(existingIncentive);
-    setLoading(false)
-    return; // ✅ Skip API call
-  }
-
-  // If not cached, fetch it from API
-  let fetchedIncentives = [];
-  let fetchedIndustryIncentives = [];
-
-  const filters = JSON.stringify([["name", "=", incentiveName]]);
-  const fields = JSON.stringify(["*"]);
-
-  // -------------------------
-  // API CALL 1: Incentive Industry Mapping
-  // -------------------------
-  const url = `/api/resource/Incentive Industry Mapping?fields=${encodeURIComponent(fields)}&filters=${encodeURIComponent(filters)}`;
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (response.ok) {
-    const data = await response.json();
-    if (data.data?.length > 0) {
-      const incentive = data.data[0];
-      fetchedIndustryIncentives.push({
-        incentive_name: incentive.incentive,
-        state_level: incentive.state_level,
-        country_level: incentive.country_level,
-        city_level: incentive.city_level,
-      });
-    }
-  }
-
-  // -------------------------
-  // API CALL 2: Incentive Details
-  // -------------------------
-  const url2 = `/api/resource/Incentive?fields=${encodeURIComponent(fields)}&filters=${encodeURIComponent(filters)}`;
-  const response2 = await fetch(url2, {
-    method: 'GET',
-    headers: {
-      'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
-      'Content-Type': 'application/json'
-    }
-  });
-
-  if (response2.ok) {
-    const data = await response2.json();
-    if (data.data?.length > 0) {
-      const incentive = data.data[0];
-      let parsedContext = safeJsonParse(incentive.contextual_analysis);
-
-      fetchedIncentives.push({
-        id: incentive.name,
-        name: incentive.incentive_name,
-        type: incentive.incentive_type || "N/A",
-        quantum_of_assistance: incentive.quantum_of_assistance,
-        description: incentive.description,
-        incentive_rank: incentive.incentive_rank || "N/A",
-        contextual_analysis: parsedContext?.final_markdown || '',
-        startDate: incentive.incentive_operation_start_date || "N/A",
-        endDate: incentive.incentive_operation_end_date || "N/A",
-        status: getProgramStatus(incentive.incentive_operation_start_date, incentive.incentive_operation_end_date),
-        category_description: JSON.parse(incentive.category_description) || {}
-      });
-    }
-  }
-
-  // -------------------------
-  // Merge industry data and compute level
-  // -------------------------
-  fetchedIncentives = fetchedIncentives.map(incentive => {
-    const matchingIndustry = fetchedIndustryIncentives.find(
-      industry => industry.incentive_name === incentive.id
-    );
-    if (matchingIndustry) {
-      let tempLevel = getLocationLevel(
-        matchingIndustry.city_level,
-        matchingIndustry.state_level,
-        matchingIndustry.country_level
-      );
-      return {
-        ...incentive,
-        level: tempLevel,
-      };
-    }
-    return incentive;
-  });
-
-  // 2️⃣ Add the newly fetched incentive to cache
-  setFetchedIncentive((prev) => [...prev, ...fetchedIncentives]);
-
-  // 3️⃣ Set as selected
-  setSelectedIncentive(fetchedIncentives[0]);
-  setLoading(false)
-  // console.log(fetchedIncentives, 'This is what we need to set now');
-};
-
-
- useEffect(() => {
-  const checkData =async()=>{
-    try {
-        if (rerender === 1 || source==='FromScratch') {
-        let tempResult = res?.['result'] ? res.result : res
-        // setIncentives(tempResult)
-        setIncentivesMap(tempResult)
-        await handleIncentiveSelection(tempResult?.[0].id)
-        setLoading(false);
-      }
-      else {
-        fetchIncentives()
-      }
-      // else {
-      //   fetchIncentivesDetails();
-      // }
-    }
-    catch(err) {
-      createDiagnostic("Incentive", `Something went wrong while rendering the data. Rerender = ${JSON.stringify(rerender)}, Source = ${JSON.stringify(source)}  ${JSON.stringify(err)} in Incentives`, lastChatId)
-      setSomeError(true)
-    }
-  }
-  checkData()
-  }, [res]);
-
-  const fetchIncentives = async()=>{
-    if (!result || !result["Incentive ID"]) {
-        setIncentives([]);
-        setTempFailure(true)
-        setLoading(false);
-        return;
-    }
-    let incentiveData = mapIncentivesToTypes(result['Incentive ID'], result['Incentive Type'], result['Incentive Name'],result["aggregated_score"])
-    // setLoading(false);
-    setIncentivesMap(incentiveData)
-    await handleIncentiveSelection(incentiveData[0].id)
-    if (lastChatId) {
-      if (source !== "FromScratch") {
-        const updatedResult = {
-          ...incentiveData,
-          "no_of_incentives": incentiveData?.length
-        }
-        await storeResultData(lastChatId, incentiveData, 'Query to search Incentives')
-      } 
-    }
-    
-    
-  }
-
-
-
+  const [selectedIncentive, setSelectedIncentive] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [incentives, setIncentives] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { updateDoc } = useFrappeUpdateDoc()
 
   function safeJsonParse(input) {
   try {
@@ -312,6 +79,7 @@ const handleIncentiveSelection = async (incentiveName) => {
     return {};
   }
 }
+
 
   const getLocationLevel = (city, state, country) => {
     if (city === 1) {
@@ -447,31 +215,85 @@ const handleIncentiveSelection = async (incentiveName) => {
       setLoading(false);
     }
   };
-  
-  // useEffect(()=>{
-  //   if(incentives.length>0) {
-  //     setSelectedIncentive(incentives[0])
+
+  const storeResultData = async (lastChat,solutions,intension) => {
+  if(!lastChat || !solutions) return 
+
+  try {
+      const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
+      child_row_id: lastChat,
+      updated_solutions: solutions,
+      intension: intension
+      },
+    {
+    headers: {
+      'Expect': '' // 👈 Clear problematic header
+    }
+  });
+      // console.log('This is the result we want ot store.... ', result.message)
+      return result.message || [];
+    } catch (err) {
+      // console.error("Error Storing Result json:", err);
+      createDiagnostic("Incentive", `Error Storing Result Json ${JSON.stringify(err)} in Incentives`, lastChatId)
+      return []; // Return empty for this batch on error
+    }
+}
+  useEffect(() => {
+    try {
+        if (rerender === 1 || source==='FromScratch') {
+        let tempResult = res?.['result'] ? res.result : res
+        setIncentives(tempResult)
+        setSelectedIncentive(tempResult?.[0])
+        setLoading(false);
+      }
+      else {
+        fetchIncentivesDetails();
+      }
+    }
+    catch(err) {
+      createDiagnostic("Incentive", `Something went wrong while rendering the data. Rerender = ${JSON.stringify(rerender)}, Source = ${JSON.stringify(source)}  ${JSON.stringify(err)} in Incentives`, lastChatId)
+      setSomeError(true)
+    }
+  }, [res]);
+  // useEffect(() => {
+  //   if (rerender === 1 || source==='FromScratch') {
+  //     console.log(res, 'Got this from BfsM')
+  //     let tempResult = res?.['result'] ? res.result : Analytics_response
+  //     setIncentives(tempResult)
+  //     setSelectedIncentive(tempResult?.[0])
+  //     setLoading(false);
   //   }
-  // },[incentives])
+  //   else {
+  //     fetchIncentivesDetails();
+  //   }
 
- 
+  // }, [res]);
 
-  const displayedIncentives = incentivesMap?.filter(
+  useEffect(()=>{
+    if(incentives.length>0) {
+      setSelectedIncentive(incentives[0])
+    }
+  },[incentives])
+
+  const [activeContext, setActiveContext] = useState()
+  const [showFull, setShowFull] = useState(false);
+  const [testJson, setTestJson] = useState({
+    "Small": "## Incentives under Gujarat Industrial Policy 2020 for Small Businesses\n### Core Benefit Overview\nThe incentive provides assistance to Micro, Small, and Medium Enterprises (MSEs) for sheds developed by private developers. It offers a proportional benefit of **15%** of the total cost of land, building, other infrastructure facilities, Technical Consultancy fees, and TPQA charges.\n\n### Illustrative Financial Details\nAssuming a total investment of **\u20b95,00,00,000**, the benefit calculation is as follows:\n- Total Investment: **\u20b95,00,00,000**\n- Benefit: **15%** of **\u20b95,00,00,000** = **\u20b975,00,000**\n- Net Cost: **\u20b95,00,00,000** - **\u20b975,00,000** = **\u20b94,25,00,000**\n\n### Key Financial Insights\n- The benefit is calculated as **15%** of the total investment in eligible costs.\n- There is no explicit cap mentioned for this benefit.\n- This incentive is particularly beneficial for small businesses as it provides significant support for infrastructure development, reducing the net investment burden.\n\n### Conclusion\nThis incentive is highly beneficial for small businesses under the Gujarat Industrial Policy 2020, as it provides substantial financial assistance for infrastructure development, thereby reducing the overall investment burden and fostering business growth.",
+    "Medium": "## Incentives under Gujarat Industrial Policy 2020 - Medium Scale\n### Core Benefit Overview\nThe incentive provides assistance to Medium Scale Enterprises (MSEs) for infrastructure development, specifically supporting costs related to land, building, other infrastructure facilities, technical consultancy fees, and TPQA charges. The support is structured as a proportional benefit, offering up to **15%** of the total investment in these areas.\n\n### Illustrative Financial Details\nFor a medium-scale investment of **\u20b930,00,00,000**, the benefit calculation is as follows:\n- Total Investment: **\u20b930,00,00,000**\n- Benefit: **15%** of **\u20b930,00,00,000** = **\u20b94,50,00,000**\n- Net Cost: **\u20b930,00,00,000** - **\u20b94,50,00,000** = **\u20b925,50,00,000**\n\nThis results in a significant reduction in the net cost of the project, making the investment more feasible for MSEs.\n\n### Key Financial Insights\n* The benefit is capped at **15%** of the total investment, ensuring alignment with the scale of the project.\n* The incentive is particularly advantageous for medium-scale businesses, as it provides a substantial proportion of the total investment cost, thereby reducing the financial burden on the enterprise.\n\n### Conclusion\nThe incentive under the Gujarat Industrial Policy 2020 is highly beneficial for medium-scale enterprises, offering significant financial support for infrastructure development. This makes it an attractive option for businesses looking to expand or establish their operations in the state."
+  })
+
+  const displayedIncentives = incentives.filter(
     (incentive) =>
       incentive.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       incentive.type?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   useEffect(() => {
-    const checkSearch = async()=>{
-      if(displayedIncentives.length>0) {
-        await handleIncentiveSelection(displayedIncentives[0].id)
-      }
-      else {
-        setSelectedIncentive(null)
-      }
+    if (searchQuery === "") {
+      setSelectedIncentive(incentives.length > 0 ? incentives[0] : null);
+    } else {
+      setSelectedIncentive(displayedIncentives.length > 0 ? displayedIncentives[0] : null);
     }
-    checkSearch()
   }, [searchQuery]);
 
   const formatDate = (dateString) => {
@@ -521,92 +343,6 @@ const handleIncentiveSelection = async (incentiveName) => {
 
   const containerRef = useRef(null)
   const contextualRef = useRef(null)
-
-  // const [fetchedIncentive, setFetchedIncentive] = useState([])
-  // const handleIncentiveSelection = async(incentive)=> {
-  //   console.log(incentive, 'this is the incentive')
-  //   let fetchedIncentives = []
-  //   let fetchedIndustryIncentives = []
-  //   const filters = JSON.stringify([["name", "=", incentive]]);
-  //   const fields = JSON.stringify(["*"]);
-    
-  //   const url = `/api/resource/Incentive Industry Mapping?fields=${encodeURIComponent(fields)}&filters=${encodeURIComponent(filters)}`;
-  //   const response = await fetch(url, {
-  //     method: 'GET',
-  //     headers: {
-  //       'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
-  //       'Content-Type': 'application/json'
-  //     }
-  //   });
-  //   if (response.ok) {
-  //     const data = await response.json();
-  //     if (data.data && data.data.length > 0) {
-  //       const incentive = data.data[0];
-  //       fetchedIndustryIncentives.push({
-  //         incentive_name: incentive.incentive,
-  //         state_level: incentive.state_level,
-  //         country_level: incentive.country_level,
-  //         city_level: incentive.city_level,
-  //       });
-  //     }
-  //   }
-
-  //   const url2 = `/api/resource/Incentive?fields=${encodeURIComponent(fields)}&filters=${encodeURIComponent(filters)}`;
-  //   const response2 = await fetch(url2, {
-  //     method: 'GET',
-  //     headers: {
-  //       'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
-  //       'Content-Type': 'application/json'
-  //     }
-  //   });
-
-  //   if (response2.ok) {
-  //     const data = await response2.json();
-  //     if (data.data && data.data.length > 0) {
-        
-  //       const incentive = data.data[0];
-        
-  //       let parsedContext = safeJsonParse(incentive.contextual_analysis);
-
-  //       fetchedIncentives.push({
-  //         id: incentive.name,
-  //         name: incentive.incentive_name,
-  //         type: incentive.incentive_type || "N/A",
-  //         quantum_of_assistance: incentive.quantum_of_assistance,
-  //         description: incentive.description,
-  //         // rank: result["Incentive Rank"]?.[index] ?? "N/A",
-  //         incentive_rank: incentive.incentive_rank || "N/A",              
-  //         contextual_analysis: parsedContext?.final_markdown || '',
-  //         // contextual_analysis: JSON.parse(incentive.contextual_analysis)?.["final_markdown"] || '',
-  //         // aggregated_score: result?.["aggregated_score"]?.[index] ?? 0,
-  //         startDate: incentive.incentive_operation_start_date || "N/A",
-  //         endDate: incentive.incentive_operation_end_date || "N/A",
-  //         status: getProgramStatus(incentive.incentive_operation_start_date, incentive.incentive_operation_end_date),
-  //         // level: result["Level"]?.[index] ?? "N/A",
-  //         category_description: JSON.parse(incentive.category_description) || {}
-  //       });
-  //     }
-  //   }
-  //   fetchedIncentives = fetchedIncentives.map(incentive => {
-  //       const matchingIndustry = fetchedIndustryIncentives.find(
-  //         industry => industry.incentive_name === incentive.id
-  //       );
-  //       if (matchingIndustry) {
-  //         let tempLevel = getLocationLevel(matchingIndustry.city_level, matchingIndustry.state_level, matchingIndustry.country_level)
-  //         return {
-  //           ...incentive,
-  //           level: tempLevel,
-  //         };
-  //       }
-
-  //     return incentive; // No match, keep as is
-  //   });
-  //   setSelectedIncentive(fetchedIncentives[0])
-  //   console.log(fetchedIncentives, 'This is what we need to set now')
-  // }
-  
-
-
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = 0;
@@ -708,8 +444,7 @@ const handleIncentiveSelection = async (incentiveName) => {
                         : "bg-[#41b655] bg-opacity-10 border-none"
                         }`}
 
-                      // onClick={() => setSelectedIncentive(incentive)}
-                      onClick={() => {handleIncentiveSelection(incentive.id)}}
+                      onClick={() => setSelectedIncentive(incentive)}
                     >
                       <div className="flex justify-between items-start">
                         <h3 className={`font-medium ${selectedIncentive?.id === incentive.id ? "text-black" : "text-[#3b69c5]"}`}>

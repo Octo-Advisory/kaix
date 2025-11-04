@@ -272,7 +272,7 @@ const ProgressScreen = () => {
     });
     setFailure(true);
     setShowfailure(true);
-  }, 45000);
+  }, 30000);
   
   return () => clearTimeout(timeout);
 }, []);

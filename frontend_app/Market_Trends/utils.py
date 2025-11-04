@@ -14,7 +14,7 @@ import configparser
 from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers_creative, llm_70b_vers
 
 # from langchain_openai import ChatOpenAI
-config_file = '/home/marsapplication/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 config = configparser.ConfigParser()
 config.read(config_file)
 api_key = config['Key']['SERPAPI_API_KEY']
@@ -25,14 +25,14 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("/home/marsapplication/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/market_trends.log", encoding="utf-8"),
+        logging.FileHandler("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/market_trends.log", encoding="utf-8"),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 
 # File-based cache
-CACHE_FILE = "/home/marsapplication/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/search_cache.json"
+CACHE_FILE = "/home/mars/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/search_cache.json"
 CACHE_EXPIRY_DAYS = 30
 
 def load_cache() -> dict:

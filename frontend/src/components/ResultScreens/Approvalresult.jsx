@@ -15,7 +15,6 @@ import { AdditionalDetailIcon, ApprovalNameIcon, ApprovalTitleIcon, BuildingIcon
 function Approvalresult({ result, source, rerender }) {
     const lastChatId = useSelector((state) => state.chat.lastId);
     const { createDoc } = useFrappeCreateDoc('');
-
     const createDiagnostic = async(errType, logMsg,chatId)=> {
       let log = ` ${logMsg}`
        createDoc("AIX Diagnostics Hub", {
@@ -24,7 +23,6 @@ function Approvalresult({ result, source, rerender }) {
       chat_name: chatId
       });
     }
-
     const {call} = useContext(FrappeContext)
     const [tempFailure, setTempFailure] = useState(false)
     const [someError, setSomeError] = useState(false)
@@ -42,14 +40,11 @@ function Approvalresult({ result, source, rerender }) {
     if (typeof approval_data === "string") {
         approval_data = JSON.parse(approval_data);
     }
-    // console.log(approval_data, 'This is the approval Data')
     const [viewMode, setViewMode] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedApproval, setSelectedApproval] = useState(null);
     const [approvalsData, setApprovalsDataData] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [approvalsMap, setApprovalsMap] = useState([])
-    const [fetchedApproval, setFetchedApproval] = useState([])
   
     const { updateDoc } = useFrappeUpdateDoc()
     const { data: uiData } = useFrappeGetDoc("UI Configuration", "Approvals")
@@ -71,257 +66,115 @@ function Approvalresult({ result, source, rerender }) {
         }
     }
 
-     function mapApprovalData(ApprovalsObj, nameObj,govtObj,scoreObj,stageObj) {
-  if(!ApprovalsObj || !nameObj) return []
-    return Object.keys(ApprovalsObj).map(key => ({
-        id: ApprovalsObj[key],
-        approval_name: nameObj[key],
-        government_department: govtObj[key] || "Department of Industry & Health", // Fallback in case type doesn't exist
-        aggregated_score: scoreObj[key],
-        stage: stageObj[key]
-    }));
-}
+    const fetchApprovalsDetails = async () => {
+        try {
 
-const fetchApprovals = async()=>{
-    if (!approval_data || !approval_data["Approval ID"]) {
-        setApprovalsDataData([]);
-        setApprovalsMap([])
-        setTempFailure(true)
-        setLoading(false);
-        return;
-    }
-    let approvalsMapp = mapApprovalData(approval_data['Approval ID'], approval_data['Approval Name'], approval_data['Government Department'], approval_data["aggregated_score"], approval_data['Stages'])
-    // console.log(approvalsMapp, 'This is the data we want tsee ')
-    setLoading(false);
-    setApprovalsMap(approvalsMapp)
-    handleApprovalSelection(approvalsMapp[0])
-
-    if (lastChatId && source != "FromScratch") {
-        const no_of_approvals = approvalsMapp?.length
-        const stageCounts = approvalsMapp?.reduce((acc, curr) => {
-            acc[curr.stage] = (acc[curr.stage] || 0) + 1;
-            return acc;
-        }, {});
-        const render_data = {
-            "Mode_Others": result["Mode_Others"],
-            "Mode_Pre-Establishment": result["Mode_Pre-Establishment"],
-            "Mode_Pre-Operation": result["Mode_Pre-Operation"],
-            "Mode_Pre-Requisite": result["Mode_Pre-Requisite"],
-            "Online Percentage": result["Online Percentage"],
-            "Others": result["Others"],
-            "Pre-Establishment": result["Pre-Establishment"],
-            "Pre-Operation": result["Pre-Operation"],
-            "Pre-Requisite": result["Pre-Requisite"],
-            "Total Effective Time": result["Total Effective Time"]
-        };
-
-        const updatedResult = {
-            ...render_data,
-            "Approval Data": approvalsMapp,
-            'no_of_approvals': no_of_approvals,
-            'stagewise_no_of_approvals': stageCounts
-        };
-        
-        await storeResultData(lastChatId, updatedResult, 'Query to Get Approvals')
-        // console.log('Process Completed')
-        // console.timeEnd()
-    }
-}
-
-const handleApprovalSelection = async (approval) => {
-    // console.time()
-    // console.log('Fetching the Incentive')
-    let aggregated_score = approval.aggregated_score
-    let id = approval.id
-    try {
-
-        // 1️⃣ Check if we already have this incentive cached
-        const existingApproval = fetchedApproval.find(
-            (item) => item.id === id
-        );
-
-        if (existingApproval) {
-            // console.log('Using cached Approval:', existingApproval);
-            setSelectedApproval(existingApproval);
-            return; // ✅ Skip API call
-        }
-
-        let fetchedApprovalsData = []
-        const filters = JSON.stringify([["name", "=", id]]);
-        const fields = JSON.stringify(["*"]);
-
-        const url = `/api/resource/Licenses and Approvals Type?fields=${encodeURIComponent(fields)}&filters=${encodeURIComponent(filters)}`;
-
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
-                'Content-Type': 'application/json'
+            if (!approval_data || !approval_data["Approval ID"]) {
+                setApprovalsDataData([]);
+                setTempFailure(true)
+                setLoading(false);
+                return;
             }
-        })
-        
-        if(response.ok) {
-            const data = await response.json();
-            if (!data || !data.data || data.data.length === 0) {
-                return {
-                    id: id,
-                    approvalID: id,
-                    approval_name: id,
-                    government_department: "N/A",
-                    mode_of_application: "N/A",
-                    level: "N/A",
-                    stage: "Others",
-                    time_taken: "N/A",
-                    land_type: "N/A",
-                    business_location: "N/A",
-                    details: "No description available",
+
+            const approvalIds = Object.values(approval_data["Approval ID"]);
+
+            const fetchPromises = approvalIds.map((id, index) => {
+                const filters = JSON.stringify([["name", "=", id]]);
+                const fields = JSON.stringify(["*"]);
+
+                const url = `/api/resource/Licenses and Approvals Type?fields=${encodeURIComponent(fields)}&filters=${encodeURIComponent(filters)}`;
+
+                return fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+                        'Content-Type': 'application/json'
+                    }
+                }).then(res => res.ok ? res.json() : null);
+            });
+
+            const responses = await Promise.all(fetchPromises);
+
+            const fetchedApprovals = responses
+                .map((res, index) => {
+                    const fallbackId = approval_data["Approval ID"][index];
+                    // const fallbackLevel = approval_data["Level"][index];
+                    const fallbackScore = approval_data["aggregated_score"][index];
+
+                    if (!res || !res.data || res.data.length === 0) {
+                        return {
+                            id: fallbackId,
+                            approvalID: fallbackId,
+                            approval_name: fallbackId,
+                            government_department: "N/A",
+                            mode_of_application: "N/A",
+                            level: "N/A",
+                            stage: "Others",
+                            time_taken: "N/A",
+                            land_type: "N/A",
+                            business_location: "N/A",
+                            details: "No description available",
+                            aggregated_score: fallbackScore || 0,
+                        };
+                    }
+
+                    const approval = res.data[0];
+                    let tempLevel = getLocationLevel(approval.city_level, approval.state_level, approval.country_level)
+                    return {
+                        id: approval.name,
+                        approvalID: approval.name,
+                        approval_name: approval.license_approval || fallbackId,
+                        government_department: approval.government_department || "N/A",
+                        mode_of_application: approval.mode_of_application || "N/A",
+                        level: tempLevel || "N/A",
+                        time_taken: approval.delivery_schedule_in_working_days,
+                        stage: approval.stage || "Others",
+                        land_type: approval.land_type || "N/A",
+                        business_location: approval.business_location || "N/A",
+                        details: approval.description || "No description available",
+                        aggregated_score: approval.aggregated_score || fallbackScore || 0
+                    };
+                });
+
+            setApprovalsDataData(fetchedApprovals);
+            setSelectedApproval(fetchedApprovals.length > 0 ? fetchedApprovals[0] : null);
+            setViewMode(fetchedApprovals.length > 0 ? fetchedApprovals[0].stage : 'Pre-Operation')
+            setLoading(false);
+            if (lastChatId && source != "FromScratch") {
+                const no_of_approvals = fetchedApprovals?.length
+                const stageCounts = fetchedApprovals?.reduce((acc, curr) => {
+                    acc[curr.stage] = (acc[curr.stage] || 0) + 1;
+                    return acc;
+                }, {});
+                const render_data = {
+                    "Mode_Others": result["Mode_Others"],
+                    "Mode_Pre-Establishment": result["Mode_Pre-Establishment"],
+                    "Mode_Pre-Operation": result["Mode_Pre-Operation"],
+                    "Mode_Pre-Requisite": result["Mode_Pre-Requisite"],
+                    "Online Percentage": result["Online Percentage"],
+                    "Others": result["Others"],
+                    "Pre-Establishment": result["Pre-Establishment"],
+                    "Pre-Operation": result["Pre-Operation"],
+                    "Pre-Requisite": result["Pre-Requisite"],
+                    "Total Effective Time": result["Total Effective Time"]
                 };
-            }
-           
-            const approval = data.data[0];
-            let tempLevel = getLocationLevel(approval.city_level, approval.state_level, approval.country_level)
-            fetchedApprovalsData.push({
-                id: approval.name,
-                approvalID: approval.name,
-                approval_name: approval.license_approval || id,
-                government_department: approval.government_department || "N/A",
-                mode_of_application: approval.mode_of_application || "N/A",
-                level: tempLevel || "N/A",
-                time_taken: approval.delivery_schedule_in_working_days,
-                stage: approval.stage || "Others",
-                land_type: approval.land_type || "N/A",
-                business_location: approval.business_location || "N/A",
-                details: approval.description || "No description available",
-                aggregated_score: approval.aggregated_score || aggregated_score || 0
-            })
-        }
-        // 2️⃣ Add the newly fetched incentive to cache
-        setFetchedApproval((prev) => [...prev, ...fetchedApprovalsData]);
 
-        setSelectedApproval(fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0] : null);
-        setViewMode(fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0].stage : 'Pre-Operation')
-        setLoading(false);
-        
-    } catch (error) {
-        // console.error("Error fetching approvals:", error);
-        createDiagnostic("Approvals", `Something Went wrong while fetching the approvals ${JSON.stringify(error)} IN Approvals`,lastChatId)
-        setSomeError(true)
-        setLoading(false);
-    }
-
-
-  
-};
-
-// const fetchApprovalsDetails = async () => {
-    //     try {
-
-    //         if (!approval_data || !approval_data["Approval ID"]) {
-    //             setApprovalsDataData([]);
-    //             setTempFailure(true)
-    //             setLoading(false);
-    //             return;
-    //         }
-
-    //         const approvalIds = Object.values(approval_data["Approval ID"]);
-
-    //         const fetchPromises = approvalIds.map((id, index) => {
-    //             const filters = JSON.stringify([["name", "=", id]]);
-    //             const fields = JSON.stringify(["*"]);
-
-    //             const url = `/api/resource/Licenses and Approvals Type?fields=${encodeURIComponent(fields)}&filters=${encodeURIComponent(filters)}`;
-
-    //             return fetch(url, {
-    //                 method: 'GET',
-    //                 headers: {
-    //                     'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
-    //                     'Content-Type': 'application/json'
-    //                 }
-    //             }).then(res => res.ok ? res.json() : null);
-    //         });
-
-    //         const responses = await Promise.all(fetchPromises);
-
-    //         const fetchedApprovals = responses
-    //             .map((res, index) => {
-    //                 const fallbackId = approval_data["Approval ID"][index];
-    //                 // const fallbackLevel = approval_data["Level"][index];
-    //                 const fallbackScore = approval_data["aggregated_score"][index];
-
-    //                 if (!res || !res.data || res.data.length === 0) {
-    //                     return {
-    //                         id: fallbackId,
-    //                         approvalID: fallbackId,
-    //                         approval_name: fallbackId,
-    //                         government_department: "N/A",
-    //                         mode_of_application: "N/A",
-    //                         level: "N/A",
-    //                         stage: "Others",
-    //                         time_taken: "N/A",
-    //                         land_type: "N/A",
-    //                         business_location: "N/A",
-    //                         details: "No description available",
-    //                         aggregated_score: fallbackScore || 0,
-    //                     };
-    //                 }
-
-    //                 const approval = res.data[0];
-    //                 let tempLevel = getLocationLevel(approval.city_level, approval.state_level, approval.country_level)
-    //                 return {
-    //                     id: approval.name,
-    //                     approvalID: approval.name,
-    //                     approval_name: approval.license_approval || fallbackId,
-    //                     government_department: approval.government_department || "N/A",
-    //                     mode_of_application: approval.mode_of_application || "N/A",
-    //                     level: tempLevel || "N/A",
-    //                     time_taken: approval.delivery_schedule_in_working_days,
-    //                     stage: approval.stage || "Others",
-    //                     land_type: approval.land_type || "N/A",
-    //                     business_location: approval.business_location || "N/A",
-    //                     details: approval.description || "No description available",
-    //                     aggregated_score: approval.aggregated_score || fallbackScore || 0
-    //                 };
-    //             });
-
-    //         setApprovalsDataData(fetchedApprovals);
-    //         setSelectedApproval(fetchedApprovals.length > 0 ? fetchedApprovals[0] : null);
-    //         setViewMode(fetchedApprovals.length > 0 ? fetchedApprovals[0].stage : 'Pre-Operation')
-    //         setLoading(false);
-    //         if (lastChatId && source != "FromScratch") {
-    //             const no_of_approvals = fetchedApprovals?.length
-    //             const stageCounts = fetchedApprovals?.reduce((acc, curr) => {
-    //                 acc[curr.stage] = (acc[curr.stage] || 0) + 1;
-    //                 return acc;
-    //             }, {});
-    //             const render_data = {
-    //                 "Mode_Others": result["Mode_Others"],
-    //                 "Mode_Pre-Establishment": result["Mode_Pre-Establishment"],
-    //                 "Mode_Pre-Operation": result["Mode_Pre-Operation"],
-    //                 "Mode_Pre-Requisite": result["Mode_Pre-Requisite"],
-    //                 "Online Percentage": result["Online Percentage"],
-    //                 "Others": result["Others"],
-    //                 "Pre-Establishment": result["Pre-Establishment"],
-    //                 "Pre-Operation": result["Pre-Operation"],
-    //                 "Pre-Requisite": result["Pre-Requisite"],
-    //                 "Total Effective Time": result["Total Effective Time"]
-    //             };
-
-    //             const updatedResult = {
-    //                 ...render_data,
-    //                 "Approval Data": fetchedApprovals,
-    //                 'no_of_approvals': no_of_approvals,
-    //                 'stagewise_no_of_approvals': stageCounts
-    //             };
+                const updatedResult = {
+                    ...render_data,
+                    "Approval Data": fetchedApprovals,
+                    'no_of_approvals': no_of_approvals,
+                    'stagewise_no_of_approvals': stageCounts
+                };
                
-    //             await storeResultData(lastChatId, updatedResult, 'Query to Get Approvals')
-    //         }
-    //     } catch (error) {
-    //         // console.error("Error fetching approvals:", error);
-    //         createDiagnostic("Approvals", `Something Went wrong while fetching the approvals ${JSON.stringify(error)} IN Approvals`,lastChatId)
-    //         setSomeError(true)
-    //         setLoading(false);
-    //     }
-    // };
+                await storeResultData(lastChatId, updatedResult, 'Query to Get Approvals')
+            }
+        } catch (error) {
+            // console.error("Error fetching approvals:", error);
+            createDiagnostic("Approvals", `Something Went wrong while fetching the approvals ${JSON.stringify(error)} IN Approvals`,lastChatId)
+            setSomeError(true)
+            setLoading(false);
+        }
+    };
 
     const storeResultData = async (lastChat,solutions,intension) => {
   if(!lastChat || !solutions) return 
@@ -349,27 +202,29 @@ const handleApprovalSelection = async (approval) => {
     useEffect(() => {
         
         if (rerender === 1 || source === 'FromScratch') {
+           
             if(!approval_data) {
                 createDiagnostic("Data Error", `Invalid Data was passed that couldn't be rendered due to ${JSON.stringify(approval_data)} in Approvals `,lastChatId)
                 setTempFailure(true)
                 return
             }
-            setApprovalsMap(approval_data)
-            handleApprovalSelection(approval_data[0])
+            setApprovalsDataData(approval_data)
+            setViewMode(approval_data?.[0].stage)
+            setSelectedApproval(approval_data?.[0])
+            setLoading(false)
         } else {
-            fetchApprovals();
+            fetchApprovalsDetails();
         }
     }, []);
 
-
-    const filteredApprovals = approvalsMap.filter(
+    const filteredApprovals = approvalsData.filter(
         (approval) => approval.stage === viewMode &&
             approval.approval_name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     useEffect(() => {
         if (filteredApprovals.length > 0) {
-            handleApprovalSelection(filteredApprovals[0]);
+            setSelectedApproval(filteredApprovals[0]);
 
         } else {
             setSelectedApproval(null);
@@ -377,18 +232,12 @@ const handleApprovalSelection = async (approval) => {
     }, [viewMode, searchQuery]);
 
     const containerRef = useRef(null)
-    const listRef = useRef(null)
 
     useEffect(() => {
         if (containerRef.current) {
             containerRef.current.scrollTop = 0;
         }
     }, [selectedApproval])
-    useEffect(() => {
-        if (listRef.current) {
-            listRef.current.scrollTop = 0;
-        }
-    }, [viewMode])
 
     if (loading) {
         return (
@@ -517,7 +366,7 @@ const handleApprovalSelection = async (approval) => {
 
                 <div className="flex flex-1 min-h-0 overflow-hidden bg-white rounded-lg border border-[#B8D1F3]">
                     <div className={`${filteredApprovals.length>0 ? 'w-1/3' : 'w-full items-center justify-center'} border-r border-[#B8D1F3] flex flex-col`}>
-                        <div ref={listRef} className="overflow-y-auto flex-1 list-view bg-gradient-to-b from-[#E6F0FA]/10 to-transparent">
+                        <div className="overflow-y-auto flex-1 list-view bg-gradient-to-b from-[#E6F0FA]/10 to-transparent">
                             {filteredApprovals.length > 0 ? (
                                 <div className="space-y-2 p-2">
                                     {filteredApprovals.map((approval) => (
@@ -527,7 +376,7 @@ const handleApprovalSelection = async (approval) => {
                                                 ? "bg-[#41b655] bg-opacity-20 border-l-4 border-[#41b655] "
                                                 : "bg-[#41b655] bg-opacity-10 border-none"
                                                 }`}
-                                            onClick={() => handleApprovalSelection(approval)}
+                                            onClick={() => setSelectedApproval(approval)}
                                         >
                                             <div className="flex justify-between items-start">
                                                 <h3 className={`font-medium ${selectedApproval?.id === approval.id ? "text-black" : "text-[#3b69c5]"

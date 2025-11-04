@@ -2,13 +2,13 @@ import os
 import frappe
 import configparser
 
-config_file = '/home/marsapplication/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 config = configparser.ConfigParser()
 config.read(config_file)
 
 @frappe.whitelist(allow_guest=True)
 def update_config(doc):
-    config_file = '/home/marsapplication/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+    config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
     config = configparser.ConfigParser()
 
     # Ensure the directory exists
