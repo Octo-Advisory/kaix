@@ -36,7 +36,7 @@ import configparser
 import frappe
 
 warnings.filterwarnings("ignore")
-config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+config_file = '/home/marsapplication/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 config = configparser.ConfigParser()
 config.read(config_file)
 api_key = config['Key']['groq_key']

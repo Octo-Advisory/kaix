@@ -912,7 +912,6 @@ function Chatscreen() {
 
   const validateSession = async (sessionId) => {
    
-
     if (sessionStorage.getItem("guest_session_id") && currentUser) {
       // Not logged in, redirect to /chat
       setSession(null);

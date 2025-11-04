@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import FailureScreen from '../Failure/FailureScreen';
 import NoResultsFound from '../Failure/NoResultsFound';
 import LogoLoader from '../Responseloader/LogoLoader';
+import NavigationPrompt from '../Chatscreen/NavigationPrompt';
 
 
 function Solutionscreen() {
@@ -17,6 +18,17 @@ function Solutionscreen() {
   // console.log("resultr",result);
 
   const [timeoutReached, setTimeoutReached] = useState(false);
+  const [confirmationPending, setConfirmationPending] = useState(false);
+
+  useEffect(() => {
+  const beforeUnloadHandler = (e) => {
+    e.preventDefault();
+    e.returnValue = "";
+  };
+  window.addEventListener("beforeunload", beforeUnloadHandler);
+  return () => window.removeEventListener("beforeunload", beforeUnloadHandler);
+}, []);
+
 
   useEffect(() => {
     // If result is empty, start a timeout
@@ -80,6 +92,13 @@ function Solutionscreen() {
       ) : (
         <FailureScreen />
       )}
+
+      <NavigationPrompt
+        when={true}
+        message="Confirmation is pending. You can’t leave this chat — if you leave, the confirmation will be lost."
+        // onConfirm={() => setConfirmationPending(false)}
+      />
+      
 
     </div>
   )

@@ -2,6 +2,7 @@ import frappe
 from datetime import datetime
 import random #added by jenith on 22-5-25
 import subprocess
+import traceback
 import sys
 import json
 import time
@@ -9,6 +10,9 @@ import gc
 import re
 import ast
 import spacy
+import gzip 
+import base64
+import msgpack
 # from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers_creative
 
 from langchain_groq import ChatGroq
@@ -18,7 +22,7 @@ from math import radians, sin, cos, sqrt, atan2
 from geopy.distance import geodesic
 
 # from langchain_openai import ChatOpenAI
-config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+config_file = '/home/marsapplication/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 config = configparser.ConfigParser()
 config.read(config_file)
 groq_api_key = config['Key']['groq_key']
@@ -619,6 +623,7 @@ def log_to_file(key,value):
     
     with open("log2.txt", "a", encoding="utf-8") as file:
         file.write(json.dumps(log_entry) + "\n")
+
 @frappe.whitelist(allow_guest=True)
 def insert_solution_result():
 
@@ -674,8 +679,8 @@ def insert_solution_result():
 
 @frappe.whitelist()
 def excute_Property_Creation(method_name=None,param=None,childBlockId=None):
-    python_exe = "/home/mars/property_seg_env/bin/python"
-    script_path = "/home/mars/frappe-bench/AeroShape/FinalCode.py"
+    python_exe = "/home/marsapplication/property_seg_env/bin/python"
+    script_path = "/home/marsapplication/frappe-bench/AeroShape/FinalCode.py"
 
     # Build args safely
     args = [python_exe, script_path, method_name]
@@ -690,13 +695,129 @@ def excute_Property_Creation(method_name=None,param=None,childBlockId=None):
             check=True,
             capture_output=True,
             text=True,
-            cwd="/home/mars/frappe-bench/AeroShape"  # set working directory
+            cwd="/home/marsapplication/frappe-bench/AeroShape"  # set working directory
         )
         return result.stdout
     except subprocess.CalledProcessError as e:
         gc.collect()  # Run garbage collection to free up memory
         frappe.log_error(e.stderr, "FinalCode Script Error")
         return f"Error running script: {e.stderr}"
+
+
+@frappe.whitelist(allow_guest=True)
+def convert_json_to_binary():
+    try:
+        updated_solutions = frappe.form_dict.get("updated_solutions")
+        child_row_id = frappe.form_dict.get("child_row_id")
+        intension = frappe.form_dict.get("intension")
+
+        # Step 1: Ensure `data` is a Python dictionary
+        if isinstance(updated_solutions, str):
+            try:
+                updated_solutions = json.loads(data)
+            except Exception as e:
+                return {
+                    "status": "fail",
+                    "message": f"Invalid JSON data: {str(e)}"
+                }
+
+        # Step 2: Convert JSON to MessagePack (binary format)
+        packed = msgpack.packb(updated_solutions, use_bin_type=True)
+
+        # Step 3: Compress using Gzip
+        compressed = gzip.compress(packed, compresslevel=9)
+
+        # Step 4: Base64 encode for safe storage in text field
+        encoded_data = base64.b64encode(compressed).decode('utf-8')
+
+        json_wrapped_data = json.dumps({"encoded_data": encoded_data})
+
+        # Optional: Log a small part for debugging
+        with open("log2.txt", "a", encoding="utf-8") as file:
+            file.write(f'Encoded Data: {encoded_data[:100]}...\n')
+
+        # Step 5: Update database
+        frappe.db.sql("""
+            UPDATE `tabChat history`
+            SET result = %s,
+                intension = %s,
+                modified = NOW()
+            WHERE name = %s
+        """, (
+            json_wrapped_data,
+            intension,
+            child_row_id
+        ))
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "Chat history updated successfully."
+        }
+
+    except Exception as e:
+        # Log full traceback to a file for debugging
+        with open("error_log.txt", "a", encoding="utf-8") as file:
+            file.write(f'Error updating chat history for child_row_id={child_row_id}:\n')
+            file.write(traceback.format_exc())
+            file.write("\n\n")
+
+        # Return fail response
+        return {
+            "status": "fail",
+            "message": f"Failed to update chat history: {str(e)}"
+        }
+
+@frappe.whitelist()
+def retrieve_and_decompress():
+
+    # Step 1: Load the JSON file
+    data = frappe.form_dict.get("converted_data")
+    with open("error_log.txt", "a", encoding="utf-8") as file:
+        file.write(f'1st Check for Data {data} :\n')
+    
+    # # Step 2: Extract the Base64 encoded data from the specific key in the JSON
+    # encoded_data = data.get("encoded_data")  # Make sure the key is correct
+
+    # if not encoded_data:
+    #     with open("error_log.txt", "a", encoding="utf-8") as file:
+    #         file.write(f'No Encoded Data Found :\n')
+    #     return
+
+    # Step 3: Decode the Base64 encoded data
+    try:
+        compressed_data = base64.b64decode(data)
+    except Exception as e:
+        with open("error_log.txt", "a", encoding="utf-8") as file:
+            file.write(f'Error decoding Base64: {e} :\n')
+        return
+
+    # Step 4: Decompress the decoded data (assuming gzip compression)
+    try:
+        decompressed_data = gzip.decompress(compressed_data)
+    except Exception as e:
+        with open("error_log.txt", "a", encoding="utf-8") as file:
+            file.write(f'Erro decompressing the gzip : {e} :\n')
+        
+        return
+
+    # Step 5: Unpack the decompressed data using msgpack
+    try:
+        final_data = msgpack.unpackb(decompressed_data, raw=False)
+        return final_data
+    except Exception as e:
+        with open("error_log.txt", "a", encoding="utf-8") as file:
+            file.write(f'Erro unpacking MessagePAck :{e} \n')
+        return
+
+    # # Step 6: Save the decoded data as a nicely formatted JSON file
+    # try:
+    #     with open(output_file, "w", encoding="utf-8") as f_out:
+    #         json.dump(final_data, f_out, indent=4, ensure_ascii=False)
+    #     print(f"Decoded JSON saved to '{output_file}' successfully!")
+    # except Exception as e:
+    #     print(f"Error writing to file: {e}")
+
 
 @frappe.whitelist()
 def trigger_script(method_name=None,param=None,childBlockId=None):    

@@ -1,0 +1,48 @@
+:root {
+  --skeleton-bg: #e6e6e6;
+  --skeleton-highlight: #f5f5f5;
+  --skeleton-radius: 8px;
+  --skeleton-duration: 1.2s;
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-bg) 25%,
+    var(--skeleton-highlight) 50%,
+    var(--skeleton-bg) 75%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--skeleton-radius);
+  animation: shimmer var(--skeleton-duration) linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Optional helpers for quick sizing */
+.skeleton.h-8 {
+  height: 2rem;
+}
+.skeleton.w-60 {
+  width: 60%;
+}
+.skeleton.circle {
+  border-radius: 50%;
+  height: 3rem;
+  width: 3rem;
+}
+
+/* Reduced motion support
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--skeleton-bg);
+  }
+} */

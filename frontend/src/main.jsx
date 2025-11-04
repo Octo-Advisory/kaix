@@ -25,9 +25,9 @@ createRoot(document.getElementById('root')).render(
     <FrappeProvider socketPort={import.meta.env.VITE_SOCKET_PORT} siteName={getSiteName()}>
       <Provider store={store}>
         <PersistGate loading={null} persistor={persistor}>
-          {/* <ErrorBoundary> */}
+          <ErrorBoundary>
           <App />
-          {/* </ErrorBoundary> */}
+          </ErrorBoundary>
         </PersistGate>
       </Provider>
     </FrappeProvider>

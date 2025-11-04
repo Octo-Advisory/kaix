@@ -2284,7 +2284,7 @@ def do_unit_conversion(state):
     converted_output = convert_to_standard_unit(
         user_quantity, user_unit, user_time_period,
         db_standard_unit, db_standard_time_per,
-        product_name, llm_deepseek
+        product_name, llm_gpt_oos_120b
     )
 
     converted_output_temp = {}
@@ -2465,13 +2465,13 @@ def do_unit_conversion(state):
                     min_conv = convert_to_standard_unit(
                         min_num, ext_unit_only, ext_time_period,
                         db_standard_unit, db_standard_time_per,
-                        product_name, llm_deepseek
+                        product_name, llm_gpt_oos_120b
                     ) if min_num is not None else None
 
                     max_conv = convert_to_standard_unit(
                         max_num, ext_unit_only, ext_time_period,
                         db_standard_unit, db_standard_time_per,
-                        product_name, llm_deepseek
+                        product_name, llm_gpt_oos_120b
                     ) if max_num is not None else None
 
                     cap_val = _to_float(converted_output.get("Capacity"))

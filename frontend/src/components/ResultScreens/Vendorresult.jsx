@@ -18,7 +18,7 @@ import NoResultsFound from '../Failure/NoResultsFound';
 import SingleMap from '../MapComponent/SingleMap';
 import { CertificateIcon, CheckIcon } from '../../Icons/icon';
 import { IoIosArrowDown, IoIosArrowUp } from "react-icons/io";
-
+import './vendorScreen.css'
 
 const useClickOutside = (ref, handler) => {
     useEffect(() => {
@@ -75,7 +75,6 @@ function Vendorresult({ result, source, rerender }) {
   
 
   const IndividualQuery = analytics_response?.['Unfiltered All IS Supplier'] ? true : false
-  // console.log(IndividualQuery, analytics_response, 'This is the first check ')
   
   if(!IndividualQuery && source!=='MapComponent') {
     let essential_all = analytics_response?.['Unfiltered Essential Supplier']
@@ -83,7 +82,7 @@ function Vendorresult({ result, source, rerender }) {
     let non_essential_all = analytics_response?.['Unfiltered Non-Essential Supplier']
     let non_essential_best = analytics_response?.['Best Non-Essential Supplier']
     let check_all = [essential_all, essential_best, non_essential_all, non_essential_best]
-    // console.log(check_all, essential_all, essential_best, non_essential_all, non_essential_best)
+    // console.log( JSON.parse(non_essential_all))
     let allNull = check_all.every(item=> !item)
     if(allNull) {
       // createDiagnostic("Data Error", `Invalid Data was passed that couldn't be rendered due to ${analytics_response} in Vendors`,lastChatId)
@@ -102,6 +101,7 @@ function Vendorresult({ result, source, rerender }) {
   const [supplierList, setSupplierList] = useState()
   const [groupedData, setGroupedData] = useState()
   const [loading, setLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(true)
 
   const [essentialAllSuppliers, setEssentialAllSuppliers] = useState([])
   const [essentialBestSuppliers, setEssentialBestSuppliers] = useState([])
@@ -130,6 +130,8 @@ function Vendorresult({ result, source, rerender }) {
   const [supplyList, setSupplyList] = useState([])
   useClickOutside(supplyNode, ()=> setSupplyDropdownOpen(false));
 
+  const [fetchedVendors , setFetchedVendors] = useState([])
+
   const { data: uiData } = useFrappeGetDoc("UI Configuration", "Vendors")
     const configurations = uiData?.configurations || [];
     const uiConfig = configurations.reduce((acc, curr) => {
@@ -139,37 +141,69 @@ function Vendorresult({ result, source, rerender }) {
 
   const mapRef = useRef(null);
 
-  
-  const { updateDoc } = useFrappeUpdateDoc()
+  const getData= async(vendor)=>{
+    try {
+        const result = await call.get("frontend_app.Management_Class.helpers.utility.get_docs_with_children", {
+          doctype: 'Vendor',
+          names: JSON.stringify([vendor])
+        });
+        const { table_podq, ...rest }   = result.message[0] || [];
+        let res = {
+          ...rest,
+          supplies: table_podq
+        };
+        return res
 
-  // const parseSuppliers = (supplierData) => {
-  //   if (!supplierData?.vendor_id) return [];
+      } catch (err) {
+        // console.error("Error fetching child records for batch:", err);
+        createDiagnostic("Land & Approvals", `Something went wrong while fetching child records for batch  ${JSON.stringify(err)} in Build From Scratch`,lastChatId)
+        return []; // Return empty for this batch on error
+      }
+  }
 
-  //   // Create a Map to handle duplicates (last entry wins)
-  //   const vendorMap = new Map();
+  const handleVendorSelection = async(vendor)=>{
+    // console.log(vendor, 'This is the passed Vendor', selectedVendor, 'This is the current selected vendor in Selection condition', fetchedVendors, 'This are the fetched vendors...:')
+    setSelectedVendor((prev) => {
+      if (prev?.vendor_id === vendor.vendor_id) {
+        setDataLoading(false)
+        return prev;
+      }  // same vendor, avoid unnecessary state update
+      // setDataLoading(false)
+      // return vendor;
+    });
 
-  //   Object.keys(supplierData.vendor_id).forEach(key => {
-  //     const vendorId = supplierData.vendor_id[key];
-  //     const vendorData = {
-  //       supply_id: supplierData.supply_id?.[key],
-  //       Final_Score_With_Features: supplierData.Final_Score_With_Features?.[key],
-  //       vendor_id: vendorId,
-  //       // aggregated_score: supplierData.aggregated_score?.[key],
-  //       // Add all other properties dynamically
-  //       ...Object.fromEntries(
-  //         Object.entries(supplierData)
-  //           .filter(([k]) => !['vendor_id', 'supply_id', 'Final_Score_With_Features'].includes(k))
-  //           .map(([k, v]) => [k, v[key]])
-  //       )
-  //     };
+    let id = vendor.vendor_id
 
-  //     // This will automatically override previous entries with same vendor_id
-  //     vendorMap.set(vendorId, vendorData);
-  //   });
+    // 1️⃣ Check if we already have this incentive cached
+    const existingVendor = fetchedVendors.find(
+        (vendors) => vendors.vendor_id === id
+    );
+    // console.log('This is the existing Vendor.. ', existingVendor)
+    if (existingVendor) {
+        // console.log('Using cached Approval:', existingApproval);
+        setSelectedVendor(existingVendor);
+        setDataLoading(false)
+        return; // ✅ Skip API call
+    }
+    // console.log('Calling Data for ', id)
+    let vendorData = await getData(id);
+    // console.log(vendorData,'This is the VendorData')
+    if(vendorData) {
+      let temp = updateData(supplierList, [vendorData]) 
+      // console.log(temp, 'This is the supplier list',supplierList)
+      let currentVendor = source === 'MapComponent' ? vendorData : temp.find((vendors)=> vendors.vendor_name === id)
+      // console.log(currentVendor, 'This is the currrent Vendot')
+      setFetchedVendors((prev) => [...prev, currentVendor]);
+      setSelectedVendor(currentVendor ? currentVendor : null);
+      setDataLoading(false)
 
-  //   return Array.from(vendorMap.values());
-  // };
-  
+      return currentVendor
+      
+    }
+  }
+
+// const { updateDoc } = useFrappeUpdateDoc()
+
 const parseAllSupplies = (supplies) => {
   // console.log('this are the supplies', supplies)
   if (!supplies || supplies.length===0) return []
@@ -180,6 +214,11 @@ const parseAllSupplies = (supplies) => {
     }) 
     return allsupplies 
   }
+
+const parseSupplies = (supplies) => {
+  let supply = supplies.map((data)=> data.supply_id)
+  return supply
+}
 
 const parseAllTempSupplies = (vendors) => {
   // console.log(vendors,'This are the vendors Supplies')
@@ -197,7 +236,7 @@ const parseAllTempSupplies = (vendors) => {
 };
 
 
-   const parseSuppliers = (supplierData) => {
+const parseSuppliers = (supplierData) => {
     // console.log("Here comes the suplyData", supplierData)
     if (!supplierData) return [];
   if (!supplierData?.vendor_id) return [];
@@ -209,12 +248,12 @@ const parseAllTempSupplies = (vendors) => {
 
     const vendorData = {
       supply_id: supplierData.supply_id?.[key],
-      Final_Score_With_Features: supplierData.Final_Score_With_Features?.[key],
+      // Final_Score_With_Features: supplierData.Final_Score_With_Features?.[key],
       vendor_id: vendorId,
       // Add all other properties dynamically
       ...Object.fromEntries(
         Object.entries(supplierData)
-          .filter(([k]) => !['vendor_id', 'supply_id', 'Final_Score_With_Features'].includes(k))
+          .filter(([k]) => !['vendor_id', 'supply_id'].includes(k))
           .map(([k, v]) => [k, v[key]])
       )
     };
@@ -249,7 +288,8 @@ const parseAllTempSupplies = (vendors) => {
         setBetterIndividualSuppliers(((source === "SolutionScreen") && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Better Supplier"] || "{}")) : analytics_response?.["Better Supplier"] || "{}")
         setAllIndividualSuppliers(((source === "SolutionScreen") && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Unfiltered All IS Supplier"] || "{}")) : analytics_response?.["Unfiltered All IS Supplier"] || "{}")
         let temp_supply = ((source=== "SolutionScreen") && rerender !==1) ? JSON.parse(analytics_response["Unfiltered All IS Supplier"] || "{}") : analytics_response?.["Unfiltered All IS Supplier"] || "{}"
-        let all_supply = parseAllSupplies(temp_supply)
+        // console.log(temp_supply,analytics_response?.["Unfiltered All IS Supplier"], 'To check the Error' )
+        let all_supply = rerender===1 ? parseSupplies(temp_supply) : parseAllSupplies(temp_supply)
         let uniqueSupplies = [...new Set(all_supply)];
         setIndividualAllSupply(uniqueSupplies)
         setSupplyName(uniqueSupplies[0])
@@ -258,7 +298,6 @@ const parseAllTempSupplies = (vendors) => {
       if (!IndividualQuery) {
         setEssentialBestSuppliers((source === 'SolutionScreen' && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Best Essential Supplier"] || "[]")) : analytics_response["Best Essential Supplier"] || "[]");
         setEssentialAllSuppliers((source === 'SolutionScreen' && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Unfiltered Essential Supplier"] || "[]")) : analytics_response["Unfiltered Essential Supplier"] || "[]");
-        // console.log(parseSuppliers(JSON.parse(analytics_response["Unfiltered Essential Supplier"] || "[]")),' Okay this is something new ')
         let temp_essential_supply = (source === 'SolutionScreen' && rerender !== 1) ? JSON.parse(analytics_response["Unfiltered Essential Supplier"] || "[]") : analytics_response["Unfiltered Essential Supplier"] || "[]"
         let all_supply = (source === 'SolutionScreen' && rerender !== 1) ? parseAllSupplies(temp_essential_supply) : parseAllTempSupplies(temp_essential_supply)
         let uniqueEssentialSupplies = [...new Set(all_supply)]
@@ -277,65 +316,68 @@ const parseAllTempSupplies = (vendors) => {
   }, [analytics_response])
 
 
-  const allVendorNames = [...(nonEssentialAllSuppliers || []).map(f => f?.vendor_id), ...(essentialAllSuppliers || []).map(f => f?.vendor_id), ...(nonEssentialBestSuppliers || []).map(f => f?.vendor_id), ...(essentialBestSuppliers || []).map(f => f?.vendor_id)];
-  const allSupplyNames = [...(nonEssentialAllSuppliers || []).map(f => f?.supply_id), ...(essentialAllSuppliers || []).map(f => f?.supply_id)];
-  const vendorNames = ((source === "SolutionScreen") && rerender !== 1) ? IndividualQuery ? allIndividualSuppliers?.map(f => f.vendor_id) : allVendorNames : []
-  const supplyNames = ((source === "SolutionScreen") && rerender !== 1) ? IndividualQuery ? allIndividualSuppliers?.map(f => f.supply_id) : allSupplyNames : []
-  // console.log(vendorNames, 'This are the Vendor Names', supplyNames)
-  const ShouldRender = rerender === 1 ? false : true
+  // const allVendorNames = [...(nonEssentialAllSuppliers || []).map(f => f?.vendor_id), ...(essentialAllSuppliers || []).map(f => f?.vendor_id), ...(nonEssentialBestSuppliers || []).map(f => f?.vendor_id), ...(essentialBestSuppliers || []).map(f => f?.vendor_id)];
+  // // const allSupplyNames = [...(nonEssentialAllSuppliers || []).map(f => f?.supply_id), ...(essentialAllSuppliers || []).map(f => f?.supply_id)];
+  // const vendorNames = ((source === "SolutionScreen") && rerender !== 1) ? IndividualQuery ? allIndividualSuppliers?.map(f => f.vendor_id) : allVendorNames : []
+  // // const supplyNames = ((source === "SolutionScreen") && rerender !== 1) ? IndividualQuery ? allIndividualSuppliers?.map(f => f.supply_id) : allSupplyNames : []
+ 
+  // // console.log(vendorNames, 'This are the Vendor Names', supplyNames)
+  // const ShouldRender = rerender === 1 ? false : true
 
-  const { data: vendorData, error, isLoading } = useFrappeGetDocList('Vendor', ShouldRender ? {
-    filters: [['name', 'in', vendorNames]],
-    fields: [
-      'no_of_services', 'no_of_past_clients', 'portfolio', 'category', 'certifications', 'state', 'website_url', 'email_id', 'years_of_experience', 'no_of_employees', 'latitude_longitude', 'vendor_name', 'name'
-    ],
-    limit: 50000
-  } : null);
+  // const { data: vendorData, error, isLoading } = useFrappeGetDocList('Vendor', ShouldRender ? {
+  //   filters: [['name', 'in', vendorNames]],
+  //   fields: [
+  //     'no_of_services', 'no_of_past_clients', 'portfolio', 'category', 'certifications', 'state', 'website_url', 'email_id', 'years_of_experience', 'no_of_employees', 'latitude_longitude', 'vendor_name', 'name'
+  //   ],
+  //   limit: 50000
+  // } : null);
 
-  const { data: supplies, isLoading: supplyLoading } = useFrappeGetDocList('Vendor', ShouldRender ? {
-    filters: [['name', 'in', vendorNames]],
-    fields: ['table_podq.supply', 'table_podq.maximum_supply_capacity', 'table_podq.uom', 'table_podq.parent'],
-    limit: 500000,
-  } : null);
+  // const { data: supplies, isLoading: supplyLoading } = useFrappeGetDocList('Vendor', ShouldRender ? {
+  //   filters: [['name', 'in', vendorNames]],
+  //   fields: ['table_podq.supply', 'table_podq.maximum_supply_capacity', 'table_podq.uom', 'table_podq.parent'],
+  //   limit: 500000,
+  // } : null);
 
-  function groupSuppliesWithVendors(vendors, supplies) {
-    // Step 1: Group supplies by parent
-    const grouped = supplies.reduce((acc, item) => {
-      if (!acc[item.parent]) acc[item.parent] = [];
-      acc[item.parent].push(item);
-      return acc;
-    }, {});
+  // function groupSuppliesWithVendors(vendors, supplies) {
+  //   // Step 1: Group supplies by parent
+  //   const grouped = supplies.reduce((acc, item) => {
+  //     if (!acc[item.parent]) acc[item.parent] = [];
+  //     acc[item.parent].push(item);
+  //     return acc;
+  //   }, {});
 
-    // Step 2: Map vendors and attach grouped supplies
-    return vendors.map(vendor => {
-      return {
-        ...vendor,
-        supplies: grouped[vendor.vendor_name] || []
-      };
-    });
-  }
+  //   // Step 2: Map vendors and attach grouped supplies
+  //   return vendors.map(vendor => {
+  //     return {
+  //       ...vendor,
+  //       supplies: grouped[vendor.vendor_name] || []
+  //     };
+  //   });
+  // }
 
-  useEffect(() => {
-    if ((source === "SolutionScreen") && rerender !== 1) {
-      if (vendorData && supplies && !supplyLoading && !isLoading && vendorData.length > 0 && supplies.length > 0) {
-        // console.log('Data Before Mapping ', vendorData, supplies)
-        let d = groupSuppliesWithVendors(vendorData, supplies)
-        // console.log(d, 'this is data grouped');
-        setGroupedData(d)
-      }
-    }
-  }, [vendorData, supplies])
+  // useEffect(() => {
+  //   if ((source === "SolutionScreen") && rerender !== 1) {
+  //     if (vendorData && supplies && !supplyLoading && !isLoading && vendorData.length > 0 && supplies.length > 0) {
+  //       // console.log('Data Before Mapping ', vendorData, supplies)
+  //       let d = groupSuppliesWithVendors(vendorData, supplies)
+  //       // console.log(d, 'this is data grouped');
+  //       setGroupedData(d)
+  //     }
+  //   }
+  // }, [vendorData, supplies])
 
   // Assuming the analytics response passes only the Ids ... and we have all data called from db in vendorData so match the names
-  const updateData = (suppliers) => {
+  
+  
+  const updateData = (suppliers,data) => {
     // console.log('Came here', suppliers)
     if (!suppliers || suppliers.length < 1) return []
     const updatedSet = new Set();
 
     return suppliers.map(supplier => {
-      if (rerender === 1) return supplier;
+      // if (rerender === 1) return supplier;
 
-      const match = groupedData?.find(
+      const match = data?.find(
         vendor => vendor.vendor_name === supplier.vendor_id
       );
       if (match) {
@@ -396,66 +438,70 @@ const parseAllTempSupplies = (vendors) => {
     }
 }
 
-  useEffect(() => {
-    if (groupedData && !isLoading && !supplyLoading) {
-      if (source !== 'MapComponent') {
-        if (IndividualQuery) {
-          if (allIndividualSuppliers && allIndividualSuppliers.length > 0) setUpdatedAllIndividualSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(allIndividualSuppliers) : [])
-          if (bestIndividualSuppliers && bestIndividualSuppliers.length > 0) setUpdatedBestIndividualSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(bestIndividualSuppliers) : [])
-        }
-        if (!IndividualQuery) {
-          if (essentialAllSuppliers && essentialAllSuppliers.length > 0) setUpdEssentialAllSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(essentialAllSuppliers) : [])
-          if (essentialBestSuppliers && essentialBestSuppliers.length > 0) setUpdEssentialBestSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(essentialBestSuppliers) : [])
-          if (nonEssentialAllSuppliers && nonEssentialAllSuppliers.length > 0) setUpdNonEssentialAllSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(nonEssentialAllSuppliers) : [])
-          if (nonEssentialBestSuppliers && nonEssentialBestSuppliers.length > 0) setUpdNonEssentialBestSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(nonEssentialBestSuppliers) : [])
-        }
-      }
-    }
+  // useEffect(() => {
+  //   if (groupedData && !isLoading && !supplyLoading) {
+  //     if (source !== 'MapComponent') {
+  //       if (IndividualQuery) {
+  //         if (allIndividualSuppliers && allIndividualSuppliers.length > 0) setUpdatedAllIndividualSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(allIndividualSuppliers) : [])
+  //         if (bestIndividualSuppliers && bestIndividualSuppliers.length > 0) setUpdatedBestIndividualSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(bestIndividualSuppliers) : [])
+  //       }
+  //       if (!IndividualQuery) {
+  //         if (essentialAllSuppliers && essentialAllSuppliers.length > 0) setUpdEssentialAllSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(essentialAllSuppliers) : [])
+  //         if (essentialBestSuppliers && essentialBestSuppliers.length > 0) setUpdEssentialBestSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(essentialBestSuppliers) : [])
+  //         if (nonEssentialAllSuppliers && nonEssentialAllSuppliers.length > 0) setUpdNonEssentialAllSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(nonEssentialAllSuppliers) : [])
+  //         if (nonEssentialBestSuppliers && nonEssentialBestSuppliers.length > 0) setUpdNonEssentialBestSupplier(((source === "SolutionScreen") && rerender !== 1) ? updateData(nonEssentialBestSuppliers) : [])
+  //       }
+  //     }
+  //   }
 
-    if (rerender === 1 || source === "FromScratch") {
-      if (source !== "MapComponent") {
-        if (IndividualQuery) {
-          if (allIndividualSuppliers && allIndividualSuppliers.length > 0) setUpdatedAllIndividualSupplier((source === "SolutionScreen") ? allIndividualSuppliers : [])
-          if (bestIndividualSuppliers && bestIndividualSuppliers.length > 0) setUpdatedBestIndividualSupplier((source === "SolutionScreen") ? bestIndividualSuppliers : [])
-        }
-        if (!IndividualQuery) {
-          if (essentialAllSuppliers && essentialAllSuppliers.length > 0) setUpdEssentialAllSupplier(((source === "SolutionScreen" || source === "FromScratch")) ? essentialAllSuppliers : [])
-          if (essentialBestSuppliers && essentialBestSuppliers.length > 0) setUpdEssentialBestSupplier(((source === "SolutionScreen" || source === "FromScratch")) ? essentialBestSuppliers : [])
-          if (nonEssentialAllSuppliers && nonEssentialAllSuppliers.length > 0) setUpdNonEssentialAllSupplier(((source === "SolutionScreen" || source === "FromScratch")) ? nonEssentialAllSuppliers : [])
-          if (nonEssentialAllSuppliers && nonEssentialBestSuppliers.length > 0) setUpdNonEssentialBestSupplier(((source === "SolutionScreen" || source === "FromScratch")) ? nonEssentialBestSuppliers : [])
-        }
-      }
-    }
+  //   if (rerender === 1 || source === "FromScratch") {
+  //     if (source !== "MapComponent") {
+  //       if (IndividualQuery) {
+  //         if (allIndividualSuppliers && allIndividualSuppliers.length > 0) setUpdatedAllIndividualSupplier((source === "SolutionScreen") ? allIndividualSuppliers : [])
+  //         if (bestIndividualSuppliers && bestIndividualSuppliers.length > 0) setUpdatedBestIndividualSupplier((source === "SolutionScreen") ? bestIndividualSuppliers : [])
+  //       }
+  //       if (!IndividualQuery) {
+  //         if (essentialAllSuppliers && essentialAllSuppliers.length > 0) setUpdEssentialAllSupplier(((source === "SolutionScreen" || source === "FromScratch")) ? essentialAllSuppliers : [])
+  //         if (essentialBestSuppliers && essentialBestSuppliers.length > 0) setUpdEssentialBestSupplier(((source === "SolutionScreen" || source === "FromScratch")) ? essentialBestSuppliers : [])
+  //         if (nonEssentialAllSuppliers && nonEssentialAllSuppliers.length > 0) setUpdNonEssentialAllSupplier(((source === "SolutionScreen" || source === "FromScratch")) ? nonEssentialAllSuppliers : [])
+  //         if (nonEssentialAllSuppliers && nonEssentialBestSuppliers.length > 0) setUpdNonEssentialBestSupplier(((source === "SolutionScreen" || source === "FromScratch")) ? nonEssentialBestSuppliers : [])
+  //       }
+  //     }
+  //   }
 
-  }, [groupedData, allIndividualSuppliers, bestIndividualSuppliers, essentialAllSuppliers, essentialBestSuppliers, nonEssentialAllSuppliers, nonEssentialBestSuppliers])
+  // }, [groupedData, allIndividualSuppliers, bestIndividualSuppliers, essentialAllSuppliers, essentialBestSuppliers, nonEssentialAllSuppliers, nonEssentialBestSuppliers])
 
   useEffect(() => {
     if ((source === "SolutionScreen" || source === 'FromScratch')) {
-      let currentypeAll = supplierType === "Essential" ? updEssentialAllSupplier : updNonEssentialAllSupplier
-      let currentypeBest = supplierType === "Essential" ? updEssentialBestSupplier : updNonEssentialBestSupplier
+      // console.log(essentialAllSuppliers, nonEssentialAllSuppliers, allIndividualSuppliers, 'oononon')
+      let currentypeAll = supplierType === "Essential" ? essentialAllSuppliers : nonEssentialAllSuppliers
+      let currentypeBest = supplierType === "Essential" ? essentialBestSuppliers : nonEssentialBestSuppliers
       setSupplyList(IndividualQuery ? individualAllSupply : (supplierType === "Essential" ? essentialAllSupply : nonessentialAllSupply))
-      let all = IndividualQuery ? updatedAllIndividualSupplier : currentypeAll
-      let best = IndividualQuery ? updatedBestIndividualSupplier : currentypeBest
+      let all = IndividualQuery ? allIndividualSuppliers : currentypeAll
+      let best = IndividualQuery ? bestIndividualSuppliers : currentypeBest
       // const filteredSuppliers = currentData==='All Suppliers' ? all.filter((s) => s.supply_id === supplyname) : best.filter((s) => s.supply_id === supplyname)
       const filteredSuppliers = currentData==='All Suppliers' ? all.filter((s) => s.best_supply.includes(supplyname)) : best.filter((s) => s.best_supply.includes(supplyname))
       // const sourceList = currentData === 'All Suppliers' ? all : best
       const sourceList = filteredSuppliers
-
+      
       if (!sourceList || sourceList.length === 0) {
         setSupplierList([]);
         setLoading(false)
+        setDataLoading(false)
+        setSelectedVendor(null)
         return;
       }
 
       const query = (searchQuery || "").toLowerCase();
       const filtered = query
-        ? sourceList?.filter(s => (s.name || "").toLowerCase().includes(query))
+        ? sourceList?.filter(s => (s.vendor_id || "").toLowerCase().includes(query))
         : sourceList;
-
+      // console.log(filtered, 'This is the filtered')
       setSupplierList(filtered);
+      setDataLoading(true)
       setLoading(false)
     }
-  }, [currentData, supplierType, groupedData,supplyname, searchQuery, updEssentialAllSupplier, updEssentialBestSupplier, updNonEssentialAllSupplier, updNonEssentialBestSupplier, updatedAllIndividualSupplier, updatedBestIndividualSupplier]);
+  }, [currentData,source, supplierType, groupedData,supplyname, searchQuery, essentialAllSuppliers, essentialBestSuppliers, nonEssentialAllSuppliers, nonEssentialBestSuppliers, allIndividualSuppliers, bestIndividualSuppliers]);
 
   useEffect(()=>{
     if(supplyList.length>0) {
@@ -469,7 +515,7 @@ const parseAllTempSupplies = (vendors) => {
   useEffect(()=>{
     if(!IndividualQuery) {
      
-      if(updEssentialAllSupplier.length> 0) {
+      if(essentialAllSuppliers.length> 0) {
         setSupplierType('Essential')
         setCurrentData('All Suppliers')
       }
@@ -478,7 +524,7 @@ const parseAllTempSupplies = (vendors) => {
         setCurrentData('All Suppliers')
       }
     }
-  },[updEssentialAllSupplier, updNonEssentialAllSupplier])
+  },[essentialAllSuppliers, nonEssentialAllSuppliers])
 
   useEffect(() => {
     // Prevents rerun if rerender flag is set
@@ -488,16 +534,16 @@ const parseAllTempSupplies = (vendors) => {
 
     // Proceed only if suppliers are ready
     if (IndividualQuery) {
-      if (updatedAllIndividualSupplier && updatedAllIndividualSupplier.length > 0) {
+      if (allIndividualSuppliers && allIndividualSuppliers.length > 0) {
         // console.log(updatedAllIndividualSupplier, updatedBestIndividualSupplier, 'This is the log we want to see')
-        const analyticsJSON = generateAnalyticsResponse(updatedBestIndividualSupplier, updatedAllIndividualSupplier);
+        const analyticsJSON = generateAnalyticsResponse(bestIndividualSuppliers, allIndividualSuppliers);
         const updatedResult = {
           'Analytics_response': analyticsJSON,
           'latitude_longitude': user_lat_long,
           "vendor_summary": {
-            "total_vendors_count": updatedAllIndividualSupplier.length,
-            "best_vendors_count": updatedBestIndividualSupplier.length,
-            "all_vendors_count": updatedAllIndividualSupplier.length
+            "total_vendors_count": allIndividualSuppliers.length,
+            "best_vendors_count": bestIndividualSuppliers.length,
+            "all_vendors_count": allIndividualSuppliers.length
           }
 
         };
@@ -517,16 +563,16 @@ const parseAllTempSupplies = (vendors) => {
       }
     }
     if (!IndividualQuery) {
-      if (updNonEssentialAllSupplier && updNonEssentialAllSupplier.length > 0 || updEssentialAllSupplier && updEssentialAllSupplier.length > 0) {
+      if (nonEssentialAllSuppliers && nonEssentialAllSuppliers.length > 0 || essentialAllSuppliers && essentialAllSuppliers.length > 0) {
         // console.log(updNonEssentialAllSupplier, updNonEssentialAllSupplier, 'This is the log we want to see')
-        const analyticsJSON = generateAnotherAnalyticsResponse(updEssentialBestSupplier, updEssentialAllSupplier, updNonEssentialBestSupplier, updNonEssentialAllSupplier);
+        const analyticsJSON = generateAnotherAnalyticsResponse(essentialBestSuppliers, essentialAllSuppliers, nonEssentialBestSuppliers, nonEssentialAllSuppliers);
         const updatedResult = {
           'Analytics_response': analyticsJSON,
           'latitude_longitude': user_lat_long,
           "vendor_summary": {
-            "total_vendors_count": updEssentialAllSupplier.length + updNonEssentialAllSupplier.length,
-            "essential_vendors_count": updEssentialAllSupplier.length,
-            "non_essential_vendors_count": updNonEssentialAllSupplier.length
+            "total_vendors_count": essentialAllSuppliers.length + nonEssentialAllSuppliers.length,
+            "essential_vendors_count": essentialAllSuppliers.length,
+            "non_essential_vendors_count": nonEssentialAllSuppliers.length
           }
         };
 
@@ -545,16 +591,21 @@ const parseAllTempSupplies = (vendors) => {
       }
 
     }
-  }, [updatedBestIndividualSupplier, updatedAllIndividualSupplier, updEssentialAllSupplier, updEssentialBestSupplier, updNonEssentialAllSupplier, updNonEssentialBestSupplier]);
+  }, [bestIndividualSuppliers, allIndividualSuppliers, essentialAllSuppliers, essentialBestSuppliers, nonEssentialAllSuppliers, nonEssentialBestSuppliers]);
 
   useEffect(() => {
-    if ((source === "SolutionScreen" || source === 'FromScratch')) {
+    const callVendorData = async()=>{
       if (supplierList && supplierList.length > 0) {
-        const newVendor = supplierList[0];
-        setSelectedVendor(newVendor);
+        setDataLoading(true)
+        await handleVendorSelection(supplierList[0]);
+
       } else {
+        setDataLoading(false)
         setSelectedVendor(null);
       }
+    }
+    if ((source === "SolutionScreen" || source === 'FromScratch')) {
+      callVendorData()
     }
   }, [supplierList]);
 
@@ -601,12 +652,12 @@ const parseAllTempSupplies = (vendors) => {
     const shouldTransform = source === "SolutionScreen" || source === 'FromScratch';
 
     let tempall = IndividualQuery
-      ? updatedAllIndividualSupplier
-      : [...(updEssentialAllSupplier || []), ...(updNonEssentialAllSupplier || [])];
+      ? allIndividualSuppliers
+      : [...(essentialAllSuppliers || []), ...(nonEssentialAllSuppliers || [])];
 
     let tempbest = IndividualQuery
-      ? updatedBestIndividualSupplier
-      : [...(updEssentialBestSupplier || []), ...(updNonEssentialBestSupplier || [])];
+      ? bestIndividualSuppliers
+      : [...(essentialBestSuppliers || []), ...(nonEssentialBestSuppliers || [])];
 
     setMapBestSuppliers(
       shouldTransform
@@ -619,7 +670,7 @@ const parseAllTempSupplies = (vendors) => {
         ? tempall?.map(s => transformSupplier(s, "General")) || []
         : []
     );
-  }, [updatedAllIndividualSupplier, updEssentialAllSupplier, updEssentialBestSupplier, updNonEssentialAllSupplier, updNonEssentialBestSupplier, updatedBestIndividualSupplier, source, user_lat_long]);
+  }, [allIndividualSuppliers, essentialAllSuppliers, essentialBestSuppliers, nonEssentialAllSuppliers, nonEssentialBestSuppliers, bestIndividualSuppliers, source, user_lat_long]);
 
   useEffect(() => {
     // Filter out suppliers with invalid coordinates before combining
@@ -630,13 +681,10 @@ const parseAllTempSupplies = (vendors) => {
     setMapResult(validSuppliers);
   }, [map_allSuppliers, map_bestSuppliers]);
 
+  // useEffect(()=>{
+  //   console.log('This is the Selected Vendor', selectedVendor)
+  // },[selectedVendor])
 
-  const handleVendorClick = (vendor) => {
-    setSelectedVendor((prev) => {
-      if (prev?.name === vendor.name) return prev; // same vendor, avoid unnecessary state update
-      return vendor;
-    });
-  };
 
   const getLatLng = (latlngStr) => {
     if (!latlngStr) return [0, 0];
@@ -656,10 +704,24 @@ const parseAllTempSupplies = (vendors) => {
   }
 
   useEffect(() => {
+    const checkData = async()=> {
+      let vendorid = result.vendor_id
+      let existingVendor = fetchedVendors.find((vendor)=>vendor.vendor_id === vendorid)
+      // console.log('Existing Vendor',existingVendor)
+      if(existingVendor) {
+        setSelectedVendor(existingVendor)
+        setDataLoading(false)
+      }
+      else {
+        let data = {vendor_id: vendorid}
+        setDataLoading(true)
+        await handleVendorSelection(data)
+      }
+    }
     if (source === 'MapComponent') {
-      // console.log(result, 'This is the result passed from the map component....')
-      setSelectedVendor(result)
+      setDataLoading(true)
       setLoading(false)
+      checkData()
     }
   }, [result])
 
@@ -797,16 +859,16 @@ const parseAllTempSupplies = (vendors) => {
                   {supplierList?.map((vendor, idx) => (
                     <div
                       key={idx}
-                      className={`p-4 cursor-pointer rounded-lg transition-all duration-200 ${selectedVendor?.name === vendor.name
+                      className={`p-4 cursor-pointer rounded-lg transition-all duration-200 ${selectedVendor?.vendor_id === vendor.vendor_id
                         ? "bg-[#41b655] bg-opacity-20 border-l-4 border-[#41b655] "
                         : "bg-[#41b655] bg-opacity-10 border-none"
                         }`}
-                      onClick={() => { handleVendorClick(vendor) }}
+                      onClick={() => { setDataLoading(true),handleVendorSelection(vendor) }}
                     >
                       <div className="flex justify-between items-start">
-                        <h3 className={`font-medium ${selectedVendor?.name === vendor.name ? "text-black" : "text-[#3b69c5]"
+                        <h3 className={`font-medium ${selectedVendor?.vendor_id === vendor.vendor_id ? "text-black" : "text-[#3b69c5]"
                           }`}>
-                          {vendor.name}
+                          {vendor.vendor_id}
                         </h3>
                       </div>
                     </div>
@@ -824,17 +886,21 @@ const parseAllTempSupplies = (vendors) => {
             </div>
           </div>)}
 
-          {selectedVendor && (
+          {/* {selectedVendor && ( */}
             <div className={`${source === "MapComponent" ? 'w-full' : 'w-2/3'} flex flex-col`}>
               <div ref={detailRef} className="w-full bg-white rounded-lg shadow-sm border border-gray-200 p-6 full flex-1 overflow-y-auto scrollbar-hide">
-                {selectedVendor ? (
+                {dataLoading ? (
+                  <div className='skeleton rounded-md h-full w-full '>
+
+                  </div>
+                ) : selectedVendor && !dataLoading ? (
 
                   <div className='relative flex flex-col gap-8'>
                     <div className='relative flex flex-row gap-2 justify-start items-center'>
                       <div className='relative flex flex-row gap-2'>
                         <span className='p-3 rounded-lg flex items-center justify-center relative bg-blue-100'><FaStoreAlt className='text-blue-800' /></span>
                         <div className='relative flex flex-col justify-center gap-0.5'>
-                          <h2 className="text-xl font-bold text-blue-700">{selectedVendor.name}</h2>
+                          <h2 className="text-xl font-bold text-blue-700">{selectedVendor.vendor_id || selectedVendor.vendor_name}</h2>
                           {/* {selectedVendor.category && (<h3 className='relative text-md'>{selectedVendor.category}</h3>)} */}
                         </div>
                       </div>
@@ -943,15 +1009,15 @@ const parseAllTempSupplies = (vendors) => {
                       </div>
                     </div>)}
                   </div>
-                ) : (
+                ) : !selectedVendor && !dataLoading ? (
                   <div>
                     <h1>Please Select a Vendor</h1>
                   </div>
-                )
+                ) : (<></>)
                 }
               </div>
             </div>
-          )}
+          {/* )} */}
         </div>)}
 
         {viewMode === 'Map' && (
