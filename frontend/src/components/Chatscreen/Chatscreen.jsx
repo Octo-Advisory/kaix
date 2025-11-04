@@ -421,9 +421,13 @@ function Chatscreen() {
       // setLoadingSession(null)
       setSessionLoading(session, false);
       setDisabled(false)
+      console.log('Cleainrg intensiio',sessionId)
       try {
         await updateDoc("Session", sessionId, {
           user_intension: "",
+        }).then((res)=>{
+          console.log('Cleared');
+          
         });
       } catch (err) {
         createDiagnostic("Others", `Something went wrong while Updating Session Record for session and clearing user_intension ${JSON.stringify(sessionId)} in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)

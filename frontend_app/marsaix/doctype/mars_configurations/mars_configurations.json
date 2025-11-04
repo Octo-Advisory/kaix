@@ -9,6 +9,8 @@
   "doc_log",
   "file_log",
   "retention_days",
+  "storage_limit",
+  "time_period_for_deletion",
   "groq_key",
   "validation_check"
  ],
@@ -46,12 +48,22 @@
    "fieldname": "validation_check",
    "fieldtype": "Check",
    "label": "Validation Check"
+  },
+  {
+   "fieldname": "storage_limit",
+   "fieldtype": "Data",
+   "label": "Storage Limit"
+  },
+  {
+   "fieldname": "time_period_for_deletion",
+   "fieldtype": "Int",
+   "label": "Time Period For Deletion"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-10-01 20:31:58.243152",
+ "modified": "2025-10-30 12:27:39.836549",
  "modified_by": "Administrator",
  "module": "marsaix",
  "name": "Mars Configurations",

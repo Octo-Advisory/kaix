@@ -211,6 +211,8 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
 
     try {
       // console.log(lastChat, solutions?.[0], 'Method Called')
+
+      
       const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
         child_row_id: lastChat,
         updated_solutions: solutions,
@@ -1051,13 +1053,15 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
     });
 
     await Promise.all(promises);
+    // console.log(preaparedSolutions, 'this are the prepared Solutions ')
     const updatedSolutions = preaparedSolutions
-      .sort((a, b) => b.score - a.score) // Sort descending by score
-      .map((solution, index) => ({
-        ...solution,
-        propertyIndex: index + 1 // Start from 1
-      }));
-
+    .sort((a, b) => b.score - a.score) // Sort descending by score
+    .map((solution, index) => ({
+      ...solution,
+      propertyIndex: index + 1 // Start from 1
+    }));
+    
+    // console.log(updatedSolutions, 'this are the updated Solutions ')
     setSolutions(updatedSolutions);
 
     if (lastChatId) {

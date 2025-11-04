@@ -9,6 +9,11 @@ import gc
 import re
 import ast
 import spacy
+import json
+import gzip
+import msgpack
+import base64
+ 
 # from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers_creative
 
 from langchain_groq import ChatGroq
@@ -619,6 +624,7 @@ def log_to_file(key,value):
     
     with open("log2.txt", "a", encoding="utf-8") as file:
         file.write(json.dumps(log_entry) + "\n")
+        
 @frappe.whitelist(allow_guest=True)
 def insert_solution_result():
 
@@ -697,6 +703,7 @@ def excute_Property_Creation(method_name=None,param=None,childBlockId=None):
         gc.collect()  # Run garbage collection to free up memory
         frappe.log_error(e.stderr, "FinalCode Script Error")
         return f"Error running script: {e.stderr}"
+    
 
 @frappe.whitelist()
 def trigger_script(method_name=None,param=None,childBlockId=None):    
