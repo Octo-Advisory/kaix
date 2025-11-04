@@ -4,7 +4,11 @@ import configparser
 import os
 import json
 
+<<<<<<< HEAD
 config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+=======
+config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+>>>>>>> 9e51c25 (payload optmization and new ui)
 config = configparser.ConfigParser()
 config.read(config_file)
 
@@ -60,12 +64,12 @@ def log(chatId, level, key, value, file_name, module: str):
                 f"{key}" : value
             }
     
-            with open(f"/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/{module}.txt", "a", encoding="utf-8") as file:
+            with open(f"/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/{module}.txt", "a", encoding="utf-8") as file:
                 file.write(json.dumps(log_entry) + "\n")
 
 @frappe.whitelist(allow_guest=True)
 def update_config(doc_log,file_log):
-    config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+    config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
     config = configparser.ConfigParser()
 
     # Ensure the directory exists

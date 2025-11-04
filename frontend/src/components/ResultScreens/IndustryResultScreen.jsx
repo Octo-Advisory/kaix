@@ -220,8 +220,24 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
           headers: {
             'Expect': '' // 👈 Clear problematic header
           }
-        });
-      return result.message || [];
+      }
+    )
+    console.log(convertJson, 'this is the msg');
+    
+    // if(convertJson.message.encoded_data) {
+    //   console.log(convertJson,convertJson.message.encoded_data, 'This the return Json we Expect..')
+    //   const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
+    //     child_row_id: lastChat,
+    //     updated_solutions: convertJson.message.encoded_data,
+    //     intension: "Query to build industry from Scratch"
+    //   },
+    //     {
+    //       headers: {
+    //         'Expect': '' // 👈 Clear problematic header
+    //       }
+    //     });
+    //   return result.message || [];
+    // }
     } catch (err) {
       // console.error("Error Storing Result json:", err);
       createDiagnostic("Land & Approvals", `Something went wrong while storing the result json ${JSON.stringify(err)} in Build From Scratch`,lastChatId)
@@ -723,7 +739,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
     // console.log('This is Vendor Lookup for Essential', Essential_supply_vendor_lookup_df)
     // console.log('This is Vendor Lookup All for Essential', Essential_supply_all_vendor_lookup_df)
     // console.log('This is Vendor Lookup for Non Essential', nonEssential_supply_vendor_lookup_df)
-    // console.log('This is Vendor Lookup All for Non Essential', nonEssential_supply_all_vendor_lookup_df)
+    console.log('This is Vendor Lookup All for Non Essential', nonEssential_supply_all_vendor_lookup_df)
     // console.log('This is Employment Lookup', Employment_lookup_df)
     // console.log('This is Solution Lookup', Solution_lookup_df)
     // console.log('This is Approval Lookup', Approval_lookup_df)
@@ -742,9 +758,12 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
         const employment_index = findIndexByPropertyId(value, Employment_lookup_df)
 
         const data = get_data[0]
-        const approval_data = await getApprovals(Approval_lookup_df['approval_id'][approval_index])
-        const incentive_data = await getIncentives(Solution_lookup_df['incentive_id'][incentive_index])
-        const industry_incentive_data = await getIndustryIncentives(Solution_lookup_df['incentive_id'][incentive_index])
+        // const approval_data = await getApprovals(Approval_lookup_df['approval_id'][approval_index])
+        const approval_data = mapApprovalData(Approval_lookup_df['approval_id'][approval_index], Approval_lookup_df['approval_name'][approval_index],Approval_lookup_df['government_department'][approval_index],Approval_lookup_df['stages'][approval_index],Approval_lookup_df['time_taken'][approval_index])
+        // const incentive_data = await getIncentives(Solution_lookup_df['incentive_id'][incentive_index])
+        const incenetives = mapIncentivesToTypes(Solution_lookup_df['incentive_id'][incentive_index],Solution_lookup_df['incentive_type'][incentive_index],Solution_lookup_df['incentive_name'][incentive_index]  )
+        console.log(nonEssential_supply_all_vendor_lookup_df?.['vendor_id']?.[non_essential_all_index],'Okay This ones new')
+        // const industry_incentive_data = await getIndustryIncentives(Solution_lookup_df['incentive_id'][incentive_index])
         const essential_vendor_id_data = Essential_supply_vendor_lookup_df?.['vendor_id']?.[essential_index] ? await getAllVendorsData("Vendor", Essential_supply_vendor_lookup_df?.['vendor_id']?.[essential_index]) : []
         const essential_vendor_all_id_data = Essential_supply_all_vendor_lookup_df?.['vendor_id']?.[essential_all_index] ? await getAllVendorsData("Vendor", Essential_supply_all_vendor_lookup_df?.['vendor_id']?.[essential_all_index]) : []
         const non_essential_vendor_id_data = nonEssential_supply_vendor_lookup_df?.['vendor_id']?.[non_essential_index] ? await getAllVendorsData("Vendor", nonEssential_supply_vendor_lookup_df?.['vendor_id']?.[non_essential_index]) : []
