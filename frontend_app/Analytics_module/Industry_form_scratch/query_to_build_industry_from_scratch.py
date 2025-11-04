@@ -736,9 +736,7 @@ def get_property_incentive_mapped(industry_id,sub_sector_id,area_id_list,city_id
 # """
 
     sql_query = f"""SELECT 
-    i.name, i.incentive_name, i.incentive_type, 
-    i.incentive_operation_start_date, i.incentive_operation_end_date, 
-    i.quantum_of_assistance, 
+    i.name, i.incentive_operation_start_date, i.incentive_operation_end_date,
     iim.sub_sector, iim.area, iim.city, iim.state, i.incentive_rank,
     p.name, p.area AS property_area_id
 FROM `tabIncentive Industry Mapping` AS iim
@@ -777,7 +775,7 @@ WHERE COALESCE(iim.exclusion, 0) = 0
     results = fetch_query_results(sql_query)
 
     if results:
-        property_incentive_mapped_df = pd.DataFrame(results, columns=['incentive_id', "incentive_name", "incentive_type", "incentive_operation_start_date", 'incentive_operation_end_date', "quantum_of_assistance", 'sub_sector_id', 'area_id', 
+        property_incentive_mapped_df = pd.DataFrame(results, columns=['incentive_id', "incentive_operation_start_date", 'incentive_operation_end_date', 'sub_sector_id', 'area_id', 
                                         'city_id', 'state_id', 'incentive_rank',
                                         'property_id', 'property_area_id'])
         found_incentive = True
@@ -1168,7 +1166,7 @@ def get_property_approval_mapped(industry_id,sub_sector_id,area_id_list,city_id_
 
     query = f"""
 SELECT 
-    a.name, a.license_approval, a.government_department, 
+    a.name,                                        a.license_approval, a.government_department, 
     a.business_location_type AS ABLT, a.land_type AS ALT, 
     a.vicinity_detail AS AVD, a.cross_following_details AS ACFD,
     a.road_cutting, a.delivery_schedule_in_working_days, 
@@ -2147,14 +2145,14 @@ def process_incentive_df_to_send_solution_screen(df):
         df.sort_values(by=['property_id', 'incentive_rank'], ascending=[True, False])
         .groupby('property_id')
         .agg({
-            'incentive_id': lambda x: list(x),  # List of incentives
-            'incentive_name': lambda x: list(x),
-            'incentive_name': lambda x: list(x),
-            'incentive_type': lambda x: list(x),
-            'incentive_operation_start_date': lambda x: list(x),
-            'incentive_operation_end_date': lambda x: list(x),
-            'quantum_of_assistance': lambda x: list(x),
-            'incentive_rank': lambda x: list(x),  # Corresponding scores
+            'incentive_id': lambda x: list(x)  # List of incentives
+            # 'incentive_name': lambda x: list(x),
+            # 'incentive_name': lambda x: list(x),
+            # 'incentive_type': lambda x: list(x),
+            # 'incentive_operation_start_date': lambda x: list(x),
+            # 'incentive_operation_end_date': lambda x: list(x),
+            # 'quantum_of_assistance': lambda x: list(x),
+            # 'incentive_rank': lambda x: list(x),  # Corresponding scores
         })
         .reset_index()
     )
@@ -2185,12 +2183,12 @@ def process_approval_df_to_send_solution_screen(df):
         df.sort_values(by=['property_id', 'stage_order', "time_taken"], ascending=[True, True, True])
         .groupby('property_id')
         .agg({
-            'approval_id': lambda x: list(x),  # List of incentives
-            'approval_name': lambda x: list(x),
-            'government_department': lambda x: list(x),
-            'time_taken': lambda x: list(x),
-            'online_or_offline': lambda x: list(x),
-            'stages': lambda x: list(x),
+            'approval_id': lambda x: list(x)  # List of incentives
+            # 'approval_name': lambda x: list(x),
+            # 'government_department': lambda x: list(x),
+            # 'time_taken': lambda x: list(x),
+            # 'online_or_offline': lambda x: list(x),
+            # 'stages': lambda x: list(x),
         })
         .reset_index()
     )
@@ -2233,13 +2231,13 @@ def process_supply_vendor_df_to_send_solution_screen(df, all_vendor = False):
                     'vendor_id': lambda x: list(x),  # List of incentives
                     'supply_score': lambda x: list(x),
                     'essential_items': lambda x: list(x),   
-                    'minimum_supply_requirement': lambda x: list(x),
-                    'vendor_supply_capacity': lambda x: list(x),
-                    'years_of_experience': lambda x: list(x),
-                    'no_of_locations': lambda x: list(x),
-                    'no_of_past_clients': lambda x: list(x),
-                    'no_of_servieces': lambda x: list(x),
-                    'no_of_employees': lambda x: list(x),
+                    # 'minimum_supply_requirement': lambda x: list(x),
+                    # 'vendor_supply_capacity': lambda x: list(x),
+                    # 'years_of_experience': lambda x: list(x),
+                    # 'no_of_locations': lambda x: list(x),
+                    # 'no_of_past_clients': lambda x: list(x),
+                    # 'no_of_servieces': lambda x: list(x),
+                    # 'no_of_employees': lambda x: list(x),
                     'latitude_longitude': lambda x: list(x),
                     'Distance': lambda x: list(x),
                     'No_of_vendors_found': lambda x: list(x),
@@ -2254,13 +2252,13 @@ def process_supply_vendor_df_to_send_solution_screen(df, all_vendor = False):
                     'vendor_id': lambda x: list(x),  # List of incentives
                     'supply_score': lambda x: list(x),
                     'essential_items': lambda x: list(x),
-                    'minimum_supply_requirement': lambda x: list(x),
-                    'vendor_supply_capacity': lambda x: list(x),
-                    'years_of_experience': lambda x: list(x),
-                    'no_of_locations': lambda x: list(x),
-                    'no_of_past_clients': lambda x: list(x),
-                    'no_of_servieces': lambda x: list(x),
-                    'no_of_employees': lambda x: list(x),
+                    # 'minimum_supply_requirement': lambda x: list(x),
+                    # 'vendor_supply_capacity': lambda x: list(x),
+                    # 'years_of_experience': lambda x: list(x),
+                    # 'no_of_locations': lambda x: list(x),
+                    # 'no_of_past_clients': lambda x: list(x),
+                    # 'no_of_servieces': lambda x: list(x),
+                    # 'no_of_employees': lambda x: list(x),
                     'latitude_longitude': lambda x: list(x),
                     'Distance': lambda x: list(x),
                     'No_of_vendors_found': lambda x: list(x),
@@ -2292,12 +2290,12 @@ def process_supply_vendor_df_to_send_solution_screen(df, all_vendor = False):
                     .agg({
                         'vendor_id': lambda x: list(x),
                         'supply_score': lambda x: list(x),
-                        'vendor_supply_capacity': lambda x: list(x),
-                        'years_of_experience': lambda x: list(x),
-                        'no_of_locations': lambda x: list(x),
-                        'no_of_past_clients': lambda x: list(x),
-                        'no_of_servieces': lambda x: list(x),
-                        'no_of_employees': lambda x: list(x),
+                        # 'vendor_supply_capacity': lambda x: list(x),
+                        # 'years_of_experience': lambda x: list(x),
+                        # 'no_of_locations': lambda x: list(x),
+                        # 'no_of_past_clients': lambda x: list(x),
+                        # 'no_of_servieces': lambda x: list(x),
+                        # 'no_of_employees': lambda x: list(x),
                         'latitude_longitude': lambda x: list(x),
                         'Distance': lambda x: list(x),
                     })
@@ -2313,13 +2311,13 @@ def process_supply_vendor_df_to_send_solution_screen(df, all_vendor = False):
                         'vendor_id': lambda x: list(x),
                         'supply_score': lambda x: list(x),
                         'essential_items': lambda x: list(x),
-                        'minimum_supply_requirement': lambda x: list(x),
-                        'vendor_supply_capacity': lambda x: list(x),
-                        'years_of_experience': lambda x: list(x),
-                        'no_of_locations': lambda x: list(x),
-                        'no_of_past_clients': lambda x: list(x),
-                        'no_of_servieces': lambda x: list(x),
-                        'no_of_employees': lambda x: list(x),
+                        # 'minimum_supply_requirement': lambda x: list(x),
+                        # 'vendor_supply_capacity': lambda x: list(x),
+                        # 'years_of_experience': lambda x: list(x),
+                        # 'no_of_locations': lambda x: list(x),
+                        # 'no_of_past_clients': lambda x: list(x),
+                        # 'no_of_servieces': lambda x: list(x),
+                        # 'no_of_employees': lambda x: list(x),
                         'latitude_longitude': lambda x: list(x),
                         'Distance': lambda x: list(x),
                         'No_of_vendors_found': lambda x: list(x),

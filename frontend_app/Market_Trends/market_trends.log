@@ -1,3 +1,89 @@
+<<<<<<< HEAD
+2025-10-14 12:01:28,749 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-15 05:32:54,117 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-15 05:57:53,401 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-15 05:57:54,662 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-15 05:57:54,926 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-15 05:57:55,129 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-15 05:57:55,309 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-15 05:57:55,576 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-15 05:57:55,809 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-15 05:57:56,215 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-15 05:57:56,653 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-15 12:05:10,481 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 06:24:17,754 - INFO - Checking cache for query: market trends for Foods and Beverages industry in Gujarat for 2024-2025
+2025-10-16 06:24:17,755 - INFO - Performing async web search: market trends for Foods and Beverages industry in Gujarat for 2024-2025
+2025-10-16 06:24:17,755 - INFO - Checking cache for query: market trends for Foods and Beverages industry in Gujarat for 2024-2025
+2025-10-16 06:24:17,756 - INFO - Pruned 1 expired cache entries
+2025-10-16 06:24:17,757 - INFO - Cache saved to /home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/search_cache.json, size: 1 entries
+2025-10-16 06:24:17,757 - INFO - Loaded cache, size: 1 entries
+2025-10-16 06:24:20,527 - INFO - Search successful, retrieved 10 results
+2025-10-16 06:24:20,527 - INFO - Storing search result for query: market trends for Foods and Beverages industry in Gujarat for 2024-2025, length: 1908 characters
+2025-10-16 06:24:20,527 - INFO - Loaded cache, size: 1 entries
+2025-10-16 06:24:20,528 - INFO - Cache saved to /home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/search_cache.json, size: 2 entries
+2025-10-16 06:24:20,528 - INFO - Deciding trend allocation for query
+2025-10-16 06:24:20,811 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 06:24:20,819 - INFO - Trend allocation from LLM: {'city': 0, 'state': 0, 'country': 4, 'global': 1}
+2025-10-16 06:24:20,819 - INFO - Trend allocation: {'city': 0, 'state': 0, 'country': 4, 'global': 1}
+2025-10-16 06:24:20,819 - INFO - Detected data scope: India for query: market trends for Foods and Beverages industry in Gujarat for 2024-2025
+2025-10-16 06:24:20,819 - INFO - Search results excerpt: Why 2025 Is the Year of Growth in the Food Industry: 2025 growth is due to increased demand for skil
+2025-10-16 06:24:23,971 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 06:24:23,972 - INFO - Trend types: No trends identified
+2025-10-16 06:24:27,102 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 06:24:27,103 - INFO - Extracted entities and metrics: Foods and Beverages Market in Gujarat Ignites 10.33% Growth, USD 50.99 billion, USD 123.5 billion, increased demand, sustainability, Food Processing Industry in India Sees 13% Budget Increase, Rs. 3290 crores, 13% increase, 32 percent, India's Food and Beverage Sector Expands at 12% CAGR, 12%, innovation, Gujarat's Food and Beverage Market Reaches USD 9.44 Trillion, USD 9.44 trillion, 3.91%, Global Food Trends Present Opportunities for Gujarat, ingredient quality, gut health, sustainability
+2025-10-16 06:24:27,103 - INFO - Raw LLM output length: 2194 characters
+2025-10-16 07:35:04,623 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:06,107 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:08,664 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:09,433 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:10,033 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:10,423 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:10,849 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:11,165 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:11,480 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:11,696 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:12,761 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:13,220 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 07:35:13,695 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 08:09:14,803 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 08:09:15,180 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 08:09:15,348 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 08:09:15,610 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 08:09:15,880 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 08:09:16,297 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 08:09:16,755 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:15:58,631 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:00,077 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:01,702 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:02,808 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:03,602 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:04,169 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:04,779 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:04,993 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:05,316 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:05,652 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:05,875 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:06,450 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:07,511 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-16 09:16:08,004 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-17 05:38:27,283 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 10:00:52,839 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:25:49,434 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:35,781 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:36,365 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:37,116 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:37,670 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:38,075 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:38,403 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:38,619 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:38,926 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:39,141 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:39,518 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:39,810 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-10-29 12:29:40,218 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2025-11-03 05:28:29,071 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-03 05:54:02,431 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+=======
 2025-09-10 11:44:33,864 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2025-09-10 11:59:18,238 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2025-09-10 11:59:20,389 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
@@ -828,6 +914,7 @@
 2025-10-01 18:48:55,801 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2025-10-01 18:48:56,263 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2025-10-01 20:09:04,907 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+<<<<<<< HEAD
 2025-10-10 18:11:16,452 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2025-10-10 19:37:17,114 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2025-10-14 16:23:15,989 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
@@ -908,3 +995,6 @@
 2025-11-04 15:47:55,283 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2025-11-04 15:47:55,577 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2025-11-04 15:47:55,995 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+=======
+>>>>>>> 9e51c25 (payload optmization and new ui)
+>>>>>>> 3a4bdaaf39cef4edb8281441d780be187fe0c3d5

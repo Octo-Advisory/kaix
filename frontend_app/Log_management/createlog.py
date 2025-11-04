@@ -4,7 +4,11 @@ import configparser
 import os
 import json
 
+<<<<<<< HEAD
+config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+=======
 config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+>>>>>>> 9e51c25 (payload optmization and new ui)
 config = configparser.ConfigParser()
 config.read(config_file)
 

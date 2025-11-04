@@ -813,7 +813,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
     return R * c;
   }
 
-  const bindDataOnMap = async (resultData, layer) => {
+  const bindDataOnMap = async (resultData, layer, showVendorDetails = false) => {
     try {
       resultData.forEach(data => {
         if (data.coordinates != null && data.coordinates != "") {
@@ -864,7 +864,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
             .addTo(mapRef.current);
 
           //If All vendor or Defualt layer is selected
-          if (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR || layer === LAYERS.ESSENTIAL_VENDORS || layer === LAYERS.NON_ESSENTIAL_VENDORS) {
+          if (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR || layer === LAYERS.ESSENTIAL_VENDORS || layer === LAYERS.NON_ESSENTIAL_VENDORS || showVendorDetails) {
             //Show label on the marker            
             addInfoPoupp(marker, data.name);
 
@@ -1088,7 +1088,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
           }));
 
         if (filteredVendors.length > 0) {
-          bindDataOnMap(filteredVendors, supplyName);
+          bindDataOnMap(filteredVendors, supplyName, true);
         }
 
         // ✅ Check all matching checkboxes
@@ -1126,7 +1126,7 @@ const SingleMap = ({ selectedProperty, intension }) => {
           }
         });
       }
-    bindDataOnMap(filteredVendors, supply);
+    bindDataOnMap(filteredVendors, supply, true);
   }
 
   //Sets the default map location

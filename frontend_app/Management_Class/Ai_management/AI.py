@@ -1,4 +1,7 @@
+import os
+import copy
 import frappe
+import json
 from langchain.prompts import PromptTemplate
 from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 from frontend_app.Ai_module.employement_query.Extraction_for_employement_search import call_handle_employment_query
@@ -12,6 +15,9 @@ from langchain.prompts import PromptTemplate
 from langchain.schema import HumanMessage, AIMessage
 from frontend_app.Log_management.createlog import log
 from frontend_app.Management_Class.helpers.utility import update_llm_token
+from frontend_app.Ai_module.feasibility_agentic_workflow.feasibility_agent import FeasibilityAgent, process_agent_result
+from frontend_app.Ai_module.Feasibility_Universal_Function.Final_Universal_Function import ensure_vector_and_update_record
+
 # --- AI.py (imports) ---
 from frontend_app.Ai_module.responder_consultant import (
     consultant_response_from_langchain,
@@ -88,23 +94,148 @@ def ai_module_call(input,confirmationMessage,chatId):
                     "Error":None
                 }
             chat_history.append(HumanMessage(content="No, I want to refine my requirements"))
-            chat_history.append(AIMessage(content=f"{resp}"))
-            save_chat(chat_history,f"chat_{chatId}")
-            chat_history = get_chat(f"chat_{chatId}") or []
+
             response = polish_ai_response_if_possible(
             raw_response=response,
-            chat_history_messages=chat_history,            # LangChain objects
+            chat_history_messages=chat_history[-11:],            # LangChain objects
             chat_history_strings=None,      # or None if you don't want to use this path
             latest_user= "No, I want to refine my requirements"
             )
-            chat_history = chat_history[:-1] + [AIMessage(content=response["Ai_response"])]
+            chat_history.append(AIMessage(content=response["Ai_response"]))
             save_chat(chat_history,f"chat_{chatId}")
             return response
 
 
         # Check if user intention is already determined
-        user_intension = check_user_intension(chatId)
+        user_intension_tuple = check_user_intension(chatId, return_default_style = False)
+        user_intension = user_intension_tuple[0]
+        feasibility_id = user_intension_tuple[1]
 
+        if feasibility_id is not None:
+            FEAS_DOCTYPE = "Feasibility Report"
+            feasibility_json_data = get_feasibility_json(feasibility_id)
+            chat_history = get_chat(f"chat_{chatId}") or []
+            Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-6:]]
+            feasibility_gate_response = check_industry_scope_with_feasibility(latest_query=input, feasibility_structured_summary=feasibility_json_data, llm=llm_gpt_oos_120b, chat_history=Chat_history_normal)
+            with open("testlog.txt", "a") as file:
+                file.write(f"\nFeasibility Gate Response: ---------><><><><> \n\t\t\t\t\t {feasibility_gate_response}")
+            if feasibility_gate_response["RedirectRequired"]:
+                chat_history = get_chat(f"chat_{chatId}") or []
+                chat_history.append(HumanMessage(content=f"{input}"))
+                feasibility_redirect_message = generate_redirect_message(llm_gpt_oos_120b, input, Chat_history_normal, feasibility_gate_response["ExpectedIndustry"], feasibility_gate_response["DetectedIndustry"], "redirect_notice", feasibility_gate_response["options"])
+                feasibility_fallback_message = generate_redirect_message(llm_gpt_oos_120b, input, Chat_history_normal, feasibility_gate_response["ExpectedIndustry"], feasibility_gate_response["DetectedIndustry"], "stay_fallback", None)
+                feasibility_gate_response["Ai_response"] = feasibility_redirect_message
+                feasibility_gate_response["on_stay_fallback_message"] = feasibility_fallback_message
+                chat_history.append(AIMessage(content=feasibility_gate_response["Ai_response"]))
+                save_chat(chat_history,f"chat_{chatId}")
+                return feasibility_gate_response
+            else:
+                chat_history = get_chat(f"chat_{chatId}") or []
+                Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+                aggressive_config = {
+                    'fresh_turns': 3,
+                    'recent_turns': 6,
+                    'aging_turns': 10,
+                    'stale_turns': 12
+                }
+                structured_json_feasibility = feasibility_json_data.get('structured_summary', {})
+
+                ctx = f"doctype={FEAS_DOCTYPE}, doc_name={feasibility_id}"
+                try:
+                    vectorstore_info, success_status = ensure_vector_and_update_record(
+                        doctype=FEAS_DOCTYPE,
+                        doc_name=feasibility_id
+                    )
+
+                except requests.HTTPError as e:
+                    # Raised from their internal update_record() → requests.put(...)
+                    status = getattr(getattr(e, "response", None), "status_code", "unknown")
+                    body   = (getattr(getattr(e, "response", None), "text", "") or "").strip()
+                    raise RuntimeError(
+                        f"[ExternalError: ensure_vector_and_update_record] HTTPError while updating record "
+                        f"({ctx}) | status={status} | body_snippet={body[:300]}"
+                    ) from e
+
+                except (requests.ConnectionError, requests.Timeout) as e:
+                    raise RuntimeError(
+                        f"[ExternalError: ensure_vector_and_update_record] Network error ({ctx}) — "
+                        f"{type(e).__name__}: {e}"
+                    ) from e
+
+                except FileNotFoundError as e:
+                    # e.g., temp PDF path or vector folder issues from their code
+                    raise RuntimeError(
+                        f"[ExternalError: ensure_vector_and_update_record] Missing file/resource ({ctx}) — {e}"
+                    ) from e
+
+                except PermissionError as e:
+                    raise RuntimeError(
+                        f"[ExternalError: ensure_vector_and_update_record] Permission error ({ctx}) — {e}"
+                    ) from e
+
+                except ValueError as e:
+                    # They raise ValueErrors (e.g., bad config/env). Keep type but mark as external.
+                    raise ValueError(
+                        f"[ExternalError: ensure_vector_and_update_record] Value error ({ctx}) — {e}"
+                    ) from e
+
+                except Exception as e:
+                    # Fallback for anything else coming from their module
+                    tb = traceback.format_exc(limit=3)
+                    raise RuntimeError(
+                        f"[ExternalError: ensure_vector_and_update_record] Unhandled {type(e).__name__} ({ctx}) — {e}\n"
+                        f"traceback:\n{tb}"
+                    ) from e
+
+                # If the external call returned but reported failure
+                if not success_status:
+                    raise ValueError("[ExternalError: ensure_vector_and_update_record] Universal status reported failure")
+
+
+                refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_gpt_oos_120b,aggressive_config, structured_json_feasibility, True)
+                chat_history.append(HumanMessage(content=refine_user_input))  # Log user query
+                save_chat(chat_history,f"chat_{chatId}")
+                
+                with open("testlog.txt", "a") as file:
+                    file.write(f"\n================= Unniversal Response: \n \t\t\t{vectorstore_info}")
+
+                # from feasibility_agent_skeleton import FeasibilityAgent
+                # # Example usage (replace with your values):
+                agent = FeasibilityAgent(
+                    persist_dir=vectorstore_info.get("final_dir") or vectorstore_info.get("persist_root"),
+                    collection_name=vectorstore_info["collection_name"],
+                    feasibility_study=structured_json_feasibility,
+                    chat_id=chatId,
+                    device="cpu",
+                )
+                result = agent.invoke(
+                    user_input=input,
+                    refined_user_input=refine_user_input,
+                    user_intension=user_intension,  # Set to e.g., "Query to search Incentives" if calling module tool
+                )
+
+                with open("testlog.txt", "a") as file:
+                    file.write(f"\n================= Agent Response: \n \t\t\t{result}")
+                
+                final_result = process_agent_result(result)
+
+                chat_history.append(AIMessage(content=final_result["Ai_response"]))
+                save_chat(chat_history,f"chat_{chatId}")  
+
+                return final_result
+        else:
+            chat_history = get_chat(f"chat_{chatId}") or []
+            Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+            aggressive_config = {
+                'fresh_turns': 3,
+                'recent_turns': 6,
+                'aging_turns': 10,
+                'stale_turns': 12
+            }
+            refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_gpt_oos_120b,aggressive_config)
+            chat_history.append(HumanMessage(content=refine_user_input))  # Log user query
+            save_chat(chat_history,f"chat_{chatId}")
+            
         if user_intension not in ["Valueless queries","Other industry-related queries","Negatively Intended Query","Follow-up Query",None]:
             chat_history = get_chat(f"chat_{chatId}") or []
             Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-6:]]
@@ -118,7 +249,7 @@ def ai_module_call(input,confirmationMessage,chatId):
             )
             temp_out = response["switch_module"]
             
-            log(chatId,'debug','response',f"ABCDEFG {temp_out}",'AI.py','ai')
+            log(chatId,'debug','response',f"{temp_out}",'AI.py','ai')
             if response["switch_module"]:
                 log(chatId,'debug','response',f"{user_intension} changed to None",'AI.py','ai')
                 user_intension = None
@@ -126,12 +257,21 @@ def ai_module_call(input,confirmationMessage,chatId):
             else:
                 pass
 
+        # chat_history = get_chat(f"chat_{chatId}") or []
+        # Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+        # aggressive_config = {
+        #     'fresh_turns': 3,
+        #     'recent_turns': 6,
+        #     'aging_turns': 10,
+        #     'stale_turns': 12
+        # }
+        # refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_gpt_oos_120b,aggressive_config)
+        # chat_history.append(HumanMessage(content=refine_user_input))  # Log user query
+        # save_chat(chat_history,f"chat_{chatId}")
+
         if user_intension in ["Valueless queries","Other industry-related queries","Negatively Intended Query", "Follow-up Query",None]:
-            chat_history = get_chat(f"chat_{chatId}") or []
-            Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
-            refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_70b_vers)
             # user_intension = classify_query(refine_user_input, chatId)
-            multifactor_classification = classify_user_intent(refine_user_input, llm_70b_vers, chatId)
+            multifactor_classification = classify_user_intent(refine_user_input, llm_gpt_oos_120b, chatId)
 
             main_class = multifactor_classification['main_class']
             sub_queries = multifactor_classification['sub_queries']
@@ -149,10 +289,15 @@ def ai_module_call(input,confirmationMessage,chatId):
                 file.write(f"\nuser_intension found {user_intension} for chatId {chatId}")
             # with open("testlog.txt", "a") as file:
             #     file.write(f"\nMulti Label user_intension found: \n\t\t\t{user_intension_multilabel} for chatId {chatId}")
+            with open("log2.txt", "a", encoding="utf-8") as file:
+                file.write(f" Before calling the function :-> \n user_intension ===>>> {user_intension} \n chatId ===>>> {chatId} \n")
             update_user_intension(user_intension,chatId)  # Store the classified intention for future use
             frappe.log_error("user intension",f"{user_intension,str(user_intension)}")
             log(chatId,'debug','user_intension',str(user_intension),'AI.py','ai')
-         # Handle different user intentions
+        else:
+            input = refine_user_input
+
+        # Handle different user intentions
         with open("testlog.txt", "a") as file:
             file.write(f"\nBefore IF Additional response testing {additional_response} for chatId {chatId}")
             
@@ -250,8 +395,8 @@ def ai_module_call(input,confirmationMessage,chatId):
             try:
                 message = respond_to_negative_query(
                     user_message=refine_user_input,
-                    append_user_to_history=True,
-                    append_AI_to_history=True,
+                    append_user_to_history=False,
+                    append_AI_to_history=False,
                     llm=llm_70b_vers,
                     chatId=chatId,
                     update_intention=False
@@ -315,16 +460,16 @@ def ai_module_call(input,confirmationMessage,chatId):
                 log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
                 return response
         if (response["Ai_response"].lower() != "Not Available in List".lower()):
-            with open("testlog.txt", "a") as file:
-                file.write(f"\nndskbajvfjjasdvbjfdjvjdsvvjfvjdsvjv")
             chat_history = get_chat(f"chat_{chatId}") or []
+            with open("testlog.txt", "a") as file:
+                file.write(f"\nI am about to call responder llm :::::::::[][][]][][[]>]")
             response = polish_ai_response_if_possible(
             raw_response=response,
-            chat_history_messages=chat_history,            # LangChain objects
+            chat_history_messages=chat_history[-11:],            # LangChain objects
             chat_history_strings=None,      # orf None if you don't want to use this path
             latest_user=input
             )
-            chat_history = chat_history[:-1] + [AIMessage(content=response["Ai_response"])]
+            chat_history.append(AIMessage(content=response["Ai_response"]))
             save_chat(chat_history,f"chat_{chatId}")
 
         return response    
@@ -349,13 +494,58 @@ def ai_module_call(input,confirmationMessage,chatId):
         log(chatId,'debug','response',f"{str(response)} error is {str(error_details)}",'AI.py','ai')
         return response
 
-def check_user_intension(chatId):
-    query = f'''select user_intension from `tabSession` where name = "{chatId}"'''
-    user_intention = frappe.db.sql(query)
-    return user_intention[0][0] or None
+@frappe.whitelist(allow_guest=True)
+def check_user_intension(chatId, return_default_style = True):
+    if return_default_style:
+        
+        query = f'SELECT user_intension FROM `tabSession` WHERE name = "{chatId}"'
+        user_intention = frappe.db.sql(query)
+        with open("log2.txt", "a", encoding="utf-8") as file:
+            file.write(f"USER_INTENSION from DB =====>>>>> {user_intention} \n Query:::::::::--------- {query}--- {chatId} \n")
+        return user_intention[0][0] or None
+    else:
+        query = f'SELECT user_intension, feasibility_id FROM `tabSession` WHERE name = "{chatId}"'
+        user_intention = frappe.db.sql(query)
+        with open("log2.txt", "a", encoding="utf-8") as file:
+            file.write(f"USER_INTENSION from DB SECOND CHECK=====>>>>> {user_intention} \n Query:::::::::--------- {query}--- {chatId} \n")
+        # Handle case where no results are returned
+        if not user_intention:
+            return None, None
+
+        user_intention_fetched = user_intention[0][0] or None
+        fea_id_feached = user_intention[0][1]
+
+        # Keep only if it’s a non-empty string; otherwise make it None
+        if not fea_id_feached or not str(fea_id_feached).strip():
+            fea_id_feached = None
+
+        return user_intention_fetched, fea_id_feached
+
+import json
+
+def get_feasibility_json(feasibility_id):
+    """
+    Returns parsed JSON (dict/list) for the given feasibility_id.
+    Raises FeasibilityJSONError (or JSONDecodeError) on any problem.
+    """
+    query = f'''SELECT result_data 
+                FROM `tabFeasibility Report` 
+                WHERE name = "{feasibility_id}"'''
+    result = frappe.db.sql(query)
+
+    if not result or not result[0][0]:
+        return {}
+
+    json_data = result[0][0]
+    try:
+        return json.loads(json_data)
+    except json.JSONDecodeError as e:
+        raise FeasibilityJSONError(f"Invalid JSON for feasibility_id={feasibility_id}: {e}") from e
 
 def update_user_intension(user_intension,chatId):
     query = "UPDATE `tabSession` SET user_intension = %s WHERE name = %s"
+    with open("log2.txt", "a", encoding="utf-8") as file:
+            file.write(f" USER_INTENTION IN SESSION =============>>>>>>>>>>>>>>>> \n {query} \n user_intension :-> {user_intension} \n chatId :-> {chatId} \n")
     frappe.db.sql(query, (user_intension, chatId))
     frappe.db.commit() 
 
@@ -382,7 +572,7 @@ def generate_dynamic_message(user_message, user_intention, chatId,llm):
     chat_history = get_chat(f"chat_{chatId}") or []
     
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-4:]]
-    chat_history.append(HumanMessage(content=user_message))
+    # chat_history.append(HumanMessage(content=user_message))
     if user_intention == "Valueless queries":
         prompt_template = """
         The user has sent the following message: '{user_message}'.
@@ -461,8 +651,8 @@ def generate_dynamic_message(user_message, user_intention, chatId,llm):
     response = chain.invoke({"user_message": user_message, "chat_history": "\n".join(Chat_history_normal)})
     update_llm_token(response)
     message_from_ai = response.content.strip()
-    chat_history.append(AIMessage(content=message_from_ai))
-    save_chat(chat_history,f"chat_{chatId}")
+    # chat_history.append(AIMessage(content=message_from_ai))
+    # save_chat(chat_history,f"chat_{chatId}")
     
     return message_from_ai
 

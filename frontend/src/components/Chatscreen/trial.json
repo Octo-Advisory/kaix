@@ -1,0 +1,10 @@
+{"Ai_response": "This chat thread is specifically connected to the industry given in your feasibility study (**Chemicals**). Your latest query appears to be about **Cement**. For a better experience, we recommend starting a new chat with your latest query. If you press **Yes**, we'll redirect you to a new chat thread; if you press **No**, you can continue here regarding **Chemicals**. Please choose from the options below.",
+ "Is_confirmation": True,
+  "options": [
+        {"label": "Yes, start new chat", "value": "RedirectToNewChat"
+        },
+        {"label": "No, stay here", "value": "StayInCurrentChat"
+        }
+    ],
+     "Trigger_Lead_Generation": False, "RedirectRequired": True, "RedirectReason": "industry_changed", "on_stay_fallback_message": "Okay — we’ll continue in this chat for **Chemicals** (the industry from your feasibility study) and proceed with your latest query here.", "Confidence": 0.93, "UserQuery": "I want to build Cement Industry", "ExpectedIndustry": "Chemicals", "DetectedIndustry": "Cement", "UsedFeasibilityDefaults": []
+}

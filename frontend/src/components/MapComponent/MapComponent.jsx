@@ -453,7 +453,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     }
   }
 
-  const bindDataOnMap = async (resultData, layer) => {
+  const bindDataOnMap = async (resultData, layer, showVendorDetails = false) => {
     resultData.forEach(data => {
       const storeIconEl = document.createElement('div');
       storeIconEl.style.width = '40px';
@@ -525,7 +525,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       }).setLngLat([lng, lat])
         .addTo(mapRef.current);
       //If All vendor or Defualt layer is selected
-      if (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR || layer === LAYERS.ESSENTIAL_VENDORS || layer === LAYERS.NON_ESSENTIAL_VENDORS) {
+      if (layer === LAYERS.VENDOR || layer === LAYERS.DEFAULT_LAYER.VENDOR || layer === LAYERS.ESSENTIAL_VENDORS || layer === LAYERS.NON_ESSENTIAL_VENDORS || showVendorDetails) {
         //Show label on the marker
         addInfoPoupp(marker, data.name);
         //clicking on the vendor marker a vendor detail modal will open
@@ -1230,7 +1230,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     removeMarker(LAYERS.DEFAULT_LAYER.LABEL);
     await loadDefaultLayer();
     resetZoomlevel();
-    document.querySelector("[data-name='checkbox-container-supply']").style.display = "block"; //Disable the vendor layer checkbox
+    // document.querySelector("[data-name='checkbox-container-supply']").style.display = "block"; //Disable the vendor layer checkbox
     document.querySelector("[data-name='checkbox-container-" + LAYERS.ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
     document.querySelector("[data-name='checkbox-container-" + LAYERS.NON_ESSENTIAL_VENDORS + "']").style.display = "flex"; //Disable the vendor layer checkbox
     changeMarkerOpacity();
@@ -1366,7 +1366,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
             }));
 
           if (filteredVendors.length > 0) {
-            bindDataOnMap(filteredVendors, supplyName);
+            bindDataOnMap(filteredVendors, supplyName,true);
           }
 
           // ✅ Check all matching checkboxes
@@ -1404,7 +1404,7 @@ const loadSelectedSupplyVendorDetails = (supply,vendorType) =>{
           }
         });
       }
-    bindDataOnMap(filteredVendors, supply);
+    bindDataOnMap(filteredVendors, supply,true);
 }
 
   //#region Helper Methods
