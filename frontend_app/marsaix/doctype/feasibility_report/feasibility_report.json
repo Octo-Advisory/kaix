@@ -1,6 +1,4 @@
 {
- "_comments": "[]",
- "_liked_by": "[]",
  "actions": [],
  "allow_import": 1,
  "allow_rename": 1,
@@ -11,6 +9,7 @@
   "user",
   "file_name",
   "file_path",
+  "custom_feasibility_vector_file_name",
   "result_data",
   "status",
   "seen_by_user",
@@ -66,11 +65,17 @@
    "fieldname": "feasibility_title",
    "fieldtype": "Small Text",
    "label": "Feasibility Title"
+  },
+  {
+   "fieldname": "custom_feasibility_vector_file_name",
+   "fieldtype": "Data",
+   "label": "Feasibility Vector File Name"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-08-06 12:58:15.108480",
+ "modified": "2025-10-16 18:10:48.317798",
  "modified_by": "Administrator",
  "module": "marsaix",
  "name": "Feasibility Report",
@@ -113,6 +118,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

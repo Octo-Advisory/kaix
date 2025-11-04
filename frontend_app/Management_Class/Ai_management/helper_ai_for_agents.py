@@ -15,9 +15,6 @@ from langchain.prompts import PromptTemplate
 from langchain.schema import HumanMessage, AIMessage
 from frontend_app.Log_management.createlog import log
 from frontend_app.Management_Class.helpers.utility import update_llm_token
-from frontend_app.Ai_module.feasibility_agentic_workflow.feasibility_agent import FeasibilityAgent, process_agent_result
-from frontend_app.Ai_module.Feasibility_Universal_Function.Final_Universal_Function import ensure_vector_and_update_record
-
 # --- AI.py (imports) ---
 from frontend_app.Ai_module.responder_consultant import (
     consultant_response_from_langchain,
@@ -80,163 +77,15 @@ def polish_ai_response_if_possible(
     except Exception:
         return raw_response
 
-@frappe.whitelist(allow_guest=True)
-def ai_module_call(input,confirmationMessage,chatId):
+def run_ai_module_flow_core(input,chatId,refine_user_input, user_intension,):
     try:
         additional_response = None
-        if input == "NOFROMUSER":
-            chat_history = get_chat(f"chat_{chatId}") or []
-            Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
-            resp = generate_fallback_message(Chat_history_normal,confirmationMessage,llm_70b_vers_creative)
-            response = { 
-                    "Ai_response": resp,
-                    "Is_confirmation" : None,
-                    "Error":None
-                }
-            chat_history.append(HumanMessage(content="No, I want to refine my requirements"))
-
-            response = polish_ai_response_if_possible(
-            raw_response=response,
-            chat_history_messages=chat_history[-11:],            # LangChain objects
-            chat_history_strings=None,      # or None if you don't want to use this path
-            latest_user= "No, I want to refine my requirements"
-            )
-            chat_history.append(AIMessage(content=response["Ai_response"]))
-            save_chat(chat_history,f"chat_{chatId}")
-            return response
-
-
-        # Check if user intention is already determined
-        user_intension_tuple = check_user_intension(chatId, return_default_style = False)
-        user_intension = user_intension_tuple[0]
-        feasibility_id = user_intension_tuple[1]
-
-        if feasibility_id is not None:
-            FEAS_DOCTYPE = "Feasibility Report"
-            feasibility_json_data = get_feasibility_json(feasibility_id)
-            chat_history = get_chat(f"chat_{chatId}") or []
-            Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-6:]]
-            feasibility_gate_response = check_industry_scope_with_feasibility(latest_query=input, feasibility_structured_summary=feasibility_json_data, llm=llm_gpt_oos_120b, chat_history=Chat_history_normal)
-            with open("testlog.txt", "a") as file:
-                file.write(f"\nFeasibility Gate Response: ---------><><><><> \n\t\t\t\t\t {feasibility_gate_response}")
-            if feasibility_gate_response["RedirectRequired"]:
-                chat_history = get_chat(f"chat_{chatId}") or []
-                chat_history.append(HumanMessage(content=f"{input}"))
-                feasibility_redirect_message = generate_redirect_message(llm_gpt_oos_120b, input, Chat_history_normal, feasibility_gate_response["ExpectedIndustry"], feasibility_gate_response["DetectedIndustry"], "redirect_notice", feasibility_gate_response["options"])
-                feasibility_fallback_message = generate_redirect_message(llm_gpt_oos_120b, input, Chat_history_normal, feasibility_gate_response["ExpectedIndustry"], feasibility_gate_response["DetectedIndustry"], "stay_fallback", None)
-                feasibility_gate_response["Ai_response"] = feasibility_redirect_message
-                feasibility_gate_response["on_stay_fallback_message"] = feasibility_fallback_message
-                chat_history.append(AIMessage(content=feasibility_gate_response["Ai_response"]))
-                save_chat(chat_history,f"chat_{chatId}")
-                return feasibility_gate_response
-            else:
-                chat_history = get_chat(f"chat_{chatId}") or []
-                Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
-                aggressive_config = {
-                    'fresh_turns': 3,
-                    'recent_turns': 6,
-                    'aging_turns': 10,
-                    'stale_turns': 12
-                }
-                structured_json_feasibility = feasibility_json_data.get('structured_summary', {})
-
-                ctx = f"doctype={FEAS_DOCTYPE}, doc_name={feasibility_id}"
-                try:
-                    vectorstore_info, success_status = ensure_vector_and_update_record(
-                        doctype=FEAS_DOCTYPE,
-                        doc_name=feasibility_id
-                    )
-
-                except requests.HTTPError as e:
-                    # Raised from their internal update_record() → requests.put(...)
-                    status = getattr(getattr(e, "response", None), "status_code", "unknown")
-                    body   = (getattr(getattr(e, "response", None), "text", "") or "").strip()
-                    raise RuntimeError(
-                        f"[ExternalError: ensure_vector_and_update_record] HTTPError while updating record "
-                        f"({ctx}) | status={status} | body_snippet={body[:300]}"
-                    ) from e
-
-                except (requests.ConnectionError, requests.Timeout) as e:
-                    raise RuntimeError(
-                        f"[ExternalError: ensure_vector_and_update_record] Network error ({ctx}) — "
-                        f"{type(e).__name__}: {e}"
-                    ) from e
-
-                except FileNotFoundError as e:
-                    # e.g., temp PDF path or vector folder issues from their code
-                    raise RuntimeError(
-                        f"[ExternalError: ensure_vector_and_update_record] Missing file/resource ({ctx}) — {e}"
-                    ) from e
-
-                except PermissionError as e:
-                    raise RuntimeError(
-                        f"[ExternalError: ensure_vector_and_update_record] Permission error ({ctx}) — {e}"
-                    ) from e
-
-                except ValueError as e:
-                    # They raise ValueErrors (e.g., bad config/env). Keep type but mark as external.
-                    raise ValueError(
-                        f"[ExternalError: ensure_vector_and_update_record] Value error ({ctx}) — {e}"
-                    ) from e
-
-                except Exception as e:
-                    # Fallback for anything else coming from their module
-                    tb = traceback.format_exc(limit=3)
-                    raise RuntimeError(
-                        f"[ExternalError: ensure_vector_and_update_record] Unhandled {type(e).__name__} ({ctx}) — {e}\n"
-                        f"traceback:\n{tb}"
-                    ) from e
-
-                # If the external call returned but reported failure
-                if not success_status:
-                    raise ValueError("[ExternalError: ensure_vector_and_update_record] Universal status reported failure")
-
-
-                refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_gpt_oos_120b,aggressive_config, structured_json_feasibility, True)
-                chat_history.append(HumanMessage(content=refine_user_input))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
-                
-                with open("testlog.txt", "a") as file:
-                    file.write(f"\n================= Unniversal Response: \n \t\t\t{vectorstore_info}")
-
-                # from feasibility_agent_skeleton import FeasibilityAgent
-                # # Example usage (replace with your values):
-                agent = FeasibilityAgent(
-                    persist_dir=vectorstore_info.get("final_dir") or vectorstore_info.get("persist_root"),
-                    collection_name=vectorstore_info["collection_name"],
-                    feasibility_study=structured_json_feasibility,
-                    chat_id=chatId,
-                    device="cpu",
-                )
-                result = agent.invoke(
-                    user_input=input,
-                    refined_user_input=refine_user_input,
-                    user_intension=user_intension,  # Set to e.g., "Query to search Incentives" if calling module tool
-                )
-
-                with open("testlog.txt", "a") as file:
-                    file.write(f"\n================= Agent Response: \n \t\t\t{result}")
-                
-                final_result = process_agent_result(result)
-
-                chat_history.append(AIMessage(content=final_result["Ai_response"]))
-                save_chat(chat_history,f"chat_{chatId}")  
-
-                return final_result
-        else:
-            chat_history = get_chat(f"chat_{chatId}") or []
-            Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
-            aggressive_config = {
-                'fresh_turns': 3,
-                'recent_turns': 6,
-                'aging_turns': 10,
-                'stale_turns': 12
-            }
-            refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_gpt_oos_120b,aggressive_config)
-            chat_history.append(HumanMessage(content=refine_user_input))  # Log user query
-            save_chat(chat_history,f"chat_{chatId}")
-            
+        with open("testlog.txt", "a") as file:
+            file.write(f"\n<<<<<<<<<<<>>>>>>>>>>>>>>>>> OUTSIDE IF User Intention : \n\t\t\t{user_intension} for chatId {chatId}") 
         if user_intension not in ["Valueless queries","Other industry-related queries","Negatively Intended Query","Follow-up Query",None]:
+            with open("testlog.txt", "a") as file:
+                file.write(f"\n<<<<<<<<<<<>>>>>>>>>>>>>>>>> INSIDE IF User Intention : \n\t\t\t{user_intension} for chatId {chatId}")
+            
             chat_history = get_chat(f"chat_{chatId}") or []
             Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-6:]]
             # refine_user_input = refine_query_with_history(Chat_history_normal,input,llm_70b_vers)
@@ -249,7 +98,7 @@ def ai_module_call(input,confirmationMessage,chatId):
             )
             temp_out = response["switch_module"]
             
-            log(chatId,'debug','response',f"{temp_out}",'AI.py','ai')
+            log(chatId,'debug','response',f"ABCDEFG {temp_out}",'AI.py','ai')
             if response["switch_module"]:
                 log(chatId,'debug','response',f"{user_intension} changed to None",'AI.py','ai')
                 user_intension = None
@@ -289,8 +138,6 @@ def ai_module_call(input,confirmationMessage,chatId):
                 file.write(f"\nuser_intension found {user_intension} for chatId {chatId}")
             # with open("testlog.txt", "a") as file:
             #     file.write(f"\nMulti Label user_intension found: \n\t\t\t{user_intension_multilabel} for chatId {chatId}")
-            with open("log2.txt", "a", encoding="utf-8") as file:
-                file.write(f" Before calling the function :-> \n user_intension ===>>> {user_intension} \n chatId ===>>> {chatId} \n")
             update_user_intension(user_intension,chatId)  # Store the classified intention for future use
             frappe.log_error("user intension",f"{user_intension,str(user_intension)}")
             log(chatId,'debug','user_intension',str(user_intension),'AI.py','ai')
@@ -430,14 +277,14 @@ def ai_module_call(input,confirmationMessage,chatId):
                 # return response
             
             except Exception as e:
-               response = { 
+                response = { 
                     "Ai_response": "Something went wrong while processing your request. Please try again shortly.",
                     "Is_confirmation" : None,
                     "error": e
                 }
-               log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
+                log(chatId,'debug','response',f"{str(response)} error is {str(e)}",'AI.py','ai')
             return response
-    
+
         else:
             try:
                 with open("log2.txt", "a") as file:
@@ -469,11 +316,11 @@ def ai_module_call(input,confirmationMessage,chatId):
             chat_history_strings=None,      # orf None if you don't want to use this path
             latest_user=input
             )
-            chat_history.append(AIMessage(content=response["Ai_response"]))
-            save_chat(chat_history,f"chat_{chatId}")
+            # chat_history.append(AIMessage(content=response["Ai_response"]))
+            # save_chat(chat_history,f"chat_{chatId}")
 
         return response    
-         
+            
     except Exception as e:
         error_details = traceback.format_exc()
         with open("log3.txt", "a") as file:
@@ -494,32 +341,6 @@ def ai_module_call(input,confirmationMessage,chatId):
         log(chatId,'debug','response',f"{str(response)} error is {str(error_details)}",'AI.py','ai')
         return response
 
-@frappe.whitelist(allow_guest=True)
-def check_user_intension(chatId, return_default_style = True):
-    if return_default_style:
-        
-        query = f'SELECT user_intension FROM `tabSession` WHERE name = "{chatId}"'
-        user_intention = frappe.db.sql(query)
-        with open("log2.txt", "a", encoding="utf-8") as file:
-            file.write(f"USER_INTENSION from DB =====>>>>> {user_intention} \n Query:::::::::--------- {query}--- {chatId} \n")
-        return user_intention[0][0] or None
-    else:
-        query = f'SELECT user_intension, feasibility_id FROM `tabSession` WHERE name = "{chatId}"'
-        user_intention = frappe.db.sql(query)
-        with open("log2.txt", "a", encoding="utf-8") as file:
-            file.write(f"USER_INTENSION from DB SECOND CHECK=====>>>>> {user_intention} \n Query:::::::::--------- {query}--- {chatId} \n")
-        # Handle case where no results are returned
-        if not user_intention:
-            return None, None
-
-        user_intention_fetched = user_intention[0][0] or None
-        fea_id_feached = user_intention[0][1]
-
-        # Keep only if it’s a non-empty string; otherwise make it None
-        if not fea_id_feached or not str(fea_id_feached).strip():
-            fea_id_feached = None
-
-        return user_intention_fetched, fea_id_feached
 
 import json
 
@@ -656,85 +477,3 @@ def generate_dynamic_message(user_message, user_intention, chatId,llm):
     
     return message_from_ai
 
-# def respond_to_negative_query(
-#     user_message: str,
-#     append_user_to_history: bool,
-#     append_AI_to_history: bool,
-#     llm,
-#     chatId,
-#     update_intention = True
-# ) -> str:
-#     """
-#     Reacts to negative intent in user queries by acknowledging it and 
-#     politely redirecting users to supported industry-related alternatives.
-
-#     Parameters:
-#     - user_message (str): The most recent user input.
-#     - append_user_to_history (bool): Flag to determine whether to add the user message to chat history.
-#     - llm: A language model instance that supports the `.invoke()` method for prompt completion.
-
-#     Returns:
-#     - str: A short, polite AI-generated redirection message (max two lines).
-#     """
-#     chat_history = get_chat(f"chat_{chatId}") or []
-#     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-4:]]
-#     if append_user_to_history:
-#         chat_history.append(HumanMessage(content=user_message))
-#         save_chat(chat_history,f"chat_{chatId}")
-
-#     prompt_template = """
-#     You are a professional AI assistant designed to help users with industry-related queries. 
-#     Sometimes users may express that they do not want to proceed with a certain type of query, 
-#     such as searching for vendors, incentives, employment, approvals, or land.
-
-#     Your task is to:
-#     - Politely acknowledge the user's intent to not continue with the current path.
-#     - Respect their decision without repeating the rejected topic.
-#     - Encourage them to explore other areas the platform supports — but limit suggestions to one or two concise, relevant alternatives.
-#     - Keep the response short, natural, and conversational — a maximum of two lines.
-    
-#     Input Usage Guidelines:
-#     - Use the latest user message to understand the user’s current concern or direction.
-#     - Refer to the recent conversation history only when needed to maintain context, avoid repetition, or recognize prior negative expressions.
-#     - Do not restate or repeat what was already covered unless it helps clarify or smoothly redirect the conversation.
-
-#     Important Instructions:
-#     - Do NOT mention or re-suggest the category the user rejected — even in a different location, product, or form.
-#     - If the user’s rejection appears to be specific to a location, product, or context, you may offer assistance in other locations or products — but only if it does not reintroduce the rejected category.
-#     - Suggest one alternative direction naturally (two if needed) based on platform capabilities:
-#         - Building an industry from scratch
-#         - Searching for employment in a city or state
-#         - Inquiring about incentives
-#         - Finding vendors for their industry
-#         - Searching for the approvals
-#     - Never use "how to build an industry" or anything that implies your platform teaches or trains users. 
-#     You are assisting them in setting up or building, not educating them.
-#     - Keep the response strictly within two lines, using concise and polite phrasing.
-
-#     Inputs:
-#     - Latest user message: {user_message}
-#     - Recent conversation history: {chat_history}
-
-#     Output Requirements:
-#     - The message should be in one short paragraph with no more than two lines.
-#     - It must feel polite, helpful, and actionable — inviting the user to continue exploring relevant options.
-#     - Do NOT list all supported categories. Suggest only 1–2 in natural language, avoiding list-like structure.
-#     """
-
-#     prompt = PromptTemplate(
-#         input_variables=["user_message", "chat_history"],
-#         template=prompt_template
-#     )
-#     chain = prompt | llm
-
-#     result = chain.invoke({
-#         "user_message": user_message,
-#         "chat_history": "\n".join(Chat_history_normal)
-#     })
-#     message_from_ai = result.content.strip()
-#     if append_AI_to_history:
-#         chat_history.append(AIMessage(content=message_from_ai))
-#         save_chat(chat_history,f"chat_{chatId}")
-#     if update_intention:
-#         update_user_intension("Negatively Intended Query", chatId)
-#     return message_from_ai

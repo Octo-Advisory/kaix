@@ -10,7 +10,9 @@
   "file_log",
   "retention_days",
   "groq_key",
-  "validation_check"
+  "validation_check",
+  "storage_limit",
+  "time_period_for_deletion"
  ],
  "fields": [
   {
@@ -46,13 +48,23 @@
    "fieldname": "validation_check",
    "fieldtype": "Check",
    "label": "Validation Check"
+  },
+  {
+   "fieldname": "storage_limit",
+   "fieldtype": "Data",
+   "label": "Storage Limit"
+  },
+  {
+   "fieldname": "time_period_for_deletion",
+   "fieldtype": "Int",
+   "label": "Time Period For Deletion"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-10-01 20:31:58.243152",
- "modified_by": "Administrator",
+ "modified": "2025-10-30 17:44:10.181376",
+ "modified_by": "rituparno.das@marsbazaar.com",
  "module": "marsaix",
  "name": "Mars Configurations",
  "owner": "Administrator",
@@ -76,15 +88,9 @@
    "role": "Guest",
    "share": 1,
    "write": 1
-  },
-  {
-   "email": 1,
-   "print": 1,
-   "read": 1,
-   "role": "AIX User",
-   "share": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

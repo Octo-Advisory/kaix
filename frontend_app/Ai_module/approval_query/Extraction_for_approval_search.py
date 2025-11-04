@@ -723,9 +723,8 @@ def handle_approval_query(
     
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     
-    refined_user_input = refine_query_with_history_for_approval(Chat_history_normal, user_input, llm)
-    chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
-    save_chat(chat_history,f"chat_{chatId}")
+    refined_user_input = user_input
+    
 
     result = classify_approval_query(refined_user_input, llm)
     user_intention = result["classification_category"]
@@ -738,8 +737,7 @@ def handle_approval_query(
             llm=llm_70b_vers,
             chatId=chatId
         )
-        chat_history.append(AIMessage(content=f"{message}"))
-        save_chat(chat_history,f"chat_{chatId}")
+        
         response = {
             "Ai_response": message,
             "Is_confirmation" : None,
@@ -840,8 +838,7 @@ def handle_approval_query(
                         # confirmation_message_approval += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
 
                         # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
-                        chat_history.append(AIMessage(content=confirmation_message_approval))  # Log user query
-                        save_chat(chat_history,f"chat_{chatId}")
+                        
 
                         confirmation_buttons = [
                             {"label": "Yes, this is correct", "value": user_intention},
@@ -861,8 +858,7 @@ def handle_approval_query(
                         return response
                     else:
                         message = INDUSTRY_NOT_AVAILABLE_MSG
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"chat_{chatId}")
+                        
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -876,8 +872,7 @@ def handle_approval_query(
                 else:
                     response_static_message = get_static_follow_up_for_approval(state, user_intention)
                     message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -896,8 +891,7 @@ def handle_approval_query(
                 save_state(state,f"QAPP_state_{chatId}")
                 if perfect_industry_data:
                     message = LOCATION_NOT_AVAILABLE_MSG
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": LOCATION_NOT_AVAILABLE_MSG,
                         "Is_confirmation" : None,
@@ -911,8 +905,7 @@ def handle_approval_query(
                 else:
                     response_static_message = get_static_follow_up_for_approval(state, user_intention)
                     message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                   
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -999,8 +992,7 @@ def handle_approval_query(
                                 # response_validation = state.get("Additional_class_response")
                                 # confirmation_message_approval += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
                                 # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
-                                chat_history.append(AIMessage(content=confirmation_message_approval))  # Log user query
-                                save_chat(chat_history,f"chat_{chatId}")
+                                
 
                                 confirmation_buttons = [
                                     {"label": "Yes, this is correct", "value": user_intention},
@@ -1020,8 +1012,7 @@ def handle_approval_query(
                                 return response
                             else:
                                 message = LOCATION_NOT_AVAILABLE_MSG
-                                chat_history.append(AIMessage(content=message))  # Log user query
-                                save_chat(chat_history,f"chat_{chatId}")
+                                
                                 response = {
                                     "Ai_response": message,
                                     "Is_confirmation" : None,
@@ -1035,8 +1026,7 @@ def handle_approval_query(
                         else:
                             response_static_message = get_static_follow_up_for_approval(state, user_intention)
                             message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                            
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1054,8 +1044,7 @@ def handle_approval_query(
                         save_state(state,f"QAPP_state_{chatId}")
                         if perfect_location_data:
                             message = INDUSTRY_NOT_AVAILABLE_MSG
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                            
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1069,8 +1058,7 @@ def handle_approval_query(
                         else:
                             response_static_message = get_static_follow_up_for_approval(state, user_intention)
                             message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                            
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1088,8 +1076,7 @@ def handle_approval_query(
                     save_state(state,f"QAPP_state_{chatId}")
                     response_static_message = get_static_follow_up_for_approval(state, user_intention)
                     message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1107,8 +1094,7 @@ def handle_approval_query(
                 save_state(state,f"QAPP_state_{chatId}")
                 if perfect_location_data:
                     message = INDUSTRY_NOT_AVAILABLE_MSG
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1122,8 +1108,7 @@ def handle_approval_query(
                 else:
                     response_static_message = get_static_follow_up_for_approval(state, user_intention)
                     message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1204,8 +1189,7 @@ def handle_approval_query(
                         
                         if perfect_location_data:
                             message = INDUSTRY_NOT_AVAILABLE_MSG
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                            
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1219,8 +1203,7 @@ def handle_approval_query(
                         else:
                             response_static_message = get_static_follow_up_for_approval(state, user_intention)
                             message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                            
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1288,8 +1271,7 @@ def handle_approval_query(
                     # confirmation_message_approval += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
 
                     # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=confirmation_message_approval))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     confirmation_buttons = [
                         {"label": "Yes, this is correct", "value": user_intention},
                         {"label": "No, I want to refine the details", "value": None}
@@ -1309,8 +1291,7 @@ def handle_approval_query(
                 else:
                     response_static_message = get_static_follow_up_for_approval(state, user_intention)
                     message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1351,8 +1332,7 @@ def handle_approval_query(
                             state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                             save_state(state,f"QAPP_state_{chatId}")
                     message = LOCATION_NOT_AVAILABLE_MSG
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1397,8 +1377,7 @@ def handle_approval_query(
                         save_state(state,f"QAPP_state_{chatId}")
                     
                     message = INDUSTRY_NOT_AVAILABLE_MSG
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1418,8 +1397,7 @@ def handle_approval_query(
                     state["Industry_info"]["Product"] = product_name if product_name != "None" else None
                     save_state(state,f"QAPP_state_{chatId}")
                     message = LOCATION_NOT_AVAILABLE_MSG + "AND" + INDUSTRY_NOT_AVAILABLE_MSG
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1434,8 +1412,7 @@ def handle_approval_query(
         else:
             response_static_message = get_static_follow_up_for_approval(state, user_intention)
             message = generate_dynamic_message_for_approval(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-            chat_history.append(AIMessage(content=message))  # Log user query
-            save_chat(chat_history,f"chat_{chatId}")
+            
             response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,

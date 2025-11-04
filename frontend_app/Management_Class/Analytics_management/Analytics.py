@@ -17,7 +17,7 @@ def analytics_module_call(aiResponse,chatId,validationResult,selectedOption):
         log(chatId,"debug","user_intension",str(user_intension),"Analytics.py",'analytics')
         aiResponse = json.loads(aiResponse)
         with open("log2.txt", "a", encoding="utf-8") as file:
-            file.write(f"AI RESPONSE FOR TESTING LOG {json.dumps(aiResponse)} \n")
+            file.write(f"AI RESPONSE FOR TESTING LOG {json.dumps(aiResponse)} USER_INTENSION---->>>> {user_intension} \n")
         log(chatId,"debug","aiResponse",str(aiResponse),"Analytics.py",'analytics')
         aiResponse = aiResponse[0]
         if user_intension == "Query to Get Employee Search":
