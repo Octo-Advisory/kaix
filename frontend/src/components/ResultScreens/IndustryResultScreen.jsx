@@ -35,6 +35,7 @@ import MapBoxMap from '../MapComponent/MapBoxMap';
 import SingleMap from '../MapComponent/SingleMap';
 import NoResultsFound from '../Failure/NoResultsFound';
 import { CiCoinInsert } from 'react-icons/ci';
+import NewIndustryScreen from './Test/NewIndustryScreen';
 
 
 const IndustryResultScreen = ({ result, source, rerender }) => {
@@ -98,7 +99,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
   const handleMouseLeave = (id) => {
     setVisibleTooltips(prev => ({ ...prev, [id]: false }));
   };
-
+  // console.log(result, 'first check')
   const analytics_response = source === "MapComponent" ? '' : result["Analytics_response"]
   if(source!== "MapComponent") {
 
@@ -109,7 +110,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     ) {
       // console.log('Invalid analytics_response:', analytics_response);
       // createDiagnostic("Data Error", `Invalid Data was passed that couldn't be rendered due to ${analytics_response} in Build From Scratch`,lastChatId)
-      return <NoResultsFound diagnostics={true} type='Land & Approval' chatId={lastChatId} data={analytics_response} module='Build From Scratch'/>;
+      return <NoResultsFound diagnostics={true} type='Land & Approvals' chatId={lastChatId} data={analytics_response} module='Build From Scratch'/>;
     }
   }
   // if ((typeof analytics_response === 'object' && analytics_response !== null) || source === "MapComponent") {
@@ -210,13 +211,13 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     if (!lastChat || !solutions) return
 
     try {
-      // console.log(lastChat, solutions?.[0], 'Method Called')
-      const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
+
+      const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.convert_json_to_binary", {
         child_row_id: lastChat,
         updated_solutions: solutions,
         intension: "Query to build industry from Scratch"
       },
-        {
+      {
           headers: {
             'Expect': '' // 👈 Clear problematic header
           }
@@ -324,7 +325,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     } catch (err) {
       // console.error("❌ Error in getAllVendorsData:", err);
       createDiagnostic("Land & Approvals", `Something went wrong while fetching All Vendors Data ${JSON.stringify(err)} in Build From Scratch`,lastChatId)
-      // setSomeError(true)
+      setSomeError(true)
       return [];
     }
   };
@@ -527,7 +528,6 @@ const parseSinglePropertySuppliers = (supplyIds, vendorIds) => {
 
   return result;
 };
-
   
   const parseAllSupplies = (supplies) => {
     const allsupplies = []
@@ -608,7 +608,6 @@ function mapVendorsToSupply(supplies, vendors) {
   return result;
 }
 
-
 const attachBestSuppliesToVendorData = (vendorData, parsedSuppliersData) => {
   // console.log(vendorData, parsedSuppliersData, 'Okay this is last second data');
   return vendorData.map(vendor => {
@@ -616,14 +615,28 @@ const attachBestSuppliesToVendorData = (vendorData, parsedSuppliersData) => {
     const supplier = parsedSuppliersData.find(s => s.vendor_id === vendor.name);
     
     // If supplier exists, add best_supply to vendor data, else return the vendor as is
+    // return supplier 
+    //   ? { ...vendor, best_supply: supplier.best_supply, vendor_id: supplier.vendor_id, supply_id: supplier.supply_id }
+    //   : vendor;
     return supplier 
-      ? { ...vendor, best_supply: supplier.best_supply, vendor_id: supplier.vendor_id, supply_id: supplier.supply_id }
-      : vendor;
+  ? (() => {
+      const { supplies,record_status, exclusion,business_type,certifications,creation,docstatus,idx,modified,modified_by,no_of_employees,no_of_location,no_of_past_clients,no_of_services,owner,years_of_experience,
+google_cid, ...rest } = {
+        ...vendor,
+        best_supply: supplier.best_supply,
+        vendor_id: supplier.vendor_id,
+        supply_id: supplier.supply_id,
+      };
+      return rest;
+    })()
+  : (() => {
+      const { supplies,record_status, exclusion,business_type,certifications,creation,docstatus,idx,modified,modified_by,no_of_employees,no_of_location,no_of_past_clients,no_of_services,owner,google_cid,years_of_experience
+, ...rest } = vendor;
+      return rest;
+    })();
+
   });
 };
-
-
-
 
 const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6.5% Real GDP**
 
@@ -719,6 +732,26 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
     // console.warn("Raw input:", input);
     return {};
   }
+}
+
+function mapIncentivesToTypes(incentivesObj, typesObj,namesObj) {
+  if(!incentivesObj || !typesObj) return []
+    return Object.keys(incentivesObj).map(key => ({
+        id: incentivesObj[key],
+        name: namesObj[key],
+        type: typesObj[key],  // Fallback in case type doesn't exist
+    }));
+}
+
+function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
+  if(!ApprovalsObj || !nameObj) return []
+    return Object.keys(ApprovalsObj).map(key => ({
+        id: ApprovalsObj[key],
+        approval_name: nameObj[key],
+        government_department: govtObj[key] || "Department of Industry & Health", // Fallback in case type doesn't exist
+        stage: stageObj[key],
+        time_taken: timeObj[key]
+    }));
 }
 
   const fetchPropertyData = async (analytics_response) => {
@@ -903,39 +936,39 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
           const semiskilled_no = Employment_lookup_df['Semi-skilled'][employment_index] || 0
           const unskilled_no = Employment_lookup_df['Unskilled'][employment_index] || 0
 
-          let incenetives = incentive_data.map(incentive => {
-            let parsedContext = safeJsonParse(incentive.contextual_analysis);
-            let inc = {
-              id: incentive.name,
-              name: incentive.incentive_name,
-              endDate: incentive.incentive_operation_end_date,
-              startDate: incentive.incentive_operation_start_date,
-              incentive_rank: incentive.incentive_rank,
-              type: incentive.incentive_type,
-              quantum_of_assistance: incentive.quantum_of_assistance,
-              contextual_analysis: parsedContext?.final_markdown || '',
-              description: incentive.description,
-              category_description: JSON.parse(incentive.category_description)
-            };
+          // let incenetives = incentive_data.map(incentive => {
+          //   // let parsedContext = safeJsonParse(incentive.contextual_analysis);
+          //   let inc = {
+          //     id: incentive.name,
+          //     name: incentive.incentive_name,
+          //     // endDate: incentive.incentive_operation_end_date,
+          //     // startDate: incentive.incentive_operation_start_date,
+          //     // incentive_rank: incentive.incentive_rank,
+          //     type: incentive.incentive_type,
+          //     // quantum_of_assistance: incentive.quantum_of_assistance,
+          //     // contextual_analysis: parsedContext?.final_markdown || '',
+          //     // description: incentive.description,
+          //     // category_description: JSON.parse(incentive.category_description)
+          //   };
 
-            // Always calculate status
-            inc.status = getProgramStatus(inc.startDate, inc.endDate);
+          //   // Always calculate status
+          //   // inc.status = getProgramStatus(inc.startDate, inc.endDate);
 
-            // Add level only if industry match found
-            const matchingIndustry = industry_incentive_data.find(
-              industry => industry.incentive === inc.id // or inc.name if needed
-            );
+          //   // Add level only if industry match found
+          //   // const matchingIndustry = industry_incentive_data.find(
+          //   //   industry => industry.incentive === inc.id // or inc.name if needed
+          //   // );
 
-            if (matchingIndustry) {
-              inc.level = getLocationLevel(
-                matchingIndustry.city_level,
-                matchingIndustry.state_level,
-                matchingIndustry.country_level
-              );
-            }
+          //   // if (matchingIndustry) {
+          //   //   inc.level = getLocationLevel(
+          //   //     matchingIndustry.city_level,
+          //   //     matchingIndustry.state_level,
+          //   //     matchingIndustry.country_level
+          //   //   );
+          //   // }
 
-            return inc;
-          });
+          //   return inc;
+          // });
 
           const total_effective_time = Approval_lookup_df['Efficient Approval Time'][approval_index]
           const online_percentage = Approval_lookup_df['Online Percentage'][approval_index]
@@ -947,27 +980,27 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
           const mode_establishment = Approval_lookup_df['Mode_Pre-Establishment'][approval_index]
           const mode_operation = Approval_lookup_df['Mode_Pre-Operation'][approval_index]
           const mode_others = Approval_lookup_df['Mode_Others'][approval_index]
-          const approvals = []
+          // const approvals = []
 
-          approval_data.forEach((approval, index) => {
-            let tempLevel = getLocationLevel(approval.city_level, approval.state_level, approval.country_level)
-            const appr = {
-              id: approval.name,
-              approvalID: approval.name,
-              approval_name: approval.license_approval,
-              government_department: approval.government_department,
-              time_taken: approval.delivery_schedule_in_working_days,
-              land_type: approval.land_type,
-              level: tempLevel,
-              stage: approval.stage || "N/A",
-              mode_of_application: approval.mode_of_application || "N/A",
-              business_location: approval.business_location || "N/A",
-              details: approval.description || "No Description Available",
-            }
-            approvals.push(appr)
-          })
+          // approval_data.forEach((approval, index) => {
+          //   // let tempLevel = getLocationLevel(approval.city_level, approval.state_level, approval.country_level)
+          //   const appr = {
+          //     id: approval.name,
+          //     // approvalID: approval.name,
+          //     approval_name: approval.license_approval,
+          //     government_department: approval.government_department,
+          //     time_taken: approval.delivery_schedule_in_working_days,
+          //     // land_type: approval.land_type,
+          //     // level: tempLevel,
+          //     stage: approval.stage || "N/A",
+          //     // mode_of_application: approval.mode_of_application || "N/A",
+          //     // business_location: approval.business_location || "N/A",
+          //     // details: approval.description || "No Description Available",
+          //   }
+          //   approvals.push(appr)
+          // })
 
-          const stageCounts = approvals?.reduce((acc, curr) => {
+          const stageCounts = approval_data?.reduce((acc, curr) => {
             acc[curr.stage] = (acc[curr.stage] || 0) + 1;
             return acc;
           }, {});
@@ -1025,8 +1058,8 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
             unskilled_no: unskilled_no,
             incentives: incenetives,
             no_of_incentives: incenetives.length,
-            approvals: approvals,
-            no_of_approvals: approvals.length,
+            approvals: approval_data,
+            no_of_approvals: approval_data.length,
             stagewise_no_of_approvals: stageCounts,
             pre_requisite: pre_requisite,
             pre_establishment: pre_establishment,
@@ -1070,6 +1103,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
     });
 
     await Promise.all(promises);
+    // console.log(preaparedSolutions, 'okay ')
     const updatedSolutions = preaparedSolutions
       .sort((a, b) => b.score - a.score) // Sort descending by score
       .map((solution, index) => ({
@@ -1257,7 +1291,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
     <>
       {shouldRender ? (
         <div className='relative flex flex-col w-screen h-screen'>
-          {source === 'SolutionScreen' && (<div className='sticky top-0 left-0 w-full h-fit flex flex-col z-99  bg-white border-b border-gray-300'>
+          {source === 'SolutionScreen' && (<div className='sticky top-0 left-0 w-full h-fit flex flex-col z-[11]  bg-white border-b border-gray-300'>
             <div className='relative w-full h-12 p-4 flex flex-row justify-between mb-4'>
               <div className='relative flex flex-row gap-2 items-center'>
                 <h1 className="text-2xl font-bold text-[#0e2044]"> {uiConfig["main_title"] || "Industrial property solutions"}<span className="bg-gradient-to-br from-[#3CB35B] via-[#2E8C4A] to-[#152F4F] font-bold bg-clip-text text-transparent ml-2">{randomTitle}</span></h1>
@@ -1269,6 +1303,7 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
               <div className='relative flex flex-col gap-1 items-center'><div className={` relative h-full flex items-center justify-center px-2 hover:cursor-pointer hover:text-[#2C53A3] ${activeButton === 'Property Details' ? 'text-[#0B2152]' : 'text-gray-500 '}`} onClick={() => { setActiveButton('Property Details'), setActiveTab('Property Details') }}>{uiConfig?.['property_tab'] || "Property Details"}</div><span className={`${activeButton === 'Property Details' ? 'w-full' : 'w-0'} h-0.5 bg-[#0B2152] rounded-full relative transition-all duration-300`}></span></div>
               <div className='relative flex flex-col gap-1 items-center'><div className={` relative h-full flex items-center justify-center px-2 hover:cursor-pointer hover:text-[#2C53A3]  ${activeButton === 'Map View' ? 'text-[#0B2152]' : 'text-gray-500 '}`} onClick={() => { setActiveButton('Map View'), setActiveTab('Map View') }}>{uiConfig?.['map_tab'] || "Map view"}</div><span className={`${activeButton === 'Map View' ? 'w-full' : 'w-0'} h-0.5 relative transition-all rounded-full duration-300 bg-[#0B2152]`}></span></div>
               <div className='relative flex flex-col gap-1 items-center'><div className={` relative h-full flex items-center justify-center px-2 hover:cursor-pointer hover:text-[#2C53A3] ${activeButton === 'Analytics' ? 'text-[#0B2152]' : 'text-gray-500 '}`} onClick={() => { setActiveButton('Analytics'), setActiveTab('Analytics') }}>{uiConfig?.['analytics_tab'] || "Analytics"}</div><span className={`${activeButton === 'Analytics' ? 'w-full' : 'w-0'} h-0.5 relative rounded-full transition-all duration-300 bg-[#0B2152]`}></span></div>
+              <div className='relative flex flex-col gap-1 items-center'><div className={` relative h-full flex items-center justify-center px-2 hover:cursor-pointer hover:text-[#2C53A3] ${activeButton === 'newUI' ? 'text-[#0B2152]' : 'text-gray-500 '}`} onClick={() => { setActiveButton('newUI'), setActiveTab('newUI') }}>{uiConfig?.['newUI_tab'] || "newUI"}</div><span className={`${activeButton === 'newUI' ? 'w-full' : 'w-0'} h-0.5 relative rounded-full transition-all duration-300 bg-[#0B2152]`}></span></div>
             </div>
 
             {activeTab === 'Property Details' && (<div className='relative w-full min-h-36 h-36 flex flex-row p-3 gap-4 overflow-x-auto overflow-y-hidden hide-scrollbar'>
@@ -1299,6 +1334,12 @@ const fallBackMarketTrend = `## **India’s Economy Sustains Strong Growth at ~6
             {activeTab === 'Analytics' && (
               <div className='relative h-screen w-screen overflow-hidden flex items-center justify-center'>
                 <Comparison solutions={solutions} />
+              </div>
+            )}
+
+            {activeTab === 'newUI' && (
+              <div className='relative h-full w-full overflow-hidden flex flex-1'>
+                <NewIndustryScreen solutions={solutions} />
               </div>
             )}
 
