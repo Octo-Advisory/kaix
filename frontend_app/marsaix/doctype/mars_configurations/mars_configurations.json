@@ -65,13 +65,8 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
-<<<<<<< HEAD
- "modified": "2025-10-30 12:27:39.836549",
- "modified_by": "Administrator",
-=======
  "modified": "2025-10-30 17:44:10.181376",
  "modified_by": "rituparno.das@marsbazaar.com",
->>>>>>> 3a4bdaaf39cef4edb8281441d780be187fe0c3d5
  "module": "marsaix",
  "name": "Mars Configurations",
  "owner": "Administrator",

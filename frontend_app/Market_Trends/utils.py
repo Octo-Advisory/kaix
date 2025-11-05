@@ -14,11 +14,7 @@ import configparser
 from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers_creative, llm_70b_vers
 
 # from langchain_openai import ChatOpenAI
-<<<<<<< HEAD
-config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
-=======
 config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
->>>>>>> 9e51c25 (payload optmization and new ui)
 config = configparser.ConfigParser()
 config.read(config_file)
 api_key = config['Key']['SERPAPI_API_KEY']
@@ -36,18 +32,13 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-<<<<<<< HEAD
         logging.FileHandler(log_file, encoding="utf-8"),
-=======
-        logging.FileHandler("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/market_trends.log", encoding="utf-8"),
->>>>>>> 9e51c25 (payload optmization and new ui)
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 
 # File-based cache
-<<<<<<< HEAD
 # Dynamically get the user's home directory
 base_dir = os.path.expanduser("~")
 
@@ -56,9 +47,6 @@ CACHE_FILE = os.path.join(
     base_dir,
     "frappe-bench/apps/frontend_app/frontend_app/Market_Trends/search_cache.json"
 )
-=======
-CACHE_FILE = "/home/mars/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/search_cache.json"
->>>>>>> 9e51c25 (payload optmization and new ui)
 CACHE_EXPIRY_DAYS = 30
 
 def load_cache() -> dict:

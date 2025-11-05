@@ -24,12 +24,8 @@ from math import radians, sin, cos, sqrt, atan2
 from geopy.distance import geodesic
 
 # from langchain_openai import ChatOpenAI
-<<<<<<< HEAD
 base_dir = os.path.expanduser("~")
 config_file = os.path.join(base_dir, "frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini")
-=======
-config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
->>>>>>> 9e51c25 (payload optmization and new ui)
 config = configparser.ConfigParser()
 config.read(config_file)
 groq_api_key = config['Key']['groq_key']
