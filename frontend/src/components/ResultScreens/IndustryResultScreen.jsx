@@ -193,7 +193,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
           }
         );
 
-        if (!response.ok) throw new Error(`Error: ${response.statusText}`);
+        if (!response.ok) throw new Error(`Errorr: ${response.statusText}`);
 
         const data = await response.json();
         results.push(data.data[0]); // assuming it returns an array
