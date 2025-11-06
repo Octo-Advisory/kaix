@@ -29,10 +29,11 @@ import ast
 import json
 from pathlib import Path
 import hashlib
+import configparser
 import chromadb  # add this import at top if missing
 
 ## function imports from FINAL_UNVIERSAL_FUNCTION ##
-from FINAL_UNIVERSAL_FUNCTION import (
+from frontend_app.Ai_module.Feasibility_Universal_Function.Final_Universal_Function import (
     fetch_single_doc_by_name, 
     fetch_doc_fields_by_name, 
     make_headers, 
@@ -51,17 +52,23 @@ FOLL_DOCTYPE = "Follow Up"
 LABEL_FOLLOW = "Follow_Up"
 LABEL_FEASIBILITY = "Feasibility_Report"
 
+base_dir = os.path.expanduser("~")
+config_file = os.path.join(base_dir, "frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini")
+config = configparser.ConfigParser()
+config.read(config_file)
+groq_api_key = config['Key']['groq_key']
+
 warnings.filterwarnings("ignore")
 # load_dotenv(dotenv_path=r"D:\work_folder\mars_rag_qna\.env")
 # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
 # api_key = os.getenv("GROQ_API_KEY")
-groq_api_key = "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"
-# base_url = "https://marsaix.marsbazaar.com"
-base_url = "http://172.17.242.222"
+
+base_url = "https://marsaix.marsbazaar.com"
+# base_url = "http://172.17.242.222"
 # api_key    = os.getenv("API_KEY")
-api_key = "d3de1e0e4e25846"
+api_key = config['Key']['frappe_doctype_api_key']
 # api_secret = os.getenv("API_SECRET")
-api_secret = "51fd8e403a19045"
+api_secret = config['Key']['frappe_doctype_api_secret']
 print(api_key)
 print("Loaded API Key:", api_key is not None)  # Should print: True
 # print("API KEY:", os.getenv("GROQ_API_KEY"))
@@ -1108,7 +1115,7 @@ def extract_query_list(message):
 def formatting_doc_info_for_user_comaptibility(json, llm_model="meta-llama/llama-4-maverick-17b-128e-instruct", temperature=0.5):
 
    
-    llm = ChatGroq(model_name=llm_model, temperature=0.5, api_key = "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")
+    llm = ChatGroq(model_name=llm_model, temperature=0.5, api_key = groq_api_key)
     prompt_template = """You are a professional assistant trained to summarize key industrial project information extracted from documents uploaded by users.
 
    Your job is to read a structured dictionary (in JSON format) containing extracted information about an industrial setup (such as a feasibility report or investment plan), and generate a **single, intuitive, formal paragraph summary**.

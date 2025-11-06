@@ -45,28 +45,53 @@ function Incentiveresult({ res, source, rerender }) {
     }));
 }
 
- const storeResultData = async (lastChat,solutions,intension) => {
-  if(!lastChat || !solutions) return 
+//  const storeResultData = async (lastChat,solutions,intension) => {
+//   if(!lastChat || !solutions) return 
 
-  try {
-      const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
-      child_row_id: lastChat,
-      updated_solutions: solutions,
-      intension: intension
+//   try {
+//       const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
+//       child_row_id: lastChat,
+//       updated_solutions: solutions,
+//       intension: intension
+//       },
+//     {
+//     headers: {
+//       'Expect': '' // 👈 Clear problematic header
+//     }
+//   });
+//       // console.log('This is the result we want ot store.... ', result.message)
+//       return result.message || [];
+//     } catch (err) {
+//       // console.error("Error Storing Result json:", err);
+//       createDiagnostic("Incentive", `Error Storing Result Json ${JSON.stringify(err)} in Incentives`, lastChatId)
+//       return []; // Return empty for this batch on error
+//     }
+// }
+
+ const storeResultData = async (lastChat, solutions,intension) => {
+    if (!lastChat || !solutions) return
+
+    try {
+
+      const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.convert_json_to_binary", {
+        child_row_id: lastChat,
+        updated_solutions: solutions,
+        intension: intension
       },
-    {
-    headers: {
-      'Expect': '' // 👈 Clear problematic header
-    }
-  });
-      // console.log('This is the result we want ot store.... ', result.message)
-      return result.message || [];
+      {
+          headers: {
+            'Expect': '' // 👈 Clear problematic header
+          }
+      }
+    )
+    // console.log(convertJson, 'this is the msg');
+    
     } catch (err) {
       // console.error("Error Storing Result json:", err);
-      createDiagnostic("Incentive", `Error Storing Result Json ${JSON.stringify(err)} in Incentives`, lastChatId)
+      createDiagnostic("Land & Approvals", `Something went wrong while storing the result json ${JSON.stringify(err)} in Incentive screen`,lastChatId)
       return []; // Return empty for this batch on error
     }
-}
+  }
 
   let Analytics_response = rerender!==1 ?  res['Analytics_response'] : {}
   if ((
@@ -251,12 +276,13 @@ const handleIncentiveSelection = async (incentiveName) => {
 
 
  useEffect(() => {
+  const checkData = async()=> {
     try {
         if (rerender === 1 || source==='FromScratch') {
         let tempResult = res?.['result'] ? res.result : res
         // setIncentives(tempResult)
         setIncentivesMap(tempResult)
-        setSelectedIncentive(tempResult?.[0])
+        await handleIncentiveSelection(tempResult[0].id)
         setLoading(false);
       }
       else {
@@ -270,6 +296,8 @@ const handleIncentiveSelection = async (incentiveName) => {
       createDiagnostic("Incentive", `Something went wrong while rendering the data. Rerender = ${JSON.stringify(rerender)}, Source = ${JSON.stringify(source)}  ${JSON.stringify(err)} in Incentives`, lastChatId)
       setSomeError(true)
     }
+  }
+  checkData()
   }, [res]);
 
   const fetchIncentives = async()=>{

@@ -59,6 +59,20 @@ function Chatscreen() {
   const [chatLoading, setChatLoading] = useState(true)
   const [loadingStates, setLoadingStates] = useState(new Map());
 
+  const { from, sendMsg, messageToSet } = location.state || {};
+
+useEffect(() => {
+  if (sendMsg) {
+    // do something only once when arriving
+    console.log('Running once for new session');
+    handleSendbtn(messageToSet)
+    // Optionally clear it
+    navigate(location.pathname, { replace: true, state: {} });
+  }
+}, [sendMsg]);
+
+
+
   const createDiagnostic = (errType, logMsg,chatIdd,sessions)=> {
       let log = ` ${logMsg}`
       try {
@@ -128,20 +142,8 @@ function Chatscreen() {
   }
 
   useEffect(() => {
-    // First: send message & create session
-    console.log(addInput,feasibilityId, 'This is the addInput Value 1st level ',sessionId)
-    if (addInput) {
-      // console.log(addInput,feasibilityId, 'This is the addInput Value 2nd level ')
-      // console.log('-----',addInput , 'ADDD INPUTT ------');
-      
-      handleSendbtn(addInput); // this will internally set the sessionId
-    }
-  }, [addInput]);
 
-
-  useEffect(() => {
-
-    const handleNewChat = async()=> {
+    const handleNewChat = async(msg)=> {
       if(!feasibilityId) return
       if(!addInput) return
       console.log('Making New Chat...')
@@ -161,19 +163,40 @@ function Chatscreen() {
 
       if (currentUser) {
         setTimeout(() => {
-          navigate(`/chat/${sessionResp.name}`, { replace: true })
+          navigate(`/chat/${sessionResp.name}`, { 
+            replace: true,
+            state: {
+              from: "new-chat-redirect",
+              sendMsg: true,
+              messageToSet: msg,
+            }, 
+          })
         }, 200);
       } else {
         sessionStorage.setItem("guest_session_id", sessionResp.name);
       }
 
     }
+    // First: send message & create session
+    console.log(addInput,feasibilityId, 'This is the addInput Value 1st level ',sessionId)
+    if (addInput) {
+      // console.log(addInput,feasibilityId, 'This is the addInput Value 2nd level ')
+      // console.log('-----',addInput , 'ADDD INPUTT ------');
+      handleNewChat(addInput)
+      // handleSendbtn(addInput); // this will internally set the sessionId
+    }
+  }, [addInput]);
+
+
+  useEffect(() => {
+
+    
     // Second: once sessionId is available, add to child table if not already present
-    const handleFeasibilityChatLink = async (feasibilityId, addInput, sessionID) => {
-      console.log("In Chat Link", feasibilityId, addInput, sessionID);
+    const handleFeasibilityChatLink = async () => {
+      console.log("In Chat Link", feasibilityId, addInput, sessionId);
 
       if (!addInput) return;
-      if (!feasibilityId || !sessionID) return;
+      if (!feasibilityId || !sessionId) return;
 
       try {
         const response = await call.get("frappe.client.get", {
@@ -189,7 +212,7 @@ function Chatscreen() {
         if (!alreadyExists) {
           console.log('we are here now!!!! to remove the addInput')
           await createDoc("Linked Chats", {
-            session: sessionID,
+            session: sessionId,
             parent: feasibilityId,
             parenttype: "Feasibility Report",
             parentfield: "chats",
@@ -463,14 +486,20 @@ function Chatscreen() {
       setSessionLoading('new-chat', false);
       setSessionLoading(sessionResp.name, true);
       hintsMutate()
-      intensionMutate();
-      addInput = null;
+      intensionMutate();  
       if (currentUser) {
+        console.log(response, label, 'Okay we want to check this')
         setTimeout(() => {
-          navigate(`/chat/${sessionResp.name}`, { replace: true })
+          navigate(`/chat/${sessionResp.name}`, { 
+            replace: true,
+            state: {
+              from: "new-chat-redirect",
+              sendMsg: true,
+              messageToSet: AiResponses.UserQuery,
+            }, 
+          })
         }, 200);
-        handleSendbtn(label)
-        
+        // handleSendbtn(label)
       } else {
         sessionStorage.setItem("guest_session_id", sessionResp.name);
       }

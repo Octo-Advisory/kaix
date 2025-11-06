@@ -17,6 +17,7 @@ from frontend_app.Log_management.createlog import log
 from frontend_app.Management_Class.helpers.utility import update_llm_token
 from frontend_app.Ai_module.feasibility_agentic_workflow.feasibility_agent import FeasibilityAgent, process_agent_result
 from frontend_app.Ai_module.Feasibility_Universal_Function.Final_Universal_Function import ensure_vector_and_update_record
+import requests
 
 # --- AI.py (imports) ---
 from frontend_app.Ai_module.responder_consultant import (

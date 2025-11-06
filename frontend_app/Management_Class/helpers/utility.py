@@ -626,7 +626,161 @@ def log_to_file(key,value):
     
     with open("log2.txt", "a", encoding="utf-8") as file:
         file.write(json.dumps(log_entry) + "\n")
-        
+
+# @frappe.whitelist(allow_guest=True)
+# def convert_json_to_binary():
+#     try:
+#         child_row_id = frappe.form_dict.get("child_row_id")
+#         updated_solutions = frappe.form_dict.get("updated_solutions")
+#         intension = frappe.form_dict.get("intension")
+
+#         # --- Validation ---
+#         if not all([child_row_id, updated_solutions, intension]):
+#             return {
+#                 "status": "fail",
+#                 "message": "The data is NONE"
+#             }
+
+#         # --- Step 1: Parse JSON if string ---
+#         if isinstance(updated_solutions, str):
+#             try:
+#                 updated_solutions = json.loads(updated_solutions)
+#             except json.JSONDecodeError:
+#                 frappe.logger().warning("updated_solutions is not JSON — storing as plain string")
+
+#         # --- Step 2: Ensure dict/list are JSON stringified ---
+#         if isinstance(updated_solutions, (dict, list)):
+#             updated_solutions = json.dumps({"result": updated_solutions})
+
+#         # --- Step 3: Ensure final value is string ---
+#         if not isinstance(updated_solutions, str):
+#             updated_solutions = str(updated_solutions)
+
+#         # --- Step 4: Compress using gzip and encode as base64 (safe for Text field) ---
+#         compressed_data = gzip.compress(updated_solutions.encode('utf-8'), compresslevel=9)
+#         compressed_base64 = base64.b64encode(compressed_data).decode('utf-8')
+
+#         # --- Step 5: Update DB safely ---
+#         frappe.db.sql("""
+#             UPDATE `tabChat history`
+#             SET result = %s,
+#                 intension = %s,
+#                 modified = NOW()
+#             WHERE name = %s
+#         """, (
+#             compressed_base64,
+#             intension,
+#             child_row_id
+#         ))
+
+#         frappe.db.commit()
+
+#         return {
+#             "status": "success",
+#             "message": "Chat history (compressed) updated successfully."
+#         }
+
+#     except Exception as e:
+#         frappe.throw(f"Server error: {str(e)}")
+
+@frappe.whitelist(allow_guest=True)
+def convert_json_to_binary():
+    try:
+        child_row_id = frappe.form_dict.get("child_row_id")
+        updated_solutions = frappe.form_dict.get("updated_solutions")
+        intension = frappe.form_dict.get("intension")
+
+        # --- Step 1: Validate required fields ---
+        if not all([child_row_id, updated_solutions, intension]):
+            return {
+                "status": "fail",
+                "message": "One or more required fields are missing (child_row_id, updated_solutions, intension)"
+            }
+
+        # --- Step 2: Parse JSON if string ---
+        if isinstance(updated_solutions, str):
+            try:
+                updated_solutions = json.loads(updated_solutions)
+            except json.JSONDecodeError:
+                # fallback: wrap as plain text
+                updated_solutions = {"raw_text": updated_solutions}
+
+        # --- Step 3: Ensure data is dict/list ---
+        if not isinstance(updated_solutions, (dict, list)):
+            updated_solutions = {"raw_text": str(updated_solutions)}
+
+        # --- Step 4: Compress & Encode ---
+        packed = msgpack.packb(updated_solutions, use_bin_type=True)
+        compressed = gzip.compress(packed, compresslevel=9)
+        encoded_data = base64.b64encode(compressed).decode("utf-8")
+
+        # --- Step 5: Build final JSON structure ---
+        final_result = {
+            "encoded_data": encoded_data
+        }
+
+        # --- Step 6: Convert to string for DB ---
+        final_json_str = json.dumps(final_result, ensure_ascii=False)
+
+        # --- Step 7: Store in DB ---
+        frappe.db.sql("""
+            UPDATE `tabChat history`
+            SET result = %s,
+                intension = %s,
+                modified = NOW()
+            WHERE name = %s
+        """, (
+            final_json_str,
+            intension,
+            child_row_id
+        ))
+
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "Chat history updated successfully with compressed data."
+        }
+
+    except Exception as e:
+        frappe.throw(f"Server error: {str(e)}")
+
+@frappe.whitelist(allow_guest=True)
+def retrieve_and_decompress(compressed_data):
+    
+    # data = json.load(compressed_data)  # Read the JSON file
+    with open("log2.txt", "a", encoding="utf-8") as file:
+        file.write(json.dumps(compressed_data) + "\n")
+    # Step 2: Extract the Base64 encoded data from the specific key in the JSON
+    encoded_data = compressed_data.get("encoded_data")  # Make sure the key is correct
+
+    if not encoded_data:
+        print("No 'encoded_data' found in the JSON.")
+        return
+
+    # Step 3: Decode the Base64 encoded data
+    try:
+        compressed_data = base64.b64decode(encoded_data)
+    except Exception as e:
+        print(f"Error decoding Base64: {e}")
+        return
+
+    # Step 4: Decompress the decoded data (assuming gzip compression)
+    try:
+        decompressed_data = gzip.decompress(compressed_data)
+    except Exception as e:
+        print(f"Error decompressing gzip: {e}")
+        return
+
+    # Step 5: Unpack the decompressed data using msgpack
+    try:
+        final_data = msgpack.unpackb(decompressed_data, raw=False)
+        return final_data
+    except Exception as e:
+        print(f"Error unpacking MessagePack: {e}")
+        return
+
+
 @frappe.whitelist(allow_guest=True)
 def insert_solution_result():
 

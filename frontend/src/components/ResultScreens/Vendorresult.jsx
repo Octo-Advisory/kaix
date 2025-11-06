@@ -417,29 +417,54 @@ const parseSuppliers = (supplierData) => {
     return Analytics_response;  // 🔥 Ready to store
   }
 
-  const storeResultData = async (lastChat,solutions,intension) => {
-  if(!lastChat || !solutions) return 
+//   const storeResultData = async (lastChat,solutions,intension) => {
+//   if(!lastChat || !solutions) return 
 
-  try {
-    // console.log(lastChat, solutions?.[0], 'Method Called')
-      const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
-      child_row_id: lastChat,
-      updated_solutions: solutions,
-      intension: intension
+//   try {
+//     // console.log(lastChat, solutions?.[0], 'Method Called')
+//       const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
+//       child_row_id: lastChat,
+//       updated_solutions: solutions,
+//       intension: intension
+//       },
+//     {
+//     headers: {
+//       'Expect': '' // 👈 Clear problematic header
+//     }
+//   });
+//       // console.log('This is the result we want ot store.... ', result.message)
+//       return result.message || [];
+//     } catch (err) {
+//       // console.error("Error Storing Result json:", err);
+//       createDiagnostic("Suppliers", `Error storing Result Json due to ${JSON.stringify(err)} in Vendors`,lastChatId)
+//       return []; // Return empty for this batch on error
+//     }
+// }
+
+ const storeResultData = async (lastChat, solutions, intension) => {
+    if (!lastChat || !solutions) return
+
+    try {
+
+      const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.convert_json_to_binary", {
+        child_row_id: lastChat,
+        updated_solutions: solutions,
+        intension: intension 
       },
-    {
-    headers: {
-      'Expect': '' // 👈 Clear problematic header
-    }
-  });
-      // console.log('This is the result we want ot store.... ', result.message)
-      return result.message || [];
+      {
+          headers: {
+            'Expect': '' // 👈 Clear problematic header
+          }
+      }
+    )
+    console.log(convertJson, 'this is the msg');
+    
     } catch (err) {
-      // console.error("Error Storing Result json:", err);
-      createDiagnostic("Suppliers", `Error storing Result Json due to ${JSON.stringify(err)} in Vendors`,lastChatId)
+      console.error("Error Storing Result json:", err);
+      createDiagnostic("Land & Approvals", `Something went wrong while storing the result json ${JSON.stringify(err)} in Vendor Screen`,lastChatId)
       return []; // Return empty for this batch on error
     }
-}
+  }
 
   // useEffect(() => {
   //   if (groupedData && !isLoading && !supplyLoading) {
@@ -497,7 +522,7 @@ const parseSuppliers = (supplierData) => {
       const filtered = query
         ? sourceList?.filter(s => (s.vendor_id || "").toLowerCase().includes(query))
         : sourceList;
-      console.log(filtered, 'This is the filtered')
+      // console.log(filtered, 'This is the filtered')
       setSupplierList(filtered);
       setDataLoading(true)
       setLoading(false)
@@ -705,10 +730,10 @@ const parseSuppliers = (supplierData) => {
 
   useEffect(() => {
     const checkData = async()=> {
-        console.log(result, 'This is the result passed from the map component....')
+        // console.log(result, 'This is the result passed from the map component....')
       let vendorid = result.vendor_id
       let existingVendor = fetchedVendors.find((vendor)=>vendor.vendor_id === vendorid)
-      console.log('Existing Vendor',existingVendor)
+      // console.log('Existing Vendor',existingVendor)
       if(existingVendor) {
         setSelectedVendor(existingVendor)
         setLoading(false)

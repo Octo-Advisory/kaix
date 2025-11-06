@@ -323,28 +323,53 @@ const handleApprovalSelection = async (approval) => {
     //     }
     // };
 
-    const storeResultData = async (lastChat,solutions,intension) => {
-  if(!lastChat || !solutions) return 
+//     const storeResultData = async (lastChat,solutions,intension) => {
+//   if(!lastChat || !solutions) return 
 
-  try {
-      const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
-      child_row_id: lastChat,
-      updated_solutions: solutions,
-      intension: intension
-      },
-    {
-    headers: {
-      'Expect': '' // 👈 Clear problematic header
-    }
-  });
+//   try {
+//       const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
+//       child_row_id: lastChat,
+//       updated_solutions: solutions,
+//       intension: intension
+//       },
+//     {
+//     headers: {
+//       'Expect': '' // 👈 Clear problematic header
+//     }
+//   });
       
-      return result.message || [];
+//       return result.message || [];
+//     } catch (err) {
+//     //   console.error("Error Storing Result json:", err);
+//       createDiagnostic("Approvals", `Something went wrong while storing the result json due to ${JSON.stringify(err)} IN Approvals`,lastChatId)
+//       return []; // Return empty for this batch on error
+//     }
+// }
+
+ const storeResultData = async (lastChat, solutions,intension) => {
+    if (!lastChat || !solutions) return
+
+    try {
+
+      const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.convert_json_to_binary", {
+        child_row_id: lastChat,
+        updated_solutions: solutions,
+        intension: intension
+      },
+      {
+          headers: {
+            'Expect': '' // 👈 Clear problematic header
+          }
+      }
+    )
+    // console.log(convertJson, 'this is the msg');
+    
     } catch (err) {
     //   console.error("Error Storing Result json:", err);
-      createDiagnostic("Approvals", `Something went wrong while storing the result json due to ${JSON.stringify(err)} IN Approvals`,lastChatId)
+      createDiagnostic("Land & Approvals", `Something went wrong while storing the result json ${JSON.stringify(err)} in ApprovalResult`,lastChatId)
       return []; // Return empty for this batch on error
     }
-}
+  }
 
     useEffect(() => {
         

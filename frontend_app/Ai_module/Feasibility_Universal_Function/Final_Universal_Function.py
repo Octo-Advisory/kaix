@@ -50,12 +50,12 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.retrievers import EnsembleRetriever
-
+import configparser
 # ── LLM client (if used with MultiQuery)
 from langchain_groq import ChatGroq
 
 # PERSIST_ROOT = "D:/work_folder/mars_rag_qna/data_45/vectors"
-PERSIST_ROOT = "/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/vectors"
+PERSIST_ROOT = "/home/mars/frappe-bench/apps/frontend_app/frontend_app/vectors"
 
 FEAS_DOCTYPE = "Feasibility Report"
 FOLL_DOCTYPE = "Follow Up"
@@ -68,29 +68,31 @@ FOLLOW_UP_ALLOCATED_STORAGE = 0.4
 LABEL_FOLLOW = "Follow_Up"
 LABEL_FEASIBILITY = "Feasibility_Report"
 
+base_dir = os.path.expanduser("~")
+config_file = os.path.join(base_dir, "frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini")
+config = configparser.ConfigParser()
+config.read(config_file)
+
 embedding_model = HuggingFaceBgeEmbeddings(
             model_name="BAAI/bge-small-en-v1.5",
             model_kwargs={"device": "cpu"},
             encode_kwargs={"normalize_embeddings": True},
             query_instruction="Represent this sentence for searching relevant passages:"
         )
-
-GROQ_API_KEY="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" 
-API_KEY = "d3de1e0e4e25846"
-API_SECRET = "51fd8e403a19045"
-# BASE_URL = "https://marsaix.marsbazaar.com"
-BASE_URL = "http://172.17.242.222"
+ 
+api_key = config['Key']['frappe_doctype_api_key']
+api_secret = config['Key']['frappe_doctype_api_secret']
+base_url = "https://marsaix.marsbazaar.com"
+# BASE_URL = "http://172.17.242.222"
 # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
 # api_key = os.getenv("GROQ_API_KEY")
 # api_key = os.getenv("GROQ_API_KEY")
-api_key = GROQ_API_KEY
 # print(api_key)
 # print("Loaded API Key:", api_key is not None)  # Should print: True
 # print("API KEY:", os.getenv("GROQ_API_KEY"))
 
-llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.5, api_key = api_key)
-
 # this code is to retrieve the values of the fields namely'storage limit' and 'time period for deletion' which are stored in 'Mars Configurations' doctype.
+
 
 def fetch_doc_fields_by_name(
     doctype: str,
@@ -103,11 +105,11 @@ def fetch_doc_fields_by_name(
     # load_dotenv("D:/work_folder/mars_rag_qna/.env")
     # base_url   = os.getenv("BASE_URL")
     # base_url = "https://marsaix.marsbazaar.com"
-    base_url = "http://172.17.242.222"
-    # api_key    = os.getenv("API_KEY")
-    api_key = "d3de1e0e4e25846"
-    # api_secret = os.getenv("API_SECRET")
-    api_secret = "51fd8e403a19045"
+    # base_url = "http://172.17.242.222"
+    # # api_key    = os.getenv("API_KEY")
+    # api_key = "d3de1e0e4e25846"
+    # # api_secret = os.getenv("API_SECRET")
+    # api_secret = "51fd8e403a19045"
     if not (base_url and api_key and api_secret):
         raise ValueError("Missing BASE_URL / API_KEY / API_SECRET")
 
@@ -159,11 +161,11 @@ def fetch_single_doc_by_name(
 
     # ---- fallbacks to environment ----
     # base_url = "https://marsaix.marsbazaar.com"
-    base_url = "http://172.17.242.222"
-    # api_key    = os.getenv("API_KEY")
-    api_key = "d3de1e0e4e25846"
-    # api_secret = os.getenv("API_SECRET")
-    api_secret = "51fd8e403a19045"
+    # base_url = "http://172.17.242.222"
+    # # api_key    = os.getenv("API_KEY")
+    # api_key = "d3de1e0e4e25846"
+    # # api_secret = os.getenv("API_SECRET")
+    # api_secret = "51fd8e403a19045"
 
     if not base_url:
         raise ValueError("Missing base_url (pass base_url=... or set BASE_URL env var)")
@@ -215,22 +217,22 @@ def fetch_single_doc_by_name(
     return data
 
 def make_headers():
-    load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
+    # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
 
-    # ---- fallbacks to environment ----
-    api_key    = os.getenv("API_KEY")
-    api_secret = os.getenv("API_SECRET")
+    # # ---- fallbacks to environment ----
+    # api_key    = os.getenv("API_KEY")
+    # api_secret = os.getenv("API_SECRET")
     return {"Authorization": f"token {api_key}:{api_secret}", "Expect": ""}
 
 def fetch_pdf_to_temp(file_url: str, is_private: bool | None = None) -> str:
     # normalize
     # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
     # base_url = "https://marsaix.marsbazaar.com"
-    base_url = "http://172.17.242.222"
-    # api_key    = os.getenv("API_KEY")
-    api_key = "d3de1e0e4e25846"
-    # api_secret = os.getenv("API_SECRET")
-    api_secret = "51fd8e403a19045"
+    # base_url = "http://172.17.242.222"
+    # # api_key    = os.getenv("API_KEY")
+    # api_key = "d3de1e0e4e25846"
+    # # api_secret = os.getenv("API_SECRET")
+    # api_secret = "51fd8e403a19045"
 
     path = file_url if file_url.startswith("/") else f"/{file_url}"
     if is_private is None:
@@ -271,9 +273,9 @@ def getting_pdf_from_file_url_in_feasibility_session_id(data: json):
     "File", # 
     # "Report-05-08-25 -2010",
     filename,
-    # api_key="d3de1e0e4e25846",
-    # api_secret="51fd8e403a19045",
-    # base_url="https://marsaix.marsbazaar.com",
+    api_key=api_key,
+    api_secret=api_secret,
+    base_url=base_url,
     fields=["*"],   # or omit to use server defaults
     debug=True
     ) # returns a json
@@ -316,9 +318,9 @@ def checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vecto
     data = fetch_single_doc_by_name(
     doctype,
     doc_name,
-    # api_key="d3de1e0e4e25846",
-    # api_secret="51fd8e403a19045",
-    # base_url="https://marsaix.marsbazaar.com",
+    api_key=api_key,
+    api_secret=api_secret,
+    base_url=base_url,
     fields=["*"],   # or omit to use server defaults
     debug=True
     ) # returns a json
@@ -959,11 +961,11 @@ def ensure_vector_and_update_record(doctype, doc_name):
     # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
 
     # base_url = "https://marsaix.marsbazaar.com"
-    base_url = "http://172.17.242.222"
-    # api_key    = os.getenv("API_KEY")
-    api_key = "d3de1e0e4e25846"
-    # api_secret = os.getenv("API_SECRET")
-    api_secret = "51fd8e403a19045"
+    # base_url = "http://172.17.242.222"
+    # # api_key    = os.getenv("API_KEY")
+    # api_key = "d3de1e0e4e25846"
+    # # api_secret = os.getenv("API_SECRET")
+    # api_secret = "51fd8e403a19045"
 
     def make_headers():
         return {

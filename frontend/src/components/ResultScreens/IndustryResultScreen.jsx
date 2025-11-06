@@ -101,6 +101,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
   };
   // console.log(result, 'first check')
   const analytics_response = source === "MapComponent" ? '' : result["Analytics_response"]
+
   if(source!== "MapComponent") {
 
     if (
@@ -215,7 +216,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
       const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.convert_json_to_binary", {
         child_row_id: lastChat,
         updated_solutions: solutions,
-        intension: "Query to build industry from Scratch"
+        intension: "Query to build industry from Scratch" 
       },
       {
           headers: {
@@ -240,7 +241,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     //   return result.message || [];
     // }
     } catch (err) {
-      // console.error("Error Storing Result json:", err);
+      console.error("Error Storing Result json:", err);
       createDiagnostic("Land & Approvals", `Something went wrong while storing the result json ${JSON.stringify(err)} in Build From Scratch`,lastChatId)
       return []; // Return empty for this batch on error
     }
@@ -772,10 +773,12 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
     // console.log('This is Vendor Lookup for Essential', Essential_supply_vendor_lookup_df)
     // console.log('This is Vendor Lookup All for Essential', Essential_supply_all_vendor_lookup_df)
     // console.log('This is Vendor Lookup for Non Essential', nonEssential_supply_vendor_lookup_df)
-    console.log('This is Vendor Lookup All for Non Essential', nonEssential_supply_all_vendor_lookup_df)
+    // console.log('This is Vendor Lookup All for Non Essential', nonEssential_supply_all_vendor_lookup_df)
     // console.log('This is Employment Lookup', Employment_lookup_df)
     // console.log('This is Solution Lookup', Solution_lookup_df)
     // console.log('This is Approval Lookup', Approval_lookup_df)
+    // console.log('This is Final DF ', final_scoring_df)
+
 
     const promises = Object.entries(property_id).map(async ([key, value]) => {
       try {
@@ -795,7 +798,7 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
         const approval_data = mapApprovalData(Approval_lookup_df['approval_id'][approval_index], Approval_lookup_df['approval_name'][approval_index],Approval_lookup_df['government_department'][approval_index],Approval_lookup_df['stages'][approval_index],Approval_lookup_df['time_taken'][approval_index])
         // const incentive_data = await getIncentives(Solution_lookup_df['incentive_id'][incentive_index])
         const incenetives = mapIncentivesToTypes(Solution_lookup_df['incentive_id'][incentive_index],Solution_lookup_df['incentive_type'][incentive_index],Solution_lookup_df['incentive_name'][incentive_index]  )
-        console.log(nonEssential_supply_all_vendor_lookup_df?.['vendor_id']?.[non_essential_all_index],'Okay This ones new')
+        // console.log(nonEssential_supply_all_vendor_lookup_df?.['vendor_id']?.[non_essential_all_index],'Okay This ones new')
         // const industry_incentive_data = await getIndustryIncentives(Solution_lookup_df['incentive_id'][incentive_index])
         const essential_vendor_id_data = Essential_supply_vendor_lookup_df?.['vendor_id']?.[essential_index] ? await getAllVendorsData("Vendor", Essential_supply_vendor_lookup_df?.['vendor_id']?.[essential_index]) : []
         const essential_vendor_all_id_data = Essential_supply_all_vendor_lookup_df?.['vendor_id']?.[essential_all_index] ? await getAllVendorsData("Vendor", Essential_supply_all_vendor_lookup_df?.['vendor_id']?.[essential_all_index]) : []
@@ -1096,14 +1099,14 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
 
         }
       } catch (error) {
-        // console.log("error is ❌", error);
+        console.log("error is ❌", error);
         createDiagnostic("Land & Approvals", `Something went wrong while preparing Full Data for Rendering ${JSON.stringify(error)} in Build From Scratch`,lastChatId)
-        setSomeError(true)
+        // setSomeError(true)
       }
     });
 
     await Promise.all(promises);
-    // console.log(preaparedSolutions, 'okay ')
+    console.log(preaparedSolutions, 'okay ')
     const updatedSolutions = preaparedSolutions
     .sort((a, b) => b.score - a.score) // Sort descending by score
     .map((solution, index) => ({

@@ -736,7 +736,7 @@ def get_property_incentive_mapped(industry_id,sub_sector_id,area_id_list,city_id
 # """
 
     sql_query = f"""SELECT 
-    i.name, i.incentive_operation_start_date, i.incentive_operation_end_date,
+    i.name,i.incentive_name, i.incentive_type, i.incentive_operation_start_date, i.incentive_operation_end_date,
     iim.sub_sector, iim.area, iim.city, iim.state, i.incentive_rank,
     p.name, p.area AS property_area_id
 FROM `tabIncentive Industry Mapping` AS iim
@@ -775,7 +775,7 @@ WHERE COALESCE(iim.exclusion, 0) = 0
     results = fetch_query_results(sql_query)
 
     if results:
-        property_incentive_mapped_df = pd.DataFrame(results, columns=['incentive_id', "incentive_operation_start_date", 'incentive_operation_end_date', 'sub_sector_id', 'area_id', 
+        property_incentive_mapped_df = pd.DataFrame(results, columns=['incentive_id', "incentive_name", "incentive_type", "incentive_operation_start_date", 'incentive_operation_end_date', 'sub_sector_id', 'area_id', 
                                         'city_id', 'state_id', 'incentive_rank',
                                         'property_id', 'property_area_id'])
         found_incentive = True
@@ -1406,6 +1406,7 @@ def get_efficient_time_for_land(all_approval_included_df):
         effecient_time[current_approval_main_stage].extend(effecient_time_list)
 
     total_approval_time_for_given_land = max(max(effecient_time["Pre-Requisite"]) + max(effecient_time["Pre-Establishment"]) + max(effecient_time["Pre-Operation"]), max(effecient_time["Others"]))
+
     # Pre_requisite_
     # print("*"*100)
     # print("total_approval_time_for_given_land:",total_approval_time_for_given_land)
@@ -2145,10 +2146,10 @@ def process_incentive_df_to_send_solution_screen(df):
         df.sort_values(by=['property_id', 'incentive_rank'], ascending=[True, False])
         .groupby('property_id')
         .agg({
-            'incentive_id': lambda x: list(x)  # List of incentives
+            'incentive_id': lambda x: list(x) , # List of incentives
+            'incentive_name': lambda x: list(x),
             # 'incentive_name': lambda x: list(x),
-            # 'incentive_name': lambda x: list(x),
-            # 'incentive_type': lambda x: list(x),
+            'incentive_type': lambda x: list(x),
             # 'incentive_operation_start_date': lambda x: list(x),
             # 'incentive_operation_end_date': lambda x: list(x),
             # 'quantum_of_assistance': lambda x: list(x),
@@ -2183,12 +2184,12 @@ def process_approval_df_to_send_solution_screen(df):
         df.sort_values(by=['property_id', 'stage_order', "time_taken"], ascending=[True, True, True])
         .groupby('property_id')
         .agg({
-            'approval_id': lambda x: list(x)  # List of incentives
-            # 'approval_name': lambda x: list(x),
-            # 'government_department': lambda x: list(x),
-            # 'time_taken': lambda x: list(x),
+            'approval_id': lambda x: list(x),  # List of incentives
+            'approval_name': lambda x: list(x),
+            'government_department': lambda x: list(x),
+            'time_taken': lambda x: list(x),
             # 'online_or_offline': lambda x: list(x),
-            # 'stages': lambda x: list(x),
+            'stages': lambda x: list(x),
         })
         .reset_index()
     )
