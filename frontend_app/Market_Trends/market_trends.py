@@ -10,13 +10,20 @@ from frontend_app.Market_Trends.utils import validate_inputs, safe_search_web, d
 from frontend_app.Market_Trends.prompts import summarize_prompt, format_prompt, fallback_prompt
 from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers_creative, llm_70b_vers
 
+# Dynamically get the user's home directory
+base_dir = os.path.expanduser("~")
 
+# Construct the full log file path
+log_file = os.path.join(
+    base_dir,
+    "frappe-bench/apps/frontend_app/frontend_app/Market_Trends/market_trends.log"
+)
 # Configure logging with UTF-8 encoding
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/market_trends.log", encoding="utf-8"),
+        logging.FileHandler(log_file, encoding="utf-8"),
         logging.StreamHandler()
     ]
 )

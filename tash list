@@ -1,0 +1,118 @@
+[33m1ecd7ea[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mkrunal[m[33m)[m commit 4/11/25 1:15 from jenth
+[33m5506777[m Merge pull request #41 from Ushan1281/vishal
+[33ma9f3227[m[33m ([m[1;31morigin/vishal[m[33m)[m Minor changes related to supply checkbox visiblity
+[33mcfc8a75[m Merge pull request #40 from Ushan1281/vishal
+[33m42bb4b4[m Added expand/collapse icon to show hide supply related vendor checkboxes
+[33m0e295dc[m 1) Added Supply wise checkbox for essential and non essential vendor 2) Added Expand/collapse icons for essential and non essential vendor checkbox in Singlemap page
+[33mcf6cb28[m Merge pull request #39 from Ushan1281/vishal
+[33mc574da5[m 1) Show only essential vendor on load on maps. 2) Added checkbox for essential and non essential vendors.
+[33m22cb5f8[m[33m ([m[1;32mbackup/my-safe-version[m[33m)[m 8/10/25 05:03 krunal commit
+[33m9d98508[m Merge pull request #38 from VishalChauhan525/vishal
+[33mb3055e4[m Sanket change 12/9/25 10:00
+[33mb277c3d[m Property Creation page changes
+[33m1825ee7[m trail commmit
+[33me8ca0f4[m temp commits
+[33mda02b40[m Merge pull request #37 from Ushan1281/ritu
+[33m2b9a446[m message/ Added Opt-out parameters across the database
+[33m36f5304[m Merge pull request #36 from VishalChauhan525/vishal
+[33m797f31f[m Added button to view shapes in property Creation
+[33m25f5e55[m path changes done after instance setup
+[33m5a44a19[m fix routing issue and progress screen issue resolve
+[33mf3a6dc7[m Merge pull request #35 from VishalChauhan525/vishal
+[33m68678d4[m service api related changes
+[33m2faaeec[m Commit Krunal 26/8/25 5:15
+[33m749fbad[m Mapbox token changes Property Creation View created property redirection changes
+[33mce25df5[m Merge pull request #34 from VishalChauhan525/vishal
+[33mc44efa4[m Highway Title on the map related changes.
+[33m8e779d0[m Merge pull request #33 from VishalChauhan525/vishal
+[33mdf52ef1[m Added nanoid package to create unique id.
+[33m7350a94[m testing
+[33m83aa021[m Second  commit testing
+[33mfae8eea[m Firtst commit testing
+[33mbe28a45[m final commit Version 1.0 6:03pm Krunal
+[33mc0bb8b6[m Commit 14/08/25 5:50pm Krunal
+[33m51c9cf3[m Commit on 32/07/2025 10:25 Krunal
+[33mdbba21d[m 17/7/25 10:00 commit krunal
+[33m6870579[m commit 12/06/2025 10:17 krunal
+[33m4fcbc42[m final commit 15/05/2025 13:20 krunal
+[33mf76033e[m 12/05/2025  14:28
+[33m65b80ec[m tsting commint
+[33me0bb395[m 06/05/25 10:10 krunal
+[33m18bf5b3[m 5/5/25 9:35 krunal
+[33mfcb76a1[m Merge pull request #27 from Ushan1281/Sanket
+[33m8ac2030[m commit by ushan from krunal branch  25-04-2025 4:42pm
+[33me97ea17[m 10th commit 25-04-2025 04:45 PM -Sanket
+[33m704e7d9[m commit by ushan from krunal branch  25-04-2025 10:48am
+[33m1c4d75b[m Merge pull request #26 from Ushan1281/Rituparno
+[33meac9957[m commit 3/4/25 2:49 rituparno
+[33ma95c533[m commit 3/4/25 14:45 krunal
+[33m686c275[m commit 3/4/25 14:30 krunal
+[33meef92ea[m commit 3/4/25 13:46 krunal
+[33mbf39d37[m commit 31/03/2025 16:24
+[33mbc01fbb[m 26/03/25 9:40 krunal
+[33mee9bff6[m Merge branch 'krunal' of https://github.com/Ushan1281/Mars-2.0 into Rituparno
+[33m04e040f[m final commit Mars2.0 24/03/25 16:15 krunal
+[33ma9fc3e4[m final commit Mars2.0 24/03/25 16:15 krunal
+[33ma51d96d[m final commit of Mars2.0 24/03/24 4:15
+[33m392ce2f[m final commit Mars2.0 24/03/25 16:15 krunal
+[33m62a0ca3[m Merge branch 'krunal' of https://github.com/Ushan1281/Mars-2.0 into Rituparno
+[33m6d47f88[m Merge pull request #23 from Ushan1281/Sanket
+[33m53d4124[m nineth commit 16-03-2025 04:12 PM -Sanket
+[33mc0ddc25[m eighth commit 15-03-2025 06:23 PM -Sanket
+[33mad5923a[m seventh commit 15-03-2025 1:21 PM -Sanket
+[33mb4b6887[m seventeenth commit 14/03/25 4:00 krunal
+[33m360c855[m sixteenth commit 7:30 krunal
+[33m4981fc8[m Merge branch 'krunal' of github.com:Ushan1281/Mars-2.0 into krunal
+[33mec06f32[m fifteenth commit 13/03/25 4:00 krunal
+[33macc630c[m Merge pull request #20 from Ushan1281/Sanket
+[33m75c7034[m sixth commit 13-03-2025 3:14 PM -Sanket
+[33m81002bf[m Merge branch 'krunal' of https://github.com/Ushan1281/Mars-2.0 into Rituparno
+[33m8ba2c66[m Fourth commit 13/03/25 01:35p.m. Rituparno
+[33m88cb53a[m Merge pull request #19 from Ushan1281/Rituparno
+[33m97a0bb7[m Merge pull request #18 from Ushan1281/Sanket
+[33mf288f69[m Merge branch 'krunal' into Sanket
+[33mf971006[m Update Extraction_for_vendor_search.py
+[33m7236a2c[m Update Extraction_for_approval_search.py
+[33m90f642e[m Update Query_Classification_And_Analysis.py
+[33m6a0a8fc[m fourteenth commit 13/03/25 2:10 krunal resolve conflict
+[33m704bb67[m Update Extraction_for_vendor_search.py
+[33m7b2cd68[m Update Extraction_for_employement_search.py
+[33mc4663b2[m Update Extraction_for_approval_search.py
+[33m320b864[m thirteenth commit 13/03/25 1:54 krunal resolve conflict
+[33m85dd7ef[m Third commit 13/03/25 01:35p.m. Rituparno
+[33md7af061[m fifth commit 13-03-2025 12:09 AM -Sanket
+[33m5211001[m fourth commit 13-03-2025 10:07 AM -Sanket
+[33m3ef8246[m Twelth Commit 12/03/25 6:30pm krunal
+[33mb61f075[m Merge pull request #16 from Ushan1281/krunal
+[33mbcc10df[m Evelenth commit 11/03/25 12:44 krunal
+[33m1fbf056[m Merge pull request #14 from Ushan1281/Sanket
+[33ma4996d6[m Tenth Commit 10/03/25 4:13 Krunal
+[33mb4035a6[m third commit 10-03-25 12:45 PM -Sanket
+[33mb519084[m second commit 07-03-25 4:15 PM -Sanket
+[33m3c6d575[m tenth commit 5/3/25 12:30 krunal
+[33mcf5bc45[m Merge pull request #11 from Ushan1281/Rituparno
+[33m5d251a7[m secod commit 05/03/25 11:00 rituparno
+[33mfa4ced3[m Ninth Commit 04/03/25 6:30 krunal
+[33me3c3add[m Merge pull request #9 from Ushan1281/Sanket
+[33ma0ee60b[m first commit 04-03-25 10 AM -Sanket
+[33mc0febb9[m Merge pull request #8 from Ushan1281/krunal
+[33m8b00119[m Merge pull request #7 from Ushan1281/Rituparno
+[33m767670b[m First commit 28/02/25 12:26 Rituparno
+[33mbae7de1[m Eightth Commit 27/02/25 6:15 krunal
+[33mc4a7e5f[m Merge pull request #6 from Ushan1281/krunal
+[33mefb1ba2[m Seventh Commit 27/02/25 3:00 krunal
+[33mbdc4475[m Merge pull request #5 from Ushan1281/krunal
+[33md66d9e1[m sixth commit 21/02/2024 6:35 krunal
+[33m09bda1a[m fifth commit 21/02/25 11:00 krunal
+[33m2e6a347[m Merge pull request #4 from Ushan1281/krunal
+[33ma544704[m Fourth commit 17/02/2025 6:30 krunal
+[33m24d0489[m Merge pull request #3 from Ushan1281/krunal
+[33m88a4fd2[m Third Commit 14/02/2025 6:30 krunal
+[33m289ca23[m 31/01/2025 6:30 -- Krunal --
+[33mb0f498e[m Merge pull request #2 from Ushan1281/krunal
+[33m1d6b17b[m third commit - First module complete - employement - 28/01/25 10:07
+[33mf8f06aa[m Merge pull request #1 from Ushan1281/krunal
+[33m08c4588[m Second commit Krunal - 20/01/2025 2:00
+[33m2f50f0c[m commit krunal 08-01-2025 6:25pm
+[33m0ae9e78[m first commit 08-01-2025 04:59 pm
+[33m7ef409e[m feat: Initialize App

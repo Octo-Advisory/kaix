@@ -356,10 +356,7 @@ def generate_dynamic_message_for_incentive(chat_history_for_context: List[dict],
     })
     update_llm_token(message)
     
-    # Append AI message to chat history
-    chat_history = get_chat(f"chat_{chatId}") or []
-    chat_history.append(AIMessage(content=f"{message.content.strip()}"))
-    save_chat(chat_history,f"chat_{chatId}")
+    
     return message.content.strip()
 
 # Get available area, city, state
@@ -401,9 +398,8 @@ def call_incentive_search(input,chatId, additional_class_response = None):
     log_to_file("----","--------------")
     chat_history = get_chat(f"chat_{chatId}") or []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
-    refine_user_input = refine_query_with_history_for_incentive(Chat_history_normal,input,llm_70b_vers)
-    chat_history.append(HumanMessage(content=refine_user_input))
-    save_chat(chat_history,f"chat_{chatId}")
+    refine_user_input = input
+    
     state = get_state(f"QINC_state_{chatId}") or None
     log_to_file("state1",state)
     if not state:
@@ -423,8 +419,7 @@ def call_incentive_search(input,chatId, additional_class_response = None):
             llm=llm_70b_vers,
             chatId=chatId)
         log_to_file("Negatively Intended Query:::::::::::::::::::::::::",":::::::::::::")
-        chat_history.append(AIMessage(content=f"{message}"))
-        save_chat(chat_history,f"chat_{chatId}")
+        
         response = {
             "Ai_response": message,
             "Is_confirmation" : None,
@@ -581,9 +576,6 @@ def call_incentive_search(input,chatId, additional_class_response = None):
                         # response_validation = state.get("Additional_class_response")
                         # confirmation_message_incentive_context_1 += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
 
-                        # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
-                        chat_history.append(AIMessage(content=f"{confirmation_message_incentive_context_1}"))
-                        save_chat(chat_history,f"chat_{chatId}")
 
                         confirmation_buttons = [
                             {"label": "Yes, this is correct", "value": query_intent},

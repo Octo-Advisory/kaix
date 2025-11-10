@@ -61,7 +61,7 @@ function Solutionscreen() {
   // console.log("resultin solution scdeen", result);
   const user_intension = result[0]["user_intension"]
   const Analytics_response = result[0]?.["Analytics_response"]
-  // console.log(Analytics_response, 'Okay its Analytics Response')
+  // console.log(Analytics_response, 'Okay its Analytics Response')z
 
 //Check if the incentive Stringis valid json after pasrsing .. if not show now result .. Reminain 
   return (

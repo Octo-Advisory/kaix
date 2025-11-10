@@ -442,6 +442,8 @@ def get_efficient_time_for_land(all_approval_included_df):
     # print("total_approval_time_for_given_land:",total_approval_time_for_given_land)
     # print("total_approval_count:",len(effecient_time["Pre-Requisite"])+len(effecient_time["Pre-Establishment"])+len(effecient_time["Pre-Operation"])+len(effecient_time["Others"]))
     # print("*"*100)
+
+
     return effecient_time, total_approval_time_for_given_land, online_count, online_percentages
 
 def calculate_efficiency(df, area_id=None, city_id=None, state_id=None, keyword_given_by_user = None, approval_keyword_df =None):

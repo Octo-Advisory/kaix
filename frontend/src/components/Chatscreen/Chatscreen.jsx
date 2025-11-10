@@ -23,6 +23,8 @@ import SideBar from '../SideBar/SideBar';
 import { FaThumbsUp, FaThumbsDown, FaArrowsRotate } from "react-icons/fa6";
 import { setFormData, setIsOpen } from '../../Redux/Store/Featuresilces/detailform';
 import rehypeRaw from 'rehype-raw';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import { BuildingIcon, BuildingLineIcon, ClearIcon, ClipboardCheckIcon, DollarIcon, SendIcon, ShopIcon, UserGroupIcon } from '../../Icons/icon';
 import usePersistedToggle from '../../PersistedState/useToggleState';
@@ -38,7 +40,8 @@ function Chatscreen() {
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.chat.messages);
   const chatId = useSelector((state) => state.chat.chatID);
-  const addInput = useSelector((state) => state.chat.addInput)
+  let addInput = useSelector((state) => state.chat.addInput)
+  
   const feasibilityId = useSelector((state) => state.feasibility.feasibility_id)
   // const [loading, setLoading] = useState(null);
   // const [loadingSession, setLoadingSession] = useState(null);
@@ -55,6 +58,20 @@ function Chatscreen() {
   const location = useLocation();
   const [chatLoading, setChatLoading] = useState(true)
   const [loadingStates, setLoadingStates] = useState(new Map());
+
+  const { from, sendMsg, messageToSet } = location.state || {};
+
+useEffect(() => {
+  if (sendMsg) {
+    // do something only once when arriving
+    console.log('Running once for new session');
+    handleSendbtn(messageToSet)
+    // Optionally clear it
+    navigate(location.pathname, { replace: true, state: {} });
+  }
+}, [sendMsg]);
+
+
 
   const createDiagnostic = (errType, logMsg,chatIdd,sessions)=> {
       let log = ` ${logMsg}`
@@ -125,17 +142,58 @@ function Chatscreen() {
   }
 
   useEffect(() => {
+
+    const handleNewChat = async(msg)=> {
+      if(!feasibilityId) return
+      if(!addInput) return
+      console.log('Making New Chat...')
+
+      setSessionLoading('new-chat', true);
+      const nowTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const sessionResp = await createDoc("Session", { time: nowTime, user: currentUser || '', });
+      if (!sessionResp.name) throw new Error("Failed to create session");
+      setSession(sessionResp.name);
+      // dispatch(addChatId(sessionResp.name))
+
+      mutate();
+      setSessionLoading('new-chat', false);
+      setSessionLoading(sessionResp.name, true);
+      hintsMutate()
+      intensionMutate();
+
+      if (currentUser) {
+        setTimeout(() => {
+          navigate(`/chat/${sessionResp.name}`, { 
+            replace: true,
+            state: {
+              from: "new-chat-redirect",
+              sendMsg: true,
+              messageToSet: msg,
+            }, 
+          })
+        }, 200);
+      } else {
+        sessionStorage.setItem("guest_session_id", sessionResp.name);
+      }
+
+    }
     // First: send message & create session
+    console.log(addInput,feasibilityId, 'This is the addInput Value 1st level ',sessionId)
     if (addInput) {
-      handleSendbtn(addInput); // this will internally set the sessionId
+      // console.log(addInput,feasibilityId, 'This is the addInput Value 2nd level ')
+      // console.log('-----',addInput , 'ADDD INPUTT ------');
+      handleNewChat(addInput)
+      // handleSendbtn(addInput); // this will internally set the sessionId
     }
   }, [addInput]);
 
 
   useEffect(() => {
+
+    
     // Second: once sessionId is available, add to child table if not already present
     const handleFeasibilityChatLink = async () => {
-      // console.log("datasasaescwev", feasibilityId, addInput, sessionId);
+      console.log("In Chat Link", feasibilityId, addInput, sessionId);
 
       if (!addInput) return;
       if (!feasibilityId || !sessionId) return;
@@ -148,17 +206,18 @@ function Chatscreen() {
 
         const chats = response.message?.chats || [];
 
-        const alreadyExists = chats.some(chat => chat.session === sessionId);
+        const alreadyExists = chats.some(chat => chat.session === sessionID);
         // console.log("raw feasibility id", feasibilityId, alreadyExists);
 
         if (!alreadyExists) {
+          console.log('we are here now!!!! to remove the addInput')
           await createDoc("Linked Chats", {
             session: sessionId,
             parent: feasibilityId,
             parenttype: "Feasibility Report",
             parentfield: "chats",
           });
-          dispatch(addInputtext(null))
+          // dispatch(addInputtext(null))
         }
       } catch (err) {
           createDiagnostic("Others", `Something went wrong while getting feasibility reports in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
@@ -166,8 +225,29 @@ function Chatscreen() {
       }
     };
 
+    const handleFeasibilitySessionLink = async () => {
+      if (!addInput) return;
+      if (!feasibilityId || !sessionId) return;
+      console.log('Feasibility Link....')
+      // console.log("Feasibility ID : ", feasibilityId);
+      // console.log("ADD INPUT: ", addInput);
+      // console.log("session ID : ", sessionId , data);
+      let tempData= await mutate()
+      // console.log(tempData, 'Its the Temp Data');
+      if(!tempData.feasibility_id || tempData.feasibility_id === '') {
+        updateDoc('Session',sessionId, {
+          feasibility_id: feasibilityId
+        }).then((updatedDoc) => {
+          // console.log(updatedDoc, 'Okay Doc Updated')
+        }).catch((err) => {
+              // console.error('Error updating doc for storing feasibility_id:', err);
+            });
+      }
+    }
+    // handleNewChat();
     handleFeasibilityChatLink();
-  }, [sessionId, feasibilityId, addInput]);
+    handleFeasibilitySessionLink();
+  }, [sessionId,feasibilityId, addInput]);
 
   useEffect(() => {
     const handleBeforeUnload = (event) => {
@@ -182,6 +262,7 @@ function Chatscreen() {
 
 
   const fetchAIResponse = async (message, confirmationMessage, chatId) => {
+    console.log(chatId,'okay')
     try {
       const result = await call.get("frontend_app.Management_Class.Ai_management.AI.ai_module_call", {
         input: message,
@@ -292,7 +373,7 @@ function Chatscreen() {
   };
 
   const handleConfirmation = async (label, response) => {
-    // console.log('response', response, 'label', label)
+    console.log('response', response, 'label', label)
     setConfirmationPending(false);
     const confirmationMessages = {
       sender: 'user',
@@ -301,7 +382,7 @@ function Chatscreen() {
     };
     dispatch(addMessage(confirmationMessages));
 
-    if (label !== 'Refine Requirements' && !label?.startsWith('No') && label) {
+    if (label !== 'Refine Requirements' && !label?.startsWith('No') && label && label!== 'Yes, start new chat') {
       let currentSession = session
 
       // STEP 1: Save user's message with idx
@@ -367,7 +448,64 @@ function Chatscreen() {
         await clearProgressAndIntention(sessionId)
         navigate(`/progress/${sessionId}`);
       }
-    } else {
+    }
+
+    else if (label === "Yes, start new chat") {
+       let currentSession = session
+
+      // STEP 1: Save user's message with idx
+      const idx = chatHistory.length + 1;
+      const chatEntry = await createDoc("Chat history", {
+        user: label,
+        parent: currentSession,
+        parentfield: "chat_history",
+        parenttype: "Session",
+        idx,
+      });
+      if (!chatEntry.name) throw new Error("Failed to save user message");
+
+      await handleConfirmationHints()
+      mutate(); // Refresh UI to show user message
+      // setLoadingSession(sessionId)
+      // setLoading(true);
+      setSessionLoading(session, true);
+ 
+      // setLoading(false);
+      // setLoadingSession(null)
+      setSessionLoading(session,false)
+      dispatch(addSelectedoption(response))
+
+      setSessionLoading('new-chat', true);
+      const nowTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const sessionResp = await createDoc("Session", { time: nowTime, user: currentUser || '', });
+      if (!sessionResp.name) throw new Error("Failed to create session");
+      setSession(sessionResp.name);
+      // dispatch(addChatId(sessionResp.name))
+
+      mutate();
+      setSessionLoading('new-chat', false);
+      setSessionLoading(sessionResp.name, true);
+      hintsMutate()
+      intensionMutate();  
+      if (currentUser) {
+        console.log(response, label, 'Okay we want to check this')
+        setTimeout(() => {
+          navigate(`/chat/${sessionResp.name}`, { 
+            replace: true,
+            state: {
+              from: "new-chat-redirect",
+              sendMsg: true,
+              messageToSet: AiResponses.UserQuery,
+            }, 
+          })
+        }, 200);
+        // handleSendbtn(label)
+      } else {
+        sessionStorage.setItem("guest_session_id", sessionResp.name);
+      }
+    }
+
+    else {
       let currentSession = session;
       // STEP 1: Save user's message with idx
       const idx = chatHistory.length + 1;
@@ -421,9 +559,13 @@ function Chatscreen() {
       // setLoadingSession(null)
       setSessionLoading(session, false);
       setDisabled(false)
+      console.log('Cleainrg intensiio',sessionId)
       try {
         await updateDoc("Session", sessionId, {
           user_intension: "",
+        }).then(()=>{
+          console.log('Clearing the intension');
+          
         });
       } catch (err) {
         createDiagnostic("Others", `Something went wrong while Updating Session Record for session and clearing user_intension ${JSON.stringify(sessionId)} in ChatScreen : ${JSON.stringify(err)}`,chatId,sessionId)
@@ -1067,13 +1209,119 @@ function Chatscreen() {
                           <div className="p-2 rounded-lg max-w-full break-words">
                             {isCurrentAi ? (
                               // <Typewriter text={msg.ai} />
-                              <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                                {msg.ai}
-                              </ReactMarkdown>
+                            <ReactMarkdown
+      // IMPORTANT: GFM enables tables
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeRaw]}
+      components={{
+        h2: ({node, ...props}) => (
+          <h2 className="text-base font-bold text-black mt-3 mb-2 pb-1" {...props} />
+        ),
+        h3: ({node, ...props}) => (
+          <h3 className="text-base font-semibold text-black mt-3 mb-2" {...props} />
+        ),
+        p: ({node, ...props}) => (
+          <p className="text-black mb-2 text-md" {...props} />
+        ),
+        strong: ({node, ...props}) => (
+          <strong className="font-semibold text-base text-black" {...props} />
+        ),
+        ul: ({node, ...props}) => (
+          <ul className="list-disc pl-5 mb-4 space-y-1" {...props} />
+        ),
+        ol: ({node, ...props}) => (
+          <ol className="list-decimal pl-5 mb-4 space-y-1" {...props} />
+        ),
+        li: ({node, ...props}) => (
+          <li className="text-black text-base mb-1" {...props} />
+        ),
+
+        // ---- Table styling (Tailwind) ----
+        table: ({node, ...props}) => (
+          <div className="overflow-x-auto mb-4">
+            <table className="min-w-full border border-gray-300/70 rounded-lg text-sm">
+              {props.children}
+            </table>
+          </div>
+        ),
+        thead: ({node, ...props}) => (
+          <thead className="bg-gray-50">{props.children}</thead>
+        ),
+        tbody: ({node, ...props}) => <tbody className="divide-y">{props.children}</tbody>,
+        tr: ({node, ...props}) => <tr className="odd:bg-white even:bg-gray-50/50">{props.children}</tr>,
+        th: ({node, ...props}) => (
+          <th
+            className="px-3 py-2 text-left font-semibold text-gray-800 border-b border-gray-300"
+            {...props}
+          />
+        ),
+        td: ({node, ...props}) => (
+          <td
+            className="px-3 py-2 align-top text-gray-900 border-b border-gray-200"
+            {...props}
+          />
+        ),
+      }}
+    >
+      {msg.ai}
+    </ReactMarkdown>
                             ) : (
-                              <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                                {msg.ai}
-                              </ReactMarkdown>
+                             <ReactMarkdown
+      // IMPORTANT: GFM enables tables
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeRaw]}
+      components={{
+        h2: ({node, ...props}) => (
+          <h2 className="text-base font-bold text-black mt-3 mb-2 pb-1" {...props} />
+        ),
+        h3: ({node, ...props}) => (
+          <h3 className="text-base font-semibold text-black mt-3 mb-2" {...props} />
+        ),
+        p: ({node, ...props}) => (
+          <p className="text-black mb-2 text-md" {...props} />
+        ),
+        strong: ({node, ...props}) => (
+          <strong className="font-semibold text-base text-black" {...props} />
+        ),
+        ul: ({node, ...props}) => (
+          <ul className="list-disc pl-5 mb-4 space-y-1" {...props} />
+        ),
+        ol: ({node, ...props}) => (
+          <ol className="list-decimal pl-5 mb-4 space-y-1" {...props} />
+        ),
+        li: ({node, ...props}) => (
+          <li className="text-black text-base mb-1" {...props} />
+        ),
+
+        // ---- Table styling (Tailwind) ----
+        table: ({node, ...props}) => (
+          <div className="overflow-x-auto mb-4">
+            <table className="min-w-full border border-gray-300/70 rounded-lg text-sm">
+              {props.children}
+            </table>
+          </div>
+        ),
+        thead: ({node, ...props}) => (
+          <thead className="bg-gray-50">{props.children}</thead>
+        ),
+        tbody: ({node, ...props}) => <tbody className="divide-y">{props.children}</tbody>,
+        tr: ({node, ...props}) => <tr className="odd:bg-white even:bg-gray-50/50">{props.children}</tr>,
+        th: ({node, ...props}) => (
+          <th
+            className="px-3 py-2 text-left font-semibold text-gray-800 border-b border-gray-300"
+            {...props}
+          />
+        ),
+        td: ({node, ...props}) => (
+          <td
+            className="px-3 py-2 align-top text-gray-900 border-b border-gray-200"
+            {...props}
+          />
+        ),
+      }}
+    >
+      {msg.ai}
+    </ReactMarkdown>
                             )}
                             {/* <ReactMarkdown rehypePlugins={[rehypeRaw]}>{msg.ai}</ReactMarkdown> */}
                             {msg.result && (

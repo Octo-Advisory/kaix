@@ -1264,10 +1264,9 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
         save_state(state,f"QIND_state_{chatId}")
     chat_history = get_chat(f"chat_{chatId}") or []
 
-    Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
-    refined_query = refine_query_with_history(Chat_history_normal, query, llm)
-    chat_history.append(HumanMessage(content=refined_query))
-    save_chat(chat_history,f"chat_{chatId}")
+    # Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+    refined_query = query
+    
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     
     result = classify_industry_setup_query(refined_query, llm)
@@ -1281,8 +1280,7 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
             append_AI_to_history=False, 
             llm=llm,
             chatId=chatId)
-        chat_history.append(AIMessage(content=f"{message}"))
-        save_chat(chat_history,f"chat_{chatId}")
+        
         response = {
             "Ai_response": message,
             "Is_confirmation" : False,
@@ -1331,8 +1329,7 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
             state['product_attempt_count'] = state['product_attempt_count'] + 1
             save_state(state,f"QIND_state_{chatId}")
             message = generate_ai_message(state,Chat_history_normal,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
-            chat_history.append(AIMessage(content=f"{message}"))
-            save_chat(chat_history,f"chat_{chatId}")
+            
             return {"Ai_response": message,
                     "Is_confirmation" : False,
                     "state":state,
@@ -1365,8 +1362,7 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                 state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
                 save_state(state,f"QIND_state_{chatId}")
                 message = generate_ai_message(state,Chat_history_normal,missing_fields,state['capacity_attempt_count'],llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=f"{message}"))
-                save_chat(chat_history,f"chat_{chatId}")
+                
                 return {"Ai_response": message,
                     "Is_confirmation" : False,
                     "state":state,
@@ -1412,8 +1408,7 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                     state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
                     save_state(state,f"QIND_state_{chatId}")
                     message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=f"{message}"))
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     return {"Ai_response": message,
                         "Is_confirmation" : False,
                         "state":state,
@@ -1504,8 +1499,7 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                     # confirmation_message_static += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
                     confirmation_message_options = confirmation_message_static_dict["Options"]
                     # dynamic_confirmation_message = generate_dynamic_confirmation_message(confirmation_message_static, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=f"{confirmation_message_static}"))
-                    save_chat(chat_history,f"QIND_chat_{chatId}")
+                    
                     response = {
                         "Ai_response" : confirmation_message_static,
                         "Is_confirmation" : True,                                   
@@ -1524,8 +1518,7 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                     state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
                     save_state(state,f"QIND_state_{chatId}")
                     message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=f"{message}"))
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     return {"Ai_response": message,
                         "Is_confirmation" : False,
                         "state": state,
@@ -1548,8 +1541,7 @@ def gather_industry_details(query, main_industries, llm,chatId, additional_class
                 state['product_attempt_count'] = state['product_attempt_count'] + 1
                 save_state(state,f"QIND_state_{chatId}")
                 message = generate_ai_message(state,Chat_history_normal,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=f"{message}"))
-                save_chat(chat_history,f"chat_{chatId}")
+               
                 return {"Ai_response": message,
                     "Is_confirmation" : False,
                     "state":state,
@@ -2284,7 +2276,7 @@ def do_unit_conversion(state):
     converted_output = convert_to_standard_unit(
         user_quantity, user_unit, user_time_period,
         db_standard_unit, db_standard_time_per,
-        product_name, llm_deepseek
+        product_name, llm_gpt_oos_120b
     )
 
     converted_output_temp = {}
@@ -2465,13 +2457,13 @@ def do_unit_conversion(state):
                     min_conv = convert_to_standard_unit(
                         min_num, ext_unit_only, ext_time_period,
                         db_standard_unit, db_standard_time_per,
-                        product_name, llm_deepseek
+                        product_name, llm_gpt_oos_120b
                     ) if min_num is not None else None
 
                     max_conv = convert_to_standard_unit(
                         max_num, ext_unit_only, ext_time_period,
                         db_standard_unit, db_standard_time_per,
-                        product_name, llm_deepseek
+                        product_name, llm_gpt_oos_120b
                     ) if max_num is not None else None
 
                     cap_val = _to_float(converted_output.get("Capacity"))

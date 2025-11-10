@@ -624,10 +624,7 @@ def generate_dynamic_message(chat_history_for_context: List[dict], static_follow
     })
     update_llm_token(message)
     
-    # Append AI message to chat history
-    chat_history.append(AIMessage(content=f"{message.content.strip()}"))
-    # logging.info(f"actual aarray3 {chat_history}")
-    save_chat(chat_history,f"chat_{chatId}")
+    
     return message.content.strip()
 
 def check_user_intent(response: str, follow_up_question: str, llm,chatId) -> str:
@@ -687,11 +684,6 @@ def check_user_intent(response: str, follow_up_question: str, llm,chatId) -> str
     intent_match = re.search(r"Classified intent:\s*(Agree|Disagree|Location Specific Query|Other Intent)", intent_text)
     classified_intent = intent_match.group(1) if intent_match else "Other Intent"
 
-    # Append the follow-up question, user response, and the AI interpretation to the chat history
-    chat_history.append(HumanMessage(content=f"User's Response: {response}"))
-    chat_history.append(AIMessage(content=f"Classified Intent: {classified_intent}"))
-    # logging.info(f"actual aarray2 {chat_history}")
-    save_chat(chat_history,f"chat_{chatId}")
 
     return classified_intent
 
@@ -721,9 +713,8 @@ def handle_employment_query(
     """
     chat_history = get_chat(chatId) if get_chat(chatId) else []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
-    refined_user_input = refine_query_with_history_for_employment(Chat_history_normal, user_input, llm_70b_vers)
-    chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
-    save_chat(chat_history,f"chat_{chatId}")
+    refined_user_input = user_input
+    
     result = classify_employment_query(refined_user_input, llm_70b_vers)
     user_intention = result["classification_category"]
     if user_intention == "Negatively Intended Query":
@@ -733,8 +724,7 @@ def handle_employment_query(
             append_AI_to_history=False, 
             llm=llm,
             chatId=chatId)
-        chat_history.append(AIMessage(content=f"{message}"))
-        save_chat(chat_history,f"chat_{chatId}")
+        
         response = {
             "Ai_response": message,
             "Is_confirmation" : None,
@@ -797,11 +787,7 @@ def handle_employment_query(
                     )
                     # confirmation_message_employment_context_1 += f"<br/><br/>Note: {additional_class_response}" if additional_class_response else ""
 
-                    # Append AI message to chat history
-                    chat_history.append(AIMessage(content=f"{confirmation_message_employment_context_1}"))
-                    # logging.info(f"actual aarray3 {chat_history}")
-                    save_chat(chat_history,f"chat_{chatId}")
-                    # message = generate_dynamic_message(Chat_history_normal,context, refined_user_input,llm_70b_vers_creative,chatId=chatId)
+                    
                     classification_data_to_send["Area"] = []
                     classification_data_to_send["City"] = [parent_city,]
                     classification_data_to_send["State"] = [parent_state,]
@@ -873,10 +859,7 @@ def handle_employment_query(
                     )
                     # confirmation_message_employment_context_2 += f"<br/><br/>Note: {additional_class_response}" if additional_class_response else ""
 
-                    # Append AI message to chat history
-                    chat_history.append(AIMessage(content=f"{confirmation_message_employment_context_2}"))
-                    # logging.info(f"actual aarray3 {chat_history}")
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
 
                     # message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
                     # frappe.error_log(f"new generated message is {message}")
@@ -932,10 +915,7 @@ def handle_employment_query(
                     )
                     # confirmation_message_employment_context_3 += f"<br/><br/>Note: {additional_class_response}" if additional_class_response else ""
                     
-                    # Append AI message to chat history
-                    chat_history.append(AIMessage(content=f"{confirmation_message_employment_context_3}"))
-                    # logging.info(f"actual aarray3 {chat_history}")
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
 
                     # message = generate_dynamic_message(Chat_history_normal,context,refined_user_input,llm_70b_vers_creative,chatId=chatId)
                     
@@ -1022,10 +1002,7 @@ def handle_employment_query(
                 )
                 # confirmation_message_employment_context_4 += f"<br/><br/>Note: {additional_class_response}" if additional_class_response else ""
 
-                # Append AI message to chat history
-                chat_history.append(AIMessage(content=f"{confirmation_message_employment_context_4}"))
-                # logging.info(f"actual aarray3 {chat_history}")
-                save_chat(chat_history,f"chat_{chatId}")
+                
 
                 # confirmation_message = generate_dynamic_message(Chat_history_normal, message,refined_user_input, llm_70b_vers_creative,chatId=chatId)
                 

@@ -1157,9 +1157,8 @@ def handle_vendor_query(
 
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
 
-    refined_user_input = refine_query_with_history_for_vendor(Chat_history_normal, user_input, llm)
-    chat_history.append(HumanMessage(content=refined_user_input))  # Log user query
-    save_chat(chat_history,f"chat_{chatId}")
+    refined_user_input = user_input
+    
     result = classify_vendor_query(refined_user_input, llm)
     user_intention = result["classification_category"]
     frappe.log_error(f"user _intesnion {user_intention}")
@@ -1171,8 +1170,7 @@ def handle_vendor_query(
             append_AI_to_history=False, 
             llm=llm,
             chatId=chatId)
-        chat_history.append(AIMessage(content=f"{message}"))
-        save_chat(chat_history,f"chat_{chatId}")
+       
         response = {
             "Ai_response": message,
             "Is_confirmation" : None,
@@ -1236,8 +1234,7 @@ def handle_vendor_query(
 
                         # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
 
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
 
                     response = {
                         "Ai_response": message,
@@ -1252,8 +1249,7 @@ def handle_vendor_query(
                 else:
                     if state["Supply_info"]["Supplies"] and all(item == "Not Available in List" for item in state["Supply_info"]["Supplies"]):
                         message = SUPPLIES_NOT_AVAILABLE_MSG
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"chat_{chatId}")
+                       
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1267,8 +1263,7 @@ def handle_vendor_query(
                     
                     elif state["Industry_info"]["Main-Industry"] == "Not Available in List" or state["Industry_info"]["Sub-Sector"] == "Not Available in List":
                         message = INDUSTRY_NOT_AVAILABLE_MSG
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"chat_{chatId}")
+                        
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1281,8 +1276,7 @@ def handle_vendor_query(
                         return response
                     else:                        
                         message = SUPPLIES_NOT_AVAILABLE_MSG + "AND" + INDUSTRY_NOT_AVAILABLE_MSG
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"chat_{chatId}")
+                        
                         response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1296,8 +1290,7 @@ def handle_vendor_query(
             else:
                 response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                 message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                chat_history.append(AIMessage(content=message))  # Log user query
-                save_chat(chat_history,f"chat_{chatId}")
+                
                 response = {
                             "Ai_response": message,
                             "Is_confirmation" : None,
@@ -1377,8 +1370,7 @@ def handle_vendor_query(
                             # message += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
 
                             # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                            
                             confirmation_buttons = [
                                 {"label": "Yes, show relevant suppliers", "value": user_intention},
                                 {"label": "No, I want to update the request", "value": None}
@@ -1397,8 +1389,7 @@ def handle_vendor_query(
                         else:
                             response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                             message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                           
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1417,7 +1408,7 @@ def handle_vendor_query(
                         save_state(state,f"QVND_state_{chatId}")
                         if perfect_location_data:
                             message = INDUSTRY_NOT_AVAILABLE_MSG
-                            chat_history.append(AIMessage(content=message))  # Log user query
+                            
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1431,8 +1422,7 @@ def handle_vendor_query(
                         else:
                             response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                             message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                            
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1451,8 +1441,7 @@ def handle_vendor_query(
                     save_state(state,f"QVND_state_{chatId}")
                     response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                     message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1471,8 +1460,7 @@ def handle_vendor_query(
                 save_state(state,f"QVND_state_{chatId}")
                 if perfect_location_data:
                     message = INDUSTRY_NOT_AVAILABLE_MSG
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1486,8 +1474,7 @@ def handle_vendor_query(
                 else:
                     response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                     message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1554,8 +1541,7 @@ def handle_vendor_query(
                         message = build_supply_confirmation_message_human_tone(extracted_state=extracted_state, validated_state=state)
 
                         # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"chat_{chatId}")
+                       
                         confirmation_buttons = [
                             {"label": "Yes, show relevant suppliers", "value": user_intention},
                             {"label": "No, I want to update the request", "value": None}
@@ -1574,8 +1560,7 @@ def handle_vendor_query(
                         response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                         
                         message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"chat_{chatId}")
+                        
                         response = {
                                     "Ai_response": message,
                                     "Is_confirmation" : None,
@@ -1590,8 +1575,7 @@ def handle_vendor_query(
                     response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                     
                     message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1605,8 +1589,7 @@ def handle_vendor_query(
             else:
                 if perfect_location_data: 
                     message = SUPPLIES_NOT_AVAILABLE_MSG
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1621,8 +1604,7 @@ def handle_vendor_query(
                     response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                     
                     message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1718,8 +1700,7 @@ def handle_vendor_query(
                             # message += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
 
                             # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                            
 
                             confirmation_buttons = [
                                 {"label": "Yes, show relevant suppliers", "value": user_intention},
@@ -1740,8 +1721,7 @@ def handle_vendor_query(
                         else:
                             response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                             message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                            
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1759,8 +1739,7 @@ def handle_vendor_query(
                         save_state(state,f"QVND_state_{chatId}")
                         if perfect_location_data:
                             message = INDUSTRY_NOT_AVAILABLE_MSG
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                            
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1774,8 +1753,7 @@ def handle_vendor_query(
                         else:
                             response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                             message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                            chat_history.append(AIMessage(content=message))  # Log user query
-                            save_chat(chat_history,f"chat_{chatId}")
+                            
                             response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1794,8 +1772,7 @@ def handle_vendor_query(
                     save_state(state,f"QVND_state_{chatId}")
                     response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                     message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1815,8 +1792,7 @@ def handle_vendor_query(
                 save_state(state,f"QVND_state_{chatId}")
                 if perfect_location_data: 
                     message = INDUSTRY_NOT_AVAILABLE_MSG
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1831,8 +1807,7 @@ def handle_vendor_query(
                     response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                     
                     message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1920,8 +1895,7 @@ def handle_vendor_query(
 
 
                         # dynamic_confirmation_message = generate_dynamic_confirmation_message(message, llm_70b_vers_creative)  
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"chat_{chatId}")
+                       
                         
                         confirmation_buttons = [
                             {"label": "Yes, show relevant suppliers", "value": user_intention},
@@ -1942,8 +1916,7 @@ def handle_vendor_query(
                         response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                     
                         message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                        chat_history.append(AIMessage(content=message))  # Log user query
-                        save_chat(chat_history,f"chat_{chatId}")
+                        
                         response = {
                                     "Ai_response": message,
                                     "Is_confirmation" : None,
@@ -1958,8 +1931,7 @@ def handle_vendor_query(
                     response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                     
                     message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -1973,8 +1945,7 @@ def handle_vendor_query(
             else:
                 if perfect_location_data and perfect_supply_data: 
                     message = SUPPLIES_NOT_AVAILABLE_MSG
-                    chat_history.append(AIMessage(content=message))  # Log user query
-                    save_chat(chat_history,f"chat_{chatId}")
+                    
                     response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,
@@ -1988,8 +1959,7 @@ def handle_vendor_query(
                 else:
                     response_static_message = get_static_follow_up_for_vendor(state, user_intention)
                     
-                    message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-                    chat_history.append(AIMessage(content=message))  # Log user query
+                    
                     response = {
                                 "Ai_response": message,
                                 "Is_confirmation" : None,
@@ -2005,8 +1975,7 @@ def handle_vendor_query(
             response_static_message = get_static_follow_up_for_vendor(state, user_intention)
             
             message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
-            chat_history.append(AIMessage(content=message))  # Log user query
-            save_chat(chat_history,f"chat_{chatId}")
+            
             response = {
                         "Ai_response": message,
                         "Is_confirmation" : None,

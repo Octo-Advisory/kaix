@@ -1,7 +1,7 @@
 // import React, { useEffect, useState } from 'react'
 // import { useDispatch, useSelector } from 'react-redux';
 // import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useFrappeAuth, useFrappeGetDoc } from 'frappe-react-sdk';
+import { FrappeContext, useFrappeAuth, useFrappeGetDoc } from 'frappe-react-sdk';
 import Incentiveresult from '../ResultScreens/Incentiveresult';
 import Approvalresult from '../ResultScreens/Approvalresult';
 import IndustryResultScreen from '../ResultScreens/IndustryResultScreen';
@@ -59,13 +59,15 @@ import Empresult from '../ResultScreens/Empresult';
 // }
 
 // export default Renderresult
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FaExclamationTriangle, FaSignInAlt, FaHome, FaArrowLeft, FaInfoCircle } from 'react-icons/fa';
 import { MdOutlineEmojiObjects } from 'react-icons/md';
 import LogoLoader from '../Responseloader/LogoLoader';
 
+
 function Renderresult() {
+  const {call} = useContext(FrappeContext)
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const name = params.get('name');
@@ -75,6 +77,30 @@ function Renderresult() {
   const [chatDoc, setChatDoc] = useState(null);
   const [renderResult, setRenderResult] = useState(null);
   const [error, setError] = useState(null);
+
+   const retrieveData = async (data) => {
+  
+    try {
+
+      const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.retrieve_and_decompress", {
+        compressed_data: data,
+      },
+      {
+          headers: {
+            'Expect': '' // 👈 Clear problematic header
+          }
+      }
+    )
+    // console.log(convertJson, 'this is the msg');
+    return {
+      "result": convertJson.message
+    }
+    } catch (err) {
+      // console.error("Error Storing Result json:", err);
+      // createDiagnostic("Land & Approvals", `Something went wrong while storing the result json ${JSON.stringify(err)} in Build From Scratch`,lastChatId)
+      return []; // Return empty for this batch on error
+    }
+  }
 
   useEffect(() => {
     const validateSessionAndFetch = async () => {
@@ -137,11 +163,16 @@ function Renderresult() {
         }
 
         // 5. Parse and set result component (original unchanged)
-        const parsedResult = JSON.parse(doc.result);
+        let parsedResult = JSON.parse(doc.result);
+
+        // if(doc.intension==='Query to build industry from Scratch' || doc.intension === 'Query to Get Approvals' || doc.intension === 'Query to Search Vendors') {
+          let tempData = await retrieveData(parsedResult);
+          parsedResult = tempData
+        // }
 
         switch (doc.intension) {
           case 'Query to search Incentives':
-            setRenderResult(<Incentiveresult res={parsedResult} source="SolutionScreen" rerender={1} />);
+            setRenderResult(<Incentiveresult res={parsedResult.result} source="SolutionScreen" rerender={1} />);
             break;
           case 'Query to Get Approvals':
             setRenderResult(<Approvalresult result={parsedResult.result} source="SolutionScreen" rerender={1} />);
