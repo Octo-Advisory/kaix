@@ -798,6 +798,7 @@ def updateNearestConnectivity():
                 doc.save()
             frappe.log_error("Updating Property Ended",surveyNo.get("name"))
 
+# Get center point Value from bounding box array
 @frappe.whitelist()
 def findCenterPoint(arr):
     # Convert string to Python list
