@@ -9,6 +9,7 @@ import gc
 import re
 import ast
 import spacy
+from shapely.geometry import Polygon
 # from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers_creative
 
 from langchain_groq import ChatGroq
@@ -796,3 +797,15 @@ def updateNearestConnectivity():
                 doc.distance_from_nearest_seaport = distaceObj['SearportDist']
                 doc.save()
             frappe.log_error("Updating Property Ended",surveyNo.get("name"))
+
+@frappe.whitelist()
+def findCenterPoint(arr):
+    # Convert string to Python list
+    bbox = json.loads(arr)
+
+    # Create polygon from coordinates
+    polygon = Polygon(bbox)
+
+    # Get centroid (center point)
+    center = polygon.centroid
+    return center
