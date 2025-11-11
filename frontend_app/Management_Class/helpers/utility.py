@@ -10,6 +10,7 @@ import gc
 import re
 import ast
 import spacy
+from shapely.geometry import Polygon
 import json
 import gzip
 import msgpack
@@ -959,3 +960,16 @@ def updateNearestConnectivity():
                 doc.distance_from_nearest_seaport = distaceObj['SearportDist']
                 doc.save()
             frappe.log_error("Updating Property Ended",surveyNo.get("name"))
+
+# Get center point Value from bounding box array
+@frappe.whitelist()
+def findCenterPoint(arr):
+    # Convert string to Python list
+    bbox = json.loads(arr)
+
+    # Create polygon from coordinates
+    polygon = Polygon(bbox)
+
+    # Get centroid (center point)
+    center = polygon.centroid
+    return center
