@@ -113,7 +113,8 @@ function PropertyCreation() {
       body: new URLSearchParams({
         lat: lat,
         lon: lon,
-        stringArray:stringArray
+        stringArray:stringArray,
+        host:location.host
       })
     })
       .then(res => res.json())
