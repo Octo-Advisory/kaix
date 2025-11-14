@@ -937,7 +937,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
       
       // Join all supply names with commas if more than one match
       const supplyNames = filteredItem[0].supplies;     
-
+      item.vendor_id = item.vendor_name;
       item.supplyName = supplyNames;
     });
     essentialVendors.current  = finalEVData.data; 
