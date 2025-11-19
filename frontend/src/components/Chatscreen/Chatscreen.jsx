@@ -59,13 +59,18 @@ function Chatscreen() {
   const [chatLoading, setChatLoading] = useState(true)
   const [loadingStates, setLoadingStates] = useState(new Map());
 
-  const { from, sendMsg, messageToSet } = location.state || {};
+  const { from, sendMsg, messageToSet,passedIntension } = location.state || {};
 
 useEffect(() => {
   if (sendMsg) {
     // do something only once when arriving
     console.log('Running once for new session');
-    handleSendbtn(messageToSet)
+    if(passedIntension) {
+      handleSendbtn(messageToSet,passedIntension)
+    }
+    else {
+      handleSendbtn(messageToSet, '')
+    }
     // Optionally clear it
     navigate(location.pathname, { replace: true, state: {} });
   }
@@ -144,6 +149,8 @@ useEffect(() => {
   useEffect(() => {
 
     const handleNewChat = async(msg)=> {
+      let tempMsg= msg==='The msg we dont want' ? 'The overriden msg to send' : msg
+
       if(!feasibilityId) return
       if(!addInput) return
       console.log('Making New Chat...')
@@ -168,7 +175,7 @@ useEffect(() => {
             state: {
               from: "new-chat-redirect",
               sendMsg: true,
-              messageToSet: msg,
+              messageToSet: tempMsg,
             }, 
           })
         }, 200);
@@ -591,7 +598,7 @@ useEffect(() => {
     if (!message.trim() && !msg.trim()) return;
 
     const userMessage = msg ? msg.trim() : message.trim();
-
+    
     setMessage('');
     try {
 

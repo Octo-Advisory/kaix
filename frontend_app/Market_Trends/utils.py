@@ -14,7 +14,9 @@ import configparser
 from frontend_app.Ai_module.Query_Classification_And_Analysis import llm_70b_vers_creative, llm_70b_vers
 
 # from langchain_openai import ChatOpenAI
-config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+base_dir = os.path.expanduser("~")
+config_file = os.path.join(base_dir, "frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini")
+# config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 config = configparser.ConfigParser()
 config.read(config_file)
 api_key = config['Key']['SERPAPI_API_KEY']

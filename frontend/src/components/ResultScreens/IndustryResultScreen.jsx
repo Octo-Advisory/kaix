@@ -11,7 +11,7 @@ import { BsCashCoin, BsCurrencyExchange, BsPatchCheckFill } from "react-icons/bs
 import { MdOfflineBolt } from "react-icons/md";
 import { FaCircleXmark, FaTriangleExclamation } from 'react-icons/fa6';
 import { FaXmark } from "react-icons/fa6";
-import { FrappeContext, useFrappePostCall, useFrappeUpdateDoc,useFrappeCreateDoc } from 'frappe-react-sdk';
+import { FrappeContext, useFrappePostCall, useFrappeUpdateDoc,useFrappeCreateDoc, useFrappeAuth } from 'frappe-react-sdk';
 import MapComponent from '../MapComponent/MapComponent';
 import Backtochat from '../Backtochat/Backtochat';
 import { useFrappeGetDoc } from 'frappe-react-sdk';
@@ -36,6 +36,9 @@ import SingleMap from '../MapComponent/SingleMap';
 import NoResultsFound from '../Failure/NoResultsFound';
 import { CiCoinInsert } from 'react-icons/ci';
 import NewIndustryScreen from './Test/NewIndustryScreen';
+import LogoIcon from '../../assets/New Symbol.png'
+import LogoIcon2 from '../../assets/New MarsAIX White - Edited.png'
+import FollowUpChat from '../FollowUp/FollowUpChat';
 
 
 const IndustryResultScreen = ({ result, source, rerender }) => {
@@ -1028,7 +1031,6 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
           const parsedTaxes = taxes ? parseLegalOrTaxText(taxes) : []
           const market_trends = final_scoring_df['market_trends'][key] ? final_scoring_df['market_trends'][key] : fallBackMarketTrend;
 
-
           const temp_power_source = Math.floor(Math.random() * (20 - 2 + 1)) + 2;
 
           const areaName = await fetchAreaName(area)
@@ -1290,11 +1292,79 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
 
 
   const shouldRender = source === "SolutionScreen" ? solutions && selectedProperty : source === "MapComponent" ? selectedProperty : false; // fallback if needed
+  
+  const { currentUser } = useFrappeAuth()
+  const { data: userDoc } = useFrappeGetDoc('User', currentUser || '');
 
+  const renderUserAvatar = (sender) => {
+      const isCurrentUser = sender === 'user';
+  
+      if (sender !== 'user') {
+        return (
+          <img
+            src={LogoIcon}
+            alt="Bot"
+            className="h-8 w-8 relative rounded-full flex-shrink-0"
+          />
+        );
+      }
+  
+      if (isCurrentUser && currentUser) {
+        if (userDoc?.user_image) {
+          return (
+            <img
+              src={userDoc.user_image}
+              alt="User"
+              className="h-8 w-8 relative rounded-full object-cover flex-shrink-0"
+            />
+          );
+        } else {
+          return (
+            <div className="h-8 w-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold flex-shrink-0">
+              {currentUser?.charAt(0).toUpperCase()}
+            </div>
+          );
+        }
+      }
+  
+      return (
+        <img
+          src={userIcon}
+          alt="User"
+          className="h-8 w-8 relative rounded-full flex-shrink-0"
+        />
+      );
+    };
+  const [isHovered, setIsHovered] = useState(false);
+  const [isClicked, setIsClicked] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const handleMouseEnterr = () => {
+    if (!isClicked) setIsHovered(true);
+  };
+
+  const handleMouseLeavee = () => {
+    if (!isClicked) setIsHovered(false);
+  };
+
+  const handleClick = () => {
+    setIsClicked((prev) => !prev);
+  };
+
+  const handleSend = () => {
+    alert(`Message sent: ${message}`);
+    setMessage("");
+  };
+
+  const expanded = isHovered || isClicked;
+  const [isExpanded, setIsExpanded] = useState(false) 
   return (
     <>
       {shouldRender ? (
         <div className='relative flex flex-col w-screen h-screen'>
+          
+          <FollowUpChat solutions={solutions} seletedProperty={selectedProperty} />
+
           {source === 'SolutionScreen' && (<div className='sticky top-0 left-0 w-full h-fit flex flex-col z-[11]  bg-white border-b border-gray-300'>
             <div className='relative w-full h-12 p-4 flex flex-row justify-between mb-4'>
               <div className='relative flex flex-row gap-2 items-center'>

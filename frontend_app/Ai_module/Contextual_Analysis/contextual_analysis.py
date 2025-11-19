@@ -4,7 +4,7 @@ import re
 import frappe
 from langchain.prompts import PromptTemplate
 
-from frontend_app.Ai_module.Query_Classification_And_Analysis  import llm_70b_vers, llm_deepseek
+from frontend_app.Ai_module.Query_Classification_And_Analysis  import llm_70b_vers, llm_gpt_oos_120b
 
 
 def clean_html_description_robust(html_text: str) -> str:
@@ -444,14 +444,14 @@ Markdown formatted and verified content only.
         }
 
         # Step 1: Structured Computation from LLM 1
-        chain_step1 = generation_prompt_1 | llm_deepseek
+        chain_step1 = generation_prompt_1 | llm_gpt_oos_120b
         response_step1 = chain_step1.invoke(llm_input)
         llm1_json = response_step1.content.strip()
         key = scale if scale else "Default"
         raw_responses[key] = llm1_json
 
         # Step 2: Plain Text Summary from LLM 2
-        chain_step2 = generation_prompt_2 | llm_deepseek
+        chain_step2 = generation_prompt_2 | llm_gpt_oos_120b
         response_step2 = chain_step2.invoke({
             "incentive_name": llm_input["incentive_name"],
             "incentive_type": llm_input["incentive_type"],

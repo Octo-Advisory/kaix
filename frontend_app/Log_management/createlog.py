@@ -4,11 +4,13 @@ import configparser
 import os
 import json
 
-config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+# config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+base_dir = os.path.expanduser("~")
+config_file = os.path.join(base_dir, "frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini")
 config = configparser.ConfigParser()
 config.read(config_file)
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def log(chatId, level, key, value, file_name, module: str):
     # Define mapping of modules to their respective log tables and fields
     # frappe.log_error(f"jkdwn {config['Settings']['doc_log']}{config['Settings']['file_log'] }")
@@ -59,13 +61,19 @@ def log(chatId, level, key, value, file_name, module: str):
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 f"{key}" : value
             }
-    
-            with open(f"/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/{module}.txt", "a", encoding="utf-8") as file:
+            config_file = os.path.join(
+                base_dir,
+                "frappe-bench/apps/frontend_app/frontend_app/Log_management",
+                f"{module}.txt"
+            )
+            with open(config_file, "a", encoding="utf-8") as file:
                 file.write(json.dumps(log_entry) + "\n")
 
 @frappe.whitelist(allow_guest=True)
 def update_config(doc_log,file_log):
-    config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+    base_dir = os.path.expanduser("~")
+    config_file = os.path.join(base_dir, "frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini")
+    # config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
     config = configparser.ConfigParser()
 
     # Ensure the directory exists

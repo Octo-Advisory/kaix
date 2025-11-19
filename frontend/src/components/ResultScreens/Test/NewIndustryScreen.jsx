@@ -88,6 +88,8 @@ const NewIndustryScreen = ({solutions}) => {
     { x: 650, y: 250, width: 250, height: 70 },  // Box 4
     { x: 650, y: 295, width: 250, height: 120 }   // Box 5
   ];
+
+  // drawInfoBox(ctx, 650, 40, 250, 70, arcs[0]);
   
   // Arcs configuration
   // const arcs = [
@@ -237,6 +239,72 @@ const NewIndustryScreen = ({solutions}) => {
     drawCenterElements(ctx);
   };
 
+const drawInfoBox = (ctx, x, y, width, height, arc, boxIndex) => {
+    const isActive = activeArc === arc.id;
+    
+    // Draw box background
+    ctx.fillStyle = isActive ? arc.color : 'rgba(255, 255, 255, 0.95)';
+    // ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+    // ctx.shadowBlur = 10;
+    // ctx.shadowOffsetY = 2;
+    
+    // Draw rounded rectangle
+    const borderRadius = 12;
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, borderRadius);
+    ctx.fill();
+    
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    
+    // Draw left border
+    ctx.fillStyle = isActive ? 'white' : arc.color;
+    ctx.fillRect(x, y, 4, height);
+    
+    // Draw content
+    const padding = 16;
+    
+    // // Draw icon (colored circle)
+    // const iconX = x + padding;
+    // const iconY = y + (height / 2);
+    
+    // ctx.fillStyle = isActive ? 'white' : arc.color;
+    // ctx.beginPath();
+    // ctx.arc(iconX, iconY, 16, 0, 2 * Math.PI);
+    // ctx.fill();
+    
+    // Draw title
+    const titleX = x + padding + 30;
+    const titleY = y + (height / 2);
+    
+    ctx.fillStyle = isActive ? 'white' : '#1f2937';
+    ctx.font = isActive ? 'bold 18px Arial' : 'bold 16px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(arc.title, titleX, titleY);
+    
+    // Draw score
+    const scoreX = x + width - padding;
+    const scoreY = y + (height / 2);
+    
+    ctx.fillStyle = isActive ? 'white' : '#1f2937';
+    ctx.font = isActive ? 'bold 24px Arial' : 'bold 20px Arial';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(arc.score.toString(), scoreX, scoreY);
+    
+    // Store box position for click detection
+    if (!window.infoBoxes) window.infoBoxes = [];
+    window.infoBoxes[boxIndex] = {
+        x: x,
+        y: y, 
+        width: width,
+        height: height,
+        arcId: arc.id
+    };
+};
+
   const drawSingleArc = (ctx, arc) => {
     // Set line properties
     ctx.lineWidth = arc.strokeWidth;
@@ -358,6 +426,13 @@ const drawNorthThenEastConnector = (ctx, arc, boxIndex) => {
     // Reset shadow
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
+
+
+    drawInfoBox(ctx, 550, 0, 250, 70, arcs[0],0);
+    drawInfoBox(ctx, 550, 90, 250, 70, arcs[1],1);
+    drawInfoBox(ctx, 550, 200, 250, 70, arcs[2],2);
+    drawInfoBox(ctx, 550, 300, 250, 70, arcs[3],3);
+    drawInfoBox(ctx, 550, 400, 250, 70, arcs[4],4);
 };
 
   const drawCenterElements = (ctx) => {
@@ -428,21 +503,36 @@ const drawNorthThenEastConnector = (ctx, arc, boxIndex) => {
   };
 
   // Canvas click handler
-  const handleCanvasClick = (event) => {
+const handleCanvasClick = (event) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    // Check each arc to see if it was clicked
-    for (let i = 0; i < arcs.length; i++) {
-      if (isPointOnArc(event.clientX, event.clientY, arcs[i])) {
-        setActiveArc(arcs[i].id);
-        return;
-      }
+    const rect = canvas.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+    
+    // First check if any info box was clicked
+    if (window.infoBoxes) {
+        for (let i = 0; i < window.infoBoxes.length; i++) {
+            const box = window.infoBoxes[i];
+            if (box && 
+                clickX >= box.x && clickX <= box.x + box.width &&
+                clickY >= box.y && clickY <= box.y + box.height) {
+                setActiveArc(box.arcId);
+                handleInfoBoxClick(box.arcId);
+                return;
+            }
+        }
     }
     
-    // If no arc was clicked, reset active arc
-    // setActiveArc(null);
-  };
+    // Then check if any arc was clicked
+    for (let i = 0; i < arcs.length; i++) {
+        if (isPointOnArc(event.clientX, event.clientY, arcs[i])) {
+            setActiveArc(arcs[i].id);
+            return;
+        }
+    }
+};
 
   // Info box click handler
   const handleInfoBoxClick = (arcId) => {
@@ -767,6 +857,15 @@ const scrollToTop = () => {
     });
   };
 
+   const scrolltoProperty = () => {
+    // setSelectedProperty(null)
+    propertyRef.current?.scrollIntoView({
+      behavior:"smooth",
+      block:'start',
+    });
+  };
+
+
    function createVendorData(essential, essential_all, nonessential, nonessential_all, latitude_longitude) {
     let result = {
       Analytics_response: {
@@ -982,54 +1081,20 @@ const scrollToTop = () => {
         <div ref={section2Ref} id='factors-section'  className="relative  h-fit min-h-[90vh] flex flex-row  justify-center lg:flex-row w-screen gap-6">
           
           {/* <div onClick={scrollToTop} className='absolute bottom-5 left-5 p-2 h-14 w-14 flex items-center justify-center   rounded-full z-[4] select-none cursor-pointer' title='Back To Top'><FaArrowUp className='animate-bounce text-xl' /> </div> */}
-          
+          {selectedProperty?.property_id && (<div className='absolute top-0 bg-white left-0 w-fit h-fit p-2 rounded-md z-[99] select-none'>{selectedProperty?.property_id}</div>)}
+
           {/* Canvas Container */}
-          <div className={`flex flex-row justify-center ${aside ? '-left-72 z-[3]': '-left-16  z-[3]'} transition-all duration-700 ease-in-out min-w-0 h-full w-full rounded-2xl p-8  relative`}>
+          <div className={`flex flex-row justify-center ${aside ? '-left-80 z-[3]': '-left-8  z-[3]'} transition-all duration-700 ease-in-out min-w-0 h-full w-full rounded-2xl p-8  relative`}>
             <canvas
               ref={canvasRef}
-              width={740}
+              width={800}
               height={600}
               className=" rounded-xl cursor-pointer"
               onClick={handleCanvasClick}
             />
 
             {/* Info Boxes Overlay */}
-            <div className={` ${aside ? 'right-44' : 'right-16'} relative flex flex-col gap-8 w-64`}>
-              {arcs.map((arc, index) => (
-                <div
-                  key={arc.id}
-                  className={`bg-white/95 backdrop-blur-sm h-[70px] max-h-[70px] flex flex-col justify-center ${aside ? 'w-80' : 'w-112'} rounded-xl p-2 shadow-lg transition-all duration-700 cursor-pointer border-l-4 ${
-                    activeArc === arc.id 
-                      ? `scale-115 shadow-2xl`
-                      : 'hover:scale-102 hover:shadow-xl'
-                  }`}
-                  title='This is the best Approval you have seen '
-                  style={{ 
-                    borderLeftColor: activeArc === arc.id ? "white" : arc.color,
-                    backgroundColor: activeArc === arc.id ? arc.color : " ",
-                    ...(activeArc === arc.id && { ringColor: arc.color })
-                  }}
-                  onClick={() => {handleInfoBoxClick(arc.id)}}
-                >
-                  <div className="flex flex-row items-center justify-between px-3 py-1 w-full  ">
-                    {/* <div 
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-md"
-                      style={{ backgroundColor: arc.color }}
-                    >
-                      {arc.id}
-                    </div> */}
-                    <div className='flex flex-row relative items-center gap-2'>
-                      {arc.title === 'Approval' ? <IoCheckmarkDone className={`${activeArc === arc.id ? 'text-white text-2xl' : 'text-gray-700 text-2xl'}`} /> : arc.title=== 'Incentives' ? <RiCoinsLine className={`${activeArc === arc.id ? 'text-white text-4xl' : 'text-gray-700 text-3xl'}`} /> : arc.title === 'Location Summary' ? <FaMapLocationDot className={`${activeArc === arc.id ? 'text-white text-2xl' : 'text-gray-700 text-2xl'}`} /> : arc.title=== 'Vendors' ? <BsShop className={`${activeArc === arc.id ? 'text-white text-2xl' : 'text-gray-700 text-2xl'}`} /> : <FaUserGroup className={`${activeArc === arc.id ? 'text-white text-2xl' : 'text-gray-700 text-2xl'}`} />  }
-                      <h3 className={` font-bold ${activeArc===arc.id ? 'text-white text-lg': 'text-gray-800 text-md'}`}>{arc?.title}</h3>
-                      {/* {activeArc===arc.id ? (<ShinyText text={arc.title} disabled={false} speed={3} className={` font-bold ${activeArc===arc.id ? 'text-white text-xl': 'text text-gray-800'}`} />) : (<h3 className={`text-base font-bold ${activeArc===arc.id ? 'text-white': 'text-gray-800'}`}>{arc?.title}</h3>)} */}
-
-                    </div>
-                    <h1 className={`font-bold ${activeArc===arc.id ? 'text-2xl text-white' : 'text-xl text-gray-800'}`}>{arc.score}</h1>
-                  </div>
-                  {/* <p className="text-xs pl-2 text-gray-600 leading-relaxed">{arc?.description}</p> */}
-                </div>
-              ))}
-            </div>
+            
           </div>
 
           <div className={` absolute right-8 h-full top-0 flex flex-col items-start justify-start p-4 bg-transparent w-[40%] duration-700 transition-all ${aside ? 'opacity-100 flex z-[3]' : 'opacity-0 z-[0]'}  self-start  `}>
@@ -1948,7 +2013,8 @@ const scrollToTop = () => {
 
 
           </div>
-
+          
+          <div className='absolute bottom-10 z-[99] left-3 p-2 bg-white rounded-full w-fit h-fit select-none text-xs flex flex-row gap-2 items-center cursor-pointer' onClick={()=>{scrolltoProperty()}}>Back to Property List <div className='animate-bounce transition-all duration-300'> <FaArrowUp /></div></div>
         </div>
 
     

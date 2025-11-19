@@ -78,7 +78,9 @@ CHUNKS_STORAGE = {}
 
 # PERSIST_DIR = r"D:\work_folder\mars_rag_qna\data\chroma_feasibility"
 # PERSIST_ROOT = "D:/work_folder/mars_rag_qna/data_45/vectors"
-PERSIST_ROOT = "/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/vectors"
+base_dir = os.path.expanduser("~")
+PERSIST_ROOT = os.path.join(base_dir, "frappe-bench/apps/frontend_app/frontend_app/vectors")
+# PERSIST_ROOT = "/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/vectors"
 os.makedirs(PERSIST_ROOT, exist_ok=True)
 # COLLECTION_NAME = "feasibility_docs"   # same name in every per-PDF folder is fine
 
