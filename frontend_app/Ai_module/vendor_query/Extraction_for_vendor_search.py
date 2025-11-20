@@ -1958,7 +1958,7 @@ def handle_vendor_query(
                     return response
                 else:
                     response_static_message = get_static_follow_up_for_vendor(state, user_intention)
-                    
+                    message = generate_dynamic_message_for_vendor(Chat_history_normal, response_static_message, refined_user_input, llm_70b_vers_creative)
                     
                     response = {
                                 "Ai_response": message,
