@@ -211,7 +211,7 @@ useEffect(() => {
           name: feasibilityId,
         });
 
-        const chats = response.message?.chats || [];
+        const chats = response?.message?.chats || [];
 
         const alreadyExists = chats.some(chat => chat.session === sessionId);
         // console.log("raw feasibility id", feasibilityId, alreadyExists);

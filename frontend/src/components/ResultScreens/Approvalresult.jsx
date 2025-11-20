@@ -93,7 +93,7 @@ const fetchApprovals = async()=>{
     }
     let approvalsMapp = mapApprovalData(approval_data['Approval ID'], approval_data['Approval Name'], approval_data['Government Department'], approval_data["aggregated_score"], approval_data['Stages'])
     // console.log(approvalsMapp, 'This is the data we want tsee ')
-
+    
     setLoading(false);
     const stages = [
     "Pre-Operation",
@@ -221,7 +221,7 @@ const handleApprovalSelection = async (approval) => {
 
         setSelectedApproval(fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0] : null);
         setViewMode(viewMode!== 'All' && fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0].stage : viewMode)
-        setLoading(false);
+        // setLoading(false);
         
     } catch (error) {
         // console.error("Error fetching approvals:", error);

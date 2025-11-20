@@ -187,7 +187,7 @@ function Vendorresult({ result, source, rerender }) {
         setSelectedVendor(existingVendor);
         return; // ✅ Skip API call
     }
-    console.log('Calling Data for ', id)
+    // console.log('Calling Data for ', id)
     let vendorData = await getData(id);
     // console.log(vendorData,'This is the VendorData')
     if(vendorData) {
@@ -291,7 +291,7 @@ const parseSuppliers = (supplierData) => {
         setBetterIndividualSuppliers(((source === "SolutionScreen") && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Better Supplier"] || "{}")) : analytics_response?.["Better Supplier"] || "{}")
         setAllIndividualSuppliers(((source === "SolutionScreen") && rerender !== 1) ? parseSuppliers(JSON.parse(analytics_response["Unfiltered All IS Supplier"] || "{}")) : analytics_response?.["Unfiltered All IS Supplier"] || "{}")
         let temp_supply = ((source=== "SolutionScreen") && rerender !==1) ? JSON.parse(analytics_response["Unfiltered All IS Supplier"] || "{}") : analytics_response?.["Unfiltered All IS Supplier"] || "{}"
-        console.log(temp_supply,analytics_response?.["Unfiltered All IS Supplier"], 'To check the Error' )
+        // console.log(temp_supply,analytics_response?.["Unfiltered All IS Supplier"], 'To check the Error' )
         let all_supply = rerender===1 ? parseSupplies(temp_supply) : parseAllSupplies(temp_supply)
         let uniqueSupplies = [...new Set(all_supply)];
         setIndividualAllSupply(uniqueSupplies)
@@ -458,7 +458,7 @@ const parseSuppliers = (supplierData) => {
           }
       }
     )
-    console.log(convertJson, 'this is the msg');
+    // console.log(convertJson, 'this is the msg');
     
     } catch (err) {
       console.error("Error Storing Result json:", err);
@@ -708,9 +708,7 @@ const parseSuppliers = (supplierData) => {
     setMapResult(validSuppliers);
   }, [map_allSuppliers, map_bestSuppliers]);
 
-  useEffect(()=>{
-    console.log('This is the Selected Vendor', selectedVendor)
-  },[selectedVendor])
+
 
 
   const getLatLng = (latlngStr) => {

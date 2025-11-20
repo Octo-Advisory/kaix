@@ -55,10 +55,10 @@ def call_incentive_query(aiResponse,chatId):
         incentive_keyword_df["Incentive Type"] = incentive_keyword_df["Incentive Type"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
         incentive_keyword_df["Incentive Details"] = incentive_keyword_df["Incentive Details"].apply(lambda x: "None" if str(x).strip() in ["", "None", "No", "Null"] else x)
         incentive_detail = incentive_details(Incentive_only_df,area,city,State,keyword_given_by_user= keywords, incentive_keyword_df = incentive_keyword_df)
-        # time.sleep(2)    
+        time.sleep(2)    
         update_process(chatId,"Analyzing Data","Complete",1)
         update_process(chatId,"Preparing Result","Processing",0)
-        # time.sleep(5)
+        time.sleep(3)
         update_process(chatId,"Preparing Result","Complete",1)
         response = {
                 "Analytics_response": incentive_detail,

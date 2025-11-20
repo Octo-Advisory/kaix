@@ -227,7 +227,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
           }
       }
     )
-    console.log(convertJson, 'this is the msg');
+    // console.log(convertJson, 'this is the msg');
     
     // if(convertJson.message.encoded_data) {
     //   console.log(convertJson,convertJson.message.encoded_data, 'This the return Json we Expect..')
@@ -1108,7 +1108,7 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
     });
 
     await Promise.all(promises);
-    console.log(preaparedSolutions, 'okay ')
+    // console.log(preaparedSolutions, 'okay ')
     const updatedSolutions = preaparedSolutions
     .sort((a, b) => b.score - a.score) // Sort descending by score
     .map((solution, index) => ({
