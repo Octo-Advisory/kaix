@@ -164,15 +164,15 @@ function Vendorresult({ result, source, rerender }) {
 
   const handleVendorSelection = async(vendor)=>{
     // console.log(vendor, 'This is the passed Vendor', selectedVendor, 'This is the current selected vendor in Selection condition', fetchedVendors, 'This are the fetched vendors...:')
-    setSelectedVendor((prev) => {
-      console.log(prev, 'This is the previous state of selected Vendor ')
-      if (prev?.vendor_id === vendor.vendor_id) {
-        setDataLoading(false)
-        return prev;
-      }  // same vendor, avoid unnecessary state update
-      // setDataLoading(false)
-      // return vendor;
-    });
+    // setSelectedVendor((prev) => {
+    //   console.log(prev, 'This is the previous state of selected Vendor ')
+    //   if (prev?.vendor_id === vendor.vendor_id) {
+    //     setDataLoading(false)
+    //     return prev;
+    //   }  // same vendor, avoid unnecessary state update
+    //   // setDataLoading(false)
+    //   // return vendor;
+    // });
 
     let id = vendor.vendor_id
 
@@ -180,21 +180,21 @@ function Vendorresult({ result, source, rerender }) {
     const existingVendor = fetchedVendors.find(
         (vendors) => vendors.vendor_id === id
     );
-    console.log('This is the existing Vendor.. ', existingVendor)
+    // console.log('This is the existing Vendor.. ', existingVendor)
     if (existingVendor) {
-        // console.log('Using cached Approval:', existingApproval);
-        setSelectedVendor(existingVendor);
+        // console.log('Using cached Vendor:', existingVendor);
         setDataLoading(false)
+        setSelectedVendor(existingVendor);
         return; // ✅ Skip API call
     }
     console.log('Calling Data for ', id)
     let vendorData = await getData(id);
-    console.log(vendorData,'This is the VendorData')
+    // console.log(vendorData,'This is the VendorData')
     if(vendorData) {
       let temp = updateData(supplierList, [vendorData]) 
-      console.log(temp, 'This is the supplier list',supplierList)
+      // console.log(temp, 'This is the supplier list',supplierList)
       let currentVendor = source === 'MapComponent' ? vendorData : temp.find((vendors)=> vendors.vendor_name === id)
-      console.log(currentVendor, 'This is the currrent Vendot')
+      // console.log(currentVendor, 'This is the currrent Vendot')
       setFetchedVendors((prev) => [...prev, currentVendor]);
       setSelectedVendor(currentVendor ? currentVendor : null);
       setDataLoading(false)
@@ -203,6 +203,7 @@ function Vendorresult({ result, source, rerender }) {
       
     }
   }
+
 
 // const { updateDoc } = useFrappeUpdateDoc()
 
@@ -668,6 +669,7 @@ const parseSuppliers = (supplierData) => {
       return {
         ...supplier,
         category,
+        vendor_name: supplier.vendor_id,
         result_type: "Vendor",
         latitude_longitude: coords,  // Will be null if invalid
         user_lat_long: user_lat_long
@@ -913,14 +915,14 @@ const parseSuppliers = (supplierData) => {
             </div>
           </div>)}
 
-          {selectedVendor && (
+          {/* {selectedVendor && ( */}
             <div className={`${source === "MapComponent" ? 'w-full' : 'w-2/3'} flex flex-col`}>
               <div ref={detailRef} className="w-full bg-white rounded-lg shadow-sm border border-gray-200 p-6 full flex-1 overflow-y-auto scrollbar-hide">
                 {dataLoading && !selectedVendor ? (
                   <div className='skeleton rounded-md h-full w-full '>
 
                   </div>
-                ) : selectedVendor && !dataLoading ? (
+                ) : selectedVendor ? (
 
                   <div className='relative flex flex-col gap-8'>
                     <div className='relative flex flex-row gap-2 justify-start items-center'>
@@ -1044,7 +1046,7 @@ const parseSuppliers = (supplierData) => {
                 }
               </div>
             </div>
-          )}
+          {/* )} */}
         </div>)}
 
         {viewMode === 'Map' && (
