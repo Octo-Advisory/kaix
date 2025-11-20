@@ -213,7 +213,7 @@ useEffect(() => {
 
         const chats = response.message?.chats || [];
 
-        const alreadyExists = chats.some(chat => chat.session === sessionID);
+        const alreadyExists = chats.some(chat => chat.session === sessionId);
         // console.log("raw feasibility id", feasibilityId, alreadyExists);
 
         if (!alreadyExists) {
