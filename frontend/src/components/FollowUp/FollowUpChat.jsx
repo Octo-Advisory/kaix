@@ -154,12 +154,12 @@ const FollowUpChat = ({ solutions, selectedProperty }) => {
 
     <div className={`fixed inset-0 top-0 left-0  ${expanded ? 'backdrop-blur-sm z-[52]' : 'bg-transparent z-[-1]'} w-screen h-screen`}>
       {/* Floating Chat Button */}
-      <div 
+      {/* <div 
         className='flex items-center justify-center w-14 h-14 bg-white fixed top-16 right-8 z-[51] cursor-pointer rounded-full border border-black shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105' 
         onClick={() => setExpanded(true)}
       >
         <img src={LogoIcon} className='h-10 w-10 object-contain relative' alt="Chat Icon" />
-      </div>
+      </div> */}
 
 
 
