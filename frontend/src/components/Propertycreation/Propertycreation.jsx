@@ -99,8 +99,12 @@ function PropertyCreation() {
       .catch(err => console.error('Error:', err));
   };
 
-  const createMainBlock = (lat, lon) => {
-    fetch(`/api/method/CreateMainBlockRecord`, {
+  const createMainBlock = (
+    lat,
+    lon,
+    stringArray
+  ) => {
+    fetch(`/api/method/CreateChildBlockRecord`, {
       method: 'POST',
       headers: {
         'Authorization': `token ${API_TOKEN}`,
@@ -108,11 +112,13 @@ function PropertyCreation() {
       },
       body: new URLSearchParams({
         lat: lat,
-        lon: lon
+        lon: lon,
+        stringArray:stringArray,
+        host:location.host
       })
     })
       .then(res => res.json())
-      .then(data => console.log('Response:', data))
+      .then(data => console.log('Response:', JSON.parse(data.message)))
       .catch(err => console.error('Error:', err));
   };
   // Draw map content
@@ -146,8 +152,29 @@ function PropertyCreation() {
       contextMenu.classList.add('hidden');
       setModalVisibility(true);
       // alert(`Create property at:\nLat: ${lngLat.lat}, Lng: ${lngLat.lng}`);
-      createMainBlock(lngLat.lat, lngLat.lng);
-      // 🔁 Replace this with triggerProSeg or other logic
+      console.log(`Create property at:\nLat: ${lngLat.lat}, Lng: ${lngLat.lng}`)
+
+      var BottomLeftLat = Math.trunc(parseFloat(lngLat.lat) * 100) / 100;
+      var BottomLeftLng = Math.trunc(parseFloat(lngLat.lng) * 100) / 100;
+
+      var topLeftLat = Math.trunc((parseFloat(BottomLeftLat)+0.01) * 100) / 100;
+      var topLeftLng = BottomLeftLng;
+
+      var topRightLat = Math.trunc((parseFloat(BottomLeftLat) + 0.01) * 100) / 100;
+      var topRightLng = Math.trunc((parseFloat(BottomLeftLng) + 0.01) * 100) / 100;
+
+      var bottomRightLat = BottomLeftLat;
+      var bottomRightLng = Math.trunc((parseFloat(BottomLeftLng) + 0.01) * 100) / 100;
+
+      var stringArray =[
+      [BottomLeftLng,BottomLeftLat],
+      [bottomRightLng,bottomRightLat],
+      [topRightLng,topRightLat],
+      [topLeftLng,topLeftLat],
+      [BottomLeftLng,BottomLeftLat],
+      ]
+      createMainBlock(lngLat.lat, lngLat.lng,
+      JSON.stringify(stringArray));
     };
 
 
