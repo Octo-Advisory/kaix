@@ -220,7 +220,7 @@ const handleApprovalSelection = async (approval) => {
         setFetchedApproval((prev) => [...prev, ...fetchedApprovalsData]);
 
         setSelectedApproval(fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0] : null);
-        setViewMode(fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0].stage : 'Pre-Operation')
+        setViewMode(viewMode!== 'All' && fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0].stage : viewMode)
         setLoading(false);
         
     } catch (error) {

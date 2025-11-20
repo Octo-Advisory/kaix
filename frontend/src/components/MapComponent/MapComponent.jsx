@@ -614,7 +614,7 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     // Create lookups for vendor names and solutions
     const vendorNameLookup = {};
     const solutionLookup = {};
-
+    console.log(solutions,'Solutions from Map')
     solutions.forEach(solution => {
       if (solution.latitude_longitude) {
         const coords = solution.latitude_longitude.slice().reverse();
