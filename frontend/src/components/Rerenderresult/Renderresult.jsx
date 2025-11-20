@@ -165,10 +165,10 @@ function Renderresult() {
         // 5. Parse and set result component (original unchanged)
         let parsedResult = JSON.parse(doc.result);
 
-        // if(doc.intension==='Query to build industry from Scratch' || doc.intension === 'Query to Get Approvals' || doc.intension === 'Query to Search Vendors') {
+        if(doc.intension!=='Query to Get Employee Search') {
           let tempData = await retrieveData(parsedResult);
           parsedResult = tempData
-        // }
+        }
 
         switch (doc.intension) {
           case 'Query to search Incentives':

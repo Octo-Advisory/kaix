@@ -837,8 +837,12 @@ def insert_solution_result():
 
 @frappe.whitelist()
 def excute_Property_Creation(method_name=None,param=None,childBlockId=None):
-    python_exe = "/home/mars/property_seg_env/bin/python"
-    script_path = "/home/mars/frappe-bench/AeroShape/FinalCode.py"
+    base_dir = os.path.expanduser("~")
+    python_exe = os.path.join(base_dir, "property_seg_env/bin/python")
+    # python_exe = "/home/marsapplication/property_seg_env/bin/python"
+    script_path = os.path.join(base_dir, "frappe-bench/AeroShape/FinalCode.py")
+    # script_path = "/home/marsapplication/frappe-bench/AeroShape/FinalCode.py"
+    # script_path = "/home/marsapplication/frappe-bench/AeroShape/FinalCode.py"
 
     # Build args safely
     args = [python_exe, script_path, method_name]
@@ -848,12 +852,14 @@ def excute_Property_Creation(method_name=None,param=None,childBlockId=None):
         args.append(str(childBlockId))  # Ensure it's a string
     
     try:
+        base_dir = os.path.expanduser("~")
+        file_path = os.path.join(base_dir, "frappe-bench/AeroShape")
         result = subprocess.run(
             args,
             check=True,
             capture_output=True,
             text=True,
-            cwd="/home/mars/frappe-bench/AeroShape"  # set working directory
+            cwd=file_path  # set working directory
         )
         return result.stdout
     except subprocess.CalledProcessError as e:

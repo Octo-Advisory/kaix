@@ -50,6 +50,7 @@ function Approvalresult({ result, source, rerender }) {
     const [loading, setLoading] = useState(true);
     const [approvalsMap, setApprovalsMap] = useState([])
     const [fetchedApproval, setFetchedApproval] = useState([])
+    const [emptyStages, setEmptyStages] = useState([])
   
     const { updateDoc } = useFrappeUpdateDoc()
     const { data: uiData } = useFrappeGetDoc("UI Configuration", "Approvals")
@@ -92,7 +93,27 @@ const fetchApprovals = async()=>{
     }
     let approvalsMapp = mapApprovalData(approval_data['Approval ID'], approval_data['Approval Name'], approval_data['Government Department'], approval_data["aggregated_score"], approval_data['Stages'])
     // console.log(approvalsMapp, 'This is the data we want tsee ')
+
     setLoading(false);
+    const stages = [
+    "Pre-Operation",
+    "Pre-Establishment",
+    "Pre-Requisite",
+    "Others"
+    ];
+
+    // GROUP BY STAGE
+    const grouped = approvalsMapp.reduce((acc, item) => {
+    if (!acc[item.stage]) acc[item.stage] = [];
+    acc[item.stage].push(item);
+    return acc;
+    }, {});
+
+    // FIND EMPTY STAGES
+    const empty_stages = stages.filter(
+    stage => !grouped[stage] || grouped[stage].length === 0
+    );
+    setEmptyStages(empty_stages)
     setApprovalsMap(approvalsMapp)
     handleApprovalSelection(approvalsMapp[0])
 
@@ -379,6 +400,26 @@ const handleApprovalSelection = async (approval) => {
                 setTempFailure(true)
                 return
             }
+            const stages = [
+            "Pre-Operation",
+            "Pre-Establishment",
+            "Pre-Requisite",
+            "Others"
+            ];
+
+            // GROUP BY STAGE
+            const grouped = approval_data.reduce((acc, item) => {
+            if (!acc[item.stage]) acc[item.stage] = [];
+            acc[item.stage].push(item);
+            return acc;
+            }, {});
+
+            // FIND EMPTY STAGES
+            const empty_stages = stages.filter(
+            stage => !grouped[stage] || grouped[stage].length === 0
+            );
+            setEmptyStages(empty_stages)
+
             setApprovalsMap(approval_data)
             handleApprovalSelection(approval_data[0])
         } else {
@@ -386,11 +427,20 @@ const handleApprovalSelection = async (approval) => {
         }
     }, []);
 
+    
+    // const filteredApprovals = approvalsMap.filter(
+    //     (approval) => approval.stage === viewMode &&
+    //         approval.approval_name.toLowerCase().includes(searchQuery.toLowerCase())
+    // );
+    const filteredApprovals = approvalsMap.filter((approval) => {
+    const matchesStage = viewMode === "All" || approval.stage === viewMode;
+    const matchesSearch = approval.approval_name
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
 
-    const filteredApprovals = approvalsMap.filter(
-        (approval) => approval.stage === viewMode &&
-            approval.approval_name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    return matchesStage && matchesSearch;
+});
+
 
     useEffect(() => {
         if (filteredApprovals.length > 0) {
@@ -482,7 +532,8 @@ const handleApprovalSelection = async (approval) => {
                         {JSON.parse(uiConfig?.['view_mode'] || '[]').map(mode => (
                             <button
                                 key={mode}
-                                className={`px-4 py-2 rounded-md text-sm font-medium ${viewMode === mode
+                                disabled = {emptyStages && emptyStages.length>0 && emptyStages.includes(mode)}
+                                className={`px-4 py-2 rounded-md text-sm font-medium ${ emptyStages && emptyStages.length>0 && emptyStages.includes(mode) ? 'cursor-not-allowed line-through opacity-40 bg-white text-[#5A7EC7] border border-[#B8D1F3]/50' : viewMode === mode
                                     ? "bg-gradient-to-r from-[#FF80AB]/10 to-[#9575CD]/10 text-[#2C53A3] border border-[#B8D1F3]"
                                     : "bg-white text-[#5A7EC7] hover:bg-[#E6F0FA] border border-[#B8D1F3]/50"
                                     }`}
@@ -501,7 +552,7 @@ const handleApprovalSelection = async (approval) => {
                             <div>
                                 <span className="font-medium text-[#5A7EC7] text-xs">{uiConfig?.['stagewise_total_time'] || 'Total Time'}</span>
                                 <div className="flex items-baseline gap-1.5">
-                                    <span className="text-md font-bold text-[#2C53A3]">{result[viewMode]}</span>
+                                    <span className="text-md font-bold text-[#2C53A3]">{viewMode==='All' ? result["Total Effective Time"] : result[viewMode]}</span>
                                     <span className="text-xs text-[#5A7EC7]/70">days</span>
                                 </div>
                             </div>
@@ -514,7 +565,7 @@ const handleApprovalSelection = async (approval) => {
                             <div>
                                 <span className="font-medium text-[#5A7EC7] text-xs">{uiConfig?.['stagewise_online_percentage'] || 'Online'}</span>
                                 <div className="flex items-baseline gap-1.5">
-                                    <span className="text-md font-bold text-[#2E7D32]">{result[`Mode_${viewMode}`]}</span>
+                                    <span className="text-md font-bold text-[#2E7D32]">{viewMode==='All' ? result["Online Percentage"] :  result[`Mode_${viewMode}`]}</span>
                                     <span className="text-xs text-[#5A7EC7]/70">%</span>
                                 </div>
                             </div>
