@@ -2578,54 +2578,101 @@ def extract_location_from_query(user_input: str, available_areas: List[str], ava
 
     # Define the prompt
     prompt_template = """
-    You are an expert in analyzing user queries and accurately extracting location information.  
-    Your task is to identify and extract the **most relevant location** from the user query.  
-    Do not classify the location into area, city, or state. Simply extract the correct location name.
+You are an expert location extraction system. 
+Your task is to extract ONE SINGLE, MOST RELEVANT location from the user’s query based on strict hierarchy and literal user intent.
 
-    Key Extraction Rules:
+------------------------------------------------------
+LOCATION EXTRACTION RULES (STRICT & HIERARCHY-AWARE)
+------------------------------------------------------
 
-    1. Extract the Most Relevant Location Based on Context:
-    - If the query contains multiple locations, analyze the intent and extract only the one location that is most relevant for the user's request.
-    - Ignore locations that are mentioned for personal reference or additional context (e.g., "I live in X but want to know about Y" → Extract only Y).
-    - Even if multiple locations are mentioned, extract only one location that is most relevant to the user's search intent.
+1. Extract ONLY the **lowest-level (most granular)** location mentioned explicitly in the query.
+   - If the query has “City + State”, return only the city.
+   - If the query has “Area + City + State”, return only the area.
+   - If the query has “District + State”, return only the district.
+   - Always pick the location **closest to the ground level**, never the larger parent region.
 
-    2. Preserve Location Abbreviations:
-    - If a location is followed by an abbreviation (e.g., "SEZ", "PCPIR", "GIDC", "MIDC", etc.), always extract the full location name including the abbreviation.
-    - Do not remove or separate the abbreviation from the location name under any circumstances.
+   Examples:
+   - “Jhagadia, Gujarat” → “Jhagadia”
+   - “Bhilad, Vapi, Gujarat” → “Bhilad”
+   - “Okhla, Delhi” → “Okhla”
+   - “Panvel, Maharashtra” → “Panvel”
 
-    3. Handle Spelling Errors & Variations:
-    - If a location contains spelling mistakes, correct it and return the corrected value.
+2. Never combine multiple levels.
+   - Do NOT return “Jhagadia, Gujarat”.
+   - Do NOT return “City + State”.
+   - Return only the **single most specific location**.
 
-    4. Ensure the Official Location Name is Used:
-    - If the location has multiple variants, always return the official name of the location instead of alternative or outdated names.
-    - Some common examples:
-        - "Bombay" → "Mumbai"
-        - "Baroda" → "Vadodara"
-        - "Kashi" → "Varanasi"
-        - "Calcutta" → "Kolkata"
-        - "Bangalore" → "Bengaluru"
-        - "Pondicherry" → "Puducherry"
-    - Ensure all locations are recognized and standardized to their official designation.
+3. Never infer or hallucinate industrial estates.
+   - Do NOT convert “Jhagadia” → “Jhagadia GIDC” unless the user explicitly writes “GIDC”.
+   - Do NOT expand locations on your own.
 
-    5. Only Return a Location if One is Mentioned:
-    - If no location is found, return `"None"` as the value.
+4. Preserve Location Abbreviations ONLY When Explicitly Present.
 
-    6. Majority of Locations Will Be from India:
-    - Assume most locations will be from India.
-    - If the location is outside India, still extract and return it.
+   - If the user includes an industrial/zone abbreviation, you MUST return it exactly as written.
+   - Never expand, shorten, modify, or infer abbreviations.
+   - Never add an abbreviation that the user did not explicitly mention.
 
-    7. No Additional Explanations:
-    - The output must only contain the extracted location.
-    - Do not provide reasoning, context, or explanations.
+   Examples:
+     - “Sanand GIDC” → “Sanand GIDC”
+     - “Dahej SEZ” → “Dahej SEZ”
+     - “Paradeep PCPIR” → “Paradeep PCPIR”
+     - “Aurangabad MIDC” → “Aurangabad MIDC”
+     - “Sri City SEZ” → “Sri City SEZ”
+     - “Oragadam SIPCOT” → “Oragadam SIPCOT”
+     - “Neemrana RIICO” → “Neemrana RIICO”
+     - “Sri City APIIC” → “Sri City APIIC”
+     - “Vikas Nagar DIC” → “Vikas Nagar DIC”
+     - “Hosur SIPCOT” → “Hosur SIPCOT”
+     - “Bengaluru KIADB” → “Bengaluru KIADB”
+     - “Indore MPIDC” → “Indore MPIDC”
+     - “Hyderabad TSIIC” → “Hyderabad TSIIC”
 
-    User Query:
-    {query}
+   Also:
+     - If user writes only “Dahej”, do NOT output “Dahej SEZ”.
+     - If user writes only “Sanand”, do NOT output “Sanand GIDC”.
+     - If user writes only “Paradeep”, do NOT output “Paradeep PCPIR”.
 
-    Output Format:
-    Provide only the extracted location in the following JSON format:
-    {{
-        "Location": "<Extracted Location or 'None'>"
-    }}
+   Only preserve abbreviations when explicitly present in the user's query.
+
+5. Correct spelling only when it’s clearly evident.
+   - “Bangluru” → “Bengaluru”
+   - “Vadora” → “Vadodara”
+
+6. Standardise only when the official modern name exists.
+   - “Bombay” → “Mumbai”
+   - “Baroda” → “Vadodara”
+   - “Kashi” → “Varanasi”
+   - “Calcutta” → “Kolkata”
+   - “Bangalore” → “Bengaluru”
+   - “Pondicherry” → “Puducherry”
+   - Additional examples:
+     - “Madras” → “Chennai” 
+     - “Poona” → “Pune” 
+     - “Trivandrum” → “Thiruvananthapuram” 
+     - “Calicut” → “Kozhikode” 
+     - “Gulbarga” → “Kalaburagi” 
+     - “Belgaum” → “Belagavi” 
+     - “Rajahmundry” → “Rajamahendravaram” 
+   - Only apply such standardisation if the user input uses the old name; if the user already uses modern name, leave it as is.
+
+7. If multiple locations appear, extract ONLY the one relevant to the user’s request.
+   - Ignore personal or background references.
+   - Example:
+     “I live in Surat but I want incentives for Dahej.” → “Dahej”
+
+8. If the query has NO location, return `"None"`.
+
+9. Output ONLY the JSON. No explanations.
+
+------------------------------------------------------
+USER QUERY
+{query}
+
+------------------------------------------------------
+OUTPUT FORMAT
+{{
+    "Location": "<Extracted Location or 'None'>"
+}}
     """
 
     # Create a PromptTemplate and LLM chain
