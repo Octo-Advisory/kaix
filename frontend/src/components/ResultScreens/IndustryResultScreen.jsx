@@ -1039,6 +1039,7 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
             property_id: property_id,
             score: score,
             area: `${areaName.area_name}`,
+            tempAddress: `${areaName.area_name}-${city}-${state}`,
             address: `${city}, ${state}`,
             property_type: property_type,
             total_area: area_acre,
@@ -1363,7 +1364,7 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
       {shouldRender ? (
         <div className='relative flex flex-col w-screen h-screen'>
           
-          <FollowUpChat solutions={solutions} seletedProperty={selectedProperty} />
+          {/* <FollowUpChat solutions={solutions} seletedProperty={selectedProperty} /> */}
 
           {source === 'SolutionScreen' && (<div className='sticky top-0 left-0 w-full h-fit flex flex-col z-[11]  bg-white border-b border-gray-300'>
             <div className='relative w-full h-12 p-4 flex flex-row justify-between mb-4'>
@@ -1411,11 +1412,11 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
               </div>
             )}
 
-            {activeTab === 'newUI' && (
+            {/* {activeTab === 'newUI' && (
               <div className='relative h-full w-full overflow-hidden flex flex-1'>
                 <NewIndustryScreen solutions={solutions} />
               </div>
-            )}
+            )} */}
 
             {activeTab === "Property Details" && (
               <>
@@ -1699,7 +1700,7 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
                           <h2 className="text-base font-semibold text-primary flex flex-row gap-2 items-center">{uiConfig?.['spider_map_card_title'] || "Decision Support Radar"} <div className='relative inline-block'><FaRegQuestionCircle size={15} className="text-gray-400" onMouseEnter={() => { handleMouseEnter('tooltip7') }} onMouseLeave={() => { handleMouseLeave('tooltip7') }} /><div className={`${visibleTooltips.tooltip7 ? 'block' : 'hidden'} absolute top-6 left-1/2 transform -translate-x-1/2 text-xs text-white bg-black rounded-md p-2 min-w-fit whitespace-nowrap z-[333]`}>{uiConfig?.['spider_map_card_tooltip'] || "Summarizes core property suitability factors."}</div></div></h2>
                         </div>
                         <div className='relative flex items-center justify-center h-[320px]'>
-                          <Spider label={selectedProperty.property_id} scores={selectedProperty.scores} />
+                          <Spider label={selectedProperty.tempAddress} scores={selectedProperty.scores} />
                         </div>
                       </div>
 

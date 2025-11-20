@@ -159,7 +159,7 @@ const handleMouseLeave = (index, type) => {
                                             <h2 className="text-base font-semibold text-primary flex flex-row gap-2 items-center">{uiConfig?.['spider_map_card_title'] ||"Decision Support Radar"} <div className='relative inline-block'><FaRegQuestionCircle size={15} className="text-gray-400" onMouseEnter={()=>{handleMouseEnter(index, 'spider')}} onMouseLeave={() => {handleMouseLeave(index, 'spider')}}/><div className={`${visibleTooltips[index]?.spider ? 'block' : 'hidden'} absolute top-6 left-1/2 transform -translate-x-1/2 text-xs text-white bg-black rounded-md p-2 min-w-fit whitespace-nowrap z-[333]`}>{uiConfig?.['spider_map_card_tooltip'] || "Summarizes core property suitability factors."}</div></div></h2>
                                         </div>
                                     <div key={`spider-${index}`} className="h-[400px] p-4 bg-white rounded-md">
-                                        <Spider label={property.property_id} scores={property.scores} />
+                                        <Spider label={property.tempAddress} scores={property.scores} />
                                     </div>
                                     </div>
                                 ))}

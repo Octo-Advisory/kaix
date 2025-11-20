@@ -221,7 +221,7 @@ const handleApprovalSelection = async (approval) => {
 
         setSelectedApproval(fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0] : null);
         setViewMode(viewMode!== 'All' && fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0].stage : viewMode)
-        // setLoading(false);
+        setLoading(false);
         
     } catch (error) {
         // console.error("Error fetching approvals:", error);
