@@ -36,7 +36,7 @@ def call_incentive_query(aiResponse,chatId):
         given_sub_sector = state.get('Sub-Sector')
         update_process(chatId,"Fetching Data","Complete",1)
         update_process(chatId,"Analyzing Data","Processing",0)
-        # time.sleep(2)
+        time.sleep(2)
         main_industry = fetch_industry_details(given_main_industry)
         sub_sector = fetch_sub_sector_details(given_sub_sector)
         area = fetch_area_details(given_area)

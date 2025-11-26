@@ -227,22 +227,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
           }
       }
     )
-    // console.log(convertJson, 'this is the msg');
     
-    // if(convertJson.message.encoded_data) {
-    //   console.log(convertJson,convertJson.message.encoded_data, 'This the return Json we Expect..')
-    //   const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
-    //     child_row_id: lastChat,
-    //     updated_solutions: convertJson.message.encoded_data,
-    //     intension: "Query to build industry from Scratch"
-    //   },
-    //     {
-    //       headers: {
-    //         'Expect': '' // 👈 Clear problematic header
-    //       }
-    //     });
-    //   return result.message || [];
-    // }
     } catch (err) {
       console.error("Error Storing Result json:", err);
       createDiagnostic("Land & Approvals", `Something went wrong while storing the result json ${JSON.stringify(err)} in Build From Scratch`,lastChatId)
