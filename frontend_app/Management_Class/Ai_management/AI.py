@@ -24,7 +24,7 @@ from frontend_app.Ai_module.responder_consultant import (
     consultant_response_from_langchain,
     consultant_response_from_strings,
 )
-
+import requests
 def polish_ai_response_if_possible(
     raw_response: dict,
     chat_history_messages,           # List[BaseMessage]  (your LangChain history)
