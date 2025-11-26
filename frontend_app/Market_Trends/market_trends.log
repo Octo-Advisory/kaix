@@ -471,4 +471,9 @@
 2025-11-21 07:16:18,439 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2025-11-21 07:16:18,608 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
 2025-11-21 07:16:20,310 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+<<<<<<< HEAD
 >>>>>>> fd6259f (code adjustment)
+=======
+2025-11-26 11:09:12,072 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2025-11-26 11:18:55,343 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+>>>>>>> e483a14 (m2)
