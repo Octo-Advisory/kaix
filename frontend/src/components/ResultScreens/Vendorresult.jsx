@@ -623,7 +623,7 @@ const parseSuppliers = (supplierData) => {
   useEffect(() => {
     const callVendorData = async()=>{
       if (supplierList && supplierList.length > 0) {
-        // setDataLoading(true)
+        setDataLoading(true)
         await handleVendorSelection(supplierList[0]);
 
       } else {
@@ -709,8 +709,6 @@ const parseSuppliers = (supplierData) => {
   }, [map_allSuppliers, map_bestSuppliers]);
 
 
-
-
   const getLatLng = (latlngStr) => {
     if (!latlngStr) return [0, 0];
     const parts = latlngStr.split(",");
@@ -731,7 +729,7 @@ const parseSuppliers = (supplierData) => {
   useEffect(() => {
     const checkData = async()=> {
         // console.log(result, 'This is the result passed from the map component....')
-      let vendorid = result.vendor_id
+      let vendorid = result.vendor_id || result.name
       let existingVendor = fetchedVendors.find((vendor)=>vendor.vendor_id === vendorid)
       // console.log('Existing Vendor',existingVendor)
       if(existingVendor) {
@@ -890,7 +888,7 @@ const parseSuppliers = (supplierData) => {
                         ? "bg-[#41b655] bg-opacity-20 border-l-4 border-[#41b655] "
                         : "bg-[#41b655] bg-opacity-10 border-none"
                         }`}
-                      onClick={() => { handleVendorSelection(vendor),setDataLoading(true) }}
+                      onClick={() => { setDataLoading(true),handleVendorSelection(vendor) }}
                     >
                       <div className="flex justify-between items-start">
                         <h3 className={`font-medium ${selectedVendor?.vendor_id === vendor.vendor_id ? "text-black" : "text-[#3b69c5]"
