@@ -248,7 +248,7 @@ def getting_pdf_from_file_url_in_feasibility_session_id(data: json):
     filename,
     api_key=frappe_api_key,
     api_secret=frappe_api_secret,
-    base_url=base_url,
+    base_url=ritu_local_base_url,
     fields=["*"],   # or omit to use server defaults
     debug=True
     ) 
@@ -292,7 +292,7 @@ def checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vecto
     doc_name,
     api_key=frappe_api_key,
     api_secret=frappe_api_secret,
-    base_url=base_url,
+    base_url=ritu_local_base_url,
     fields=["*"],   # or omit to use server defaults
     debug=True
     ) # returns a json
@@ -911,9 +911,8 @@ def ensure_vector_and_update_record(doctype, doc_name):
             "Expect": "",
         }
  
-    # def dbg(label, r):
-        # print(f"[{label}] {r.status_code} {r.url}")
-        # print(r.text[:800])
+    def dbg(label, r):
+        pass
  
     def update_record(doctype, docname, updated_data, timeout=30):
         # Prepare the API endpoint URL
