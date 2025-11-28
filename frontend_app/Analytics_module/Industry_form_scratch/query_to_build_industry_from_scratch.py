@@ -1168,13 +1168,8 @@ def get_property_approval_mapped(industry_id,sub_sector_id,area_id_list,city_id_
     query = f"""
 SELECT 
     a.name, a.license_approval, a.government_department, 
-<<<<<<< HEAD
     a.business_location_type AS ABLT, a.land_type AS ALT, 
     a.vicinity_detail AS AVD, a.cross_following_details AS ACFD,
-=======
-    a.business_location_type as ABLT, a.land_type as ALT, 
-    a.vicinity_detail as AVD, a.cross_following_details as ACFD,
->>>>>>> e483a14 (m2)
     a.road_cutting, a.delivery_schedule_in_working_days, 
     a.mode_of_application, a.stage, a.is_dependent, a.depends_on, 
     a.area, 
@@ -2190,12 +2185,12 @@ def process_approval_df_to_send_solution_screen(df):
         df.sort_values(by=['property_id', 'stage_order', "time_taken"], ascending=[True, True, True])
         .groupby('property_id')
         .agg({
-            'approval_id': lambda x: list(x)  # List of incentives
-            # 'approval_name': lambda x: list(x),
-            # 'government_department': lambda x: list(x),
-            # 'time_taken': lambda x: list(x),
+            'approval_id': lambda x: list(x),  # List of incentives
+            'approval_name': lambda x: list(x),
+            'government_department': lambda x: list(x),
+            'time_taken': lambda x: list(x),
             # 'online_or_offline': lambda x: list(x),
-            # 'stages': lambda x: list(x),
+            'stages': lambda x: list(x),
         })
         .reset_index()
     )

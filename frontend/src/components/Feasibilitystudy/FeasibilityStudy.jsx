@@ -323,7 +323,6 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
 
     const [feasibilityId, setFeasibilityId] = useState()
     useFrappeEventListener("feasibility_analysis_done", async (data) => {
-        console.log('Check feasibility',data);
         
         if (data.status === "done" && data.docname) {
             try {
