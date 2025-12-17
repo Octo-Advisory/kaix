@@ -276,7 +276,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
         return mergedResults;
       }
     } catch (err) {
-      // console.error("Error fetching child records:", err);
+      console.error("Error fetching child records:", err);
       createDiagnostic("Land & Approvals", `Something went wrong while fetching child records  ${JSON.stringify(err)} in Build From Scratch`,lastChatId)
       return []; // Return empty array on failure
     }
@@ -381,7 +381,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
   const findIndexByPropertyId = (propertyId, lookupDF) => {
     const entries = Object.entries(lookupDF["Property_ID"]);
     const found = entries.find(([idx, val]) => val === propertyId);
-    return found ? found[0] : null; // returns index like "0", "1", etc.
+    return found ? Number(found[0]) : null; // returns index like "0", "1", etc.
   };
   const getLocationLevel = (city, state, country) => {
     if (city === 1) {
@@ -758,14 +758,14 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
     const Employment_lookup_df = JSON.parse(analytics_response['Employment_lookup_df'])
     const Solution_lookup_df = JSON.parse(analytics_response['Solution_lookup_df'])
     const Approval_lookup_df = JSON.parse(analytics_response['Approval_lookup_df'])
-    // console.log('This is Vendor Lookup for Essential', Essential_supply_vendor_lookup_df)
-    // console.log('This is Vendor Lookup All for Essential', Essential_supply_all_vendor_lookup_df)
-    // console.log('This is Vendor Lookup for Non Essential', nonEssential_supply_vendor_lookup_df)
-    // console.log('This is Vendor Lookup All for Non Essential', nonEssential_supply_all_vendor_lookup_df)
-    // console.log('This is Employment Lookup', Employment_lookup_df)
-    // console.log('This is Solution Lookup', Solution_lookup_df)
-    // console.log('This is Approval Lookup', Approval_lookup_df)
-    // console.log('This is Final DF ', final_scoring_df)
+    console.log('This is Vendor Lookup for Essential', Essential_supply_vendor_lookup_df)
+    console.log('This is Vendor Lookup All for Essential', Essential_supply_all_vendor_lookup_df)
+    console.log('This is Vendor Lookup for Non Essential', nonEssential_supply_vendor_lookup_df)
+    console.log('This is Vendor Lookup All for Non Essential', nonEssential_supply_all_vendor_lookup_df)
+    console.log('This is Employment Lookup', Employment_lookup_df)
+    console.log('This is Solution Lookup', Solution_lookup_df)
+    console.log('This is Approval Lookup', Approval_lookup_df)
+    console.log('This is Final DF ', final_scoring_df)
 
 
     const promises = Object.entries(property_id).map(async ([key, value]) => {
@@ -775,6 +775,7 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
         //Added by jenith for matching the property id in every DF
         const approval_index = findIndexByPropertyId(value, Approval_lookup_df)
         const incentive_index = findIndexByPropertyId(value, Solution_lookup_df)
+        console.log("incentive_index",incentive_index)
         const essential_index = findIndexByPropertyId(value, Essential_supply_vendor_lookup_df)
         const essential_all_index = findIndexByPropertyId(value, Essential_supply_all_vendor_lookup_df)
         const non_essential_index = findIndexByPropertyId(value, nonEssential_supply_vendor_lookup_df)
