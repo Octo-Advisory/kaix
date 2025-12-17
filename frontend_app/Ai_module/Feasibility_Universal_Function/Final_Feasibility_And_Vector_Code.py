@@ -31,6 +31,7 @@ from pathlib import Path
 import hashlib
 import configparser
 import chromadb  # add this import at top if missing
+import configparser
 
 ## function imports from FINAL_UNVIERSAL_FUNCTION ##
 from frontend_app.Ai_module.Feasibility_Universal_Function.Final_Universal_Function import (
@@ -59,19 +60,17 @@ config.read(config_file)
 groq_api_key = config['Key']['groq_key']
 
 warnings.filterwarnings("ignore")
-# load_dotenv(dotenv_path=r"D:\work_folder\mars_rag_qna\.env")
-# load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
-# api_key = os.getenv("GROQ_API_KEY")
 
-base_url = "https://marsaix.marsbazaar.com"
-# base_url = "http://172.17.242.222"
-# api_key    = os.getenv("API_KEY")
-api_key = config['Key']['frappe_doctype_api_key']
-# api_secret = os.getenv("API_SECRET")
-api_secret = config['Key']['frappe_doctype_api_secret']
-print(api_key)
-print("Loaded API Key:", api_key is not None)  # Should print: True
-# print("API KEY:", os.getenv("GROQ_API_KEY"))
+warnings.filterwarnings("ignore")
+config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+config = configparser.ConfigParser()
+config.read(config_file)
+
+api_key = config['Key']['groq_key']
+frappe_api_key = config['Frappe_api_key_and_secret']['frappe_api_key']
+frappe_api_secret = config['Frappe_api_key_and_secret']['frappe_api_secret']
+ritu_local_base_url = config['Frappe_api_key_and_secret']['ritu_local_base_url']
+live_base_url = config['Frappe_api_key_and_secret']['live_base_url']
 
 # CHUNKS_STORAGE
 CHUNKS_STORAGE = {}
@@ -127,8 +126,8 @@ class AdvancedRAGSystem:
     # def __init__(self, llm_model: str = "qwen/qwen3-32b"):
     # def __init__(self, llm_model: str = "meta-llama/llama-4-maverick-17b-128e-instruct"):
         # Initialize core components
-        print("✅ API Key value used:", repr(groq_api_key))
-        self.llm = ChatGroq(model_name=llm_model, temperature=0.5, api_key = groq_api_key)
+        # print("✅ API Key value used:", repr(groq_api_key))
+        self.llm = ChatGroq(model_name=llm_model, temperature=0.5, api_key = api_key)
         self.embedding_model = HuggingFaceBgeEmbeddings(
             model_name="BAAI/bge-small-en-v1.5",
             model_kwargs={"device": "cpu"},
@@ -151,15 +150,7 @@ class AdvancedRAGSystem:
         # Initialize intent classifier
         self.intent_classifier = pipeline("text-classification", 
                                         model="facebook/bart-large-mnli")
-        
-        # ["Give me the capacity range of the product to be manufactured?",
-        # "What is the total estimated duration (in months/years) for completing the industrial project described in this document? Extract only the numerical timeframe (e.g., '24 months') and ignore preparatory phases.",  
-        # "What is the unit(eg:- if time taken for industrial construction is '12 to 30 months' the unit of time is months or if time taken for industrial construction is '4 to 5 years' the unit of time is years, etc) of time taken for industrial construction?",                            
-        # "Tell me which type of product is to be maufactured by analysing the given context?",
-        # "Can you tell me the main-industry to which the document belongs to?",
-        # "Can you tell me the sub-sector to which the document belongs to?",
-        # "Tell me specific 'AREA' or 'CITY' or 'STATE' from the document in which industry is planning to be built?",
-        # "Tell me all the 'SUPPLIES' and 'EQUIPMENTS' required for the product which is planned to be built in the industry?"]
+
 
         # Predefined questions for auto-analysis
         self.predefined_questions = ["Give me the capacity range of the product to be manufactured(include exact unit of the product mentioned in the context)?",
@@ -174,12 +165,7 @@ class AdvancedRAGSystem:
     # def create_advanced_retriever(self, vector_store:dict|str, status:bool doctype:str, docname:str, docs: List[Document]):
     def create_advanced_retriever(self, vector_store:dict|str, status:bool, doctype:str):
 
-        # mko_2, status = yet_to_decide_2(allocated_budget="4mb", 
-        #                     doctype = doctype, 
-        #                     # doc_name = "Report-13-08-25 -2045",)
-        #                     # doc_name = "Report-14-10-25 -2425",)
-        #                     # doc_name = "Report-06-10-25 -2424",)
-        #                     doc_name = docname,)
+ 
 
         if doctype == FEAS_DOCTYPE:
             folder_name = LABEL_FEASIBILITY
@@ -188,14 +174,11 @@ class AdvancedRAGSystem:
         
         if status:
             if isinstance(vector_store, str):
-                # root = os.path.join(PERSIST_ROOT, "vectors", doctype, vector_store)
-                # root = os.path.join(PERSIST_ROOT, doctype, vector_store)
-                # root = os.path.join(PERSIST_ROOT, doctype, vector_store)
+                
                 root = os.path.join(PERSIST_ROOT, folder_name, vector_store)
                 collection_name = vector_store
             elif isinstance(vector_store, dict):
-                # root = os.path.join(PERSIST_ROOT, "vectors", doctype, vector_store["collection_name"])
-                # root = os.path.join(PERSIST_ROOT, doctype, vector_store["collection_name"])
+     
                 root = os.path.join(PERSIST_ROOT, folder_name, vector_store["collection_name"])
                 collection_name = vector_store["collection_name"]
         elif not status:
@@ -233,17 +216,11 @@ class AdvancedRAGSystem:
             documents = list(iter_chroma_docs(vs, batch_size=1500, hard_cap=20000))  # cap is optional
 
             dense_retriever = vs.as_retriever(search_kwargs={"k": 10}) # @@
-            # print("DENSE RETRIEVER🤡",dense_retriever)
-            
-            # # 2. Sparse (BM25) Retriever
-            # bm25_retriever = BM25Retriever.from_documents(docs)
-            # bm25_retriever.k = 10
-            # print(bm25_retriever)
-
+           
             # 3) Build BM25 index
             bm25 = BM25Retriever.from_documents(documents)
             bm25.k = 10  # top-k
-            print(bm25)
+            # print(bm25)
             
             # 3. Multi-Query Retriever
             query_prompt = PromptTemplate(
@@ -297,7 +274,7 @@ class AdvancedRAGSystem:
         )
         
         chain = prompt | self.llm | StrOutputParser()
-        print("this is the error", "👇")
+        # print("this is the error", "👇")
         draft_answer = chain.invoke({"context": context, "question": question})
         
         # Step 3: Verification
@@ -589,7 +566,7 @@ class AdvancedRAGSystem:
                 # full_answer = self.generate_answer(question=question, file_path=file_path)
                 full_answer = self.generate_answer(question=question)
                 keyword = self.prompt_for_supplies_question(question, full_answer['verified_answer'])
-                print(full_answer['verified_answer'])
+                # print(full_answer['verified_answer'])
                 results_for_supplies_question[question] = {
                     'full_answer': full_answer,
                     'LIST': keyword
@@ -598,7 +575,7 @@ class AdvancedRAGSystem:
                 # full_answer = self.generate_answer(question=question, file_path=file_path)
                 full_answer = self.generate_answer(question=question)
                 keyword = self.extract_keyword(question, full_answer['verified_answer'])
-                print(full_answer['verified_answer'])
+                # print(full_answer['verified_answer'])
                 results[question] = {
                     'full_answer': full_answer,
                     'keyword': keyword
@@ -655,9 +632,9 @@ def cleaning_and_range_cal(dict):
             has_range, range_values = detect_and_extract_range(value)
 
             if has_range:
-                print(f"Range detected: {range_values[0]:,} to {range_values[1]:,}")
+                # print(f"Range detected: {range_values[0]:,} to {range_values[1]:,}")
                 mean = sum(range_values) / len(range_values)
-                print(f"Mean of range: {mean:,.2f}")  # Format with commas
+                # print(f"Mean of range: {mean:,.2f}")  # Format with commas
                 final_dict[key] = mean
             else:
                 # Clean non-range values
@@ -713,8 +690,8 @@ def supply_list_extraction(text):
             data = json.loads(json_str)
             supplies = data.get("supplies", [])
             equipment = data.get("equipment", [])
-            print("Supplies:", supplies)
-            print("Equipment:", equipment)
+            # print("Supplies:", supplies)
+            # print("Equipment:", equipment)
         except json.JSONDecodeError as e:
             print("JSON parsing error:", e)
     else:
@@ -743,11 +720,12 @@ def process_feasibility_report(vector_store, doctype, status):
         if question == "Tell me all the 'SUPPLIES' required for the product which is planned to be built in the industry?":
             print('')
         else:    
-            display(Markdown(f"### {question}"))
-            display(Markdown(f"**Full Answer:** {result['full_answer']['verified_answer']}"))
-            print(result['full_answer']['verified_answer'])
-            display(Markdown(f"**Key Keyword:** {result['keyword']}"))
-            display(Markdown("---"))
+            print("")
+            # display(Markdown(f"### {question}"))
+            # display(Markdown(f"**Full Answer:** {result['full_answer']['verified_answer']}"))
+            # print(result['full_answer']['verified_answer'])
+            # display(Markdown(f"**Key Keyword:** {result['keyword']}"))
+            # display(Markdown("---"))
 
             # Replace the elif chain with:
             if question == rag.predefined_questions[0]:  # Capacity range
@@ -757,10 +735,10 @@ def process_feasibility_report(vector_store, doctype, status):
             elif question == rag.predefined_questions[1]:  # Duration
                 product_and_duration_dict["time period_0"] = result['keyword'] 
                 # unit detection 
-                print("time_period_1🍞",result['keyword'])
+                # print("time_period_1🍞",result['keyword'])
                 product_and_duration_dict["time period_1"] = extract_time_unit(result['keyword']) 
             elif question == rag.predefined_questions[2]: 
-                print("EXTRACTED TIME UNIT FROM DOCUMENT😊😊😊😊😊😊😊😊😊😊", result['keyword']) 
+                # print("EXTRACTED TIME UNIT FROM DOCUMENT😊😊😊😊😊😊😊😊😊😊", result['keyword']) 
                 if result["keyword"] != "I don't know" :
                     product_and_duration_dict["time period_1"] = extract_time_unit(result['keyword'])
             elif question == rag.predefined_questions[3]:  # product
@@ -773,12 +751,12 @@ def process_feasibility_report(vector_store, doctype, status):
                 location_dict["area_or_city_or_state"] = result['keyword']       
     
     for question, supply_result in supplies_results.items():
-        display(Markdown(f"### {question}"))
-        display(Markdown(f"**Full Answer:** {supply_result['full_answer']['verified_answer']}"))
-        print(result['full_answer']['verified_answer'])
-        display(Markdown(f"**List:** {supply_result['LIST']}"))
-        display(Markdown(""))
-        display(Markdown("---"))
+        # display(Markdown(f"### {question}"))
+        # display(Markdown(f"**Full Answer:** {supply_result['full_answer']['verified_answer']}"))
+        # # print(result['full_answer']['verified_answer'])
+        # display(Markdown(f"**List:** {supply_result['LIST']}"))
+        # display(Markdown(""))
+        # display(Markdown("---"))
 
         str_list = str(supply_result["LIST"])
 
@@ -852,7 +830,7 @@ def process_feasibility_report(vector_store, doctype, status):
 def generate_questions(dict_45, llm_model="meta-llama/llama-4-maverick-17b-128e-instruct", temperature=0.5):
 # def generate_questions(dict_45, llm_model="llama-3.3-70b-versatile", temperature=0.5):
 
-    llm = ChatGroq(model_name=llm_model, temperature=temperature, api_key=groq_api_key)
+    llm = ChatGroq(model_name=llm_model, temperature=temperature, api_key=api_key)
 
     prompt_template = """You are a domain-aware assistant helping users plan and explore key aspects of setting up an industry in India.
 
@@ -1060,9 +1038,9 @@ def final_call(vector_store, doctype, status):
     # elif relevance_or_not.lower() == "relevant pdf":
         # a, b, c= process_feasibility_report(file_path=file_path, vector_store=vector_store, doctype=doctype, status=status)
     a, b, c= process_feasibility_report(vector_store=vector_store, doctype=doctype, status=status)
-    print("a",a)
-    print("b",b)
-    print("c",c)
+    # print("a",a)
+    # print("b",b)
+    # print("c",c)
 
     display_statement = """Below is a structured summary of key information extracted from 
                             the document you provided. Please review the details for accuracy and 
@@ -1080,8 +1058,8 @@ def final_call(vector_store, doctype, status):
         unique_queries = set(list_of_queries)
         uniques_list_of_queries = list(unique_queries)
         
-        print("uniques_list_of_queries", uniques_list_of_queries)
-        print("display statement", display_statement)
+        # print("uniques_list_of_queries", uniques_list_of_queries)
+        # print("display statement", display_statement)
 
         return result, display_statement, uniques_list_of_queries
         
@@ -1158,7 +1136,7 @@ def formatting_doc_info_for_user_comaptibility(json, llm_model="meta-llama/llama
     return response.content
 
 # def query_classification(file_path, llm_model="meta-llama/llama-4-maverick-17b-128e-instruct", temperature=0.5):
-def query_classification(vector_store: dict|str, doctype: str, status:bool, llm_model="meta-llama/llama-4-maverick-17b-128e-instruct", temperature=0.5):
+def analysing_documents(vector_store: dict|str, doctype: str, status:bool, llm_model="meta-llama/llama-4-maverick-17b-128e-instruct", temperature=0.5):
 # def query_classification(status:bool, llm_model="meta-llama/llama-4-maverick-17b-128e-instruct", temperature=0.5):
 
     # vector_store = "tmpasxlzajf__doc_e75c45b6998d0f66"
@@ -1175,7 +1153,7 @@ def query_classification(vector_store: dict|str, doctype: str, status:bool, llm_
     # print("questions_list",questions_list)
     # print(file_path)
 
-    llm = ChatGroq(model_name=llm_model, temperature=temperature, api_key=groq_api_key)
+    llm = ChatGroq(model_name=llm_model, temperature=temperature, api_key=api_key)
 
     # for_user = formatting_doc_info_for_user_comaptibility(doc_info)
 
@@ -1325,17 +1303,17 @@ def query_classification(vector_store: dict|str, doctype: str, status:bool, llm_
     )
 
     response = llm.invoke(formatted_prompt)
-    print("response",response)
+    # print("response",response)
     # str_response = str(response)
     str_response = response.content
-    print("str_response",str_response)
+    # print("str_response",str_response)
     # Look for the list between triple backticks (```python\n ... \n```)
 
     response_1 = llm.invoke(formatted_prompt_1)
-    print("title for feasibility", response_1)
+    # print("title for feasibility", response_1)
 
     extracting_query = extract_query_list(str_response)
-    print("etracting_query",extracting_query)
+    # print("etracting_query",extracting_query)
 
     final_json_0 = {
     "structured_summary": doc_info,
@@ -1348,28 +1326,28 @@ def query_classification(vector_store: dict|str, doctype: str, status:bool, llm_
     }
     return final_json_0
 
-def yet_to_decide_3(doctype:str, doc_name:str):
+def generate_feasibility_analysis(doctype:str, doc_name:str):
     # mko_2, status = yet_to_decide_2(allocated_budget=storage_limit, 
     #                 doctype = doctype, 
     #                 doc_name = doc_name,)
 
-    mko_2, status = ensure_vector_store( 
+    mko_2, status = ensure_vector_and_update_record( 
                 doctype = doctype, 
                 doc_name = doc_name,)
-    print("vector_file💕", mko_2)
+    # print("vector_file💕", mko_2)
 
     if status:
         if isinstance(mko_2, str):
-            print("🤡🤡🤡🤡🤡🤡🤡")
-            final_json = query_classification(vector_store=mko_2, doctype=doctype, status=status)
+            # print("🤡🤡🤡🤡🤡🤡🤡")
+            final_json = analysing_documents(vector_store=mko_2, doctype=doctype, status=status)
         elif isinstance(mko_2, dict):
-            print("😊😊😊😊😊😊😊")
-            final_json = query_classification(vector_store=mko_2["collection_name"], doctype=doctype, status=status)
+            # print("😊😊😊😊😊😊😊")
+            final_json = analysing_documents(vector_store=mko_2["collection_name"], doctype=doctype, status=status)
         return final_json
     elif not status:
         return "Feasibility Report Generation Failed!"
 
-final = ensure_vector_and_update_record(doctype=FEAS_DOCTYPE,
+final = generate_feasibility_analysis(doctype=FEAS_DOCTYPE,
                         # doc_name="Report-13-08-25 -2045")
                         # doc_name="Report-28-10-25 -2427")
                         # doc_name="Report-14-08-25 -2054")
@@ -1378,9 +1356,10 @@ final = ensure_vector_and_update_record(doctype=FEAS_DOCTYPE,
                         # doc_name="Report-08-08-25 -2030")
                         # doc_name="Report-15-10-25 -2139")
                         # doc_name="Report-03-10-25 -2116")
-                        doc_name="Report-14-08-25 -2050")
+                        # doc_name="Report-14-08-25 -2050")
+                        doc_name="Report-28-10-25 -2427")
 
-print(final)
+# print(final)
 # tmpxcfgv3kj__doc_b9948d88c025ce62
 # tmpsz2ltr8v__doc_ccc5dd821406e7d6
 # qwert_34 = query_classification(status=True)

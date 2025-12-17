@@ -44,36 +44,96 @@ def feasibility_method_call(file_path):
 
     return {"status": "queued", "message": "Analysis started."}
 
+# def run_feasibility_analysis(file_path, result_docname, user):
+#     try:
+#         frappe.log_error("come here with",file_path)
+#         from frontend_app.Ai_module.Feasibility_study.feasibility_study import query_classification
+#         result = query_classification(file_path)
+#         doc = frappe.get_doc("Feasibility Report", result_docname)
+#         doc.status = "Complete"
+#         doc.result_data = frappe.as_json(result)
+#         if result.get("feasibility_title"):
+#             doc.feasibility_title = result["feasibility_title"]
+#         doc.save(ignore_permissions=True)
+#         frappe.db.commit()
+#         frappe.publish_realtime(
+#             event="feasibility_analysis_done",
+#             message={"status": "done","docname" : doc.name},
+#             user=user,
+#         )
+
+#     except Exception as e:
+#         frappe.log_error("Feasibility Job Error",frappe.get_traceback())
+#         doc = frappe.get_doc("Feasibility Report", result_docname)
+#         doc.status = "Fail"
+#         doc.feasibility_title = "Processing Error" #added By Jenith on 6/8/25
+#         doc.result_data = frappe.as_json({"error": str(e)})
+#         doc.save(ignore_permissions=True)
+#         frappe.db.commit()
+#         frappe.publish_realtime(
+#             event="feasibility_analysis_done",
+#             message={"status": "error", "message": str(e)},
+#             user=user
+#         )
+
 def run_feasibility_analysis(file_path, result_docname, user):
     try:
-        frappe.log_error("come here with",file_path)
+        frappe.log_error("come here with", file_path)
+
         from frontend_app.Ai_module.Feasibility_study.feasibility_study import query_classification
-        result = query_classification(file_path)
+        result = query_classification(file_path=file_path, feasibility_id=result_docname)
+
+        with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_study/testlog.txt", "a") as file:
+            file.write(f"\nresult:- \n{result}")
+
+        # -----------------------------------------
+        # ALWAYS RELOAD FIRST
+        # -----------------------------------------
         doc = frappe.get_doc("Feasibility Report", result_docname)
+        doc.reload()
+
+        # -----------------------------------------
+        # MODIFY AFTER RELOAD
+        # -----------------------------------------
         doc.status = "Complete"
         doc.result_data = frappe.as_json(result)
+
         if result.get("feasibility_title"):
             doc.feasibility_title = result["feasibility_title"]
+
+        with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_study/testlog.txt", "a") as file:
+            file.write(f"\nstatus:- {doc.status}\nresult_data:- {doc.result_data}")
+
+        # -----------------------------------------
+        # BYPASS TIMESTAMP CHECK
+        # -----------------------------------------
+        doc.flags.ignore_version = True
         doc.save(ignore_permissions=True)
-        frappe.db.commit()
+
         frappe.publish_realtime(
             event="feasibility_analysis_done",
-            message={"status": "done","docname" : doc.name},
+            message={"status": "done", "docname": doc.name},
             user=user,
         )
 
     except Exception as e:
-        frappe.log_error("Feasibility Job Error",frappe.get_traceback())
+        frappe.log_error("Feasibility Job Error", frappe.get_traceback())
+
+        # Reload before modifying in exception
         doc = frappe.get_doc("Feasibility Report", result_docname)
+        doc.reload()
+
         doc.status = "Fail"
-        doc.feasibility_title = "Processing Error" #added By Jenith on 6/8/25
+        doc.feasibility_title = "Processing Error"
         doc.result_data = frappe.as_json({"error": str(e)})
+
+        doc.flags.ignore_version = True
         doc.save(ignore_permissions=True)
-        frappe.db.commit()
+
         frappe.publish_realtime(
             event="feasibility_analysis_done",
             message={"status": "error", "message": str(e)},
-            user=user
+            user=user,
         )
 
 # @frappe.whitelist()

@@ -29,6 +29,17 @@ log_file = os.path.join(
     base_dir,
     "frappe-bench/apps/frontend_app/frontend_app/Market_Trends/market_trends.log"
 )
+# Construct the full log file path
+config_file = os.path.join(
+    base_dir,
+    "frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini"
+)
+
+
+config = configparser.ConfigParser()
+config.read(config_file)
+api_key = config['Key']['SERPAPI_API_KEY']
+
 # Configure logging with UTF-8 encoding
 logging.basicConfig(
     level=logging.INFO,

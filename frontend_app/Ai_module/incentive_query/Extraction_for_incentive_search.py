@@ -12,6 +12,9 @@ from datetime import datetime
 import json
 from frontend_app.Management_Class.helpers.utility import update_llm_token
 from frontend_app.Management_Class.Ai_management.AI import *
+import warnings
+
+warnings.filterwarnings("ignore")
 
 def fetch_query_results(query):
     """

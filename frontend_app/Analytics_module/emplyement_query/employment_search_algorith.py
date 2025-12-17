@@ -117,7 +117,7 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                     file.write(f"\n {intention} No city and state found in ~ {response} ::")
                 return response
             
-            elif state and not city:
+            # elif state and not city:
                 # State-wise Employment Status
                 state_data = Employment_Status[Employment_Status['state'] == state]
                 if state_data.empty:
@@ -302,7 +302,7 @@ def employment_search_algo(intention, input_data,chatId,keyword_given_by_user):
                 }
                 with open("log2.txt", "a") as file:
                     file.write(f"\n Comparison Selected full comparison ~ {response} ::")
-                return response
+                # return response
             update_process(chatId,"Analyzing Data","Complete",1)
             update_process(chatId,"Preparing Result","Processing",0)
             time.sleep(3)

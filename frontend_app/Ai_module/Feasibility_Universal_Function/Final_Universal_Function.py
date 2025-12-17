@@ -17,7 +17,9 @@ from typing import Any, List, Tuple, Union
 import requests
 import json
 from urllib.parse import urlencode, quote
-
+import warnings
+import configparser
+import frappe
 
 # ── Third-party utilities
 import psutil
@@ -80,17 +82,19 @@ embedding_model = HuggingFaceBgeEmbeddings(
             encode_kwargs={"normalize_embeddings": True},
             query_instruction="Represent this sentence for searching relevant passages:"
         )
- 
-api_key = config['Key']['frappe_doctype_api_key']
-api_secret = config['Key']['frappe_doctype_api_secret']
-base_url = "https://marsaix.marsbazaar.com"
-# BASE_URL = "http://172.17.242.222"
-# load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
-# api_key = os.getenv("GROQ_API_KEY")
-# api_key = os.getenv("GROQ_API_KEY")
-# print(api_key)
-# print("Loaded API Key:", api_key is not None)  # Should print: True
-# print("API KEY:", os.getenv("GROQ_API_KEY"))
+
+warnings.filterwarnings("ignore")
+config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+config = configparser.ConfigParser()
+config.read(config_file)
+
+api_key = config['Key']['groq_key']
+frappe_api_key = config['Frappe_api_key_and_secret']['frappe_api_key']
+frappe_api_secret = config['Frappe_api_key_and_secret']['frappe_api_secret']
+ritu_local_base_url = config['Frappe_api_key_and_secret']['ritu_local_base_url']
+live_base_url = config['Frappe_api_key_and_secret']['live_base_url']
+
+llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.5, api_key = api_key)
 
 # this code is to retrieve the values of the fields namely'storage limit' and 'time period for deletion' which are stored in 'Mars Configurations' doctype.
 
@@ -103,19 +107,15 @@ def fetch_doc_fields_by_name(
     timeout: int = 30,
     debug: bool = False,
 ):
-    # load_dotenv("D:/work_folder/mars_rag_qna/.env")
-    # base_url   = os.getenv("BASE_URL")
-    # base_url = "https://marsaix.marsbazaar.com"
-    # base_url = "http://172.17.242.222"
-    # # api_key    = os.getenv("API_KEY")
-    # api_key = "d3de1e0e4e25846"
-    # # api_secret = os.getenv("API_SECRET")
-    # api_secret = "51fd8e403a19045"
-    if not (base_url and api_key and api_secret):
+ 
+    # base_url = live_base_url
+    base_url = ritu_local_base_url
+
+    if not (base_url and frappe_api_key and frappe_api_secret):
         raise ValueError("Missing BASE_URL / API_KEY / API_SECRET")
 
     headers = {
-        "Authorization": f"token {api_key}:{api_secret}",
+        "Authorization": f"token {frappe_api_key}:{frappe_api_secret}",
         "Content-Type": "application/json",
         "Expect": "",
     }
@@ -129,10 +129,7 @@ def fetch_doc_fields_by_name(
         params["fields"] = json.dumps(fields)
 
     r = requests.get(url, headers=headers, params=params, timeout=timeout)
-    # if debug:
-        # print(f"[GET] {r.status_code} {r.url}")
-        # print(r.text[:800])
-    # r.raise_for_status() 
+ 
     return r.json()["data"]     # <-- a dict of fieldname -> value
 
 def fetch_single_doc_by_name(
@@ -158,24 +155,17 @@ def fetch_single_doc_by_name(
     - Returns parsed JSON (dict). Raises requests.HTTPError on non-2xx.
     """
 
-    # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
-
-    # ---- fallbacks to environment ----
-    # base_url = "https://marsaix.marsbazaar.com"
-    # base_url = "http://172.17.242.222"
-    # # api_key    = os.getenv("API_KEY")
-    # api_key = "d3de1e0e4e25846"
-    # # api_secret = os.getenv("API_SECRET")
-    # api_secret = "51fd8e403a19045"
+    # base_url = live_base_url
+    base_url = ritu_local_base_url
 
     if not base_url:
         raise ValueError("Missing base_url (pass base_url=... or set BASE_URL env var)")
-    if not api_key or not api_secret:
+    if not frappe_api_key or not frappe_api_secret:
         raise ValueError("Missing API credentials (API_KEY/API_SECRET)")
 
     # ---- headers ----
     headers = {
-        "Authorization": f"token {api_key}:{api_secret}",
+        "Authorization": f"token {frappe_api_key}:{frappe_api_secret}",
         "Content-Type": "application/json",
         "Expect": "",
     }
@@ -202,38 +192,20 @@ def fetch_single_doc_by_name(
     # ---- make request ----
     r = requests.get(url, headers=headers, params=params, timeout=timeout)
 
-    # if debug:
-        # print(f"[GET] {r.status_code} {r.url}")
-        # Print first 800 chars for safety
-        # print(r.text[:800])
-
-    # raise for HTTP errors (will include body in debug above)
-    r.raise_for_status()
-
-    # ---- parse and return ----
+   
     data = r.json()
-    # if debug:
-        # print(json.dumps(data, indent=2))
+   
 
     return data
 
 def make_headers():
-    # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
-
-    # # ---- fallbacks to environment ----
-    # api_key    = os.getenv("API_KEY")
-    # api_secret = os.getenv("API_SECRET")
-    return {"Authorization": f"token {api_key}:{api_secret}", "Expect": ""}
+ 
+    return {"Authorization": f"token {frappe_api_key}:{frappe_api_secret}", "Expect": ""}
 
 def fetch_pdf_to_temp(file_url: str, is_private: bool | None = None) -> str:
-    # normalize
-    # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
-    # base_url = "https://marsaix.marsbazaar.com"
-    # base_url = "http://172.17.242.222"
-    # # api_key    = os.getenv("API_KEY")
-    # api_key = "d3de1e0e4e25846"
-    # # api_secret = os.getenv("API_SECRET")
-    # api_secret = "51fd8e403a19045"
+
+    # base_url = live_base_url
+    base_url = ritu_local_base_url
 
     path = file_url if file_url.startswith("/") else f"/{file_url}"
     if is_private is None:
@@ -274,13 +246,12 @@ def getting_pdf_from_file_url_in_feasibility_session_id(data: json):
     "File", # 
     # "Report-05-08-25 -2010",
     filename,
-    api_key=api_key,
-    api_secret=api_secret,
-    base_url=base_url,
+    api_key=frappe_api_key,
+    api_secret=frappe_api_secret,
+    base_url=ritu_local_base_url,
     fields=["*"],   # or omit to use server defaults
     debug=True
-    ) # returns a json
-    # print("file_date(getting_pdf_from_file_url_in_feasibility_session_id)", file_data)
+    ) 
 
     if file_data["data"]:
         if_is_file_data = file_data["data"][0]["file_url"]
@@ -319,12 +290,14 @@ def checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vecto
     data = fetch_single_doc_by_name(
     doctype,
     doc_name,
-    api_key=api_key,
-    api_secret=api_secret,
-    base_url=base_url,
+    api_key=frappe_api_key,
+    api_secret=frappe_api_secret,
+    base_url=ritu_local_base_url,
     fields=["*"],   # or omit to use server defaults
     debug=True
     ) # returns a json
+
+    # print("data", data)
 
     # print("data(fetch_doc_by_name)",data)
     
@@ -332,31 +305,6 @@ def checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vecto
         is_vector_exists = data["data"][0]["custom_feasibility_vector_file_name"]
         # print(is_vector_exists)
         if not is_vector_exists:
-            # pdf_path = data["data"][0]["file_path"]
-
-            # m = re.search(r'[^/\\]+$', pdf_path)
-            # filename = m.group(0) if m else None
-            # print(filename)  # samplesecured_256bitaes_pdf.pdf
-
-            # # calling the fetch_single_doc_by_name() again to access the contents of the pdf from the "file list" doctype in order to create a new vector file form it.
-            # file_data = fetch_single_doc_by_name(
-            # "File", # 
-            # # "Report-05-08-25 -2010",
-            # filename,
-            # # api_key="d3de1e0e4e25846",
-            # # api_secret="51fd8e403a19045",
-            # # base_url="https://marsaix.marsbazaar.com",
-            # fields=["*"],   # or omit to use server defaults
-            # debug=True
-            # ) # returns a json
-
-            # if_is_file_data = file_data["data"][0]["file_url"]
-            # if not if_is_file_data:
-            #     print("No such file exists.Upload the PDF again to continue")
-            #     return "No such file exists.Upload the PDF again to continue", "fail-not is_vector_exists"
-            # if if_is_file_data:
-            #     tmp_pdf = fetch_pdf_to_temp(if_is_file_data)
-            #     return tmp_pdf, "success-not is_vector_exists"
             
             creating_vectors = getting_pdf_from_file_url_in_feasibility_session_id(data=data)
 
@@ -387,13 +335,7 @@ def checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vecto
                 if item == is_vector_exists:
                     # print("VECTOR MATCH",is_vector_exists)
                     return is_vector_exists, "success-is_vector_exists"
-                # else:
-                #     creating_vectors = getting_pdf_from_file_url_in_feasibility_session_id(data=data)
-                #     if creating_vectors == "No such file exists.Upload the PDF again to continue":
-                #         return creating_vectors, "fail-no_PDF_exists"
-                #     else:
-                #         print("VECTOR MATCH",is_vector_exists)
-                #         return creating_vectors, "success-is_PDF_exists"
+        
             creating_vectors = getting_pdf_from_file_url_in_feasibility_session_id(data=data)
             if creating_vectors == "No such file exists.Upload the PDF again to continue":
                 return creating_vectors, "fail-no_PDF_exists"
@@ -959,31 +901,25 @@ def ensure_vector_and_update_record(doctype, doc_name):
     elif doctype == FOLL_DOCTYPE:
         folder_name = LABEL_FOLLOW
 
-    # load_dotenv(dotenv_path="D:/work_folder/mars_rag_qna/.env")
-
-    # base_url = "https://marsaix.marsbazaar.com"
-    # base_url = "http://172.17.242.222"
-    # # api_key    = os.getenv("API_KEY")
-    # api_key = "d3de1e0e4e25846"
-    # # api_secret = os.getenv("API_SECRET")
-    # api_secret = "51fd8e403a19045"
+    # base_url = live_base_url
+    base_url = ritu_local_base_url
 
     def make_headers():
         return {
-            "Authorization": f"token {api_key}:{api_secret}",
+            "Authorization": f"token {frappe_api_key}:{frappe_api_secret}",
             "Content-Type": "application/json",
             "Expect": "",
         }
  
-    # def dbg(label, r):
-        # print(f"[{label}] {r.status_code} {r.url}")
-        # print(r.text[:800])
+    def dbg(label, r):
+        pass
  
     def update_record(doctype, docname, updated_data, timeout=30):
         # Prepare the API endpoint URL
         url = f"{base_url}/api/resource/{doctype}/{docname}"
         # Make the PUT request to update the record
         r = requests.put(url, headers=make_headers(), data=json.dumps(updated_data), timeout=timeout)
+        frappe.db.commit()
         try:
             r.raise_for_status()  # Raise an exception for HTTP errors
 
@@ -1041,13 +977,9 @@ if __name__ == "__main__":
                             # doc_name = "Report-13-08-25 -2046",)
                             # doc_name = "Report-05-08-25 -2009",)
                             # doc_name = "Report-03-10-25 -2116",)
-                            doc_name="Report-14-08-25 -2050")
+                            # doc_name="Report-14-08-25 -2050")
+                            # doc_name="Report-03-11-25 -2174")
+                            doc_name="Report-28-10-25 -2427")
 
-    # print("JSON👌",mko_2)
     with open("testlog.txt", "a") as file:
         file.write(f"\nJSON👌:- \n{mko_2}")
-    # tmp438ieonb__doc_1703688dc9a5de44
-                            # /home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/vectors/Feasibility_Report/tmpj9xp08lg__doc_b9948d88c025ce62/77ece48b-33e4-414c-8f0c-11b26d31e159
-
-                            # {'ok': True, 'uploaded_filename': 'tmplwf12vs2__doc_1703688dc9a5de44', 'collection_name': 'tmplwf12vs2__doc_1703688dc9a5de44', 'persist_root': '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/vectors', 'vectors_root': '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/vectors', 'final_dir': PosixPath('/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/vectors/tmplwf12vs2__doc_1703688dc9a5de44')}
-    # tmpjb9yw2bs__doc_9734791eb66b1f3b
