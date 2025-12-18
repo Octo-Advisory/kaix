@@ -260,7 +260,6 @@ const handleIncentiveSelection = async (incentiveName) => {
     try {
         if (rerender === 1 || source==='FromScratch') {
         let tempResult = res?.['result'] ? res.result : res
-        console.log(tempResult, 'This is the Temp Result')
         // setIncentives(tempResult)
         setIncentivesMap(tempResult)
         await handleIncentiveSelection(tempResult[0].id)
@@ -468,26 +467,15 @@ const handleIncentiveSelection = async (incentiveName) => {
   );
 
   useEffect(() => {
-  const checkSearch = async () => {
-    const source =
-      searchQuery === "" ? incentivesMap : displayedIncentives;
-
-    if (source?.length > 0) {
-      await handleIncentiveSelection(source[0].id);
+    const checkSearch = async()=>{
+      if (searchQuery === "") {
+        incentivesMap.length > 0 ? await handleIncentiveSelection(incentivesMap[0].id) : null
+      } else {
+        setSelectedIncentive(displayedIncentives.length > 0 ? displayedIncentives[0] : null);
+      }
     }
-    else {
-      setSelectedIncentive(null)
-    }
-  };
-
-  checkSearch();
-}, [searchQuery, incentivesMap, displayedIncentives, handleIncentiveSelection]);
-
-
-  useEffect(()=>{
-    console.log(incentivesMap, 'Thisi sthe IncentivesMap', searchQuery, displayedIncentives);
-    
-  },[incentivesMap,searchQuery])
+    checkSearch()
+  }, [searchQuery]);
 
   const formatDate = (dateString) => {
     if (!dateString || dateString === "N/A") return "N/A";
@@ -713,9 +701,9 @@ const handleIncentiveSelection = async (incentiveName) => {
           {/* Incentive List - Scrollable */}
           <div className="w-1/3 border-r border-[#B8D1F3] flex flex-col">
             <div className="overflow-y-auto flex-1 list-view p-2 bg-gradient-to-b from-[#E6F0FA]/20 to-transparent">
-              {displayedIncentives.length > 0 ? (
+              {incentivesMap.length > 0 ? (
                 <div className="space-y-2">
-                  {displayedIncentives.map((incentive) => (
+                  {incentivesMap.map((incentive) => (
                     <div
                       key={incentive.id}
                       className={`p-4 cursor-pointer rounded-lg transition-all duration-200 ${selectedIncentive?.id === incentive.id

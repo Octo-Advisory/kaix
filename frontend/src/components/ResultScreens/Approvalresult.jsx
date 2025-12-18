@@ -118,8 +118,7 @@ const fetchApprovals = async()=>{
     );
     setEmptyStages(empty_stages)
     setApprovalsMap(approvalsMapp)
-    await handleApprovalSelection(approvalsMapp[0])
-    setViewMode("All")
+    handleApprovalSelection(approvalsMapp[0])
 
     if (lastChatId && source != "FromScratch") {
         const no_of_approvals = approvalsMapp?.length
@@ -224,7 +223,7 @@ const handleApprovalSelection = async (approval) => {
         setFetchedApproval((prev) => [...prev, ...fetchedApprovalsData]);
 
         setSelectedApproval(fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0] : null);
-        // setViewMode(viewMode!== 'All' && fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0].stage : viewMode)
+        setViewMode(viewMode!== 'All' && fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0].stage : viewMode)
         setLoading(false);
         
     } catch (error) {
@@ -397,8 +396,6 @@ const handleApprovalSelection = async (approval) => {
   }
 
     useEffect(() => {
-        const checkRerender = async ()=> {
-            
         
         if (rerender === 1 || source === 'FromScratch') {
             if(!approval_data) {
@@ -427,13 +424,10 @@ const handleApprovalSelection = async (approval) => {
             setEmptyStages(empty_stages)
 
             setApprovalsMap(approval_data)
-            await handleApprovalSelection(approval_data[0])
-            setViewMode("All")
+            handleApprovalSelection(approval_data[0])
         } else {
             fetchApprovals();
         }
-        }
-        checkRerender()
     }, []);
 
     
@@ -441,51 +435,24 @@ const handleApprovalSelection = async (approval) => {
     //     (approval) => approval.stage === viewMode &&
     //         approval.approval_name.toLowerCase().includes(searchQuery.toLowerCase())
     // );
-  const filteredApprovals = approvalsMap.filter((approval) => {
-  // STEP 1: Check mode
-  if (viewMode !== "All" && approval.stage !== viewMode) {
-    return false;
-  }
+    const filteredApprovals = approvalsMap.filter((approval) => {
+    const matchesStage = viewMode === "All" || approval.stage === viewMode;
+    const matchesSearch = approval.approval_name
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
 
-  // STEP 2: If search is empty, mode check is enough
-  if (!searchQuery.trim()) {
-    return true;
-  }
-
-  // STEP 3: Apply search
-  return approval.approval_name
-    .toLowerCase()
-    .includes(searchQuery.toLowerCase());
+    return matchesStage && matchesSearch;
 });
 
 
-useEffect(() => {
-  if (!filteredApprovals.length) {
-    setSelectedApproval(null);
-    return;
-  }
+    useEffect(() => {
+        if (filteredApprovals.length > 0) {
+            handleApprovalSelection(filteredApprovals[0]);
 
-  // If current selection still exists, do nothing
-  if (
-    selectedApproval &&
-    filteredApprovals.some(a => a.id === selectedApproval.id)
-  ) {
-    return;
-  }
-
-  // Otherwise select the first valid approval
-  handleApprovalSelection(filteredApprovals[0]);
-
-}, [filteredApprovals]);
-
-    // useEffect(() => {
-    //     if (filteredApprovals.length > 0) {
-    //         handleApprovalSelection(filteredApprovals[0]);
-
-    //     } else {
-    //         setSelectedApproval(null);
-    //     }
-    // }, [viewMode, searchQuery]);
+        } else {
+            setSelectedApproval(null);
+        }
+    }, [viewMode, searchQuery]);
 
     const containerRef = useRef(null)
 

@@ -190,7 +190,7 @@ const SignUp = () => {
       //   }
       // console.log(result, result?.data)
       if(result.data) {
-        // console.log('User updated successfully:', result);
+        console.log('User updated successfully:', result);
         setRegistrationComplete(true)
         return true
       }
