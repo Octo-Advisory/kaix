@@ -10,7 +10,7 @@ import './assets/style/propertycreationstyle.css';
 import { useFrappeGetDoc } from "frappe-react-sdk";
 
 const BASE_URL = window.location.origin;
-const API_TOKEN = 'd3de1e0e4e25846:51fd8e403a19045';
+// const ADMIN_TOKEN = 'd3de1e0e4e25846:51fd8e403a19045';
 
 function PropertyCreation() {
   const mapContainerRef = useRef(null);
@@ -36,6 +36,10 @@ function PropertyCreation() {
     acc[curr.key] = curr.value;
     return acc;
   }, {});
+
+  const { data: adminToken } = useFrappeGetDoc("Mars Configurations", "admin_token")
+  const ADMIN_TOKEN = adminToken?.admin_token
+
   useEffect(() => {
     if (!uiData) return;
     mapboxgl.accessToken = `${uiConfig?.['mapmobx_api_token']}`;
@@ -70,7 +74,7 @@ function PropertyCreation() {
         url += `&filters=${encodeURIComponent(JSON.stringify(filters))}`;
       }
       const headers = {
-        'Authorization': `token ${API_TOKEN}`,
+        'Authorization': `token ${ADMIN_TOKEN}`,
         'Content-Type': 'application/json'
       };
       const response = await axios.get(url, { headers });
@@ -86,7 +90,7 @@ function PropertyCreation() {
     fetch(`/api/method/StartPropertySegmentation`, {
       method: 'POST',
       headers: {
-        'Authorization': `token ${API_TOKEN}`,
+        'Authorization': `token ${ADMIN_TOKEN}`,
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({
@@ -107,7 +111,7 @@ function PropertyCreation() {
     fetch(`/api/method/CreateChildBlockRecord`, {
       method: 'POST',
       headers: {
-        'Authorization': `token ${API_TOKEN}`,
+        'Authorization': `token ${ADMIN_TOKEN}`,
         'Content-Type': 'application/x-www-form-urlencoded'
       },
       body: new URLSearchParams({

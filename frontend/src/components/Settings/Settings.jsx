@@ -22,7 +22,7 @@ const deleteUser = async (userId) => {
     const response = await fetch(url, {
       method: 'DELETE',
       headers: {
-        'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045', // Replace with your actual token
+        'Authorization': `token ${ADMIN_TOKEN}`, // Replace with your actual token
         'Content-Type': 'application/json',
       },
     });
@@ -49,6 +49,9 @@ function Settings({onClose}) {
         "User",
         currentUser || "Guest" // fallback to a dummy value to avoid hook breaking
       );
+
+    const { data: adminToken } = useFrappeGetDoc("Mars Configurations", "admin_token")
+    const ADMIN_TOKEN = adminToken?.admin_token
     
     const [activeTab, setActiveTab] = useState('Profile');
     const [user, setUser] = useState({
@@ -210,7 +213,7 @@ function Settings({onClose}) {
     const response = await fetch(url, {
       method: 'PUT',
       headers: {
-        'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045', // Replace with your token
+        'Authorization': `token ${ADMIN_TOKEN}`, // Replace with your token
         'Content-Type': 'application/json',
       },
       credentials:'include',

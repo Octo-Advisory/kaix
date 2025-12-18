@@ -9,12 +9,11 @@
   "doc_log",
   "file_log",
   "retention_days",
-  "storage_limit",
-  "time_period_for_deletion",
   "groq_key",
   "validation_check",
   "storage_limit",
-  "time_period_for_deletion"
+  "time_period_for_deletion",
+  "admin_token"
  ],
  "fields": [
   {
@@ -60,23 +59,19 @@
    "fieldname": "time_period_for_deletion",
    "fieldtype": "Int",
    "label": "Time Period For Deletion"
+  },
+  {
+   "fieldname": "admin_token",
+   "fieldtype": "Data",
+   "label": "Admin token"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
-<<<<<<< HEAD
- "modified": "2025-10-30 17:44:10.181376",
- "modified_by": "rituparno.das@marsbazaar.com",
-=======
-<<<<<<< HEAD
- "modified": "2025-08-11 11:49:26.085523",
- "modified_by": "Administrator",
-=======
- "modified": "2025-10-30 17:44:10.181376",
- "modified_by": "rituparno.das@marsbazaar.com",
->>>>>>> ed76567 (Feasibility Study Enhancement on 03-11-2025)
->>>>>>> 738bac7 (Feasibility Study Enhancement on 03-11-2025)
+ "modified": "2025-12-18 11:36:43.219668",
+ "modified_by": "krunal.prajapati@marsbazaar.com",
  "module": "marsaix",
  "name": "Mars Configurations",
  "owner": "Administrator",

@@ -63,6 +63,9 @@ function MapComponent({ solutions, toggleModal, source, intension }) {
     return acc;
   }, {});
 
+  const { data: adminToken } = useFrappeGetDoc("Mars Configurations", "admin_token")
+  const ADMIN_TOKEN = adminToken?.admin_token
+  
   const LAYERS = {
     DEFAULT_LAYER: {
       LABEL: `${uiConfig?.['default_layers'] || 'Default Layers'}`,
@@ -1413,7 +1416,7 @@ const loadSelectedSupplyVendorDetails = (supply,vendorType) =>{
       const response = await fetch(`/api/resource/Vendor?fields=["*"]&limit=1000&filters=[["name","in",`+filters+`]]`, {
         method: 'GET',
         headers: {
-          'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+          'Authorization': `token ${ADMIN_TOKEN}`,
           'Content-Type': 'application/json'
         }
       });

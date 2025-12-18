@@ -61,10 +61,10 @@ groq_api_key = config['Key']['groq_key']
 
 warnings.filterwarnings("ignore")
 
-warnings.filterwarnings("ignore")
-config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
-config = configparser.ConfigParser()
-config.read(config_file)
+# warnings.filterwarnings("ignore")
+# config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+# config = configparser.ConfigParser()
+# config.read(config_file)
 
 api_key = config['Key']['groq_key']
 frappe_api_key = config['Frappe_api_key_and_secret']['frappe_api_key']

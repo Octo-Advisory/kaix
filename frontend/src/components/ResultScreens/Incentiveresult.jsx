@@ -25,6 +25,9 @@ function Incentiveresult({ res, source, rerender }) {
     acc[curr.key] = curr.value;
     return acc;
   }, {}); 
+
+  const { data: adminToken } = useFrappeGetDoc("Mars Configurations", "admin_token")
+  const ADMIN_TOKEN = adminToken?.admin_token
  
   const createDiagnostic = (errType, logMsg,chatId)=> {
       let log = ` ${logMsg}`
@@ -44,29 +47,6 @@ function Incentiveresult({ res, source, rerender }) {
         aggregated_score: scoreObj[key]
     }));
 }
-
-//  const storeResultData = async (lastChat,solutions,intension) => {
-//   if(!lastChat || !solutions) return 
-
-//   try {
-//       const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
-//       child_row_id: lastChat,
-//       updated_solutions: solutions,
-//       intension: intension
-//       },
-//     {
-//     headers: {
-//       'Expect': '' // 👈 Clear problematic header
-//     }
-//   });
-//       // console.log('This is the result we want ot store.... ', result.message)
-//       return result.message || [];
-//     } catch (err) {
-//       // console.error("Error Storing Result json:", err);
-//       createDiagnostic("Incentive", `Error Storing Result Json ${JSON.stringify(err)} in Incentives`, lastChatId)
-//       return []; // Return empty for this batch on error
-//     }
-// }
 
  const storeResultData = async (lastChat, solutions,intension) => {
     if (!lastChat || !solutions) return
@@ -192,7 +172,7 @@ const handleIncentiveSelection = async (incentiveName) => {
   const response = await fetch(url, {
     method: 'GET',
     headers: {
-      'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+      'Authorization': `token ${ADMIN_TOKEN}`,
       'Content-Type': 'application/json'
     }
   });
@@ -217,7 +197,7 @@ const handleIncentiveSelection = async (incentiveName) => {
   const response2 = await fetch(url2, {
     method: 'GET',
     headers: {
-      'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+      'Authorization': `token ${ADMIN_TOKEN}`,
       'Content-Type': 'application/json'
     }
   });
@@ -371,7 +351,7 @@ const handleIncentiveSelection = async (incentiveName) => {
         const response = await fetch(url, {
           method: 'GET',
           headers: {
-            'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+            'Authorization': `token ${ADMIN_TOKEN}`,
             'Content-Type': 'application/json'
           }
         });
@@ -398,7 +378,7 @@ const handleIncentiveSelection = async (incentiveName) => {
         const response = await fetch(url, {
           method: 'GET',
           headers: {
-            'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+            'Authorization': `token ${ADMIN_TOKEN}`,
             'Content-Type': 'application/json'
           }
         });

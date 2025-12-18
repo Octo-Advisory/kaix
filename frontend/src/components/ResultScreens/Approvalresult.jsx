@@ -60,6 +60,9 @@ function Approvalresult({ result, source, rerender }) {
         return acc;
       }, {}); 
 
+    const { data: adminToken } = useFrappeGetDoc("Mars Configurations", "admin_token")
+    const ADMIN_TOKEN = adminToken?.admin_token
+
     const getLocationLevel = (city, state, country) => {
         if (city === 1) {
             return "City";
@@ -176,7 +179,7 @@ const handleApprovalSelection = async (approval) => {
         const response = await fetch(url, {
             method: 'GET',
             headers: {
-                'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+                'Authorization': `token ${ADMIN_TOKEN}`,
                 'Content-Type': 'application/json'
             }
         })

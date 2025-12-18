@@ -60,6 +60,9 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     return acc;
   }, {});
 
+  const { data: adminToken } = useFrappeGetDoc("Mars Configurations", "admin_token")
+  const ADMIN_TOKEN = adminToken?.admin_token
+
   const [showEssentialMaterials, setShowEssentialMaterials] = useState(true);
 
   const [activeTab, setActiveTab] = useState('Property Details')
@@ -148,7 +151,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
       const response = await fetch(`/api/resource/Survey No?fields=["*"]&filters=[["name","=","${property}"]]&order_by=modified asc`, {
         method: 'GET',
         headers: {
-          'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+          'Authorization': `token ${ADMIN_TOKEN}`,
           'Content-Type': 'application/json'
         }
       });
@@ -167,7 +170,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
       const response = await fetch(`/api/resource/Area?fields=["area_name"]&filters=[["name","=","${area}"]]`, {
         method: 'GET',
         headers: {
-          'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+          'Authorization': `token ${ADMIN_TOKEN}`,
           'Content-Type': 'application/json'
         }
       });
@@ -190,7 +193,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
           {
             method: 'GET',
             headers: {
-              'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+              'Authorization': `token ${ADMIN_TOKEN}`,
               'Content-Type': 'application/json',
             },
           }
@@ -328,7 +331,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
           {
             method: 'GET',
             headers: {
-              'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+              'Authorization': `token ${ADMIN_TOKEN}`,
               'Content-Type': 'application/json',
             },
           }
@@ -358,7 +361,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
           {
             method: 'GET',
             headers: {
-              'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+              'Authorization': `token ${ADMIN_TOKEN}`,
               'Content-Type': 'application/json',
             },
           }

@@ -4,7 +4,7 @@ import { FaEye, FaEyeSlash, FaArrowRight } from "react-icons/fa";
 import { FiUser } from "react-icons/fi";
 import { HiOutlineMail, HiOutlineOfficeBuilding, HiOutlineBriefcase } from "react-icons/hi";
 import { useNavigate } from 'react-router-dom';
-import { useFrappeCreateDoc, FrappeContext,useFrappeGetDocList } from 'frappe-react-sdk';
+import { useFrappeCreateDoc, FrappeContext,useFrappeGetDocList, useFrappeGetDoc } from 'frappe-react-sdk';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { IoIosArrowDown, IoIosArrowUp } from 'react-icons/io';
@@ -27,6 +27,9 @@ const useClickOutside = (ref, handler) => {
 };
 
 const SignUp = () => {
+
+  const { data: adminToken } = useFrappeGetDoc("Mars Configurations", "admin_token")
+  const ADMIN_TOKEN = adminToken?.admin_token
   
       const createDiagnostic = async(errType, logMsg,chatId)=> {
         let log = ` ${logMsg}`
@@ -166,7 +169,8 @@ const SignUp = () => {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045', // Replace with your token
+        // 'Authorization': 'token d3de1e0e4e25846:9345b96f0c957d9', // Replace with your token
+        'Authorization': `token ${ADMIN_TOKEN}`, // Replace with your token
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

@@ -84,11 +84,11 @@ embedding_model = HuggingFaceBgeEmbeddings(
         )
 
 warnings.filterwarnings("ignore")
-config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
-config = configparser.ConfigParser()
-config.read(config_file)
+# config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+# config = configparser.ConfigParser()
+# config.read(config_file)
 
-api_key = config['Key']['groq_key']
+api_key = config['Key']['groq_key'] 
 frappe_api_key = config['Frappe_api_key_and_secret']['frappe_api_key']
 frappe_api_secret = config['Frappe_api_key_and_secret']['frappe_api_secret']
 ritu_local_base_url = config['Frappe_api_key_and_secret']['ritu_local_base_url']
