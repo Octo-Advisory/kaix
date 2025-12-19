@@ -43,6 +43,8 @@ function Approvalresult({ result, source, rerender }) {
         approval_data = JSON.parse(approval_data);
     }
     // console.log(approval_data, 'This is the approval Data')
+    const approvalItemRefs = useRef({});
+    const listContainerRef = useRef(null);
     const [viewMode, setViewMode] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedApproval, setSelectedApproval] = useState(null);
@@ -52,6 +54,9 @@ function Approvalresult({ result, source, rerender }) {
     const [fetchedApproval, setFetchedApproval] = useState([])
     const [emptyStages, setEmptyStages] = useState([])
   
+    
+
+
     const { updateDoc } = useFrappeUpdateDoc()
     const { data: uiData } = useFrappeGetDoc("UI Configuration", "Approvals")
       const configurations = uiData?.configurations || [];
@@ -118,7 +123,8 @@ const fetchApprovals = async()=>{
     );
     setEmptyStages(empty_stages)
     setApprovalsMap(approvalsMapp)
-    handleApprovalSelection(approvalsMapp[0])
+    await handleApprovalSelection(approvalsMapp[0])
+    setViewMode("All")
 
     if (lastChatId && source != "FromScratch") {
         const no_of_approvals = approvalsMapp?.length
@@ -223,7 +229,7 @@ const handleApprovalSelection = async (approval) => {
         setFetchedApproval((prev) => [...prev, ...fetchedApprovalsData]);
 
         setSelectedApproval(fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0] : null);
-        setViewMode(viewMode!== 'All' && fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0].stage : viewMode)
+        // setViewMode(viewMode!== 'All' && fetchedApprovalsData.length > 0 ? fetchedApprovalsData[0].stage : viewMode)
         setLoading(false);
         
     } catch (error) {
@@ -396,6 +402,8 @@ const handleApprovalSelection = async (approval) => {
   }
 
     useEffect(() => {
+        const checkRerender = async ()=> {
+            
         
         if (rerender === 1 || source === 'FromScratch') {
             if(!approval_data) {
@@ -424,10 +432,13 @@ const handleApprovalSelection = async (approval) => {
             setEmptyStages(empty_stages)
 
             setApprovalsMap(approval_data)
-            handleApprovalSelection(approval_data[0])
+            await handleApprovalSelection(approval_data[0])
+            setViewMode("All")
         } else {
             fetchApprovals();
         }
+        }
+        checkRerender()
     }, []);
 
     
@@ -435,32 +446,102 @@ const handleApprovalSelection = async (approval) => {
     //     (approval) => approval.stage === viewMode &&
     //         approval.approval_name.toLowerCase().includes(searchQuery.toLowerCase())
     // );
-    const filteredApprovals = approvalsMap.filter((approval) => {
-    const matchesStage = viewMode === "All" || approval.stage === viewMode;
-    const matchesSearch = approval.approval_name
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
+  const filteredApprovals = approvalsMap.filter((approval) => {
+  // STEP 1: Check mode
+  if (viewMode !== "All" && approval.stage !== viewMode) {
+    return false;
+  }
 
-    return matchesStage && matchesSearch;
+  // STEP 2: If search is empty, mode check is enough
+  if (!searchQuery.trim()) {
+    return true;
+  }
+
+  // STEP 3: Apply search
+  return approval.approval_name
+    .toLowerCase()
+    .includes(searchQuery.toLowerCase());
 });
 
 
-    useEffect(() => {
-        if (filteredApprovals.length > 0) {
-            handleApprovalSelection(filteredApprovals[0]);
+useEffect(() => {
+  // 🚫 Do nothing when search is cleared
+  if (searchQuery === "") return;
 
-        } else {
-            setSelectedApproval(null);
-        }
-    }, [viewMode, searchQuery]);
+  if (!filteredApprovals.length) {
+    setSelectedApproval(null);
+    return;
+  }
+
+  const stillValid =
+    selectedApproval &&
+    filteredApprovals.some(a => a.id === selectedApproval.id);
+
+  if (!stillValid) {
+    handleApprovalSelection(filteredApprovals[0]);
+  }
+}, [searchQuery, filteredApprovals]);
+
+
+
+useEffect(() => {
+  // No approvals for this mode
+  if (!filteredApprovals.length) {
+    setSelectedApproval(null);
+    return;
+  }
+
+  // If current selection is still valid for this mode → keep it
+  if (
+    selectedApproval &&
+    filteredApprovals.some(a => a.id === selectedApproval.id)
+  ) {
+    return;
+  }
+
+  // Otherwise select first approval in this mode
+  handleApprovalSelection(filteredApprovals[0]);
+
+}, [viewMode]);
+
+useEffect(() => {
+  if (!selectedApproval?.id) return;
+
+  const node = approvalItemRefs.current[selectedApproval.id];
+  const container = listContainerRef.current;
+
+  if (!node || !container) return;
+
+  // Wait for DOM paint
+  requestAnimationFrame(() => {
+    node.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  });
+
+}, [selectedApproval, filteredApprovals]);
+
+
+
+
+
+    // useEffect(() => {
+    //     if (filteredApprovals.length > 0) {
+    //         handleApprovalSelection(filteredApprovals[0]);
+
+    //     } else {
+    //         setSelectedApproval(null);
+    //     }
+    // }, [viewMode, searchQuery]);
 
     const containerRef = useRef(null)
 
-    useEffect(() => {
-        if (containerRef.current) {
-            containerRef.current.scrollTop = 0;
-        }
-    }, [selectedApproval])
+    // useEffect(() => {
+    //     if (containerRef.current) {
+    //         containerRef.current.scrollTop = 0;
+    //     }
+    // }, [selectedApproval])
 
     if (loading) {
         return (
@@ -590,12 +671,15 @@ const handleApprovalSelection = async (approval) => {
 
                 <div className="flex flex-1 min-h-0 overflow-hidden bg-white rounded-lg border border-[#B8D1F3]">
                     <div className={`${filteredApprovals.length>0 ? 'w-1/3' : 'w-full items-center justify-center'} border-r border-[#B8D1F3] flex flex-col`}>
-                        <div className="overflow-y-auto flex-1 list-view bg-gradient-to-b from-[#E6F0FA]/10 to-transparent">
+                        <div  ref={listContainerRef} className="overflow-y-auto flex-1 list-view bg-gradient-to-b from-[#E6F0FA]/10 to-transparent">
                             {filteredApprovals.length > 0 ? (
                                 <div className="space-y-2 p-2">
                                     {filteredApprovals.map((approval) => (
                                         <div
                                             key={approval.id}
+                                            ref={(el) => {
+    if (el) approvalItemRefs.current[approval.id] = el;
+  }}
                                             className={`p-4 cursor-pointer rounded-lg transition-all duration-200 ${selectedApproval?.id === approval.id
                                                 ? "bg-[#41b655] bg-opacity-20 border-l-4 border-[#41b655] "
                                                 : "bg-[#41b655] bg-opacity-10 border-none"

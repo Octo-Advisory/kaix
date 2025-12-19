@@ -102,6 +102,12 @@ function Incentiveresult({ res, source, rerender }) {
     "Medium": "## Incentives under Gujarat Industrial Policy 2020 - Medium Scale\n### Core Benefit Overview\nThe incentive provides assistance to Medium Scale Enterprises (MSEs) for infrastructure development, specifically supporting costs related to land, building, other infrastructure facilities, technical consultancy fees, and TPQA charges. The support is structured as a proportional benefit, offering up to **15%** of the total investment in these areas.\n\n### Illustrative Financial Details\nFor a medium-scale investment of **\u20b930,00,00,000**, the benefit calculation is as follows:\n- Total Investment: **\u20b930,00,00,000**\n- Benefit: **15%** of **\u20b930,00,00,000** = **\u20b94,50,00,000**\n- Net Cost: **\u20b930,00,00,000** - **\u20b94,50,00,000** = **\u20b925,50,00,000**\n\nThis results in a significant reduction in the net cost of the project, making the investment more feasible for MSEs.\n\n### Key Financial Insights\n* The benefit is capped at **15%** of the total investment, ensuring alignment with the scale of the project.\n* The incentive is particularly advantageous for medium-scale businesses, as it provides a substantial proportion of the total investment cost, thereby reducing the financial burden on the enterprise.\n\n### Conclusion\nThe incentive under the Gujarat Industrial Policy 2020 is highly beneficial for medium-scale enterprises, offering significant financial support for infrastructure development. This makes it an attractive option for businesses looking to expand or establish their operations in the state."
   })
 
+  const incentiveItemRefs = useRef({});
+const prevSearchRef = useRef("");
+
+
+  
+
 
 
  
@@ -466,16 +472,62 @@ const handleIncentiveSelection = async (incentiveName) => {
       incentive.type?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  useEffect(() => {
-    const checkSearch = async()=>{
-      if (searchQuery === "") {
-        incentivesMap.length > 0 ? await handleIncentiveSelection(incentivesMap[0].id) : null
-      } else {
-        setSelectedIncentive(displayedIncentives.length > 0 ? displayedIncentives[0] : null);
-      }
+//  useEffect(() => {
+//   const source =
+//     searchQuery === "" ? incentivesMap : displayedIncentives;
+
+//   if (!source || source.length === 0) {
+//     setSelectedIncentive(null);
+//     return;
+//   }
+
+//   // ✅ Only auto-select if current selection is invalid
+//   const stillValid = selectedIncentive &&
+//     source.some(item => item.id === selectedIncentive.id);
+
+//   if (!stillValid) {
+//     handleIncentiveSelection(source[0].id);
+//   }
+
+// }, [searchQuery, incentivesMap]);
+
+useEffect(() => {
+  // 🔴 Do nothing when search is cleared
+  if (searchQuery === "") return;
+
+  if (!displayedIncentives || displayedIncentives.length === 0) {
+    setSelectedIncentive(null);
+    return;
+  }
+
+  // ✅ Only auto-select if current selection is invalid
+  const stillValid =
+    selectedIncentive &&
+    displayedIncentives.some(item => item.id === selectedIncentive.id);
+
+  if (!stillValid) {
+    handleIncentiveSelection(displayedIncentives[0].id);
+  }
+}, [searchQuery, displayedIncentives]);
+
+
+useEffect(() => {
+  const prevSearch = prevSearchRef.current;
+  const searchCleared = prevSearch !== "" && searchQuery === "";
+
+  if (searchCleared && selectedIncentive?.id) {
+    const node = incentiveItemRefs.current[selectedIncentive.id];
+
+    if (node) {
+      node.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
     }
-    checkSearch()
-  }, [searchQuery]);
+  }
+
+  prevSearchRef.current = searchQuery;
+}, [searchQuery, selectedIncentive]);
 
   const formatDate = (dateString) => {
     if (!dateString || dateString === "N/A") return "N/A";
@@ -701,11 +753,14 @@ const handleIncentiveSelection = async (incentiveName) => {
           {/* Incentive List - Scrollable */}
           <div className="w-1/3 border-r border-[#B8D1F3] flex flex-col">
             <div className="overflow-y-auto flex-1 list-view p-2 bg-gradient-to-b from-[#E6F0FA]/20 to-transparent">
-              {incentivesMap.length > 0 ? (
+              {displayedIncentives.length > 0 ? (
                 <div className="space-y-2">
-                  {incentivesMap.map((incentive) => (
+                  {displayedIncentives.map((incentive) => (
                     <div
                       key={incentive.id}
+                      ref={(el) => {
+                        if (el) incentiveItemRefs.current[incentive.id] = el;
+                      }}
                       className={`p-4 cursor-pointer rounded-lg transition-all duration-200 ${selectedIncentive?.id === incentive.id
                         ? "bg-[#41b655] bg-opacity-20 border-l-4 border-[#41b655] "
                         : "bg-[#41b655] bg-opacity-10 border-none"

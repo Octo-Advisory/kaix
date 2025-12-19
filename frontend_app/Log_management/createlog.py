@@ -61,13 +61,22 @@ def log(chatId, level, key, value, file_name, module: str):
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 f"{key}" : value
             }
-            config_file = os.path.join(
-                base_dir,
-                "frappe-bench/apps/frontend_app/frontend_app/Log_management",
-                f"{module}.txt"
-            )
-            with open(config_file, "a", encoding="utf-8") as file:
+            # config_file = os.path.join(
+            #     base_dir,
+            #     "frappe-bench/apps/frontend_app/frontend_app/Log_management",
+            #     f"{module}.txt"
+            # )
+            # with open(config_file, "a", encoding="utf-8") as file:
+            #     file.write(json.dumps(log_entry) + "\n")
+            log_dir = "/mnt/d/mars_logs"
+
+            os.makedirs(log_dir, exist_ok=True)
+
+            log_file = os.path.join(log_dir, f"{module}.txt")
+
+            with open(log_file, "a", encoding="utf-8") as file:
                 file.write(json.dumps(log_entry) + "\n")
+
 
 @frappe.whitelist(allow_guest=True)
 def update_config(doc_log,file_log):
