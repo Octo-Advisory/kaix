@@ -1012,7 +1012,8 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
           const road_transport = availability_of_local_transportation == 'Yes' ? 'good' : 'bad'
           const property_id = final_scoring_df['Property_ID'][key]
           // const score = final_scoring_df['aggregated_score'][key]
-          const score = final_scoring_df['Aggregate Property Performance Score (APPS)'][key]
+          const score = final_scoring_df['Aggregate Property Performance Score (APPS)'][key]  
+          // const score = final_scoring_df['Reranked_Aggregate_Property_Performance_Score_(RAPPS)'][key]
 
           const local_laws = final_scoring_df['local_laws'][key]
           const parsedLocalLaws = local_laws ? parseLegalText(local_laws) : []

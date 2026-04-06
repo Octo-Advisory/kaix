@@ -20,6 +20,12 @@ from urllib.parse import urlencode, quote
 import warnings
 import configparser
 import frappe
+import base64
+import gzip
+import bz2
+import re
+import zlib
+import msgpack
 
 # ── Third-party utilities
 import psutil
@@ -76,6 +82,45 @@ config_file = os.path.join(base_dir, "frappe-bench/apps/frontend_app/frontend_ap
 config = configparser.ConfigParser()
 config.read(config_file)
 
+
+UNIVERSAL_DICT = {
+    "Doctypes": [
+        {
+            "name": "Feasibility Report",
+            "Vector_ID_Field": "custom_feasibility_vector_file_name",
+            "Data_Source_Field": "file_path",
+            "session_id_required": True
+        },
+        {
+            "name": "Mars Configurations",
+            "Storage_Field": "storage_limit",
+            "Deletion_Period_Field": "time_period_for_deletion",
+            "session_id_required": False
+        },
+        {
+            "name": "File",
+            "File_URL_Field": "file_url",
+            "session_id_required": True
+        }
+    ]
+}
+
+UNIVERSAL_DICT_FOR_HELPER_DOCTYPES = {
+    "Doctypes": [
+        {
+            "name": "Mars Configurations",
+            "Storage_Field": "storage_limit",
+            "Deletion_Period_Field": "time_period_for_deletion",
+            "session_id_required": False
+        },
+        {
+            "name": "File",
+            "File_URL_Field": "file_url",
+            "session_id_required": True
+        }
+    ]
+}
+
 embedding_model = HuggingFaceBgeEmbeddings(
             model_name="BAAI/bge-small-en-v1.5",
             model_kwargs={"device": "cpu"},
@@ -96,9 +141,293 @@ live_base_url = config['Frappe_api_key_and_secret']['live_base_url']
 
 llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.5, api_key = api_key)
 
+
+# this code is to check whether the data passes to it is base64 encoded or not.
+def is_base64(data: str|dict) -> bool:
+    """
+    Check if a string is Base64 encoded.
+    
+    Args:
+        data: String to check
+        
+    Returns:
+        True if data appears to be Base64 encoded, False otherwise
+    """
+    if isinstance(data, dict):
+        frappe.log_error("is_base_64_data_a_dict", "YESSSSS")
+        data = data.get("encoded_data")
+    # data = data.get("encoded_data")
+
+    if not isinstance(data, str):
+        frappe.log_error("NOT A STRING", "YESSSSS")
+        return False
+    
+    if not data:
+        frappe.log_error("NO DATA AVAILABLE", "YESSSSS")
+        return False
+    
+    # Base64 regex pattern
+    base64_pattern = r'^[A-Za-z0-9+/]*={0,2}$'
+    
+    # Must match the pattern
+    if not re.match(base64_pattern, data):
+        frappe.log_error("not re.match", "YESSSSS")
+        return False
+    
+    # Length must be divisible by 4
+    if len(data) % 4 != 0:
+        return False
+    
+    # Check for valid padding
+    if '=' in data:
+        # '=' can only appear at the end
+        if not data.endswith('='):
+            return False
+        # Count '=' at the end (max 2)
+        if data.count('=') > 2:
+            return False
+        # Check '=' are only at the end
+        if not data.rstrip('=').endswith(('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 
+                                        'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+                                        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+                                        'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+                                        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/')):
+            return False
+    
+    # Additional check: Try to decode it (optional but more accurate)
+    try:
+        import base64
+        # This will raise an error if it's not valid Base64
+        base64.b64decode(data, validate=True)
+        return True
+    except:
+        # If decode check fails, fall back to pattern matching
+        # At this point, pattern matching already passed
+        return True
+
+# This code is to check whether the encoded data passed to us is string or not and if string then convert it in to our required format which is dict and then proceed with checking whether the passed data is base64 encoded or not.
+def check_encoded_data(input_data: str) -> bool:
+    """
+    Handle both raw Base64 strings and JSON containing Base64
+    """
+    # First, try to parse as JSON
+    try:
+        parsed = json.loads(input_data)
+        
+        # Check if it has an 'encoded_data' field
+        if isinstance(parsed, dict) and 'encoded_data' in parsed:
+            encoded_string = parsed['encoded_data']
+            return is_base64(encoded_string)
+        else:
+            # If it's JSON but doesn't have encoded_data, check the whole thing
+            # Convert back to string and check
+            return is_base64(str(input_data))
+            
+    except json.JSONDecodeError:
+        # If it's not valid JSON, treat it as a raw string
+        return is_base64(input_data)
+
+# This code is used to decode the encoded data which is identified by the above isbase64() function   
+def retrieve_and_decompress(compressed_data):
+   
+    data = json.loads(compressed_data)  # Read the JSON file
+    # with open("log2.txt", "a", encoding="utf-8") as file:
+    #     file.write(json.dumps(compressed_data) + "\n")
+    # Step 2: Extract the Base64 encoded data from the specific key in the JSON
+    encoded_data = data.get("encoded_data")  # Make sure the key is correct
+ 
+    if not encoded_data:
+        frappe.log_error("not encoded data", "YESS")
+        print("No 'encoded_data' found in the JSON.")
+        return
+ 
+    # Step 3: Decode the Base64 encoded data
+    try:
+        frappe.log_error("Decode the Base64 encoded data", "YESS")
+        compressed_data = base64.b64decode(encoded_data)
+    except Exception as e:
+        print(f"Error decoding Base64: {e}")
+        frappe.log_error("Decode the Base64 encoded data(exception)", f"YESS{e}")
+        return
+ 
+    # Step 4: Decompress the decoded data (assuming gzip compression)
+    try:
+        frappe.log_error("Decompress the decoded data", "YESS")
+        decompressed_data = gzip.decompress(compressed_data)
+    except Exception as e:
+        print(f"Error decompressing gzip: {e}")
+        frappe.log_error("Decompress the decoded data(exception)", f"YESS{e}")
+        return
+ 
+    # Step 5: Unpack the decompressed data using msgpack
+    try:
+        frappe.log_error("Unpack the decompressed data using msgpack", "YESS")
+        final_data = msgpack.unpackb(decompressed_data, raw=False)
+        return final_data
+    except Exception as e:
+        print(f"Error unpacking MessagePack: {e}")
+        frappe.log_error("Unpack the decompressed data using msgpack(exception)", f"YESS{e}")
+        return
+
+def fetch_frappe_doc_universal(
+    doctype: str,
+    identifier: str,
+    *,
+    fields: list[str] | None = None,
+    timeout: int = 30,
+    debug: bool = False,
+):
+
+    base_url = ritu_local_base_url
+
+    headers = {
+        "Authorization": f"token {frappe_api_key}:{frappe_api_secret}",
+        "Content-Type": "application/json",
+        "Expect": "",
+    }
+
+    doctype_path = quote(doctype, safe="")
+    name_path = quote(identifier, safe="")
+
+    # ---------- Step 1: try by primary key ----------
+    url = f"{base_url.rstrip('/')}/api/resource/{doctype_path}/{name_path}"
+    params = {}
+
+    if fields:
+        params["fields"] = json.dumps(fields)
+
+    r = requests.get(url, headers=headers, params=params, timeout=timeout)
+    data = r.json()
+
+    if debug:
+        print("[TRY name]", r.url)
+
+    # ---------- success case ----------
+    if isinstance(data, dict) and "exc_type" not in data:
+        return data
+
+    # ---------- Step 2: fallback to filter lookup ----------
+    # Works for File and other non-standard doctypes
+    fallback_params = {
+        "filters": json.dumps({"file_name": identifier})
+    }
+
+    if fields:
+        fallback_params["fields"] = json.dumps(fields)
+
+    fallback_url = f"{base_url.rstrip('/')}/api/resource/{doctype_path}"
+
+    r2 = requests.get(
+        fallback_url,
+        headers=headers,
+        params=fallback_params,
+        timeout=timeout
+    )
+
+    fallback_data = r2.json()
+
+    if debug:
+        print("[FALLBACK filter]", r2.url)
+
+    return fallback_data
+
+
+# THIS FUNCTION IS FOR HELPER DOCTYPES ONLY AND NOT FOR THE MAIN DOCTYPES.
+def wrapper_for_frappe_function_for_fetching_fields(doctype_name: str, doc_session_id:str = None, fields = ["*"]):
+
+    # doctype_name(input parameter) = the actual name of the doctype from which fields are to be fetched
+    # doc_session_id(input parameter) = the session id present in the respective doctype.But if no value is provided in this input parameter then we will insert the value of the doctype_name input parameter as a default value in this but in no way we will leave this input parameter empty.
+
+    # for value in UNIVERSAL_DICT.get("Doctypes", []):
+    for value in UNIVERSAL_DICT_FOR_HELPER_DOCTYPES.get("Doctypes", []):
+        # print(value)
+        if value["name"] == doctype_name:
+            print(doctype_name)
+            if value["session_id_required"]:
+                if not doc_session_id:
+                    with open("/home/marsaiae/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                        file.write(f"\nSTATUS👌:- /n{"Particular session id is required for the respective doctype."}")
+                    return "Particular session id is required for the respective helper doctype without which we cannot go ahead."
+            
+                # data = frappe_function_for_fetching_fields_from_doctype(doctype = doctype_name, doc_id = doc_session_id)
+                data = fetch_frappe_doc_universal(doctype = doctype_name, identifier = doc_session_id, fields = fields)
+                with open("/home/marsaiae/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                    file.write(f"\nSTATUS👌:- /n{data}") 
+                return data
+            
+            elif not value["session_id_required"]:
+                print("ok😍")
+                doc_session_id = doctype_name
+                print(doc_session_id)
+                print(type(doc_session_id))
+                # data = frappe_function_for_fetching_fields_from_doctype(doctype = doctype_name, doc_id = doc_session_id)
+                data = fetch_frappe_doc_universal(doctype = doctype_name, identifier = doc_session_id, fields = fields)
+                with open("/home/marsaiae/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                    file.write(f"\nSTATUS👌:- /n{data}")
+                return data
+
+    with open("/home/marsaiae/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+        file.write(f"\nSTATUS👌:- /n{"The doctype mentioned does not exist in the Universal dict in which we store the doctypes which requires the usage of vector stores"}")
+    return "The doctype mentioned does not exist in the Universal helper doctype dict in which we store the doctypes that acts as a helper to the main doctypes."
+
+def detect_data_source(data):
+    frappe.log_error("data_for_detection", f"{data}")
+    frappe.log_error("data_for_detection_again", f"{type(data)}")
+    # json.loads(data)
+    # detecting whether the data is base64 encoded or not
+    detect_base64_data = check_encoded_data(data)
+    frappe.log_error("is_it_base_64", f"{detect_base64_data}")
+    if detect_base64_data:
+        frappe.log_error("is_it_base_64", f"{detect_base64_data}")
+        return "base64_encoded_data"
+
+    # 1. JSON onject(dict or list)
+    if isinstance(data, (dict, list)):
+        return "JSON_object"
+
+    # 2. JSON string
+    if isinstance(data, str):
+        # check if it's a valid JSON content
+        try:
+            frappe.log_error("json_string_2", f"{json.loads(data)}")
+            json.loads(data)
+            frappe.log_error("json_string", f"{json.loads(data)}")
+            return "json_string"
+        except:
+            pass
+
+        # check if it's a filename (file path exists or looks like one)
+        if os.path.isfile(data):
+            return "file_path"
+        
+        # check for filename pattern even if it does'nt exist yet(it means even if it is not a filepath and rather a filename then check it)
+        if any(data.endswith(ext) for ext in [
+            ".pdf", ".txt", ".json", ".csv", ".docx", 
+            ".xlsx", ".png", ".jpg", ".jpeg"
+        ]):
+
+            return "file_name_like"
+
+        return "string"
+        # data_type = type(data)
+        # frappe.log_error("data_type", f"{data_type}")
+        # return data_type
+
+    # 3. PIL images object
+    if isinstance(data, Image.Image):
+        return "PIL image"
+
+    # 4. Image bytes
+    if isinstance(data, (bytes, bytearray)):
+        try:
+            Image.open(BytesIO(data))
+            return "Image Bytes"
+        except:
+            return "raw bytes"
+
+    return "Unknown"
+
 # this code is to retrieve the values of the fields namely'storage limit' and 'time period for deletion' which are stored in 'Mars Configurations' doctype.
-
-
 def fetch_doc_fields_by_name(
     doctype: str,
     doc_name: str,                 # for Single doctypes, this is the same as doctype
@@ -234,84 +563,347 @@ def fetch_pdf_to_temp(file_url: str, is_private: bool | None = None) -> str:
             if chunk: f.write(chunk)
     return tmp_path
 
-def getting_pdf_from_file_url_in_feasibility_session_id(data: json):
-    pdf_path = data["data"][0]["file_path"]
+# def getting_pdf_from_file_url_in_feasibility_session_id(data: json):
+#     pdf_path = data["data"][0]["file_path"]
+
+#     m = re.search(r'[^/\\]+$', pdf_path)
+#     filename = m.group(0) if m else None
+#     # print(filename)  # samplesecured_256bitaes_pdf.pdf
+
+#     # calling the fetch_single_doc_by_name() again to access the contents of the pdf from the "file list" doctype in order to create a new vector file form it.
+#     file_data = fetch_single_doc_by_name(
+#     "File", # 
+#     # "Report-05-08-25 -2010",
+#     filename,
+#     api_key=frappe_api_key,
+#     api_secret=frappe_api_secret,
+#     base_url=ritu_local_base_url,
+#     fields=["*"],   # or omit to use server defaults
+#     debug=True
+#     ) 
+
+#     if file_data["data"]:
+#         if_is_file_data = file_data["data"][0]["file_url"]
+#         if not if_is_file_data:
+#             # print("No such file exists.Upload the PDF again to continue")
+#             return "No such file exists.Upload the PDF again to continue"
+#         if if_is_file_data:
+#             tmp_pdf = fetch_pdf_to_temp(if_is_file_data)
+#             # sanity check
+#             if not os.path.exists(tmp_pdf) or os.path.getsize(tmp_pdf) < 1024:
+#                 return "Downloaded file is missing/too small to be a valid PDF.", "fail-file-download-too-small"
+
+#             with open(tmp_pdf, "rb") as fh:
+#                 head = fh.read(5)
+#             if head != b"%PDF-":
+#                 return "Downloaded file is not a PDF (likely an HTML redirect/login page).", "fail-not-a-pdf"
+
+#             return tmp_pdf
+#     if not file_data["data"]:
+#         # print("No such file exists.Upload the PDF again to continue")
+#         return "No such file exists.Upload the PDF again to continue"
+#     # if_is_file_data = file_data["data"][0]["file_url"]
+#     # if not if_is_file_data:
+#     #     print("No such file exists.Upload the PDF again to continue")
+#     #     return "No such file exists.Upload the PDF again to continue"
+#     # if if_is_file_data:
+#     #     tmp_pdf = fetch_pdf_to_temp(if_is_file_data)
+#     #     return tmp_pdf
+
+def getting_pdf_from_file_url_in_feasibility_session_id(
+    main_doctype_data: dict|str,
+    main_doctype_field: str,
+    helper_doctype_name: str,
+    helper_doctype_field: str,
+    ):
+    # What is main_doctype_data = the amin doctype is the doctype where vector is used like feasibility report doctype and the helper doctype is the doctype which acts as a helper to the main doctype like the file doctype here.
+    # pdf_path = data["data"][0]["file_path"]
+    pdf_path = main_doctype_data["data"][main_doctype_field]
 
     m = re.search(r'[^/\\]+$', pdf_path)
     filename = m.group(0) if m else None
     # print(filename)  # samplesecured_256bitaes_pdf.pdf
 
     # calling the fetch_single_doc_by_name() again to access the contents of the pdf from the "file list" doctype in order to create a new vector file form it.
-    file_data = fetch_single_doc_by_name(
-    "File", # 
+    # file_data = fetch_single_doc_by_name(
+    file_data = wrapper_for_frappe_function_for_fetching_fields(
+    # "File",  
+    doctype_name = helper_doctype_name, # 
     # "Report-05-08-25 -2010",
-    filename,
-    api_key=frappe_api_key,
-    api_secret=frappe_api_secret,
-    base_url=ritu_local_base_url,
-    fields=["*"],   # or omit to use server defaults
-    debug=True
+    doc_session_id = filename,
+
+    # fields=["*"],   # or omit to use server defaults
+    # debug=True
     ) 
 
-    if file_data["data"]:
-        if_is_file_data = file_data["data"][0]["file_url"]
-        if not if_is_file_data:
+    with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+        file.write(f"\nSTATUS👌:- /n{file_data}")
+    print(file_data)
+
+    if_is_file_data = None
+
+    if isinstance(file_data, dict):
+        if file_data["data"]:
+            # if_is_file_data = file_data["data"][0]["file_url"]
+            # if_is_file_data = file_data["data"][helper_doctype_field]
+            try:
+                for item in file_data["data"]:
+                    if_is_file_data = item[helper_doctype_field]
+            except:
+                return "some error occured while fetching required fields from the 'file' doctype."
+            if not if_is_file_data:
+                # print("No such file exists.Upload the PDF again to continue")
+                return "No such file exists.Upload the PDF again to continue"
+            if if_is_file_data:
+                tmp_pdf = fetch_pdf_to_temp(if_is_file_data)
+                # sanity check
+                if not os.path.exists(tmp_pdf) or os.path.getsize(tmp_pdf) < 1024:
+                    return "Downloaded file is missing/too small to be a valid PDF:- fail-file-download-too-small"
+
+                with open(tmp_pdf, "rb") as fh:
+                    head = fh.read(5)
+                if head != b"%PDF-":
+                    return "Downloaded file is not a PDF (likely an HTML redirect/login page):- fail-not-a-pdf"
+
+                return tmp_pdf
+        if not file_data["data"]:
             # print("No such file exists.Upload the PDF again to continue")
             return "No such file exists.Upload the PDF again to continue"
-        if if_is_file_data:
-            tmp_pdf = fetch_pdf_to_temp(if_is_file_data)
-            # sanity check
-            if not os.path.exists(tmp_pdf) or os.path.getsize(tmp_pdf) < 1024:
-                return "Downloaded file is missing/too small to be a valid PDF.", "fail-file-download-too-small"
+    
+    else:
+        return file_data
 
-            with open(tmp_pdf, "rb") as fh:
-                head = fh.read(5)
-            if head != b"%PDF-":
-                return "Downloaded file is not a PDF (likely an HTML redirect/login page).", "fail-not-a-pdf"
+# def checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vector_file(
+#         doctype:str, 
+#         doc_name:str,
+#         folder_name:str):
+    
+#     data = fetch_single_doc_by_name(
+#     doctype,
+#     doc_name,
+#     api_key=frappe_api_key,
+#     api_secret=frappe_api_secret,
+#     base_url=ritu_local_base_url,
+#     fields=["*"],   # or omit to use server defaults
+#     debug=True
+#     ) # returns a json
 
-            return tmp_pdf
-    if not file_data["data"]:
-        # print("No such file exists.Upload the PDF again to continue")
-        return "No such file exists.Upload the PDF again to continue"
-    # if_is_file_data = file_data["data"][0]["file_url"]
-    # if not if_is_file_data:
-    #     print("No such file exists.Upload the PDF again to continue")
-    #     return "No such file exists.Upload the PDF again to continue"
-    # if if_is_file_data:
-    #     tmp_pdf = fetch_pdf_to_temp(if_is_file_data)
-    #     return tmp_pdf
+#     # print("data", data)
 
+#     # print("data(fetch_doc_by_name)",data)
+    
+#     if doctype == "Feasibility Report":
+#         is_vector_exists = data["data"][0]["custom_feasibility_vector_file_name"]
+#         # print(is_vector_exists)
+#         if not is_vector_exists:
+            
+#             creating_vectors = getting_pdf_from_file_url_in_feasibility_session_id(data=data)
+
+#             if creating_vectors == "No such file exists.Upload the PDF again to continue":
+#                 return creating_vectors, "fail-not is_vector_exists-also_PDF_not_exists"
+#             else:
+#                 return creating_vectors, "success-not is_vector_exists-but_PDF_exists"
+
+#         elif is_vector_exists:
+#             # parent = Path(fr"D:\work_folder\mars_rag_qna\data_45\vectors\{doctype}")
+#             # parent = Path(fr"{PERSIST_ROOT}\{doctype}")
+#             parent = Path(fr"{PERSIST_ROOT}/{folder_name}")
+#             # parent = os.path.join(PERSIST_ROOT, folder_name)
+#             os.makedirs(parent, exist_ok=True)
+#             folders = sorted([p for p in parent.iterdir() if p.is_dir()],
+#                             key=lambda p: p.stat().st_ctime)  # creation time on Windows
+
+#             iter_folders = []
+
+#             for p in folders:
+#                 iter_folders.append(p.name)
+
+#             # print("ITER_FOLDERS",iter_folders)
+
+#             for item in iter_folders:
+#                 # print("ITEM",item)
+#                 # print("VECTOR",is_vector_exists)
+#                 if item == is_vector_exists:
+#                     # print("VECTOR MATCH",is_vector_exists)
+#                     return is_vector_exists, "success-is_vector_exists"
+        
+#             creating_vectors = getting_pdf_from_file_url_in_feasibility_session_id(data=data)
+#             if creating_vectors == "No such file exists.Upload the PDF again to continue":
+#                 return creating_vectors, "fail-no_PDF_exists"
+#             else:
+#                 # print("VECTOR MATCH",is_vector_exists)
+#                 return creating_vectors, "success-is_PDF_exists"
+#                 # return "vector folder does not exist in the local storage", "fail-is_vector_exists"
+                    
+                
+#     else: # for follow up #
+#         # print("The support for follow up is not integrated yet")
+#         return "The support for follow up is not integrated yet"
 
 def checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vector_file(
-        doctype:str, 
-        doc_name:str,
-        folder_name:str):
+        doctype:str, # it means the name of the doctype
+        doc_name:str, # it means the session id of the doctype
+        folder_name:str,
+        vector_id_field: str,
+        data_source_field: str):
     
-    data = fetch_single_doc_by_name(
-    doctype,
-    doc_name,
-    api_key=frappe_api_key,
-    api_secret=frappe_api_secret,
-    base_url=ritu_local_base_url,
-    fields=["*"],   # or omit to use server defaults
-    debug=True
-    ) # returns a json
+    # data = fetch_single_doc_by_name(
+    # doctype,
+    # doc_name,
 
-    # print("data", data)
+    # fields=["*"],   # or omit to use server defaults
+    # debug=True
+    # ) # returns a json
 
-    # print("data(fetch_doc_by_name)",data)
+    # data = wrapper_for_frappe_function_for_fetching_fields(
+    #     doctype_name = doctype,
+    #     doc_session_id = doc_name,
+    # )    
+
+    data = fetch_frappe_doc_universal(
+        doctype = doctype,
+        identifier = doc_name
+    )
+
+    frappe.log_error("Check", f"{data}")
+
+    with open("/home/marsaiae/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+        file.write(f"\nSTATUS👌:- /n{data}")
+
+    if not isinstance(data, dict):
+        return data, "fail-not is_vector_exists-also_PDF_not_exists"
+
+    vector_id_field_for_respective_doctype = None
+    data_source_fields_for_respective_doctype = None
+    name_for_helper_doctype = None
+    field_for_helper_doctype = None
+
+    # These fields are present only for those doctypes in the universal dict for which session id is required.
+    # for value in UNIVERSAL_DICT["Doctypes"]:
+    #     if value["name"] == doctype and value["session_id_required"]:
+    #         if vector_id_field and data_source_field:
+    #             vector_id_field_for_respective_doctype = vector_id_field
+    #             data_source_fields_for_respective_doctype = data_source_field
+    #         else:
+    #             vector_id_field_for_respective_doctype = value["Vector_ID_Field"]
+    #             data_source_fields_for_respective_doctype = value["Data_Source_Field"]
+
+    # for value in UNIVERSAL_DICT.get("Doctypes", []):
+    #     if (
+    #         value.get("name") == doctype
+    #         and value.get("session_id_required") is True
+    #         and vector_id_field
+    #         and data_source_field
+    #     ):
+    #         vector_id_field_for_respective_doctype = vector_id_field
+    #         data_source_fields_for_respective_doctype = data_source_field
+    #     else:
+    #         vector_id_field_for_respective_doctype = value["Vector_ID_Field"]
+    #         data_source_fields_for_respective_doctype = value["Data_Source_Field"]
+
+    # for value in UNIVERSAL_DICT.get("Doctypes", []):
+        # if value.get("name") == doctype and value.get("session_id_required"):
+        #     vector_id_field_for_respective_doctype = (
+        #         vector_id_field or value["Vector_ID_Field"]
+        #     )
+        #     data_source_fields_for_respective_doctype = (
+        #         data_source_field or value["Data_Source_Field"]
+        #     )
+        #     break
+        # else:
+        #     raise ValueError(f"Doctype '{doctype}' not found or not session-based")
+
+    # found = False
+    # for value in UNIVERSAL_DICT.get("Doctypes", []):
+    #     if value.get("name") == doctype and value.get("session_id_required"):
+    #         vector_id_field_for_respective_doctype = vector_id_field or value["Vector_ID_Field"]
+    #         data_source_fields_for_respective_doctype = data_source_field or value["Data_Source_Field"]
+    #         found = True
+    #         break
+
+    # if not found:
+    #     raise ValueError(f"Doctype '{doctype}' not found or not session-based")
+
+    vector_id_field_for_respective_doctype = vector_id_field 
+    data_source_fields_for_respective_doctype = data_source_field 
+
+    for value in UNIVERSAL_DICT_FOR_HELPER_DOCTYPES.get("Doctypes", []):
+        if value["name"] == "File":
+            name_for_helper_doctype = "File"
+            field_for_helper_doctype = value["File_URL_Field"]
+
+    fail_statements = [
+    "No such file exists.Upload the PDF again to continue",
+    "some error occured while fetching required fields from the 'file' doctype.",
+    "Downloaded file is missing/too small to be a valid PDF:- fail-file-download-too-small",
+    "Downloaded file is not a PDF (likely an HTML redirect/login page):- fail-not-a-pdf",
+    "Particular session id is required for the respective helper doctype without which we cannot go ahead.",
+    "The doctype mentioned does not exist in the Universal helper doctype dict in which we store the doctypes that acts as a helper to the main doctypes.",
+    ]
+
+    # checking_data_source = detect_data_source(data)
+    # doc_data = safe_get_data(data)
+
+    # if not isinstance(doc_data, dict):
+    #     return "Invalid Response from feasibility Report Doctype"
+    source_value = data["data"][data_source_fields_for_respective_doctype]  
+    frappe.log_error("source_value", f"{source_value}")  
+    # source_value = doc_data.get(data_source_fields_for_respective_doctype)
+    checking_data_source = detect_data_source(source_value)
+    frappe.log_error("another check", f"{type(checking_data_source)}")
+    frappe.log_error("checking_data_source", f"{checking_data_source}")
+
+    try:
+        # is_vector_exists = data["data"][0]["custom_feasibility_vector_file_name"]
+        is_vector_exists = data["data"][vector_id_field_for_respective_doctype]
+    except KeyError:
+        is_vector_exists = None
     
-    if doctype == "Feasibility Report":
-        is_vector_exists = data["data"][0]["custom_feasibility_vector_file_name"]
+    '''This block of code(ie:- if block) supports the data source which is either the file path or file name ie. basically just the path or name and not the actual content
+    which is why a helper doctype namely "file" doctype is needed to fetch the actual content from either the file path or file name.'''
+    if checking_data_source == "file_path" or checking_data_source == "file_name_like":
+    # if doctype == "Feasibility Report":
+        
+        # try:
+        #     # is_vector_exists = data["data"][0]["custom_feasibility_vector_file_name"]
+        #     is_vector_exists = data["data"][vector_id_field_for_respective_doctype]
+        # except KeyError:
+        #     is_vector_exists = None
         # print(is_vector_exists)
         if not is_vector_exists:
-            
-            creating_vectors = getting_pdf_from_file_url_in_feasibility_session_id(data=data)
 
-            if creating_vectors == "No such file exists.Upload the PDF again to continue":
-                return creating_vectors, "fail-not is_vector_exists-also_PDF_not_exists"
-            else:
-                return creating_vectors, "success-not is_vector_exists-but_PDF_exists"
+            # for value in UNIVERSAL_DICT_FOR_HELPER_DOCTYPES.get("Doctypes", []):
+            #     if value["name"] == "File":
+            #         name_for_helper_doctype = "File"
+            #         field_for_helper_doctype = value["File_URL_Field"]
+            
+            # creating_vectors = getting_pdf_from_file_url_in_feasibility_session_id(data=data)
+            creating_vectors = getting_pdf_from_file_url_in_feasibility_session_id(
+                                                                                    main_doctype_data=data, 
+                                                                                    main_doctype_field=data_source_fields_for_respective_doctype,
+                                                                                    helper_doctype_name=name_for_helper_doctype,
+                                                                                    helper_doctype_field=field_for_helper_doctype)
+
+            # fail_statements = [
+            #     "No such file exists.Upload the PDF again to continue",
+            #     "some error occured while fetching required fields from the 'file' doctype.",
+            #     "Downloaded file is missing/too small to be a valid PDF:- fail-file-download-too-small",
+            #     "Downloaded file is not a PDF (likely an HTML redirect/login page):- fail-not-a-pdf",
+            #     "Particular session id is required for the respective helper doctype without which we cannot go ahead.",
+            #     "The doctype mentioned does not exist in the Universal helper doctype dict in which we store the doctypes that acts as a helper to the main doctypes.",
+            #     ]
+
+            for value in fail_statements:
+                if creating_vectors == value:
+                    return creating_vectors, "fail-not is_vector_exists-also_PDF_not_exists"
+                else:
+                    return creating_vectors, "success-not is_vector_exists-but_PDF_exists"
+            # if creating_vectors == "No such file exists.Upload the PDF again to continue":
+            #     return creating_vectors, "fail-not is_vector_exists-also_PDF_not_exists"
+            # elif creating_vectors == "some error occured while fetching required fields from the 'file' doctype.":
+            #     return creating_vectors, "fail-not is_vector_exists-also_PDF_not_exists"
+            # else:
+            #     return creating_vectors, "success-not is_vector_exists-but_PDF_exists"
 
         elif is_vector_exists:
             # parent = Path(fr"D:\work_folder\mars_rag_qna\data_45\vectors\{doctype}")
@@ -335,19 +927,86 @@ def checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vecto
                 if item == is_vector_exists:
                     # print("VECTOR MATCH",is_vector_exists)
                     return is_vector_exists, "success-is_vector_exists"
-        
-            creating_vectors = getting_pdf_from_file_url_in_feasibility_session_id(data=data)
-            if creating_vectors == "No such file exists.Upload the PDF again to continue":
-                return creating_vectors, "fail-no_PDF_exists"
-            else:
-                # print("VECTOR MATCH",is_vector_exists)
-                return creating_vectors, "success-is_PDF_exists"
+              
+            creating_vectors = getting_pdf_from_file_url_in_feasibility_session_id(
+                                                                                    main_doctype_data=data, 
+                                                                                    main_doctype_field=data_source_fields_for_respective_doctype,
+                                                                                    helper_doctype_name=name_for_helper_doctype,
+                                                                                    helper_doctype_field=field_for_helper_doctype)
+
+            for value in fail_statements:
+                if creating_vectors == value:
+                    return creating_vectors, "fail-no_PDF_exists"
+                else:
+                    return creating_vectors, "success-is_PDF_exists"
+            # if creating_vectors == "No such file exists.Upload the PDF again to continue":
+            #     return creating_vectors, "fail-no_PDF_exists"
+            # else:
+            #     # print("VECTOR MATCH",is_vector_exists)
+            #     return creating_vectors, "success-is_PDF_exists"
                 # return "vector folder does not exist in the local storage", "fail-is_vector_exists"
-                    
-                
-    else: # for follow up #
-        # print("The support for follow up is not integrated yet")
-        return "The support for follow up is not integrated yet"
+    
+    elif checking_data_source == "JSON_object" or checking_data_source == "json_string" or checking_data_source == "base64_encoded_data":
+        # if not is_vector_exists:
+        #     try:
+        #         # is_vector_exists = data["data"][0]["custom_feasibility_vector_file_name"]
+        #         is_json_exists = data["data"][data_source_fields_for_respective_doctype]
+        #         frappe.log_error("is_json_exists", f"{is_json_exists}")
+        #     except KeyError:
+        #         is_json_exists = None
+
+        #     if not is_json_exists:
+        #         frappe.log_error("is_json_exists", f"fail-not is_vector_exists-also_JSON_not_exists")
+        #         return is_json_exists, "fail-not is_vector_exists-also_JSON_not_exists"
+        #     elif is_json_exists:
+        #         frappe.log_error("is_json_exists", "success-not is_vector_exists-but_JSON_exists")
+        #         return is_json_exists, "success-not is_vector_exists-but_JSON_exists"
+
+
+        # elif is_vector_exists:
+        if is_vector_exists:
+                        # parent = Path(fr"D:\work_folder\mars_rag_qna\data_45\vectors\{doctype}")
+            # parent = Path(fr"{PERSIST_ROOT}\{doctype}")
+            parent = Path(fr"{PERSIST_ROOT}/{folder_name}")
+            # parent = os.path.join(PERSIST_ROOT, folder_name)
+            os.makedirs(parent, exist_ok=True)
+            folders = sorted([p for p in parent.iterdir() if p.is_dir()],
+                            key=lambda p: p.stat().st_ctime)  # creation time on Windows
+
+            iter_folders = []
+
+            for p in folders:
+                iter_folders.append(p.name)
+
+            # print("ITER_FOLDERS",iter_folders)
+
+            for item in iter_folders:
+                # print("ITEM",item)
+                # print("VECTOR",is_vector_exists)
+                if item == is_vector_exists:
+                    # print("VECTOR MATCH",is_vector_exists)
+                    return is_vector_exists, "success-is_vector_exists"
+
+        try:
+            # is_vector_exists = data["data"][0]["custom_feasibility_vector_file_name"]
+            is_json_exists = data["data"][data_source_fields_for_respective_doctype]
+            frappe.log_error("is_json_exists", f"{is_json_exists}")
+        except KeyError:
+            is_json_exists = None
+
+        if not is_json_exists:
+            frappe.log_error("is_json_exists", f"fail-not is_vector_exists-also_JSON_not_exists")
+            return is_json_exists, "fail-not is_vector_exists-also_JSON_not_exists"
+        elif is_json_exists:
+            frappe.log_error("is_json_exists", "success-not is_vector_exists-but_JSON_exists")
+            if checking_data_source == "base64_encoded_data":
+                is_json_exists = retrieve_and_decompress(is_json_exists)
+                frappe.log_error("base64_decode_data", f"{is_json_exists}")
+            return is_json_exists, "success-not is_vector_exists-but_JSON_exists"
+
+    else:
+        return "Either the support for the data source passed is not available or something went wrong.", "fail-not is_vector_exists-also_JSON_not_exists"
+
     
 ### 2nd version of updated working code ###   #### WE WILL GO WITH THESE  ####
 def ingest_and_persist_with_budget_2(
@@ -568,22 +1227,118 @@ def ingest_and_persist_with_budget_2(
                 start += max_chars_per_doc; part += 1
         return docs
 
-    def _load_document(src: Union[str, dict, list]) -> Tuple[Union[List[Document], str], str, str]:
-        try:
-            if isinstance(src, (dict, list)):
-                return _json_to_documents(src, source_meta="inline_json"), "successful loading", "inline_json.json"
-            if isinstance(src, str):
-                s = src.strip()
-                if s.startswith("{") or s.startswith("["):
-                    try:
-                        data = json.loads(s)
-                        return _json_to_documents(data, source_meta="inline_json_string"), "successful loading", "inline_json.json"
-                    except Exception:
-                        pass
-            if not isinstance(src, str):
-                return "Invalid source type. Provide a file path, JSON dict/list, or JSON string.", "error loading document", "unknown.json"
+    def _normalize_json_payload(obj: Any) -> Any:
+        """
+        Normalize common wrapper formats:
+        - {"data": ...} -> ...
+        - {"message": {"data": ...}} -> ...
+        - list/dict as-is
+        """
+        if isinstance(obj, dict):
+            # most common wrappers in APIs
+            if "data" in obj and isinstance(obj["data"], (dict, list)):
+                return obj["data"]
+            if "message" in obj and isinstance(obj["message"], dict) and "data" in obj["message"]:
+                return obj["message"]["data"]
+        return obj
 
-            file_path = src
+
+    def _try_parse_inline_json(src: Any) -> Tuple[bool, Any]:
+        """
+        Try to parse inline JSON from:
+        - dict/list (already JSON)
+        - str (JSON string)
+        - bytes/bytearray (utf-8 JSON)
+        Returns: (is_json, parsed_obj)
+        """
+        if isinstance(src, (dict, list)):
+            return True, _normalize_json_payload(src)
+
+        if isinstance(src, (bytes, bytearray)):
+            try:
+                s = bytes(src).decode("utf-8").strip()
+            except Exception:
+                return False, None
+            if s.startswith("{") or s.startswith("["):
+                try:
+                    return True, _normalize_json_payload(json.loads(s))
+                except Exception:
+                    return False, None
+            return False, None
+
+        if isinstance(src, str):
+            s = src.strip()
+            if s.startswith("{") or s.startswith("["):
+                try:
+                    return True, _normalize_json_payload(json.loads(s))
+                except Exception:
+                    return False, None
+
+        return False, None
+
+    # def _load_document(src: Union[str, dict, list]) -> Tuple[Union[List[Document], str], str, str]:
+    #     try:
+    #         if isinstance(src, (dict, list)):
+    #             return _json_to_documents(src, source_meta="inline_json"), "successful loading", "inline_json.json"
+    #         if isinstance(src, str):
+    #             s = src.strip()
+    #             if s.startswith("{") or s.startswith("["):
+    #                 try:
+    #                     data = json.loads(s)
+    #                     return _json_to_documents(data, source_meta="inline_json_string"), "successful loading", "inline_json.json"
+    #                 except Exception:
+    #                     pass
+    #         if not isinstance(src, str):
+    #             return "Invalid source type. Provide a file path, JSON dict/list, or JSON string.", "error loading document", "unknown.json"
+
+    #         file_path = src
+    #         mime_type, _ = mimetypes.guess_type(file_path)
+    #         file_ext = os.path.splitext(file_path)[1].lower()
+
+    #         if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+    #             return [], "error loading document", os.path.basename(file_path)
+
+    #         if mime_type == "application/json" or file_ext == ".json":
+    #             with open(file_path, "r", encoding="utf-8") as f:
+    #                 data = json.load(f)
+    #             return _json_to_documents(data, source_meta=file_path), "successful loading", os.path.basename(file_path)
+
+    #         if mime_type == "application/pdf" or file_ext == ".pdf":
+    #             return PyPDFLoader(file_path).load(), "successful loading", os.path.basename(file_path)
+    #         elif (mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or file_ext == ".docx"):
+    #             return Docx2txtLoader(file_path).load(), "successful loading", os.path.basename(file_path)
+    #         elif (mime_type in ("application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") or file_ext in (".xls", ".xlsx")):
+    #             return UnstructuredExcelLoader(file_path).load(), "successful loading", os.path.basename(file_path)
+    #         elif mime_type == "text/plain" or file_ext == ".txt":
+    #             return TextLoader(file_path).load(), "successful loading", os.path.basename(file_path)
+    #         else:
+    #             return UnstructuredFileLoader(file_path, mode="elements").load(), "successful loading", os.path.basename(file_path)
+
+    #     except Exception as e:
+    #         return f"Error loading {src}: {str(e)}", "error loading document", "unknown.json"
+
+    def _load_document(src: Any) -> Tuple[Union[List[Document], str], str, str]:
+        """
+        Supports:
+        - Inline JSON: dict/list, JSON string, JSON bytes
+        - File paths: pdf/docx/xlsx/txt/json file
+        """
+        try:
+            # ---------- A) Inline JSON content ----------
+            is_json, parsed = _try_parse_inline_json(src)
+            if is_json:
+                # Use a stable pseudo filename for inline JSON
+                return _json_to_documents(parsed, source_meta="inline_json"), "successful loading", "inline_json.json"
+
+            # ---------- B) File path mode ----------
+            if not isinstance(src, str):
+                return (
+                    "Invalid source type. Provide a file path OR inline JSON (dict/list/JSON string/JSON bytes).",
+                    "error loading document",
+                    "unknown",
+                )
+
+            file_path = src.strip()
             mime_type, _ = mimetypes.guess_type(file_path)
             file_ext = os.path.splitext(file_path)[1].lower()
 
@@ -593,13 +1348,17 @@ def ingest_and_persist_with_budget_2(
             if mime_type == "application/json" or file_ext == ".json":
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                data = _normalize_json_payload(data)
                 return _json_to_documents(data, source_meta=file_path), "successful loading", os.path.basename(file_path)
 
             if mime_type == "application/pdf" or file_ext == ".pdf":
                 return PyPDFLoader(file_path).load(), "successful loading", os.path.basename(file_path)
-            elif (mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or file_ext == ".docx"):
+            elif mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or file_ext == ".docx":
                 return Docx2txtLoader(file_path).load(), "successful loading", os.path.basename(file_path)
-            elif (mime_type in ("application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") or file_ext in (".xls", ".xlsx")):
+            elif mime_type in (
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ) or file_ext in (".xls", ".xlsx"):
                 return UnstructuredExcelLoader(file_path).load(), "successful loading", os.path.basename(file_path)
             elif mime_type == "text/plain" or file_ext == ".txt":
                 return TextLoader(file_path).load(), "successful loading", os.path.basename(file_path)
@@ -607,7 +1366,9 @@ def ingest_and_persist_with_budget_2(
                 return UnstructuredFileLoader(file_path, mode="elements").load(), "successful loading", os.path.basename(file_path)
 
         except Exception as e:
-            return f"Error loading {src}: {str(e)}", "error loading document", "unknown.json"
+            return f"Error loading {type(src)}: {str(e)}", "error loading document", "unknown"
+
+
 
     # ---------------------- 1) Load ----------------------
     docs, status, uploaded_filename = _load_document(source)
@@ -633,11 +1394,13 @@ def ingest_and_persist_with_budget_2(
 
     joined = "\n\n".join(d.page_content for d in child_docs)
     stable_doc_id = f"doc_{_hash(joined or source_label)}"
+    short_doc_id = stable_doc_id.replace("doc_", "")[:16]
 
     for i, d in enumerate(child_docs):
         d.metadata["chunk_id"] = f"{i:05d}_{_hash(d.page_content)}"
         d.metadata["source"] = source_label
-        d.metadata["stable_doc_id"] = stable_doc_id
+        # d.metadata["stable_doc_id"] = stable_doc_id
+        d.metadata["stable_doc_id"] = short_doc_id
         d.metadata["doc_id"] = f"doc_{i}"
         d.metadata["parent_id"] = f"parent_{i//4}"
         d.metadata["chunk_level"] = "child" if len(d.page_content) < 1000 else "parent"
@@ -651,8 +1414,23 @@ def ingest_and_persist_with_budget_2(
         return {"ok": False, "status": "no_chunks",
                 "message": "Text chunks are empty; not adding to Chroma."}
 
+    # safe_name = _safe_stem(uploaded_filename or "inline_json")
+    # collection_name = f"{safe_name}__{stable_doc_id}"
+
+    MAX_COLLECTION_LEN = 63
+
     safe_name = _safe_stem(uploaded_filename or "inline_json")
-    collection_name = f"{safe_name}__{stable_doc_id}"
+
+    # hard-trim filename part
+    safe_name = safe_name[:30]
+
+    # shorten hash
+    # short_doc_id = stable_doc_id.replace("doc_", "")[:16]
+
+    collection_name = f"{safe_name}_{short_doc_id}"
+
+    # final safety clamp
+    collection_name = collection_name[:MAX_COLLECTION_LEN].strip("_-")
 
     # --- Folder structure: <persist_root>/vectors/<Feasibility Report|Follow Up>/<collection_name> ---
 
@@ -670,14 +1448,18 @@ def ingest_and_persist_with_budget_2(
 
     if doctype_name == FEAS_DOCTYPE:
         # target_root = os.path.join(vectors_root, label_feasibility)
-        target_root = os.path.join(PERSIST_ROOT, LABEL_FEASIBILITY)
+        # target_root = os.path.join(PERSIST_ROOT, LABEL_FEASIBILITY)
+        target_root = os.path.join(PERSIST_ROOT, doctype_name)
         # allocated_budget_bytes_per_doctype = Total_allocated_budget_bytes
         storage_config = FEASIBILITY_ALLOCATED_STORAGE
     elif doctype_name == FOLL_DOCTYPE:
         # target_root = os.path.join(vectors_root, label_follow)
-        target_root = os.path.join(PERSIST_ROOT, LABEL_FOLLOW)
+        # target_root = os.path.join(PERSIST_ROOT, LABEL_FOLLOW)
+        target_root = os.path.join(PERSIST_ROOT, doctype_name)
         # allocated_budget_bytes_per_doctype = Total_allocated_budget_bytes
         storage_config = FOLLOW_UP_ALLOCATED_STORAGE
+
+    target_root = os.path.join(PERSIST_ROOT, doctype_name)
 
     final_dir = os.path.join(target_root, collection_name)
     os.makedirs(target_root, exist_ok=True)
@@ -700,19 +1482,46 @@ def ingest_and_persist_with_budget_2(
         existing_size = _get_dir_size_bytes(final_dir)  # 0 if not present
         projected_total = current_usage - existing_size + new_size
 
+        # ---------------- TOTAL BYTE SIZE OF THE PERSIST ROOT --------------------------
+        preparing_persist_root = fr"{PERSIST_ROOT}"
+        total_byte_size_of_persist_root = _get_dir_size_bytes(preparing_persist_root)
+
+        #------ projected total of whole persists root including the new vector file stored in temp file to get the possible storage limit --------------
+        projected_total_of_persist_root_including_new_vector_file_created = total_byte_size_of_persist_root + new_size
+
         parent = Path(target_root)
         final_name = Path(final_dir).name  # don't delete this one
         failed_cleanup = False
 
         ## getting the storage limit from mars configurations doctype
-        fields = ["storage_limit","time_period_for_deletion"]
-        data = fetch_doc_fields_by_name("Mars Configurations", "Mars Configurations", fields=fields)
+        for value in UNIVERSAL_DICT_FOR_HELPER_DOCTYPES.get("Doctypes", []):
+            if value["name"] == "Mars Configurations": 
+                fields = [value["Storage_Field"], value["Deletion_Period_Field"]]
+                configuration_doctype = value["name"]
+                # fields = ["storage_limit","time_period_for_deletion"]
+                data = wrapper_for_frappe_function_for_fetching_fields(doctype_name = configuration_doctype)
+
+                with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                    file.write(f"\nSTATUS👌:- /n{data}")
+
+        if not isinstance(data, dict):
+            Total_allocated_budget = STORAGE_LIMIT
+            # Total_allocated_budget = data["data"]["storage_limit"]
+            with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                file.write(f"\nSTATUS👌:- /n{Total_allocated_budget}")
+        elif isinstance(data, dict):
+            # Total_allocated_budget = STORAGE_LIMIT
+            Total_allocated_budget = data["data"]["storage_limit"]
+
+        ## getting the storage limit from mars configurations doctype
+        # fields = ["storage_limit","time_period_for_deletion"]
+        # data = fetch_doc_fields_by_name("Mars Configurations", "Mars Configurations", fields=fields)
         # print("storage limit", data["storage_limit"])
         # print(type(data["storage_limit"]))
         # print("time period for deletion", data["time_period_for_deletion"])
         # -> {'doc_log': 1, 'file_log': 1, 'retention_days': 1, 'storage_limit': 4, 'time_period_for_deletion': 0, 'groq_key': '...'}
 
-        Total_allocated_budget = data["storage_limit"]
+        # Total_allocated_budget = data["storage_limit"]
 
         # parse human budget if passed as string like "6gb", else assume bytes||
         # if isinstance(allocated_budget, str):
@@ -728,11 +1537,13 @@ def ingest_and_persist_with_budget_2(
             # allocated_budget_bytes = int(allocated_budget)
 
         # deriving budget bytes allocated per doctype vectors:-
-        allocated_budget_bytes_per_doctype = Total_allocated_budget_bytes * storage_config
+        # allocated_budget_bytes_per_doctype = Total_allocated_budget_bytes * storage_config
+        allocated_budget_bytes_per_doctype = Total_allocated_budget_bytes 
 
         # Keep freeing space until within budget or nothing left to delete
         # while projected_total > allocated_budget_bytes:
         while projected_total > allocated_budget_bytes_per_doctype:
+        # while projected_total_of_persist_root_including_new_vector_file_created > allocated_budget_bytes_per_doctype:
             candidates = _list_oldest_dirs(parent, exclude_name=final_name)
             if not candidates:
                 # print("[Budget] No more folders to delete; still over budget.")
@@ -762,6 +1573,7 @@ def ingest_and_persist_with_budget_2(
                 #   f"budget={_humanize_bytes(allocated_budget_bytes_per_doctype)}")
 
         if failed_cleanup or projected_total > allocated_budget_bytes_per_doctype:
+        # if failed_cleanup or projected_total_of_persist_root_including_new_vector_file_created > allocated_budget_bytes_per_doctype:
             del temp_col; del temp_client; gc.collect(); time.sleep(0.2)
             return {
                 "ok": False,
@@ -772,6 +1584,7 @@ def ingest_and_persist_with_budget_2(
                     f"existing_dir={_humanize_bytes(existing_size)}, "
                     f"new={_humanize_bytes(new_size)}, "
                     f"projected_total={_humanize_bytes(projected_total)}, "
+                    # f"projected_total_of_persist_root_including_new_vector_file={_humanize_bytes(projected_total_of_persist_root_including_new_vector_file_created)}, "
                     # f"budget={_humanize_bytes(allocated_budget_bytes)}"
                     f"budget={_humanize_bytes(allocated_budget_bytes_per_doctype)}"
                 ),
@@ -830,19 +1643,19 @@ def ingest_and_persist_with_budget_2(
 
 
 # def yet_to_decide(allocated_budget, doctype, doc_name, folder_name):
-def ensure_vector_store(doctype, doc_name, folder_name):
+def ensure_vector_store(doctype, doc_name, folder_name, vector_id_field, data_source_field):
 
-    temporary, progress = checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vector_file(doctype=doctype, doc_name=doc_name, folder_name=folder_name)
+    temporary, progress = checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vector_file(doctype=doctype, doc_name=doc_name, folder_name=folder_name, vector_id_field=vector_id_field, data_source_field=data_source_field)
     # print("TEMPORARY", temporary)
-    with open("testlog.txt", "a") as file:
+    with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
         file.write(f"/nSTATUS👌:- /n{progress}")
     # print("PROGRESS", progress)
 
     if progress == "fail-no_PDF_exists":
         return temporary, "DO NOT PROCEED"
-    elif progress == "fail-not is_vector_exists-also_PDF_not_exists":
+    elif progress == "fail-not is_vector_exists-also_PDF_not_exists" or progress == "fail-not is_vector_exists-also_JSON_not_exists":
         return temporary, "DO NOT PROCEED"
-    elif progress == "success-not is_vector_exists-but_PDF_exists":
+    elif progress == "success-not is_vector_exists-but_PDF_exists" or progress == "success-not is_vector_exists-but_JSON_exists":
         # qwerty = ingest_and_persist_with_budget(
         qwerty = ingest_and_persist_with_budget_2(
             # source = "Wood Saw Mill and Seasoning Plant Rs. 86.64 million Dec-2022.pdf",
@@ -860,6 +1673,8 @@ def ensure_vector_store(doctype, doc_name, folder_name):
             # doctype_name="Feasibility Report"
             doctype_name=doctype
         )
+        frappe.log_error("okay", f"{qwerty}")
+
         return qwerty, "CONDITIONAL PROCEED"
     
     elif progress == "success-is_vector_exists":
@@ -893,13 +1708,16 @@ def ensure_vector_store(doctype, doc_name, folder_name):
         return qwerty, "CONDITIONAL PROCEED"
     
 # def yet_to_decide_2(allocated_budget, doctype, doc_name):
-def ensure_vector_and_update_record(doctype, doc_name):
+@frappe.whitelist()
+def ensure_vector_and_update_record(doctype, doc_name, vector_id_field, data_source_field):
 
+    frappe.log_error("Check", f"{doctype} {doc_name} {vector_id_field} {data_source_field}")
     #getting in which folder vector is to be stored
     if doctype == FEAS_DOCTYPE:
-        folder_name = LABEL_FEASIBILITY
+        folder_name = doctype
     elif doctype == FOLL_DOCTYPE:
-        folder_name = LABEL_FOLLOW
+        folder_name = doctype
+    folder_name = doctype
 
     # base_url = live_base_url
     base_url = ritu_local_base_url
@@ -934,7 +1752,7 @@ def ensure_vector_and_update_record(doctype, doc_name):
 
 
     # mko, is_proceed = yet_to_decide(allocated_budget=allocated_budget, doctype = doctype, doc_name = doc_name, folder_name = folder_name)
-    mko, is_proceed = ensure_vector_store(doctype = doctype, doc_name = doc_name, folder_name = folder_name)
+    mko, is_proceed = ensure_vector_store(doctype = doctype, doc_name = doc_name, folder_name = folder_name, vector_id_field=vector_id_field, data_source_field=data_source_field)
 
     if is_proceed.lower() == "proceed":
         return mko, True
@@ -960,6 +1778,9 @@ def ensure_vector_and_update_record(doctype, doc_name):
         
             # Print the response (which should include the updated document data)
             # print(json.dumps(updated_response, indent=2))
+
+        with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+            file.write(f"\nSTATUS👌:- /n{mko}")
 
             return mko, True
 

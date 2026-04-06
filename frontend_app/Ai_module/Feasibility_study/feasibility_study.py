@@ -12,7 +12,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain_community.retrievers import BM25Retriever
+from langchain_community.retrievers import BM25Retriever    
 from langchain.retrievers import EnsembleRetriever
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain_groq import ChatGroq
@@ -36,8 +36,9 @@ import random
 
 ## function imports from FINAL_UNVIERSAL_FUNCTION ##
 from frontend_app.Ai_module.Feasibility_Universal_Function.Final_Universal_Function import (
-    fetch_single_doc_by_name, 
-    fetch_doc_fields_by_name, 
+    # fetch_single_doc_by_name, 
+    # fetch_doc_fields_by_name, 
+    fetch_frappe_doc_universal,
     make_headers, 
     fetch_pdf_to_temp, 
     getting_pdf_from_file_url_in_feasibility_session_id, 
@@ -191,9 +192,12 @@ class AdvancedRAGSystem:
     def create_advanced_retriever(self, vector_store:dict|str, status:bool, doctype:str):
 
         if doctype == FEAS_DOCTYPE:
-            folder_name = LABEL_FEASIBILITY
+            # folder_name = LABEL_FEASIBILITY
+            folder_name = doctype
         elif doctype == FOLL_DOCTYPE:
-            folder_name = LABEL_FOLLOW
+            # folder_name = LABEL_FOLLOW
+            folder_name = doctype
+        folder_name = doctype
         
         if status:
             if isinstance(vector_store, str):
@@ -205,6 +209,10 @@ class AdvancedRAGSystem:
                 # root = os.path.join(PERSIST_ROOT, doctype, vector_store["collection_name"])
                 root = os.path.join(PERSIST_ROOT, folder_name, vector_store["collection_name"])
                 collection_name = vector_store["collection_name"]
+            
+            with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_study/testlog.txt", "a") as file:
+                file.write(f"\COLLECTION NAME 😊:- \n{collection_name}")
+
         elif not status:
             root = None
 
@@ -1553,7 +1561,7 @@ def analysing_documents(file_path, vector_store: dict|str, doctype: str, status:
             file.write(f"\nSTATUS👌:- /n{final_json_0}")
         return final_json_0
 
-def query_classification(file_path, feasibility_id, llm_model=llm_maverik, temperature=0.5):
+def query_classification(file_path, feasibility_id, vector_id_field, data_source_field, llm_model=llm_maverik, temperature=0.5):
 
     # doctype = FEAS_DOCTYPE
     doc_name = feasibility_id
@@ -1562,7 +1570,9 @@ def query_classification(file_path, feasibility_id, llm_model=llm_maverik, tempe
 
     mko_2, status = ensure_vector_and_update_record( 
                 doctype = FEAS_DOCTYPE, 
-                doc_name = doc_name,)
+                doc_name = doc_name,
+                vector_id_field=vector_id_field,
+                data_source_field=data_source_field)
     with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_study/testlog.txt", "a") as file:
             file.write(f"\nSTATUS👌:- /n{mko_2}")
 

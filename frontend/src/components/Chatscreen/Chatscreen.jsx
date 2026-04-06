@@ -246,6 +246,7 @@ useEffect(() => {
           feasibility_id: feasibilityId
         }).then((updatedDoc) => {
           // console.log(updatedDoc, 'Okay Doc Updated')
+          dispatch(addInputtext(null))
         }).catch((err) => {
               // console.error('Error updating doc for storing feasibility_id:', err);
             });
@@ -379,17 +380,22 @@ useEffect(() => {
     }
   };
 
-  const handleConfirmation = async (label, response) => {
-    console.log('response', response, 'label', label)
+  const handleConfirmation = async (label, response,action) => {
+    console.log('response', response, 'label', label,action, confirmationMessage)
+
+    if (action === "Stay in chat") {
+      await handleSendbtn(response);
+      return 
+    }
     setConfirmationPending(false);
     const confirmationMessages = {
       sender: 'user',
       text: response, //confirmation required
       timestamp: new Date().toISOString(),
-    };
+    };   
     dispatch(addMessage(confirmationMessages));
 
-    if (label !== 'Refine Requirements' && !label?.startsWith('No') && label && label!== 'Yes, start new chat') {
+    if (label !== 'Refine Requirements' && !label?.startsWith('No') && label && label!== 'Yes, start new chat' && action !== "Stay in chat") {
       let currentSession = session
 
       // STEP 1: Save user's message with idx
@@ -450,11 +456,11 @@ useEffect(() => {
       // setLoading(false);
       // setLoadingSession(null)
       setSessionLoading(session,false)
-      if (pass) {
+     
         dispatch(addSelectedoption(response))
         await clearProgressAndIntention(sessionId)
         navigate(`/progress/${sessionId}`);
-      }
+      
     }
 
     else if (label === "Yes, start new chat") {
@@ -532,8 +538,8 @@ useEffect(() => {
       setSessionLoading(session, true);
 
       // STEP 2: Get AI response
-      const resp = await fetchAIResponse("NOFROMUSER", confirmationMessage, session);
       
+      const resp = await fetchAIResponse("NOFROMUSER", confirmationMessage, session)
       const aiResponse = resp.Ai_response;
 
       if (resp.Is_confirmation) {
@@ -594,7 +600,7 @@ useEffect(() => {
 
 
   const handleSendbtn = async (msg) => {
-
+    setConfirmationPending(false);
     if (!message.trim() && !msg.trim()) return;
 
     const userMessage = msg ? msg.trim() : message.trim();
@@ -658,7 +664,7 @@ useEffect(() => {
       const aiMsg = resp.Ai_response === "Not Available in List" ? noResultMsg : resp.Ai_response 
       const aiResponse = aiMsg;
       
-      if (resp.Is_confirmation) {
+    if (resp.Is_confirmation) {
         await updateDoc("Chat history", chatEntry.name, {
           ai: aiResponse || "Waiting For Confirmation"
         });
@@ -673,8 +679,12 @@ useEffect(() => {
         // setLoadingSession(null)
         // setSessionLoading(session, false);
         setSessionLoading(currentSession || session, false);
-        setConfirmationMessage(aiResponse);
-        dispatch(addAIresponse(resp))
+        console.log('out of chat')
+        if (!resp?.in_chat){
+          console.log('here in confirmation without in chat')
+          setConfirmationMessage(aiResponse);
+          dispatch(addAIresponse(resp))
+        }
         setConfirmationPending(true);
         setDisabled(true);
         processChat()
@@ -1361,7 +1371,7 @@ useEffect(() => {
                       <button
                         key={index}
                         className={`${(button.label === 'Refine Requirements' || button.label.startsWith('No')) ? 'bg-red-400' : 'bg-green-400'} text-white px-4 py-2 rounded-full text-xs cursor-pointer justify-center w-full items-center font-semibold flex flex-row gap-2`}
-                        onClick={() => { handleConfirmation(button.label, button.value) }}
+                        onClick={() => { handleConfirmation(button.label, button.value, button?.action) }}
                       >
                         {(button.label === 'Refine Requirements' || button.label.startsWith('No')) ? (<FaThumbsDown size={16} />) : (<FaThumbsUp size={16} />)}
                         {button.label}

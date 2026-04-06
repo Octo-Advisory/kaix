@@ -1,7 +1,7 @@
 import re
 import json
 from dotenv import load_dotenv
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Union, Any
 from langchain.prompts import PromptTemplate
 from langchain.schema import HumanMessage, AIMessage
 from frontend_app.Ai_module.Query_Classification_And_Analysis import *
@@ -9,6 +9,8 @@ import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
 from frontend_app.Management_Class.helpers.utility import update_llm_token
 from frontend_app.Management_Class.Ai_management.AI import *
+from rapidfuzz import process, fuzz
+import pandas as pd
 
 def classify_industry_setup_query(query: str, llm) -> dict:
     """
@@ -206,6 +208,37 @@ Output:
     chain = prompt_template | llm
 
     response = chain.invoke({"query": query})
+
+    ###### Start New_code #######
+    # Invoke the model
+    # response = llm.invoke([("human", "What is the capital of France?")])
+
+    # --- LOGGING OUTPUT ---
+    # Access usage metadata from the AIMessage response
+    usage = response.usage_metadata  # Dictionary with keys: input_tokens, output_tokens, total_tokens
+
+    # print(f"Model Used: {response.response_metadata['model']}")  # Extract model from metadata
+    # print(f"Input Tokens: {usage['input_tokens']}")
+    # print(f"Output Tokens: {usage['output_tokens']}")
+    # print(f"Total Tokens: {usage['total_tokens']}")
+
+    frappe.log_error(
+    title="raw_prompt",
+    message=frappe.as_json({
+        "USAGE": response.usage_metadata,
+        "model": response.response_metadata.get("model"),
+        "metadata": response.response_metadata,
+        "input_tokens": usage.get("input_tokens"),
+        "output_tokens": usage.get("output_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }))
+
+
+    ####### End New code ######
+
+    with open("learnlog.txt", "w") as file:
+        file.write(f"\n response:- {response}")
+
     match = re.search(r"^\s*([1-6])\s*$", response.content.strip())
 
     if match:
@@ -218,6 +251,686 @@ Output:
         }
     else:
         raise ValueError(f"Invalid classification from LLM: {response}")
+
+
+def extract_locations_from_query_multi(
+    user_input: str,
+    location_df: pd.DataFrame,
+    llm,
+    similarity_threshold: int = 80
+) -> Tuple[List[Dict[str, str]], List[Dict[str, str]], str]:
+    """
+    Extract MULTIPLE locations from the user query and classify each one
+    leveraging the provided location_df to fill the entire hierarchy.
+
+    Parameters:
+        user_input (str): The user's query text.
+        location_df (pd.DataFrame): A DataFrame with columns:
+            ["Villages", "Areas", "Cities", "Talukas", "Districts", "States", "Countries"]
+        llm: The language model instance to call for location extraction.
+        similarity_threshold (int): Threshold for fuzzy matching.
+
+    Returns:
+        Tuple[List[Dict[str, str]], List[Dict[str, str]], str]:
+            extracted_locations and validated (with hierarchy filled).
+    """
+
+    # 1 — Build unique lists from the DataFrame
+    
+    # Ensure columns exist
+    expected_cols = ["Villages","Areas","Cities","Talukas","Districts","States","Countries"]
+    for col in expected_cols:
+        if col not in location_df.columns:
+            raise ValueError(f"Missing expected column in location_df: '{col}'")
+
+    unique_villages  = sorted(location_df["Villages"].dropna().unique().tolist())
+    unique_areas     = sorted(location_df["Areas"].dropna().unique().tolist())
+    unique_cities    = sorted(location_df["Cities"].dropna().unique().tolist())
+    unique_talukas  = sorted(location_df["Talukas"].dropna().unique().tolist())
+    unique_districts= sorted(location_df["Districts"].dropna().unique().tolist())
+    unique_states   = sorted(location_df["States"].dropna().unique().tolist())
+    unique_countries = sorted(location_df["Countries"].dropna().unique().tolist())
+
+    
+    # 2 — Prompt for multiple locations
+    prompt_template = """
+You are an expert location extraction system.  
+Your job is to extract **ALL distinct geographic locations** mentioned in the user’s query 
+and list them individually. Locations include villages, areas, cities, talukas, districts, and states.
+
+------------------------------------------------------
+LOCATION EXTRACTION RULES (STRICT & HIERARCHY-AWARE)
+------------------------------------------------------
+
+1. Extract ONLY the **explicitly mentioned** geographic names from the query. Do NOT infer locations.
+
+2. For each extracted location, preserve the **exact text** the user wrote.
+
+3. Do NOT combine multiple levels (e.g., "City, State" should produce separate entries, not a combined one).
+
+4. Use these **hierarchy rules** to understand location context, but still list all found:
+   - If the query has “Area + City + State”, capture all three individually.
+   - If the query has “City + State”, capture both.
+   - If the query has “District + State”, capture both.
+
+5. DO NOT infer or hallucinate industrial estates or zones (e.g., do NOT add “GIDC”, “SEZ”, etc., unless the user explicitly wrote them).
+
+6. **Preserve abbreviations ONLY when explicitly present.**
+   - If the user includes an industrial/zone abbreviation, preserve it exactly as written.
+   - Never add, modify, or infer abbreviations not present in the input.
+
+   Examples of preserved abbreviations:
+     - “Sanand GIDC” → “Sanand GIDC”
+     - “Dahej SEZ” → “Dahej SEZ”
+     - “Paradeep PCPIR” → “Paradeep PCPIR”
+     - “Aurangabad MIDC” → “Aurangabad MIDC”
+     - “Sri City SEZ” → “Sri City SEZ”
+     - “Oragadam SIPCOT” → “Oragadam SIPCOT”
+     - “Neemrana RIICO” → “Neemrana RIICO”
+     - “Sri City APIIC” → “Sri City APIIC”
+     - “Vikas Nagar DIC” → “Vikas Nagar DIC”
+     - “Hosur SIPCOT” → “Hosur SIPCOT”
+     - “Bengaluru KIADB” → “Bengaluru KIADB”
+     - “Indore MPIDC” → “Indore MPIDC”
+     - “Hyderabad TSIIC” → “Hyderabad TSIIC”
+
+   Also:
+     - If user writes only “Dahej”, do NOT output “Dahej SEZ”.
+     - If user writes only “Sanand”, do NOT output “Sanand GIDC”.
+     - If user writes only “Paradeep”, do NOT output “Paradeep PCPIR”.
+
+7. **Correct common spelling errors only when clearly evident**:
+   - “Bangluru” → “Bengaluru”
+   - “Vadora” → “Vadodara”
+
+8. **Standardise old place names only when the official modern name exists**:
+   - “Bombay” → “Mumbai”
+   - “Baroda” → “Vadodara”
+   - “Kashi” → “Varanasi”
+   - “Calcutta” → “Kolkata”
+   - “Bangalore” → “Bengaluru”
+   - “Pondicherry” → “Puducherry”
+   - Additional:
+     - “Madras” → “Chennai”
+     - “Poona” → “Pune”
+     - “Trivandrum” → “Thiruvananthapuram”
+     - “Calicut” → “Kozhikode”
+     - “Gulbarga” → “Kalaburagi”
+     - “Belgaum” → “Belagavi”
+     - “Rajahmundry” → “Rajamahendravaram”
+   - Only apply such standardisation if the user input uses the old nam
+
+------------------------------------------------------
+EXAMPLES (VALID OUTPUTS)
+------------------------------------------------------
+
+Input: “I want incentives for Dahej and Panvel, Maharashtra”
+Output:
+{{
+    "Locations": [
+        {{ "Location": "Dahej" }},
+        {{ "Location": "Panvel" }},
+        {{ "Location": "Maharashtra" }}
+    ]
+}}
+
+Input: “Check in Sanand GIDC, Pune, Maharashtra”
+Output:
+{{
+    "Locations": [
+        {{ "Location": "Sanand GIDC" }},
+        {{ "Location": "Pune" }},
+        {{ "Location": "Maharashtra" }}
+    ]
+}}
+
+Input: “Nothing relevant here”
+Output:
+{{
+    "Locations": []
+}}
+
+------------------------------------------------------
+USER QUERY
+{query}
+    """
+
+    prompt = PromptTemplate(
+        input_variables=["query"],
+        template=prompt_template
+    )
+    chain = prompt | llm
+    response = chain.invoke({"query": user_input})
+
+    ###### Start New_code #######
+    # Invoke the model
+    # response = llm.invoke([("human", "What is the capital of France?")])
+
+    # --- LOGGING OUTPUT ---
+    # Access usage metadata from the AIMessage response
+    usage = response.usage_metadata  # Dictionary with keys: input_tokens, output_tokens, total_tokens
+
+    # print(f"Model Used: {response.response_metadata['model']}")  # Extract model from metadata
+    # print(f"Input Tokens: {usage['input_tokens']}")
+    # print(f"Output Tokens: {usage['output_tokens']}")
+    # print(f"Total Tokens: {usage['total_tokens']}")
+
+    frappe.log_error(
+    title="locations prompt template",
+    message=frappe.as_json({
+        "model": response.response_metadata.get("model"),
+        "metadata": response.response_metadata,
+        "input_tokens": usage.get("input_tokens"),
+        "output_tokens": usage.get("output_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }))
+
+
+    ####### End New code ######
+
+    raw_response = getattr(response, "content", str(response)).strip()
+
+    with open("learnlog.txt", "a") as file:
+        file.write(f"\n raw_response:- {raw_response}")
+
+    # 3 — Parse JSON
+    def _safe_json_extract(text: str) -> Dict[str, Any]:
+        try:
+            return json.loads(text)
+        except Exception:
+            m = re.search(r"\{.*\}", text, re.DOTALL)
+            if m:
+                try: return json.loads(m.group(0))
+                except: pass
+        return {"Locations": []}
+
+    parsed = _safe_json_extract(raw_response)
+    locations_raw = parsed.get("Locations", [])
+
+    with open("learnlog.txt", "a") as file:
+        file.write(f"\n locations_raw:- {locations_raw}")
+
+    normalised_locations: List[Dict[str, str]] = []
+    if isinstance(locations_raw, list):
+        for item in locations_raw:
+            if isinstance(item, str):
+                s = item.strip()
+                if s and s.lower() != "none":
+                    normalised_locations.append({"Location": s})
+            elif isinstance(item, dict):
+                s = str(item.get("Location") or item.get("location") or "").strip()
+                if s and s.lower() != "none":
+                    normalised_locations.append({"Location": s})
+
+    if not normalised_locations:
+        return [], [], "INVALID"
+
+    # 4 — Fuzzy match helper
+    def get_best_match(location: str, choices: List[str], threshold: int) -> Tuple[str, int]:
+        if not location.strip() or not choices:
+            return "Not Available in List", 0
+        result = process.extractOne(location.lower(), [c.lower() for c in choices], scorer=fuzz.ratio)
+        if not result:
+            return "Not Available in List", 0
+        match_lower, score, _ = result
+
+        with open("learnlog.txt", "a") as file:
+            file.write(f"\n match_lower, score, _, result, choices:- {match_lower, score, _, result, choices}")
+
+        match_original = next((c for c in choices if c.lower() == match_lower), "Not Available in List")
+        return (match_original, score) if score >= threshold else ("Not Available in List", score)
+
+    # 5 — Validate & fill hierarchy correctly
+    validated_locations: List[Dict[str, str]] = []
+
+    resolution_flags = [] # Ritu
+
+    for loc_obj in normalised_locations:
+        raw_loc = loc_obj["Location"].strip()
+
+        # fuzzy match for each level
+        v_m, v_s = get_best_match(raw_loc, unique_villages, similarity_threshold)
+        a_m, a_s = get_best_match(raw_loc, unique_areas, similarity_threshold)
+        c_m, c_s = get_best_match(raw_loc, unique_cities, similarity_threshold)
+        t_m, t_s = get_best_match(raw_loc, unique_talukas, similarity_threshold)
+        d_m, d_s = get_best_match(raw_loc, unique_districts, similarity_threshold)
+        s_m, s_s = get_best_match(raw_loc, unique_states, similarity_threshold)
+        co_m, co_s = get_best_match(raw_loc, unique_countries, similarity_threshold)
+
+        # if all failed
+        if all(m == "Not Available in List" for m in [v_m, a_m, c_m, t_m, d_m, s_m, co_m]):
+            resolution_flags.append("INVALID")
+            validated_locations.append({
+                "Location": raw_loc,
+                "Village": "Not Available in List",
+                "Area": "Not Available in List",
+                "City": "Not Available in List",
+                "Taluka": "Not Available in List",
+                "District": "Not Available in List",
+                "State": "Not Available in List",
+                "Country": "Not Available in List",
+            })
+            continue
+
+        # pick best level by score
+        candidates = [
+            ("Village", v_m, v_s),
+            ("Area", a_m, a_s),
+            ("City", c_m, c_s),
+            ("Taluka", t_m, t_s),
+            ("District", d_m, d_s),
+            ("State", s_m, s_s),
+            ("Country", co_m, co_s)
+        ]
+        best_level, best_match, _ = max(candidates, key=lambda x: x[2])
+
+        with open("learnlog.txt", "a") as file:
+                    file.write(f"\n best_level, best_match, _:- {best_level, best_match, _}")
+
+        # # --- District Enforcement Tracking ---
+        # if best_level in ["Country", "State"]:
+        #     resolution_flags.append("NEED_DISTRICT")
+        # elif best_level in ["Village", "Area", "City", "Taluka", "District"]:
+        #     resolution_flags.append("PROCEED")
+        # else:
+        #     resolution_flags.append("INVALID")
+        # --- District Enforcement Tracking ---
+        if best_level == "Country":
+            resolution_flags.append("COUNTRY_LEVEL")
+        if best_level == "State":
+            resolution_flags.append("STATE_LEVEL")
+        elif best_level in ["Village", "Area", "City", "Taluka", "District"]:
+            resolution_flags.append("PROCEED")
+        else:
+            resolution_flags.append("INVALID")
+
+
+        validated = {
+            "Location": raw_loc,
+            "Village": "None",
+            "Area": "None",
+            "City": "None",
+            "Taluka": "None",
+            "District": "None",
+            "State": "None",
+            "Country": "None",
+        }
+
+        # fill hierarchies based on best level
+        if best_level == "Village":
+            df_row = location_df[location_df["Villages"].str.lower() == best_match.lower()]
+
+            with open("learnlog.txt", "a") as file:
+                file.write(f"\n df_row:- {df_row}")
+
+            if not df_row.empty:
+                row = df_row.iloc[0]
+                
+                with open("learnlog.txt", "a") as file:
+                    file.write(f"\n row:- {row}")
+
+                validated["Village"] = row["Villages"]
+                validated["Area"] = row["Areas"]
+                validated["City"] = row["Cities"]
+                validated["Taluka"] = row["Talukas"]
+                validated["District"] = row["Districts"]
+                validated["State"] = row["States"]
+                validated["Country"] = row["Countries"]
+        elif best_level == "Area":
+            df_row = location_df[location_df["Areas"].str.lower() == best_match.lower()]
+
+            with open("learnlog.txt", "a") as file:
+                file.write(f"\n area_df_row:- \n{df_row}")
+
+            if not df_row.empty:
+                row = df_row.iloc[0]
+
+                with open("learnlog.txt", "a") as file:
+                    file.write(f"\n area_row:- \n{row}")
+
+                validated["Area"] = row["Areas"]
+                validated["City"] = row["Cities"]
+                validated["Taluka"] = row["Talukas"]
+                validated["District"] = row["Districts"]
+                validated["State"] = row["States"]
+                validated["Country"] = row["Countries"]
+        elif best_level == "City":
+            df_row = location_df[location_df["Cities"].str.lower() == best_match.lower()]
+
+            with open("learnlog.txt", "a") as file:
+                file.write(f"\n city_df_row:- {df_row}")
+
+            if not df_row.empty:
+                row = df_row.iloc[0]
+
+                with open("learnlog.txt", "a") as file:
+                    file.write(f"\n city_row:- {row}")
+
+                validated["City"] = row["Cities"]
+                validated["Taluka"] = row["Talukas"]
+                validated["District"] = row["Districts"]
+                validated["State"] = row["States"]
+                validated["Country"] = row["Countries"]
+        elif best_level == "Taluka":
+            df_row = location_df[location_df["Talukas"].str.lower() == best_match.lower()]
+            if not df_row.empty:
+                row = df_row.iloc[0]
+                validated["Taluka"] = row["Talukas"]
+                validated["District"] = row["Districts"]
+                validated["State"] = row["States"]
+                validated["Country"] = row["Countries"]
+        elif best_level == "District":
+            df_row = location_df[location_df["Districts"].str.lower() == best_match.lower()]
+            if not df_row.empty:
+                row = df_row.iloc[0]
+                validated["District"] = row["Districts"]
+                validated["State"] = row["States"]
+                validated["Country"] = row["Countries"]
+        elif best_level == "State":
+            df_row = location_df[location_df["States"].str.lower() == best_match.lower()]
+            if not df_row.empty:
+                row = df_row.iloc[0]
+                validated["State"] = row["States"]
+                validated["Country"] = row["Countries"]
+        
+        elif best_level == "Country":
+            df_row = location_df[location_df["Countries"].str.lower() == best_match.lower()]
+            if not df_row.empty:
+                row = df_row.iloc[0]
+                validated["Country"] = row["Countries"]
+
+        
+        validated_locations.append(validated)
+
+    with open("learnlog.txt", "a") as file:
+        file.write(f"\n normalised_locations, validated_locations:- {normalised_locations, validated_locations}")
+
+    # --- Final Resolution Status ---
+    # if "INVALID" in resolution_flags:
+    #     resolution_status = "INVALID"
+    # elif "NEED_DISTRICT" in resolution_flags:
+    #     resolution_status = "NEED_DISTRICT"
+    # else:
+    #     resolution_status = "PROCEED"
+
+    has_valid_district = any(
+    loc.get("District") not in ["None", "Not Available in List"]
+    for loc in validated_locations
+    )
+
+    has_valid_state = any(
+        loc.get("State") not in ["None", "Not Available in List"]
+        for loc in validated_locations
+    )
+    has_valid_country = any(
+        loc.get("Country") not in ["None", "Not Available in List"]
+        for loc in validated_locations
+    )
+
+    # if has_valid_district:
+    #     resolution_status = "PROCEED"
+    # elif "INVALID" in resolution_flags:
+    #     resolution_status = "INVALID"
+    # else:
+    #     resolution_status = "NEED_DISTRICT"
+    if has_valid_district:
+        resolution_status = "PROCEED"
+    elif has_valid_state:
+        resolution_status = "STATE_LEVEL"
+    elif has_valid_country:
+        resolution_status = "COUNTRY_LEVEL"
+    else:
+        resolution_status = "INVALID"
+
+    return normalised_locations, validated_locations, resolution_status
+
+# ===========================================================================
+# ADDED — get_ai_recommended_states
+# Brand new function. Did not exist before.
+# Asks AI for best states for a given industry,
+# then cross-checks against DB and returns only available ones.
+# ===========================================================================
+def get_ai_recommended_states(
+    industry: str,
+    product: str,
+    location_df: pd.DataFrame,
+    llm
+) -> List[str]:
+    """
+    Ask AI to recommend best Indian states for a given industry.
+    Cross-check with DB and return only states that exist in our database.
+ 
+    Returns:
+        List[str]: DB-validated states in AI recommended order.
+                   Empty list if no states found in DB.
+    """
+ 
+    prompt_template = """
+You are an expert in Indian industrial geography.
+ 
+Recommend the best Indian states for setting up a {industry} industry{product_context}.
+ 
+Consider:
+- Raw material availability
+- Industrial infrastructure and clusters
+- Connectivity and logistics
+- Government policies and incentives
+- Power and water availability
+ 
+Return a ranked list of top 25 most suitable Indian states.
+Return ONLY this JSON format, nothing else:
+{{
+    "states": ["State1", "State2", "State3", ...]
+}}
+ 
+Use official state names only (e.g., "Gujarat", "Maharashtra", "Rajasthan").
+    """
+ 
+    product_context = f" (product: {product})" if product and product != "None" else ""
+ 
+    prompt = PromptTemplate(
+        input_variables=["industry", "product_context"],
+        template=prompt_template
+    )
+    chain = prompt | llm
+    response = chain.invoke({
+        "industry": industry,
+        "product_context": product_context
+    })
+ 
+    frappe.log_error(
+        title="AI State Recommendation",
+        message=frappe.as_json({
+            "industry": industry,
+            "product": product,
+            "response": response.content[:500]
+        })
+    )
+ 
+    # Parse AI response
+    ai_states = []
+    try:
+        raw = response.content.strip()
+        try:
+            data = json.loads(raw)
+            ai_states = data.get("states", [])
+        except Exception:
+            m = re.search(r'\{.*\}', raw, re.DOTALL)
+            if m:
+                data = json.loads(m.group(0))
+                ai_states = data.get("states", [])
+    except Exception as e:
+        frappe.log_error(title="AI State Parse Error", message=str(e))
+        ai_states = []
+ 
+    if not ai_states:
+        return []
+ 
+    # Cross-check AI list against DB
+    db_states = sorted(location_df["States"].dropna().unique().tolist())
+    matched_states = cross_check_locations_with_db(ai_states, db_states, threshold=80)
+ 
+    with open("learnlog.txt", "a") as file:
+        file.write(f"\n AI states: {ai_states}")
+        file.write(f"\n DB states: {db_states}")
+        file.write(f"\n Matched states: {matched_states}")
+ 
+    return matched_states
+ 
+ 
+# ===========================================================================
+# ADDED — get_ai_recommended_districts
+# Brand new function. Did not exist before.
+# Asks AI for best districts in a given state for a given industry,
+# then cross-checks against DB and returns only available ones.
+# ===========================================================================
+def get_ai_recommended_districts(
+    industry: str,
+    product: str,
+    state_name: str,
+    location_df: pd.DataFrame,
+    llm
+) -> List[str]:
+    """
+    Ask AI to recommend best districts in a state for a given industry.
+    Cross-check with DB and return only districts that exist in our database
+    for that specific state.
+ 
+    Returns:
+        List[str]: DB-validated districts in AI recommended order.
+                   Empty list if no districts found in DB for this state.
+    """
+ 
+    prompt_template = """
+You are an expert in Indian industrial geography.
+ 
+Recommend the best districts in {state_name} for setting up a {industry} industry{product_context}.
+ 
+Consider:
+- Proximity to raw materials
+- Industrial estates and zones (GIDC, MIDC, etc.)
+- Port and highway connectivity
+- Existing industry clusters
+- Power and water infrastructure
+ 
+Return a ranked list of top 25 most suitable districts in {state_name}.
+Return ONLY this JSON format, nothing else:
+{{
+    "districts": ["District1", "District2", "District3", ...]
+}}
+ 
+Use official district names only.
+    """
+ 
+    product_context = f" (product: {product})" if product and product != "None" else ""
+ 
+    prompt = PromptTemplate(
+        input_variables=["industry", "product_context", "state_name"],
+        template=prompt_template
+    )
+    chain = prompt | llm
+    response = chain.invoke({
+        "industry": industry,
+        "product_context": product_context,
+        "state_name": state_name
+    })
+ 
+    frappe.log_error(
+        title="AI District Recommendation",
+        message=frappe.as_json({
+            "industry": industry,
+            "state": state_name,
+            "response": response.content[:500]
+        })
+    )
+ 
+    # Parse AI response
+    ai_districts = []
+    try:
+        raw = response.content.strip()
+        try:
+            data = json.loads(raw)
+            ai_districts = data.get("districts", [])
+        except Exception:
+            m = re.search(r'\{.*\}', raw, re.DOTALL)
+            if m:
+                data = json.loads(m.group(0))
+                ai_districts = data.get("districts", [])
+    except Exception as e:
+        frappe.log_error(title="AI District Parse Error", message=str(e))
+        ai_districts = []
+ 
+    if not ai_districts:
+        return []
+ 
+    # Filter DB to only this state first, then cross-check
+    # This ensures we only show districts that belong to the selected state
+    state_filtered_df = location_df[
+        location_df["States"].str.lower() == state_name.lower()
+    ]
+    db_districts_in_state = sorted(
+        state_filtered_df["Districts"].dropna().unique().tolist()
+    )
+ 
+    matched_districts = cross_check_locations_with_db(
+        ai_districts, db_districts_in_state, threshold=80
+    )
+ 
+    with open("learnlog.txt", "a") as file:
+        file.write(f"\n AI districts: {ai_districts}")
+        file.write(f"\n DB districts in {state_name}: {db_districts_in_state}")
+        file.write(f"\n Matched districts: {matched_districts}")
+ 
+    return matched_districts
+ 
+ 
+# ===========================================================================
+# ADDED — cross_check_locations_with_db
+# Brand new helper function. Did not exist before.
+# Takes AI generated list, fuzzy matches against DB list,
+# returns only matched items preserving AI ranking order.
+# ===========================================================================
+def cross_check_locations_with_db(
+    ai_list: List[str],
+    db_list: List[str],
+    threshold: int = 80
+) -> List[str]:
+    """
+    Cross-check AI generated location names against DB available locations.
+    Uses fuzzy matching to handle spelling differences between AI and DB.
+    Preserves the ranking order from AI list.
+ 
+    Example:
+        AI list: ["Gujarat", "Rajasthan", "Telangana", "Kerala"]
+        DB list: ["Gujarat", "Maharashtra", "Rajasthan", "Andhra Pradesh"]
+        Result:  ["Gujarat", "Rajasthan"]  ← only matched, in AI order
+ 
+    Returns:
+        List[str]: DB-correct location names in AI ranking order.
+    """
+    if not ai_list or not db_list:
+        return []
+ 
+    matched = []
+    db_list_lower = [d.lower() for d in db_list]
+ 
+    for ai_loc in ai_list:
+        result = process.extractOne(
+            ai_loc.lower(),
+            db_list_lower,
+            scorer=fuzz.ratio
+        )
+        if result:
+            match_lower, score, idx = result
+            if score >= threshold:
+                # Use original DB name (correct spelling from DB)
+                db_original = db_list[idx]
+                # Avoid duplicates
+                if db_original not in matched:
+                    matched.append(db_original)
+ 
+    return matched
+
 
 def extract_json_main_industry_details(output: str) -> Dict[str, str]:
     """
@@ -412,6 +1125,35 @@ Provide only the JSON object in the required format.
         "query": user_query,
         "main_industries": main_industries_str,
     })
+
+    ###### Start New_code #######
+    # Invoke the model
+    # response = llm.invoke([("human", "What is the capital of France?")])
+
+    # --- LOGGING OUTPUT ---
+    # Access usage metadata from the AIMessage response
+    usage = result.usage_metadata  # Dictionary with keys: input_tokens, output_tokens, total_tokens
+
+    # print(f"Model Used: {result.result_metadata['model']}")  # Extract model from metadata
+    # print(f"Input Tokens: {usage['input_tokens']}")
+    # print(f"Output Tokens: {usage['output_tokens']}")
+    # print(f"Total Tokens: {usage['total_tokens']}")
+
+    frappe.log_error(
+    title="Industry prompt template",
+    message=frappe.as_json({
+        "model": result.response_metadata.get("model"),
+        "metadata": result.response_metadata,
+        "input_tokens": usage.get("input_tokens"),
+        "output_tokens": usage.get("output_tokens"),
+        "cache_creation_tokens": usage.get("cache_creation_input_tokens", 0),
+        "cache_read_tokens": usage.get("cache_read_input_tokens", 0),
+        "total_tokens": usage.get("total_tokens"),
+    }))
+
+
+    ####### End New code ######
+
     update_llm_token(result)
     
     result_text = result.content.strip()
@@ -672,6 +1414,30 @@ Provide only the JSON object in the required format.
         "sub_sectors_str": sub_sectors_str,
         "context": context
     })
+
+     ###### Start New_code #######
+    # Invoke the model
+    # response = llm.invoke([("human", "What is the capital of France?")])
+
+    # --- LOGGING OUTPUT ---
+    # Access usage metadata from the AIMessage response
+    usage = result.usage_metadata  # Dictionary with keys: input_tokens, output_tokens, total_tokens
+
+    # print(f"Model Used: {response.response_metadata['model']}")  # Extract model from metadata
+    # print(f"Input Tokens: {usage['input_tokens']}")
+    # print(f"Output Tokens: {usage['output_tokens']}")
+    # print(f"Total Tokens: {usage['total_tokens']}")
+
+    frappe.log_error(
+    title="sub sector prompt template",
+    message=frappe.as_json({
+        "model": result.response_metadata.get("model"),
+        "metadata": result.response_metadata,
+        "input_tokens": usage.get("input_tokens"),
+        "output_tokens": usage.get("output_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }))
+
     update_llm_token(result)
     
     # Extract JSON response using the new function
@@ -931,6 +1697,30 @@ Provide only the JSON object in the required format.
         "segments_str": segments_str,
         "context": context
     })
+
+     ###### Start New_code #######
+    # Invoke the model
+    # response = llm.invoke([("human", "What is the capital of France?")])
+
+    # --- LOGGING OUTPUT ---
+    # Access usage metadata from the AIMessage response
+    usage = result.usage_metadata  # Dictionary with keys: input_tokens, output_tokens, total_tokens
+
+    # print(f"Model Used: {response.response_metadata['model']}")  # Extract model from metadata
+    # print(f"Input Tokens: {usage['input_tokens']}")
+    # print(f"Output Tokens: {usage['output_tokens']}")
+    # print(f"Total Tokens: {usage['total_tokens']}")
+
+    frappe.log_error(
+    title="segment prompt template",
+    message=frappe.as_json({
+        "model": result.response_metadata.get("model"),
+        "metadata": result.response_metadata,
+        "input_tokens": usage.get("input_tokens"),
+        "output_tokens": usage.get("output_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }))
+
     update_llm_token(result)
 
     # Extract JSON response using the robust function
@@ -1118,6 +1908,30 @@ def extract_capacity_details(user_query, llm):
 
     # Invoke the query through the chain
     result = chain.invoke({"query": user_query})
+
+     ###### Start New_code #######
+    # Invoke the model
+    # response = llm.invoke([("human", "What is the capital of France?")])
+
+    # --- LOGGING OUTPUT ---
+    # Access usage metadata from the AIMessage response
+    usage = result.usage_metadata  # Dictionary with keys: input_tokens, output_tokens, total_tokens
+
+    # print(f"Model Used: {response.response_metadata['model']}")  # Extract model from metadata
+    # print(f"Input Tokens: {usage['input_tokens']}")
+    # print(f"Output Tokens: {usage['output_tokens']}")
+    # print(f"Total Tokens: {usage['total_tokens']}")
+
+    frappe.log_error(
+    title="capacity prompt template",
+    message=frappe.as_json({
+        "model": result.response_metadata.get("model"),
+        "metadata": result.response_metadata,
+        "input_tokens": usage.get("input_tokens"),
+        "output_tokens": usage.get("output_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }))
+
     update_llm_token(result)
     result_text = result.content.strip()
 
@@ -1153,6 +1967,9 @@ def generate_ai_message(state, history, missing_fields, attempt_count, llm):
 
     Guidelines:  
     - Use the latest user message from the chat history to guide your response, ensuring it directly addresses their input.
+    - Do NOT use awkward constructions like "We have you..." or indirect phrasing.
+    - Use natural professional business English.
+    - Give a human tone too.
 
     - Avoid Explanations or Assumptions:  
     - Do NOT include unnecessary explanations, assumptions, or robotic acknowledgments like "It seems you are asking about..." or "I’ve reviewed your message."  
@@ -1242,323 +2059,920 @@ def generate_ai_message(state, history, missing_fields, attempt_count, llm):
         "attempt_count": attempt_count,
         "chat_history": history,
     })
+
+     ###### Start New_code #######
+    # Invoke the model
+    # response = llm.invoke([("human", "What is the capital of France?")])
+
+    # --- LOGGING OUTPUT ---
+    # Access usage metadata from the AIMessage response
+    usage = result.usage_metadata  # Dictionary with keys: input_tokens, output_tokens, total_tokens
+
+    # print(f"Model Used: {response.response_metadata['model']}")  # Extract model from metadata
+    # print(f"Input Tokens: {usage['input_tokens']}")
+    # print(f"Output Tokens: {usage['output_tokens']}")
+    # print(f"Total Tokens: {usage['total_tokens']}")
+
+    frappe.log_error(
+    title="message prompt",
+    message=frappe.as_json({
+        "model": result.response_metadata.get("model"),
+        "metadata": result.response_metadata,
+        "input_tokens": usage.get("input_tokens"),
+        "output_tokens": usage.get("output_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }))
+
     update_llm_token(result)
     return result.content.strip()
 
-def gather_industry_details(query, main_industries, llm,chatId, additional_class_response = None):
-    """
-    Gathers industry details from the user query while maintaining a conversation history.
-    
-    Args:
-    - query (str): The latest user query or follow-up response.
-    - main_industries (list): List of valid main industries.
-    - state (dict): Tracks previously provided information.
+def extract_location_strings(location_info):
+    available_locations = []
+    unavailable_locations = []
+    mapped_districts = []
 
-    Returns:
-    - tuple: A dictionary containing the extracted details and the updated conversation history.
+    for loc in location_info:
+        location_name = loc.get("Location")
+
+        # Check if location is unavailable
+        if all(
+            loc.get(level) == "Not Available in List"
+            for level in ["Village", "Area", "City", "Taluka", "District", "State"]
+        ):
+            unavailable_locations.append(location_name)
+            continue
+
+        # Location is available
+        available_locations.append(location_name)
+
+        # Determine hierarchy level (lower than district)
+        is_lower_than_district = any(
+            loc.get(level) not in ["None", "Not Available in List"]
+            for level in ["Village", "Area", "City", "Taluka"]
+        )
+
+        district = loc.get("District")
+
+        # Map district ONLY if location is lower-level than district
+        if (
+            is_lower_than_district
+            and district not in ["None", "Not Available in List"]
+        ):
+            mapped_districts.append(district)
+
+    # Remove duplicates while preserving order
+    def unique(seq):
+        seen = set()
+        return [x for x in seq if not (x in seen or seen.add(x))]
+
+    available_locations = unique(available_locations)
+    unavailable_locations = unique(unavailable_locations)
+    mapped_districts = unique(mapped_districts)
+
+    # Convert to UI-ready strings
+    available_locations_str = ", ".join(available_locations)
+    unavailable_locations_str = ", ".join(unavailable_locations)
+    mapped_districts_str = ", ".join(mapped_districts)
+
+    with open("learnlog.txt", "a") as file:
+        file.write(f"\n available_locations_str, unavailable_locations_str, mapped_districts_str:- {available_locations_str, unavailable_locations_str, mapped_districts_str}")
+
+    return available_locations_str, unavailable_locations_str, mapped_districts_str
+
+
+## ----------------- Start New define funcation for followup question for location india by Hiren ------------------------ ##
+
+# def determine_location_specificity(location_data):
+#     """
+#     Determines how specific the user's location input is.
+#     Used to decide if we need to ask for more location details.
+    
+#     Args:
+#         location_data (list): List of location dictionaries from state["Location"]
+#                              Each dict has keys: Country, State, District, City, etc.
+    
+#     Returns:
+#         str: One of the following:
+#             - "Country_Only": User only provided country (too broad)
+#             - "State_Only": User provided state but not district (still broad)
+#             - "District_Or_More": User provided district (specific enough)
+#             - "No_Location": No location provided at all
+    
+#     Examples:
+#         Input: [{"Country": "India", "State": "None", "District": "None"}]
+#         Output: "Country_Only"
+        
+#         Input: [{"Country": "India", "State": "Gujarat", "District": "None"}]
+#         Output: "State_Only"
+        
+#         Input: [{"Country": "India", "State": "Gujarat", "District": "Ahmedabad"}]
+#         Output: "District_Or_More"
+#     """
+    
+#     # If location_data is empty or None, return No_Location
+#     if not location_data:
+#         return "No_Location"
+    
+#     # Loop through each location in the list (user might have given multiple locations)
+#     for location in location_data:
+#         # Check if state is provided and valid (not "None" or "Not Available in List")
+#         has_state = location.get("State") not in ["None", None, "Not Available in List", ""]
+        
+#         # Check if district is provided and valid
+#         has_district = location.get("District") not in ["None", None, "Not Available in List", ""]
+        
+#         # Check if country is provided (usually always there, but good to check)
+#         has_country = location.get("Country") not in ["None", None, ""]
+        
+#         # Priority check: Most specific first
+#         # If district is provided (with or without city/taluka), it's specific enough
+#         if has_district:
+#             return "District_Or_More"
+        
+#         # If state is provided but no district, it's still broad
+#         elif has_state:
+#             return "State_Only"
+        
+#         # If only country is provided, too broad
+#         elif has_country:
+#             return "Country_Only"
+    
+#     # If nothing found, return No_Location
+#     return "No_Location"
+
+#     ## ----------------- End New define funcation for followup question for location india by Hiren ------------------------ ##
+
+
+def gather_industry_details(
+    query,
+    main_industries,
+    llm,
+    chatId,
+    additional_class_response=None,
+    location_df=pd.DataFrame(columns=["Villages", "Areas", "Cities", "Talukas", "Districts", "States", "Countries"])
+):
+    """
+    Gathers industry details from the user query.
+ 
+    CHANGED: Location resolution now handles COUNTRY_LEVEL, STATE_LEVEL,
+    and district-level scope (only / nearby) in addition to existing PROCEED flow.
     """
     state = get_state(f"QIND_state_{chatId}") or None
     if state is None:
-        state = {'Main-Industry': 'None', 'Sub-Sector': 'None','Segment':'None', 'Capacity': 'None', 'Capacity Unit': 'None', 
-                 'Time Period': 'None', 'Product': 'None','product_attempt_count':0,'capacity_attempt_count':0, "KEYWORDS": None, "Additional_class_response": None}
-        save_state(state,f"QIND_state_{chatId}")
+        state = {
+            'Main-Industry': 'None',
+            'Sub-Sector': 'None',
+            'Segment': 'None',
+            'Capacity': 'None',
+            'Capacity Unit': 'None',
+            'Time Period': 'None',
+            'Product': 'None',
+            'product_attempt_count': 0,
+            'capacity_attempt_count': 0,
+            "KEYWORDS": None,
+            "Additional_class_response": None,
+            "Location": 'None',
+            # -------------------------------------------------------------------
+            # ADDED — Location_Scope tracks final scope choice
+            # Values: "None", "full_state", "district_only", "district_nearby"
+            # This is the only new state field needed 
+            # -------------------------------------------------------------------
+            "Location_Scope": "None",
+        }
+        save_state(state, f"QIND_state_{chatId}")
+ 
     chat_history = get_chat(f"chat_{chatId}") or []
-
-    # Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
+    frappe.log_error("CHAT_HISTORY",f"{chat_history}")
+    Chat_history_normal = [
+        f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}"
+        for m in chat_history[-11:]
+    ]
+    frappe.log_error("CHAT_HISTORY_NORMAL",f"{Chat_history_normal}")
+ 
     refined_query = query
-    
-    Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
-    
+ 
     result = classify_industry_setup_query(refined_query, llm)
     user_intention = result["classification_category"]
+ 
     with open("testlog.txt", "a") as file:
         file.write(f"\nSUB CLASS {user_intention} for chatId {chatId}")
+ 
     if user_intention == "Negatively Intended Query":
         message = respond_to_negative_query(
-            user_intention, 
-            append_user_to_history=False, 
-            append_AI_to_history=False, 
+            user_intention,
+            append_user_to_history=False,
+            append_AI_to_history=False,
             llm=llm,
             chatId=chatId)
-        
-        response = {
+ 
+        return {
             "Ai_response": message,
-            "Is_confirmation" : False,
-            "state":state,
+            "Is_confirmation": False,
+            "state": state,
             "options": None,
             "User Intention": user_intention,
-            "Trigger_Lead_Generation":False
+            "Trigger_Lead_Generation": False
         }
-        return response
+ 
     else:
         keyword_list = extract_important_words(refined_query, "Query to build industry from Scratch")
         state["KEYWORDS"] = keyword_list
         state["Additional_class_response"] = additional_class_response or state.get("Additional_class_response")
-
-        save_state(state,f"QIND_state_{chatId}")
-        
-        with open("log.txt", "a") as file:
-                file.write(f"\nstate2 {state}")
-        # Extract industry details from the refined query
+        save_state(state, f"QIND_state_{chatId}")
+ 
+        # Extract industry
         is_changed = False
-        extracted_data,validated_data =  extract_main_industry_and_product_for_scratch(refined_query,main_industries,llm)
+        extracted_data, validated_data = extract_main_industry_and_product_for_scratch(
+            refined_query, main_industries, llm
+        )
+ 
         if validated_data['Main-Industry'] != 'None' and validated_data["Main-Industry"] != state['Main-Industry']:
-            state["Main-Industry"] = validated_data["Main-Industry"]
-            state["Product"] = validated_data["Product"]
-            state["Segment"] = 'None'
-            state['Capacity'] = 'None'
-            state["Capacity Unit"] = 'None'
-            state["Time Period"] = 'None'
-            state['product_attempt_count'] = 0
+            state["Main-Industry"]   = validated_data["Main-Industry"]
+            state["Product"]         = validated_data["Product"]
+            state["Segment"]         = 'None'
+            state['Capacity']        = 'None'
+            state["Capacity Unit"]   = 'None'
+            state["Time Period"]     = 'None'
+            state["Location"]        = 'None'
+            state["Location_Scope"]  = 'None'
+            state['product_attempt_count']  = 0
             state['capacity_attempt_count'] = 0
-            save_state(state,f"QIND_state_{chatId}")
+            save_state(state, f"QIND_state_{chatId}")
             is_changed = True
-        
+ 
+        # Extract location
+        location_extraction_data, location_validation_data, location_resolution_status = \
+            extract_locations_from_query_multi(
+                user_input=query,
+                location_df=location_df,
+                llm=llm_gpt_oos_120b
+            )
+ 
+        if location_validation_data and location_extraction_data:
+            state["Location"] = location_validation_data
+            state["Location_Resolution_Status"] = location_resolution_status
+            save_state(state, f"QIND_state_{chatId}")
+ 
+        # ── Industry not found yet ──────────────────────────────────────────
         if state['Main-Industry'] == 'None' and state['Product'] == 'None':
-            capacity_json = extract_capacity_details(refined_query,llm)
-            
-            # Check if at least one value is not 'None'            
+            capacity_json = extract_capacity_details(refined_query, llm)
+ 
             if any(value != 'None' for value in capacity_json.values()):
-                # Update only if the value is different and not 'None'
                 for key, value in capacity_json.items():
                     if value != 'None' and state.get(key) != value:
                         state[key] = value
-                save_state(state,f"QIND_state_{chatId}")
-
-            chat_history = get_chat(f"chat_{chatId}")
-            state['product_attempt_count'] = state['product_attempt_count'] + 1
-            save_state(state,f"QIND_state_{chatId}")
-            message = generate_ai_message(state,Chat_history_normal,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
-            
-            return {"Ai_response": message,
-                    "Is_confirmation" : False,
-                    "state":state,
-                    "options": None,
-                    "User Intention": user_intention,
-                    "Trigger_Lead_Generation":False
-                    }
-        
+                save_state(state, f"QIND_state_{chatId}")
+ 
+            state['product_attempt_count'] += 1
+            save_state(state, f"QIND_state_{chatId}")
+            message = generate_ai_message(
+                state, Chat_history_normal, ['Product'],
+                state['product_attempt_count'], llm_70b_vers_creative
+            )
+            return {
+                "Ai_response": message,
+                "Is_confirmation": False,
+                "state": state,
+                "options": None,
+                "User Intention": user_intention,
+                "Trigger_Lead_Generation": False
+            }
+ 
+        # ── Industry not in DB ──────────────────────────────────────────────
         elif state["Main-Industry"] == 'Not Available in List':
-            capacity_json = extract_capacity_details(refined_query,llm)
-            
+            capacity_json = extract_capacity_details(refined_query, llm)
+ 
             if any(value != 'None' for value in capacity_json.values()):
-                # Update only if the value is different and not 'None'
                 for key, value in capacity_json.items():
                     if value != 'None' and state.get(key) != value:
                         state[key] = value
-                save_state(state,f"QIND_state_{chatId}")
+                save_state(state, f"QIND_state_{chatId}")
+ 
             missing_fields = [field for field, value in capacity_json.items() if value == 'None']
-            if len(missing_fields) == 0:
+ 
+            if len(missing_fields) == 0 and state["Location"] != "None":
                 message = INDUSTRY_NOT_AVAILABLE_MSG
-                return {"Ai_response": message,
-                    "Is_confirmation" : False,
-                    "state":state,
+                return {
+                    "Ai_response": message,
+                    "Is_confirmation": False,
+                    "state": state,
                     "options": None,
                     "User Intention": user_intention,
-                    "Trigger_Lead_Generation":True
-                    }
+                    "Trigger_Lead_Generation": True
+                }
             else:
-                chat_history = get_chat(f"chat_{chatId}")
-                state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
-                save_state(state,f"QIND_state_{chatId}")
-                message = generate_ai_message(state,Chat_history_normal,missing_fields,state['capacity_attempt_count'],llm_70b_vers_creative)
-                
-                return {"Ai_response": message,
-                    "Is_confirmation" : False,
-                    "state":state,
+                state['capacity_attempt_count'] += 1
+                save_state(state, f"QIND_state_{chatId}")
+                message = generate_ai_message(
+                    state, Chat_history_normal, missing_fields,
+                    state['capacity_attempt_count'], llm_70b_vers_creative
+                )
+                return {
+                    "Ai_response": message,
+                    "Is_confirmation": False,
+                    "state": state,
                     "options": None,
                     "User Intention": user_intention,
-                    "Trigger_Lead_Generation":False
-                    }
-            
+                    "Trigger_Lead_Generation": False
+                }
+ 
+        # ── Industry found ──────────────────────────────────────────────────
         elif state["Main-Industry"] != 'None':
-            capacity_json = extract_capacity_details(refined_query,llm)
-
+            capacity_json = extract_capacity_details(refined_query, llm)
+ 
             if any(value != 'None' for value in capacity_json.values()):
-                # Update only if the value is different and not 'None'
                 for key, value in capacity_json.items():
                     if value != 'None' and state.get(key) != value:
                         state[key] = value
-                save_state(state,f"QIND_state_{chatId}")
+                save_state(state, f"QIND_state_{chatId}")
+ 
             final_json = get_json_for_industry()
+ 
+            # Sub-sector extraction
             if state['Sub-Sector'] == 'None' or is_changed:
-                
-                sub_sector = get_sub_sectors(final_json,state["Main-Industry"])
-                sub_extracted_data,sub_validated_data = extract_sub_sector_and_product_for_scratch(refined_query,sub_sector,llm,state["Main-Industry"],state["Product"])
-            
+                sub_sector = get_sub_sectors(final_json, state["Main-Industry"])
+                sub_extracted_data, sub_validated_data = extract_sub_sector_and_product_for_scratch(
+                    refined_query, sub_sector, llm, state["Main-Industry"], state["Product"]
+                )
                 state = get_state(f"QIND_state_{chatId}")
                 state["Sub-Sector"] = sub_validated_data["Sub-Sector"]
-                state["Product"] = sub_validated_data["Product"]
-                
-                save_state(state,f"QIND_state_{chatId}")
-            # state = get_state(f"QIND_state_{chatId}")
+                state["Product"]    = sub_validated_data["Product"]
+                save_state(state, f"QIND_state_{chatId}")
+ 
+            # Segment extraction
             if state['Sub-Sector'] != 'None' and state['Sub-Sector'] != 'Not Available in List':
-                segments = get_segments(final_json,state["Main-Industry"],state['Sub-Sector'])
-
-                segment_extracted_data,segment_validated_data = extract_segment_and_product_for_scratch(refined_query,segments,llm,main_industries,state['Sub-Sector'],state["Product"])
-                
+                segments = get_segments(final_json, state["Main-Industry"], state['Sub-Sector'])
+                segment_extracted_data, segment_validated_data = extract_segment_and_product_for_scratch(
+                    refined_query, segments, llm, main_industries, state['Sub-Sector'], state["Product"]
+                )
                 state = get_state(f"QIND_state_{chatId}")
-                state["Segment"] = segment_validated_data["Segment"] 
+                state["Segment"] = segment_validated_data["Segment"]
                 state["Product"] = segment_validated_data["Product"]
-                
-                save_state(state,f"QIND_state_{chatId}")
+                save_state(state, f"QIND_state_{chatId}")
+ 
+                # Capacity still missing
                 capicity_pending_list = get_keys_for_capicity(chatId)
                 if len(capicity_pending_list) > 0:
-                    chat_history = get_chat(f"chat_{chatId}")
-                    state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
-                    save_state(state,f"QIND_state_{chatId}")
-                    message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
-                    
-                    return {"Ai_response": message,
-                        "Is_confirmation" : False,
-                        "state":state,
+                    state['capacity_attempt_count'] += 1
+                    save_state(state, f"QIND_state_{chatId}")
+                    message = generate_ai_message(
+                        state, Chat_history_normal, capicity_pending_list,
+                        state['capacity_attempt_count'], llm_70b_vers_creative
+                    )
+                    return {
+                        "Ai_response": message,
+                        "Is_confirmation": False,
+                        "state": state,
                         "options": None,
                         "User Intention": user_intention,
-                        "Trigger_Lead_Generation":False
-                        }
-                else:
-                    selected_option = next(
-                        (state.get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry'] if state.get(key) not in [None, 'None']),
-                        ''
-                    )
-
-                    confirmation_message_class_1 = (
-                        f"Based on your query, we’ve understood that you are looking for **land options** to **build a new industrial unit** "
-                        f"for **{selected_option}** production, with a planned capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} {state.get('Time Period')}**. <br/><br/>"
-                        f"Please confirm if this information is correct."
-                        )
-                    
-                    confirmation_buttons_class_1 = [
-                        {"label": "Yes, this is correct", "value": "Intent to Build Industry from Scratch"},
-                        {"label": "No, this is not correct", "value": None}
-                        ]
-                    
-                    confirmation_message_class_2 = (
-                        f"Based on your query, we’ve understood that you are looking to **acquire an existing industrial facility** "
-                        f"for **{selected_option}** production, with a planned capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} {state.get('Time Period')}**. <br/><br/>"
-                        f"Please confirm if this information is correct."
-                    )
-
-                    confirmation_buttons_class_2 = [
-                        {"label": "Yes, this is correct", "value": "Intent to Acquire Existing Industrial Infrastructure"},
-                        {"label": "No, this is not correct", "value": None}
-                    ]
-
-                    confirmation_message_class_3 = (
-                        f"Great! We’re ready to assist you in setting up your **{selected_option}** production unit with a planned capacity of "
-                        f"**{state.get('Capacity')} {state.get('Capacity Unit')} {state.get('Time Period')}**.<br/><br/>"
-                        f"To help you move forward, you can choose to explore **land options**, **existing industrial facilities**, or **both** — whatever suits your plans best.<br/><br/>"
-                        f"You may also choose to refine your requirements if you'd like us to reassess the details."
-                    )
-
-                    confirmation_buttons_class_3 = [
-                        {"label": "Explore Land for New Unit", "value": "Intent to Build Industry from Scratch"},
-                        {"label": "Explore Existing Facilities", "value": "Intent to Acquire Existing Industrial Infrastructure"},
-                        {"label": "View All Setup Options", "value": "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure"},
-                        {"label": "Refine Requirements", "value": None}
-                    ]
-
-                    confirmation_message_class_6 = (
-                        f"Based on your query, we’ve understood that you are interested in exploring **both** options — "
-                        f"**land for setting up a new industrial unit** as well as **acquiring an existing industrial facility** "
-                        f"for **{selected_option}** production, with a planned capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} {state.get('Time Period')}**. <br/><br/>"
-                        f"Please confirm if this information is correct."
-                    )
-
-                    confirmation_buttons_class_6 = [
-                        {"label": "Yes, this is correct", "value": "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure"},
-                        {"label": "No, this is not correct", "value": None}
-                    ]
-
-                    class_confirmation_message_mapping = {
-                        "Intent to Build Industry from Scratch": {
-                            "Message": confirmation_message_class_1, 
-                            "Options": confirmation_buttons_class_1
-                        },
-                        "Intent to Acquire Existing Industrial Infrastructure": {
-                            "Message": confirmation_message_class_2,
-                            "Options": confirmation_buttons_class_2
-                        },
-                        "Intent to Set Up Industry with Unspecified Build or Buy Intent": {
-                            "Message": confirmation_message_class_3,
-                            "Options": confirmation_buttons_class_3
-                        },
-                        "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure": {
-                            "Message": confirmation_message_class_6,
-                            "Options": confirmation_buttons_class_6
-                        },
+                        "Trigger_Lead_Generation": False
                     }
-
-                    confirmation_message_static_dict = class_confirmation_message_mapping.get(
-                        user_intention,
-                        class_confirmation_message_mapping["Intent to Set Up Industry with Unspecified Build or Buy Intent"]
+ 
+                # Location still missing
+                elif state["Location"] == 'None':
+                    # -----------------------------------------------------------
+                    # CHANGED — Message now says user can give country/state/district
+                    # Old message only asked for district/location without guidance
+                    # -----------------------------------------------------------
+                    message = (
+                        f"Thank you for sharing the details so far. We've noted your requirement for "
+                        f"**{state.get('Product') or state.get('Segment') or state.get('Sub-Sector') or state.get('Main-Industry')}** production, "
+                        f"with a planned capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} "
+                        f"per {state.get('Time Period')}**. <br/><br/>"
+                        f"To move ahead, please share your **preferred location**. "
+                        f"You can provide a country (e.g. India), a state (e.g. Gujarat), "
+                        f"or a specific district — we will guide you from there."
                     )
-
-                    confirmation_message_static = confirmation_message_static_dict["Message"]
-                    # response_validation = state.get("Additional_class_response")
-                    # confirmation_message_static += f"<br/><br/>**Note**: {response_validation}" if response_validation is not None else ""
-                    confirmation_message_options = confirmation_message_static_dict["Options"]
-                    # dynamic_confirmation_message = generate_dynamic_confirmation_message(confirmation_message_static, llm_70b_vers_creative)
-                    
-                    response = {
-                        "Ai_response" : confirmation_message_static,
-                        "Is_confirmation" : True,                                   
-                        "validated_data" : segment_validated_data,
-                        "state" : state,
-                        "options": confirmation_message_options,
+                    chat_history.append(AIMessage(content=message))
+                    return {
+                        "Ai_response": message,
+                        "Is_confirmation": False,
+                        "state": state,
+                        "options": None,
                         "User Intention": user_intention,
-                        "Trigger_Lead_Generation":False
+                        "Trigger_Lead_Generation": False
                     }
-                    return response
+ 
+                # Location available — handle by resolution status
+                else:
+                    location_resolution_status = state.get("Location_Resolution_Status")
+                    selected_option = next(
+                        (state.get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry']
+                         if state.get(key) not in [None, 'None']),
+                        'your requirement'
+                    )
+ 
+                    # ═══════════════════════════════════════════════════════════
+                    # ADDED — COUNTRY_LEVEL handling
+                    # User gave "India" → AI recommends states → show to user
+                    # Risk 3: if no states in DB → trigger lead generation
+                    # ═══════════════════════════════════════════════════════════
+                    if location_resolution_status == "COUNTRY_LEVEL":
 
+                        country_name = "None"
+                        if state.get("Location") and state["Location"] != "None":
+                            for loc in state["Location"]:
+                                if loc.get("Country") not in ["None", "Not Available in List"]:
+                                    country_name = loc.get("Country")
+                                    break
+ 
+                        matched_states = get_ai_recommended_states(
+                            industry=state["Main-Industry"],
+                            product=state["Product"],
+                            location_df=location_df,
+                            llm=llm
+                        )
+ 
+                        # Risk 3 — no states available in DB
+                        if not matched_states:
+                            message = (
+                                f"Thank you for your interest in setting up a **{selected_option}** production unit in **{country_name}**. "
+                                f"At the moment, this requirement falls outside our current active opportunities for the "
+                                f"**{state['Main-Industry']}** industry.<br/><br/>"
+                                f"That said, we have shared your requirement with our team. "
+                                f"They will evaluate potential options and connect with you shortly to assist further."
+                            )
+                            return {
+                                "Ai_response": message,
+                                "Is_confirmation": False,
+                                "state": state,
+                                "options": None,
+                                "User Intention": user_intention,
+                                "Trigger_Lead_Generation": True
+                            }
+ 
+                        # Build numbered state list
+                        states_list = "<br/>".join(
+                            [f"{i+1}. {s}" for i, s in enumerate(matched_states[:5])]
+                        )
+                        capacity_text = (
+                            f" with a planned capacity of **{state.get('Capacity')} "
+                            f"{state.get('Capacity Unit')} per {state.get('Time Period')}**"
+                            if state.get('Capacity') not in [None, 'None'] else ""
+                        )
+ 
+                        message = (
+                            f"Based on your requirement for a **{selected_option}** production unit"
+                            f"{capacity_text}, here are some locations that currently match your needs:<br/><br/>"
+                            f"{states_list}<br/><br/>"
+                            f"Let me know which of these you would like to explore further, and I will share more details."
+                        )
+                        return {
+                            "Ai_response": message,
+                            "Is_confirmation": False,
+                            "state": state,
+                            "options": None,
+                            "User Intention": user_intention,
+                            "Trigger_Lead_Generation": False
+                        }
+ 
+                    # ═══════════════════════════════════════════════════════════
+                    # ADDED — STATE_LEVEL handling
+                    # User gave "Gujarat" → AI recommends districts → show to user
+                    # Also offer "All Gujarat" option
+                    # Risk 3: if no districts in DB → trigger lead generation
+                    # ═══════════════════════════════════════════════════════════
+                    elif location_resolution_status == "STATE_LEVEL":
+                        # Get state name from validated location data
+                        state_name = "None"
+                        if state.get("Location") and state["Location"] != "None":
+                            for loc in state["Location"]:
+                                if loc.get("State") not in ["None", "Not Available in List"]:
+                                    state_name = loc.get("State")
+                                    break
+
+                        query_lower = query.lower().strip()
+                        all_state_keywords = [
+                            f"all {state_name.lower()}",
+                            f"entire {state_name.lower()}",
+                            f"whole {state_name.lower()}",
+                            f"all of {state_name.lower()}",
+                        ]
+
+                        selected_option = next(
+                            (state.get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry']
+                             if state.get(key) not in [None, 'None']),
+                            'your requirement'
+                        )
+                        capacity_text = (
+                            f", with a planned capacity of **{state.get('Capacity')} "
+                            f"{state.get('Capacity Unit')} per {state.get('Time Period')}**"
+                            if state.get('Capacity') not in [None, 'None'] else ""
+                        )
+
+                        # ── Case 1 — User explicitly typed "All Gujarat" ──────────────────
+                        if any(kw in query_lower for kw in all_state_keywords):
+                            state["Location_Scope"] = "full_state"
+                            save_state(state, f"QIND_state_{chatId}")
+                            message = (
+                                f"Based on your inputs, we understand that you are planning to set up a "
+                                f"**{selected_option}** production unit{capacity_text}. <br/><br/>"
+                                f"We will evaluate all available properties across the entire "
+                                f"**{state_name}** state. <br/><br/>"
+                                f"Please confirm if the above understanding is correct."
+                            )
+                            options = [
+                                {"label": "Yes, this is correct", "value": user_intention},
+                                {"label": "No, this is not correct", "value": None}
+                            ]
+                            return {
+                                "Ai_response": message,
+                                "Is_confirmation": True,
+                                "validated_data": segment_validated_data,
+                                "state": state,
+                                "options": options,
+                                "User Intention": user_intention,
+                                "Trigger_Lead_Generation": False
+                            }
+
+                        # ── Case 2 — User typed same state again (count logic) ────────────
+                        elif state.get("District_List_State") == state_name and state.get("State_Shown_Count", 0) > 0:
+                            state["Location_Scope"] = "full_state"
+                            save_state(state, f"QIND_state_{chatId}")
+                            message = (
+                                f"Based on your inputs, we understand that you are planning to set up a "
+                                f"**{selected_option}** production unit{capacity_text}. <br/><br/>"
+                                f"We will evaluate all available properties across the entire "
+                                f"**{state_name}** state. <br/><br/>"
+                                f"Please confirm if the above understanding is correct."
+                            )
+                            options = [
+                                {"label": "Yes, this is correct", "value": user_intention},
+                                {"label": "No, this is not correct", "value": None}
+                            ]
+                            return {
+                                "Ai_response": message,
+                                "Is_confirmation": True,
+                                "validated_data": segment_validated_data,
+                                "state": state,
+                                "options": options,
+                                "User Intention": user_intention,
+                                "Trigger_Lead_Generation": False
+                            }
+
+                        # ── Case 3 — First time or different state — show district list ───
+                        else:
+                            state["State_Shown_Count"] = 1
+                            state["District_List_State"] = state_name
+                            save_state(state, f"QIND_state_{chatId}")
+
+                            # Get AI recommended districts
+                            matched_districts = get_ai_recommended_districts(
+                                industry=state["Main-Industry"],
+                                product=state["Product"],
+                                state_name=state_name,
+                                location_df=location_df,
+                                llm=llm
+                            )
+
+                            # Risk 3 — no districts available in DB for this state
+                            if not matched_districts:
+                                message = (
+                                    f"Thank you for selecting **{state_name}**. "
+                                    f"At present, we are not actively handling opportunities for the "
+                                    f"**{state['Main-Industry']}** industry in this region.<br/><br/>"
+                                    f"Your requirement has been shared with our team, who will review and "
+                                    f"connect with you if relevant options become available."
+                                )
+                                return {
+                                    "Ai_response": message,
+                                    "Is_confirmation": False,
+                                    "state": state,
+                                    "options": None,
+                                    "User Intention": user_intention,
+                                    "Trigger_Lead_Generation": True
+                                }
+
+                            # Build numbered district list
+                            districts_list = "<br/>".join(
+                                [f"{i+1}. {d}" for i, d in enumerate(matched_districts[:5])]
+                            )
+
+                            message = (
+                                f"For **{selected_option}** in **{state_name}**, here are the districts where "
+                                f"we currently have relevant options:<br/><br/>"
+                                f"{districts_list}<br/><br/>"
+                                f"Let me know if any of these stand out to you, or if you would prefer to explore options across the entire state."
+                            )
+                            return {
+                                "Ai_response": message,
+                                "Is_confirmation": False,
+                                "state": state,
+                                "options": None,
+                                "User Intention": user_intention,
+                                "Trigger_Lead_Generation": False
+                            }
+ 
+                    # ═══════════════════════════════════════════════════════════
+                    # ADDED — INVALID location handling
+                    # ═══════════════════════════════════════════════════════════
+                    elif location_resolution_status == "INVALID":
+                        invalid_locations = ", ".join(
+                            loc.get("Location")
+                            for loc in state["Location"]
+                            if loc.get("District") == "Not Available in List"
+                        )
+                        message = (
+                            f"Thank you for sharing your location details. "
+                            f"At present, we are not actively handling opportunities for **{invalid_locations}**.<br/><br/>"
+                            f"Your request has been shared with our team, who will review it and "
+                            f"connect with you if relevant options become available in this location."
+                        )
+                        return {
+                            "Ai_response": message,
+                            "Is_confirmation": False,
+                            "state": state,
+                            "options": None,
+                            "User Intention": user_intention,
+                            "Trigger_Lead_Generation": False
+                        }
+ 
+                    # ═══════════════════════════════════════════════════════════
+                    # CHANGED — PROCEED handling (district level)
+                    # New: first checks if user said "only" or "nearby"
+                    #      If neither, asks scope question before confirmation
+                    # ═══════════════════════════════════════════════════════════
+                    else:
+                        # Get district name for scope question
+                        district_name = "None"
+                        if state.get("Location") and state["Location"] != "None":
+                            for loc in state["Location"]:
+                                if loc.get("District") not in ["None", "Not Available in List"]:
+                                    district_name = loc.get("District")
+                                    break
+ 
+                        query_lower = query.lower().strip()
+ 
+                        # -----------------------------------------------------------
+                        # ADDED — Detect "only district" scope from user message
+                        # -----------------------------------------------------------
+                        only_keywords = [
+                            f"only {district_name.lower()}",
+                            f"just {district_name.lower()}",
+                            f"{district_name.lower()} only",
+                            "only this district",
+                            "only district",
+                        ]
+ 
+                        # -----------------------------------------------------------
+                        # ADDED — Detect "district and nearby" scope from user message
+                        # -----------------------------------------------------------
+                        nearby_keywords = [
+                            f"{district_name.lower()} and nearby",
+                            f"{district_name.lower()} and surrounding",
+                            f"{district_name.lower()} and adjacent",
+                            "and nearby",
+                            "nearby areas",
+                            "nearby districts",
+                            "surrounding districts",
+                            "include nearby",
+                        ]
+ 
+                        if any(kw in query_lower for kw in only_keywords):
+                            state["Location_Scope"] = "district_only"
+                            save_state(state, f"QIND_state_{chatId}")
+ 
+                        elif any(kw in query_lower for kw in nearby_keywords):
+                            state["Location_Scope"] = "district_nearby"
+                            save_state(state, f"QIND_state_{chatId}")
+ 
+                        # -----------------------------------------------------------
+                        # ADDED — Scope not yet chosen, ask user
+                        # -----------------------------------------------------------
+                        if state.get("Location_Scope") in ["None", None]:
+                            message = (
+                                f"You have selected **{district_name}** district.<br/><br/>"
+                                f"Would you like to explore options only within this district, "
+                                f"or also include nearby areas?<br/><br/>"
+                                f"Please choose one of the options below to continue."
+                            )
+                            # message = (
+                            #     f"You have selected **{district_name}** district. "
+                            #     f"You can now type:"
+                            #     f" **{district_name} Only** to continue with this district</br>"
+                            #     f" **{district_name} and nearby to explore properties around this district</br></br>"
+                            #     f"How would you like to proceed?"
+                            # )
+                            return {
+                                "Ai_response": message,
+                                "Is_confirmation": True,
+                                "in_chat": True,
+                                "state": state,
+                                 "options":
+                                 [
+                                    {"label": f"{district_name} only", "value": f"{district_name} only", "action": "Stay in chat"},
+                                    {"label": f"{district_name} and nearby", "value": f"{district_name} and nearby", "action": "Stay in chat"},
+                                    ],
+                                "User Intention": user_intention,
+                                "Trigger_Lead_Generation": False
+                            }
+ 
+                        selected_option = next(
+                            (state.get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry']
+                             if state.get(key) not in [None, 'None']),
+                            ''
+                        )
+ 
+                        available_locations_str, unavailable_locations_str, mapped_districts_str = extract_location_strings(state["Location"])
+ 
+                        with open("learnlog.txt", "a") as file:
+                            file.write(f"\n available_locations_str, unavailable_locations_str, mapped_districts_str:- {available_locations_str, unavailable_locations_str, mapped_districts_str}")
+ 
+                        has_any_district = any(
+                            loc.get("District") not in ["None", "Not Available in List"]
+                            for loc in state["Location"]
+                        )
+                        has_mapped_districts = bool(mapped_districts_str)
+ 
+                        district_mapping_explanation = (
+                            f"I'd like to highlight one important point about how we evaluate locations. "
+                            f"When a requirement is shared at a very specific level (for example, an area/city/taluka), the number of listed land parcels "
+                            f"can sometimes be limited at that exact micro-boundary. In practice, strong options often exist a short distance away within the "
+                            f"**same district**—sometimes with better highway connectivity, utility access, industrial ecosystem support, or more favorable pricing. <br/><br/>"
+                            f"To ensure we do not miss these high-potential opportunities, we will evaluate land options at the **district level** for the "
+                            f"lower-level locations you mentioned, i.e., across **{mapped_districts_str}**. This provides a broader, more competitive shortlist "
+                            f"while still staying aligned to your intended geography. <br/><br/>"
+                        ) if has_mapped_districts else ""
+ 
+                        boundary_expansion_explanation = (
+                            f"In addition, our evaluation will also cover land parcels located **just outside the district boundary** (within a short distance). "
+                            f"This is a practical step we take because some of the most attractive industrial plots sit near district borders—"
+                            f"they may be technically outside the boundary, but can offer materially better logistics access, infrastructure readiness, "
+                            f"availability of utilities, or commercial viability compared to many options strictly inside the district. <br/><br/>"
+                            f"By including these nearby pockets, we increase the likelihood of identifying 'value winners'—options that can outperform "
+                            f"district-only choices while remaining operationally close to your target area. <br/><br/>"
+                        ) if has_any_district else ""
+
+                        scope = state.get("Location_Scope", "None")
+                        if scope == "district_only":
+                            scope_line = f"You have selected to evaluate properties **strictly within {district_name} district only**. <br/><br/>"
+                        elif scope == "district_nearby":
+                            scope_line = f"You have selected to evaluate properties in **{district_name} district and surrounding nearby districts**. <br/><br/>"
+                        else:
+                            scope_line = ""
+                        
+                        district_only_line = f"We will focus our search strictly within **{district_name}** district, as per your preference. <br/><br/>"
+ 
+                        confirmation_message_class_1 = (
+                            f"Great, here's what we've understood from your inputs. <br/><br/>"
+                            f"You are planning to **build a new industrial unit** for **{selected_option}** production, "
+                            f"with a planned capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} per {state.get('Time Period')}**. <br/><br/>"
+                            f"Your preferred location is **{available_locations_str}**"
+                            f"{f', however we currently do not have land availability in **{unavailable_locations_str}**, so these will not be part of the evaluation' if unavailable_locations_str else ''}. <br/><br/>"
+                            f"{scope_line}"
+                            f"{district_mapping_explanation}"
+                            f"{district_only_line if scope == 'district_only' else boundary_expansion_explanation}"
+                            f"Does this reflect what you had in mind? Please confirm so we can get started."
+                        )
+ 
+                        confirmation_buttons_class_1 = [
+                            {"label": "Yes, this is correct", "value": "Intent to Build Industry from Scratch"},
+                            {"label": "No, this is not correct", "value": None}
+                        ]
+ 
+                        confirmation_message_class_2 = (
+                            f"Got it, here's our understanding of your requirement. <br/><br/>"
+                            f"You are looking to **acquire an existing industrial facility** for **{selected_option}** production, "
+                            f"with a capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} per {state.get('Time Period')}**. <br/><br/>"
+                            f"Your preferred location is **{available_locations_str}**"
+                            f"{f', though we do not currently have matching facilities in **{unavailable_locations_str}**, so these will be excluded' if unavailable_locations_str else ''}. <br/><br/>"
+                            f"{scope_line}"
+                            f"{district_mapping_explanation}"
+                            f"{district_only_line if scope == 'district_only' else boundary_expansion_explanation}"
+                            f"Please confirm if this is correct so we can begin identifying suitable facilities for you."
+                        )
+ 
+                        confirmation_buttons_class_2 = [
+                            {"label": "Yes, this is correct", "value": "Intent to Acquire Existing Industrial Infrastructure"},
+                            {"label": "No, this is not correct", "value": None}
+                        ]
+ 
+                        confirmation_message_class_3 = (
+                            f"Here's what we've noted from your inputs. <br/><br/>"
+                            f"You are planning to set up a **{selected_option}** production unit "
+                            f"with a capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} per {state.get('Time Period')}**. <br/><br/>"
+                            f"Your preferred location is **{available_locations_str}**"
+                            f"{f', though we currently do not have listings in **{unavailable_locations_str}**' if unavailable_locations_str else ''}. <br/><br/>"
+                            f"{scope_line}"
+                            f"{district_mapping_explanation}"
+                            f"{district_only_line if scope == 'district_only' else boundary_expansion_explanation}"
+                            f"Kindly choose one of the following options to move forward."
+                        )
+ 
+                        confirmation_buttons_class_3 = [
+                            {"label": "Explore Land for New Unit", "value": "Intent to Build Industry from Scratch"},
+                            {"label": "Explore Existing Facilities", "value": "Intent to Acquire Existing Industrial Infrastructure"},
+                            {"label": "View All Setup Options", "value": "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure"},
+                            {"label": "Refine Requirements", "value": None}
+                        ]
+ 
+                        confirmation_message_class_6 = (
+                            f"Excellent, here's our understanding of what you're looking for. <br/><br/>"
+                            f"You'd like to **explore both pathways** — "
+                            f"**building a new industrial unit** as well as **acquiring an existing facility** — "
+                            f"for **{selected_option}** production, "
+                            f"with a capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} per {state.get('Time Period')}**. <br/><br/>"
+                            f"Your preferred location is **{available_locations_str}**"
+                            f"{f', though we currently do not have suitable options in **{unavailable_locations_str}**, so these will be excluded from the evaluation' if unavailable_locations_str else ''}. <br/><br/>"
+                            f"{scope_line}"
+                            f"{district_mapping_explanation}"
+                            f"{district_only_line if scope == 'district_only' else boundary_expansion_explanation}"
+                            f"Does everything look right? Please confirm so we can start identifying the best **land options** and **ready facilities** for your project."
+                        )
+ 
+                        confirmation_buttons_class_6 = [
+                            {"label": "Yes, this is correct", "value": "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure"},
+                            {"label": "No, this is not correct", "value": None}
+                        ]
+ 
+                        class_confirmation_message_mapping = {
+                            "Intent to Build Industry from Scratch": {
+                                "Message": confirmation_message_class_1,
+                                "Options": confirmation_buttons_class_1
+                            },
+                            "Intent to Acquire Existing Industrial Infrastructure": {
+                                "Message": confirmation_message_class_2,
+                                "Options": confirmation_buttons_class_2
+                            },
+                            "Intent to Set Up Industry with Unspecified Build or Buy Intent": {
+                                "Message": confirmation_message_class_3,
+                                "Options": confirmation_buttons_class_3
+                            },
+                            "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure": {
+                                "Message": confirmation_message_class_6,
+                                "Options": confirmation_buttons_class_6
+                            },
+                        }
+ 
+                        confirmation_message_static_dict = class_confirmation_message_mapping.get(
+                            user_intention,
+                            class_confirmation_message_mapping["Intent to Set Up Industry with Unspecified Build or Buy Intent"]
+                        )
+ 
+                        confirmation_message_static = confirmation_message_static_dict["Message"]
+                        confirmation_message_options = confirmation_message_static_dict["Options"]
+ 
+                        return {
+                            "Ai_response": confirmation_message_static,
+                            "Is_confirmation": True,
+                            "validated_data": segment_validated_data,
+                            "state": state,
+                            "options": confirmation_message_options,
+                            "User Intention": user_intention,
+                            "Trigger_Lead_Generation": False
+                        }
+ 
+            # Sub-sector not in DB
             elif state['Sub-Sector'] == 'Not Available in List':
                 capicity_pending_list = get_keys_for_capicity(chatId)
                 if len(capicity_pending_list) > 0:
                     chat_history = get_chat(f"chat_{chatId}")
                     state['capacity_attempt_count'] = state['capacity_attempt_count'] + 1
-                    save_state(state,f"QIND_state_{chatId}")
-                    message = generate_ai_message(state,Chat_history_normal,capicity_pending_list,state['capacity_attempt_count'],llm_70b_vers_creative)
-                    
-                    return {"Ai_response": message,
-                        "Is_confirmation" : False,
+                    save_state(state, f"QIND_state_{chatId}")
+                    message = generate_ai_message(state, Chat_history_normal, capicity_pending_list, state['capacity_attempt_count'], llm_70b_vers_creative)
+                    return {
+                        "Ai_response": message,
+                        "Is_confirmation": False,
                         "state": state,
                         "options": None,
                         "User Intention": user_intention,
-                        "Trigger_Lead_Generation":False
-                        }
+                        "Trigger_Lead_Generation": False
+                    }
                 else:
                     message = INDUSTRY_NOT_AVAILABLE_MSG
-                    return {"Ai_response": message,
-                    "Is_confirmation" : False,
-                    "state":state,
-                    "options": None,
-                    "User Intention": user_intention,
-                    "Trigger_Lead_Generation":True
+                    return {
+                        "Ai_response": message,
+                        "Is_confirmation": False,
+                        "state": state,
+                        "options": None,
+                        "User Intention": user_intention,
+                        "Trigger_Lead_Generation": True
                     }
-
+ 
             else:
                 chat_history = get_chat(f"chat_{chatId}")
                 state['product_attempt_count'] = state['product_attempt_count'] + 1
-                save_state(state,f"QIND_state_{chatId}")
-                message = generate_ai_message(state,Chat_history_normal,['Product'],state['product_attempt_count'],llm_70b_vers_creative)
-               
-                return {"Ai_response": message,
-                    "Is_confirmation" : False,
-                    "state":state,
+                save_state(state, f"QIND_state_{chatId}")
+                message = generate_ai_message(state, Chat_history_normal, ['Product'], state['product_attempt_count'], llm_70b_vers_creative)
+                return {
+                    "Ai_response": message,
+                    "Is_confirmation": False,
+                    "state": state,
                     "options": None,
                     "User Intention": user_intention,
-                    "Trigger_Lead_Generation":False}
-        
+                    "Trigger_Lead_Generation": False
+                }
+ 
         else:
-            response = {
+            return {
                 "Ai_response": "Please enter valid query with some details.",
-                "Is_confirmation" : False,
-                "state":state,
+                "Is_confirmation": False,
+                "state": state,
                 "options": None,
                 "User Intention": user_intention,
-                "Trigger_Lead_Generation":False
+                "Trigger_Lead_Generation": False
             }
-            return response
+        return response
 
 def extract_json_time_conversion(output):
     """
@@ -1773,6 +3187,31 @@ def time_conversion(user_quantity, user_time_period, db_standard_time_period, pr
         "db_standard_time_period": db_standard_time_period,
         "product": product
     })
+
+     ###### Start New_code #######
+    # Invoke the model
+    # response = llm.invoke([("human", "What is the capital of France?")])
+
+    # --- LOGGING OUTPUT ---
+    # Access usage metadata from the AIMessage response
+    usage = response.usage_metadata  # Dictionary with keys: input_tokens, output_tokens, total_tokens
+
+    # print(f"Model Used: {response.response_metadata['model']}")  # Extract model from metadata
+    # print(f"Input Tokens: {usage['input_tokens']}")
+    # print(f"Output Tokens: {usage['output_tokens']}")
+    # print(f"Total Tokens: {usage['total_tokens']}")
+
+    frappe.log_error(
+    title="time prompt",
+    message=frappe.as_json({
+        "USAGE": response.usage_metadata,
+        "model": response.response_metadata.get("model"),
+        "metadata": response.response_metadata,
+        "input_tokens": usage.get("input_tokens"),
+        "output_tokens": usage.get("output_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }))
+
     update_llm_token(response,'Deepseek')
 
     # Extract multiplier using helper function
@@ -1835,6 +3274,30 @@ def unit_conversion(user_quantity, user_unit, db_standard_unit, product, llm):
         "db_standard_unit": db_standard_unit,
         "product": product
     })
+
+     ###### Start New_code #######
+    # Invoke the model
+    # response = llm.invoke([("human", "What is the capital of France?")])
+
+    # --- LOGGING OUTPUT ---
+    # Access usage metadata from the AIMessage response
+    usage = response.usage_metadata  # Dictionary with keys: input_tokens, output_tokens, total_tokens
+
+    # print(f"Model Used: {response.response_metadata['model']}")  # Extract model from metadata
+    # print(f"Input Tokens: {usage['input_tokens']}")
+    # print(f"Output Tokens: {usage['output_tokens']}")
+    # print(f"Total Tokens: {usage['total_tokens']}")
+
+    frappe.log_error(
+    title="unit prompt",
+    message=frappe.as_json({
+        "model": response.response_metadata.get("model"),
+        "metadata": response.response_metadata,
+        "input_tokens": usage.get("input_tokens"),
+        "output_tokens": usage.get("output_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }))
+
     update_llm_token(response,'Deepseek')
 
     # Extract JSON response from model output
@@ -2040,13 +3503,38 @@ Return ONLY the JSON as specified.
     response = chain.invoke({
         "input_string": input_string
     })
+
+     ###### Start New_code #######
+    # Invoke the model
+    # response = llm.invoke([("human", "What is the capital of France?")])
+
+    # --- LOGGING OUTPUT ---
+    # Access usage metadata from the AIMessage response
+    usage = response.usage_metadata  # Dictionary with keys: input_tokens, output_tokens, total_tokens
+
+    # print(f"Model Used: {response.response_metadata['model']}")  # Extract model from metadata
+    # print(f"Input Tokens: {usage['input_tokens']}")
+    # print(f"Output Tokens: {usage['output_tokens']}")
+    # print(f"Total Tokens: {usage['total_tokens']}")
+
+    frappe.log_error(
+    title="split prompt",
+    message=frappe.as_json({
+        "model": response.response_metadata.get("model"),
+        "metadata": response.response_metadata,
+        "input_tokens": usage.get("input_tokens"),
+        "output_tokens": usage.get("output_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }))
+
     update_llm_token(response)
     return extract_json_unit_split(response.content.strip())
  
 def entry_build_from_scratch(input,chatId, additional_class_response = None):
     final_json = get_json_for_industry()
     main_industry = get_main_industry(final_json)
-    k = gather_industry_details(input,main_industry,llm_70b_vers,chatId, additional_class_response=additional_class_response)
+    location_df = get_location_dataframe()
+    k = gather_industry_details(input,main_industry,llm_70b_vers,chatId, additional_class_response=additional_class_response, location_df=location_df)
 
     if k['Is_confirmation']:
         s, new_s = do_unit_conversion(k['state'])
@@ -2074,21 +3562,21 @@ def get_json_for_industry():
     #         """
 
     query = f"""
-SELECT
-  sgt.segment,
-  sst.sub_sector_name,
-  indt.industry_name
-FROM `tabSegment` AS sgt
-JOIN `tabSub Sector` AS sst
-  ON sgt.sub_sector = sst.name
- AND COALESCE(sst.exclusion, 0) = 0
-JOIN `tabZone` AS z
-  ON z.name = sst.zone_id
- AND COALESCE(z.exclusion, 0) = 0
-JOIN `tabIndustry` AS indt
-  ON sst.industry_id = indt.name
- AND COALESCE(indt.exclusion, 0) = 0
-WHERE COALESCE(sgt.exclusion, 0) = 0;
+    SELECT
+    sgt.segment,
+    sst.sub_sector_name,
+    indt.industry_name
+    FROM `tabSegment` AS sgt
+    JOIN `tabSub Sector` AS sst
+    ON sgt.sub_sector = sst.name
+    AND COALESCE(sst.exclusion, 0) = 0
+    JOIN `tabZone` AS z
+    ON z.name = sst.zone_id
+    AND COALESCE(z.exclusion, 0) = 0
+    JOIN `tabIndustry` AS indt
+    ON sst.industry_id = indt.name
+    AND COALESCE(indt.exclusion, 0) = 0
+    WHERE COALESCE(sgt.exclusion, 0) = 0;
         """
     s = frappe.db.sql(query,as_dict=True)
     for item in s:
@@ -2504,3 +3992,35 @@ def do_unit_conversion(state):
                     converted_output_temp["Is_confirmation"] = False
 
     return converted_output, converted_output_temp
+
+
+def get_location_dataframe() -> pd.DataFrame:
+    """
+    executes a sql query to fetch survey location data from the database along with area names by joining the `tabSurvey No` and `tabArea` tables.
+    It filters out records where the survey status is 'Sold' or marked for exclusion. The results are then organized into a pandas DataFrame with specified column names.
+    Execute the SQL to get survey location data and return a cleaned location DataFrame.
+
+    Returns:
+        pd.DataFrame with columns:
+        ["Villages", "Areas", "Cities", "Talukas", "Districts", "States", "Countries"]
+    """
+
+    query = """
+    SELECT sn.village, a.area_name, sn.city, sn.taluka, sn.district, sn.state, a.country  
+    FROM `tabSurvey No` as sn
+    join `tabArea` as a
+    where sn.area = a.name
+    and sn.status != 'Sold'
+    and sn.exclusion = 0
+    and a.exclusion = 0
+    """
+
+    # Fetch the raw database results
+    location_result = frappe.db.sql(query=query)
+
+    # Build the pandas DataFrame
+    location_df = pd.DataFrame(
+        location_result,
+        columns=["Villages", "Areas", "Cities", "Talukas", "Districts", "States", "Countries"])
+
+    return location_df

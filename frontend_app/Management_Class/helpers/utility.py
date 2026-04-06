@@ -35,8 +35,6 @@ groq_api_key = config['Key']['groq_key']
 llm_70b_vers_creative = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.7)
 llm_4_maverick = ChatGroq(groq_api_key=groq_api_key, model_name="meta-llama/llama-4-maverick-17b-128e-instruct", temperature=0.7) #Added by jenith for Query Hints Ai Responses
 
-
-
 @frappe.whitelist(allow_guest=True)
 def delete_user(user_id):
     try:
@@ -201,7 +199,7 @@ def randomSentences(module_name,process_name):
 
     analyse_query_industry = ["Analyzing your industry and preferred location","Understanding your setup goals and requirements","Exploring regions suitable for your industry type","Reviewing location intent and business objectives","Starting your site discovery process"]
     fetching_industry = [ "Gathering property options aligned with your needs", "Finding potential sites based on setup suitability", "Shortlisting regions with promising business potential", "Exploring land parcels across your selected areas", "Scanning zones with high industrial compatibility"]
-    analyzing_industry = ["Evaluating site feasibility for your business","Analyzing incentives, connectivity, and surroundings", "Assessing setup readiness across locations","Reviewing supporting infrastructure and vendor access", "Scoring properties based on multiple growth factors"]
+    analyzing_industry = ["Evaluating site feasibility for your business","Analyzing incentives, connectivity, and surroundings", "Assessing setup readinesgpts across locations","Reviewing supporting infrastructure and vendor access", "Scoring properties based on multiple growth factors"]
     preparing_industry = ["Preparing best-matched property suggestions","Compiling location insights for informed decision-making", "Finalizing property profiles tailored to your setup", "Creating your personalized site recommendation list", "Getting your ideal business locations ready to view"]
 
     sentence_map = {

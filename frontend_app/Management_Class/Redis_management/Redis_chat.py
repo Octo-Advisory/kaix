@@ -74,17 +74,18 @@ def save_chat(chat_history, key):
     from langchain.schema import BaseMessage
 
     try:
+        frappe.log_error("CHAT_HISTORY_0",f"{chat_history}")
         session_id = _extract_session_id(key, "chat_")
 
         final_msgs = []
-
+        
         # Find the index of the last human message
         last_human_index = None
         for i in range(len(chat_history) - 1, -1, -1):
             if isinstance(chat_history[i], BaseMessage) and chat_history[i].type == "human":
                 last_human_index = i
                 break
-
+        
         for idx, msg in enumerate(chat_history):
             if isinstance(msg, BaseMessage):
                 msg_dict = {
@@ -101,12 +102,13 @@ def save_chat(chat_history, key):
         # with open("log3.txt", "a") as file:
         #     file.write(f"\n📨 Final Save New for {session_id}: {json.dumps(final_msgs)}")
 
+
         frappe.db.set_value("Session", session_id, "chat_json", json.dumps(final_msgs))
         frappe.db.commit()
 
     except Exception as e:
         frappe.log_error(f"❌ Error saving chat for {key}: {e}")
-
+ 
 # The below is the original old methoid 
 # def get_chat(key):
 #     try:
@@ -127,7 +129,7 @@ def save_chat(chat_history, key):
 #         return []
 
 def get_chat(key):
-   
+                                                                                                                                                                                   
     try:
         from langchain.schema import HumanMessage, AIMessage
         session_id = _extract_session_id(key, "chat_")
@@ -139,6 +141,7 @@ def get_chat(key):
 
         msg_map = {"human": HumanMessage, "ai": AIMessage}
         messages = json.loads(raw)
+        frappe.log_error("MESSAGES",f"{messages}")
 
         # with open("log3.txt", "a") as file:
         #     file.write(f"\n📨OK OK  {session_id} New Messages (raw): {raw}")
@@ -149,12 +152,11 @@ def get_chat(key):
                 additional_kwargs={k: v for k, v in m.items() if k not in ["type", "content"]}
             )
             for m in messages if m["type"] in msg_map
-        ]
+        ]  # to be reviewed 🙌
 
     except Exception as e:
         frappe.log_error(f"Error getting chat for {key}: {str(e)}")
         return []
-
 
 # Get chat from Session
 # def get_chat(key):
@@ -239,7 +241,6 @@ def save_state(state, key):
     except Exception as e:
         frappe.log_error(f"Error saving state for key {key}: {str(e)}")
 
-
 def get_state(key):
     try:
         session_id = _extract_session_id(key, "_state_")
@@ -252,7 +253,6 @@ def get_state(key):
     except Exception as e:
         frappe.log_error(f"Error getting state for key {key}: {str(e)}")
         return None
-
 
 def delete_state(key):
     try:

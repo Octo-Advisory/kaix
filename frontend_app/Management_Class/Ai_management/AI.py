@@ -35,6 +35,23 @@ def polish_ai_response_if_possible(
     Rewrites Ai_response via the Responder-Consultant. Falls back gracefully.
     Pass either 'chat_history_messages' OR 'chat_history_strings'.
     """
+
+    '''
+    example of chat_history_messages:- [
+    HumanMessage(content="Hi, I need help."),
+    AIMessage(content="Sure, what do you need?"),
+    SystemMessage(content="You are a helpful assistant.")
+    ]
+
+    example of chat_history_strings:- [
+    "User: Hi, I need help.",
+    "AI: Sure, what do you need?"
+    ]
+    '''
+
+    '''trigger_lead_generation:- it means that when user queries about a industry which is not supported by us currently then the 
+                                trigger lead generation will be TRUE which means that it will generate a lead for the sales team, and if user queries about a industry which is supported by us then it will be FALSE.'''
+
     try:
         if not raw_response or raw_response.get("Error"):
             return raw_response
@@ -42,9 +59,6 @@ def polish_ai_response_if_possible(
         ai_resp = (raw_response.get("Ai_response") or "").strip()
         is_confirmation = raw_response.get("Is_confirmation")
         trigger_lead_generation = raw_response.get("Trigger_Lead_Generation", False)
-
-        with open("testlog.txt", "a") as file:
-                file.write(f"\n############### RESPONDER LLM: \n\t\t\t Precious ai_resp: {ai_resp} \n\t\t\tis_confirmation:{is_confirmation} \n\t\t\ttrigger_lead_generation:{trigger_lead_generation} ")
 
         if not ai_resp:
             return raw_response
@@ -84,6 +98,7 @@ def polish_ai_response_if_possible(
 @frappe.whitelist(allow_guest=True)
 def ai_module_call(input,confirmationMessage,chatId):
     try:
+        frappe.log_error("CHAT_ID",f"{chatId}")
         additional_response = None
         if input == "NOFROMUSER":
             chat_history = get_chat(f"chat_{chatId}") or []
@@ -145,7 +160,9 @@ def ai_module_call(input,confirmationMessage,chatId):
                 try:
                     vectorstore_info, success_status = ensure_vector_and_update_record(
                         doctype=FEAS_DOCTYPE,
-                        doc_name=feasibility_id
+                        doc_name=feasibility_id,
+                        vector_id_field = "custom_feasibility_vector_file_name",
+                        data_source_field = "file_path"
                     )
 
                 except requests.HTTPError as e:
@@ -495,7 +512,7 @@ def ai_module_call(input,confirmationMessage,chatId):
         log(chatId,'debug','response',f"{str(response)} error is {str(error_details)}",'AI.py','ai')
         return response
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist(allow_guest=True) 
 def check_user_intension(chatId, return_default_style = True):
     if return_default_style:
         
@@ -503,7 +520,7 @@ def check_user_intension(chatId, return_default_style = True):
         user_intention = frappe.db.sql(query)
         with open("log2.txt", "a", encoding="utf-8") as file:
             file.write(f"USER_INTENSION from DB =====>>>>> {user_intention} \n Query:::::::::--------- {query}--- {chatId} \n")
-        return user_intention[0][0] or None
+        return user_intention[0][0] or None #### THIS LINE COULD POSE A PROBLEM GOING AHEAD :_ hint:- TUPLE UNPACKING#####
     else:
         query = f'SELECT user_intension, feasibility_id FROM `tabSession` WHERE name = "{chatId}"'
         user_intention = frappe.db.sql(query)

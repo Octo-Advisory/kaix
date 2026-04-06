@@ -165,8 +165,6 @@ class AdvancedRAGSystem:
     # def create_advanced_retriever(self, vector_store:dict|str, status:bool doctype:str, docname:str, docs: List[Document]):
     def create_advanced_retriever(self, vector_store:dict|str, status:bool, doctype:str):
 
- 
-
         if doctype == FEAS_DOCTYPE:
             folder_name = LABEL_FEASIBILITY
         elif doctype == FOLL_DOCTYPE:
@@ -335,7 +333,7 @@ class AdvancedRAGSystem:
         """Extracts the most relevant keyword from text based on the question"""
 
         extraction_prompt="""Given a user question and input text, extract the most relevant **2-3 word keyword or numeric value** from the text **only if it directly and unambiguously answers the question**. Follow the specific extraction rules below based on the question type:
-
+        
 ---
 
 🔹 **General Semantic Matching Rules**:
@@ -400,7 +398,7 @@ class AdvancedRAGSystem:
     Good Example:
     Question: "What is the unit of time taken for industrial construction?"
     Text: "Construction usually takes around 12-18 months."
-    Output: Most Relevant Keyword: months
+    Output: Most Relevant Keyword: months                                      
 
     Good Example:
     Question: "How long is the project duration?"

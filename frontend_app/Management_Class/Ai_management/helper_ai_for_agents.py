@@ -35,6 +35,8 @@ def polish_ai_response_if_possible(
         if not raw_response or raw_response.get("Error"):
             return raw_response
 
+        ai_response = raw_response,get("AI_response")
+
         ai_resp = (raw_response.get("Ai_response") or "").strip()
         is_confirmation = raw_response.get("Is_confirmation")
         trigger_lead_generation = raw_response.get("Trigger_Lead_Generation", False)

@@ -10,6 +10,79 @@ import traceback
 import spacy
 from typing import List, Tuple
 
+#####################################################################################################################
+GUJARAT_DISTRICTS = [
+    "Sabarkantha",
+    "Mehsana",
+    "Chhota Udaipur",
+    "Morbi",
+    "Rajkot",
+    "Dadra and Nagar Haveli",
+    "Daman",
+    "Gir Somnath",
+    "Kutch",
+    "Porbandar",
+    "Junagadh",
+    "Amreli",
+    "Bhavnagar",
+    "Jamnagar",
+    "Surendranagar",
+    "Navsari",
+    "Surat",
+    "PanchMahal",
+    "Kheda",
+    "Banaskatha",
+    "Patan",
+    "Dahod",
+    "Gandhinagar",
+    "Valsad",
+    "Ahmedabad",
+    "Vadodara",
+    "Narmada",
+    "Anand",
+    "Bharuch"
+]
+
+INDIA_STATES_AND_UTS = [
+    "West Bengal",
+    "Uttarakhand",
+    "Uttar Pradesh",
+    "Tripura",
+    "Telangana",
+    "Tamil Nadu",
+    "Sikkim",
+    "Rajasthan",
+    "Punjab",
+    "Puducherry",
+    "Odisha",
+    "Nagaland",
+    "Mizoram",
+    "Meghalaya",
+    "Manipur",
+    "Maharashtra",
+    "Madhya Pradesh",
+    "Lakshadweep",
+    "Ladakh",
+    "Kerala",
+    "Karnataka",
+    "Jharkhand",
+    "Jammu and Kashmir",
+    "Himachal Pradesh",
+    "Haryana",
+    "Gujarat",
+    "Goa",
+    "Delhi",
+    "Dadra and Nagar Haveli and Daman and Diu",
+    "Chhattisgarh",
+    "Chandigarh",
+    "Bihar",
+    "Assam",
+    "Arunachal Pradesh",
+    "Andhra Pradesh",
+    "Andaman and Nicobar Islands"
+]
+#####################################################################################################################
+
 nlp = spacy.load("en_core_web_lg")
 
 def fetch_query_results(query):
@@ -498,7 +571,7 @@ WHERE c.name IN ({city_id_str})
 #         found_employment = False
 #         return None,None
 
-def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_land_for_user, required_UpperMargin_land_for_user, found_property, found_employment,selectedOption):
+def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_land_for_user, required_UpperMargin_land_for_user, found_property, found_employment,selectedOption,location=None):
     """
     Fetch property and employment details based on a given zone and area list.
 
@@ -520,29 +593,27 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
             - (None, None): If no results are found in both queries.
     """
 
+    #####################################
+    location_type = None
+    if location:
+        if location in INDIA_STATES_AND_UTS:
+            location_type = "state"
+        elif location in GUJARAT_DISTRICTS:
+            location_type = "district"
+    frappe.log_error("location_type",location_type)
+    frappe.log_error("location_for_district",location)
+    #####################################
+
+    frappe.log_error("selectedOption",f"{selectedOption}")
+
     # convert list to string to use in query
     area_id_str = ', '.join(f"'{area_id}'" for area_id in area_id_list)
 
     sql_query_for_property_and_employment = ""
-
+    
     if selectedOption == "Intent to Build Industry from Scratch":
-        # sql_query_for_property_and_employment = f"""
-            # SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
-            # FROM `tabSurvey No` p
-            # JOIN `tabEmployment City Mapping` e ON p.area = e.area
-            # JOIN `tabArea` a on p.area = a.name
-            # WHERE (p.zone = '{zone_id}') 
-            # AND (p.area IN ({area_id_str}))
-            # AND p.status != "Sold"
-            # AND p.area_acre >0
-            # AND (p.property_type is NOT Null)
-            # AND p.property_type != ''
-            # AND p.property_type != 'Warehouse'
-            # AND p.property_type != 'Industrial Plant'
-            # AND p.property_type != 'Auction Property';
-        #     """
-
-        sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+        # Base query without location filter
+        base_query = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
         p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
         p.distance_from_power_source, p.latitude_longitude, p.property_type,
         p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
@@ -557,7 +628,14 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
         ON p.area = a.name
         AND COALESCE(a.exclusion, 0) = 0
         WHERE p.zone = '{zone_id}'
-        AND p.area IN ({area_id_str})
+        AND p.area IN ({area_id_str})"""
+        
+        # Add location filter if location_type is valid
+        if location_type:
+            base_query += f"\n        AND p.{location_type} = '{location}'"
+        
+        # Add the remaining conditions
+        base_query += f"""
         AND p.status <> 'Sold'
         AND p.area_acre > 0
         AND p.property_type IS NOT NULL
@@ -565,15 +643,13 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
         AND p.property_type <> 'Warehouse'
         AND p.property_type <> 'Industrial Plant'
         AND p.property_type <> 'Auction Property'
-        AND COALESCE(p.exclusion, 0) = 0;
-        """
-        # 👌👌
-
+        AND COALESCE(p.exclusion, 0) = 0;"""
+        
+        sql_query_for_property_and_employment = base_query
 
     elif selectedOption == "Intent to Acquire Existing Industrial Infrastructure":
-        # sql_query_for_property_and_employment = f""" SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity FROM tabSurvey No p JOIN tabEmployment City Mapping e ON p.area = e.area JOIN tabArea a on p.area = a.name WHERE (p.zone = '{zone_id}') AND (p.area IN ({area_id_str})) AND p.status != "Sold" AND p.area_acre >0 AND (p.property_type is NOT Null) AND p.property_type != '' AND p.property_type != 'Warehouse' AND (p.property_type = 'Industrial Plant' OR p.property_type = 'Auction Property'); """
-
-        sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+        # Base query without location filter
+        base_query = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
         p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
         p.distance_from_power_source, p.latitude_longitude, p.property_type,
         p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
@@ -588,37 +664,33 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
         ON p.area = a.name
         AND COALESCE(a.exclusion, 0) = 0
         WHERE p.zone = '{zone_id}'
-        AND p.area IN ({area_id_str})
+        AND p.area IN ({area_id_str})"""
+        
+        # Add location filter if location_type is valid
+        if location_type:
+            base_query += f"\n        AND p.{location_type} = '{location}'"
+        
+        # Add the remaining conditions
+        base_query += f"""
         AND p.status <> 'Sold'
         AND p.area_acre > 0
         AND p.property_type IS NOT NULL
         AND p.property_type <> ''
         AND (p.property_type = 'Industrial Plant'
             OR p.property_type = 'Auction Property')
-        AND COALESCE(p.exclusion, 0) = 0;
-        """
-        # 👌👌
+        AND COALESCE(p.exclusion, 0) = 0;"""
+        
+        sql_query_for_property_and_employment = base_query
 
-    elif selectedOption == "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure":
-        # sql_query_for_property_and_employment = f"""
-        #     SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
-        #     FROM `tabSurvey No` p
-        #     JOIN `tabEmployment City Mapping` e ON p.area = e.area
-        #     JOIN `tabArea` a on p.area = a.name
-        #     WHERE (p.zone = '{zone_id}') 
-        #     AND (p.area IN ({area_id_str}))
-        #     AND p.status != "Sold"
-        #     AND p.area_acre >0
-        #     AND (p.property_type != 'Warehouse');
-        #     """
-
-        sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
-       p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
-       p.distance_from_power_source, p.latitude_longitude, p.property_type,
-       p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
-       p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved,
-       p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport,
-       e.area, e.employment_type, e.availability, a.network_connectivity
+    elif selectedOption == "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure" or selectedOption == "Intent to Set Up Industry with Unspecified Build or Buy Intent":
+        # Base query without location filter
+        base_query = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+        p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
+        p.distance_from_power_source, p.latitude_longitude, p.property_type,
+        p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
+        p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved,
+        p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport,
+        e.area, e.employment_type, e.availability, a.network_connectivity
         FROM `tabSurvey No` p
         JOIN `tabEmployment City Mapping` e
         ON p.area = e.area
@@ -627,24 +699,220 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
         ON p.area = a.name
         AND COALESCE(a.exclusion, 0) = 0
         WHERE p.zone = '{zone_id}'
-        AND p.area IN ({area_id_str})
+        AND p.area IN ({area_id_str})"""
+        
+        # Add location filter if location_type is valid
+        if location_type:
+            base_query += f"\n        AND p.{location_type} = '{location}'"
+        
+        # Add the remaining conditions
+        base_query += f"""
         AND p.status <> 'Sold'
         AND p.area_acre > 0
         AND p.property_type <> 'Warehouse'
-        AND COALESCE(p.exclusion, 0) = 0;
-        """
-        # 👌👌
+        AND COALESCE(p.exclusion, 0) = 0;"""
+        
+        sql_query_for_property_and_employment = base_query
+
+    # if selectedOption == "Intent to Build Industry from Scratch":
+    #     # sql_query_for_property_and_employment = f"""
+    #         # SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
+    #         # FROM `tabSurvey No` p
+    #         # JOIN `tabEmployment City Mapping` e ON p.area = e.area
+    #         # JOIN `tabArea` a on p.area = a.name
+    #         # WHERE (p.zone = '{zone_id}') 
+    #         # AND (p.area IN ({area_id_str}))
+    #         # AND p.status != "Sold"
+    #         # AND p.area_acre >0
+    #         # AND (p.property_type is NOT Null)
+    #         # AND p.property_type != ''
+    #         # AND p.property_type != 'Warehouse'
+    #         # AND p.property_type != 'Industrial Plant'
+    #         # AND p.property_type != 'Auction Property';
+    #     #     """
+
+    #     if location_type is None:
+    #         sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+    #         p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
+    #         p.distance_from_power_source, p.latitude_longitude, p.property_type,
+    #         p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
+    #         p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved,
+    #         p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport,
+    #         e.area, e.employment_type, e.availability, a.network_connectivity
+    #         FROM `tabSurvey No` p
+    #         JOIN `tabEmployment City Mapping` e
+    #         ON p.area = e.area
+    #         AND COALESCE(e.exclusion, 0) = 0
+    #         JOIN `tabArea` a
+    #         ON p.area = a.name
+    #         AND COALESCE(a.exclusion, 0) = 0
+    #         WHERE p.zone = '{zone_id}'
+    #         AND p.area IN ({area_id_str})
+    #         AND p.status <> 'Sold'
+    #         AND p.area_acre > 0
+    #         AND p.property_type IS NOT NULL
+    #         AND p.property_type <> ''
+    #         AND p.property_type <> 'Warehouse'
+    #         AND p.property_type <> 'Industrial Plant'
+    #         AND p.property_type <> 'Auction Property'
+    #         AND COALESCE(p.exclusion, 0) = 0;
+    #         """
+
+    #     sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+    #     p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
+    #     p.distance_from_power_source, p.latitude_longitude, p.property_type,
+    #     p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
+    #     p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved,
+    #     p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport,
+    #     e.area, e.employment_type, e.availability, a.network_connectivity
+    #     FROM `tabSurvey No` p
+    #     JOIN `tabEmployment City Mapping` e
+    #     ON p.area = e.area
+    #     AND COALESCE(e.exclusion, 0) = 0
+    #     JOIN `tabArea` a
+    #     ON p.area = a.name
+    #     AND COALESCE(a.exclusion, 0) = 0
+    #     WHERE p.zone = '{zone_id}'
+    #     AND p.area IN ({area_id_str})
+    #     AND p.{location_type} = '{location}'
+    #     AND p.status <> 'Sold'
+    #     AND p.area_acre > 0
+    #     AND p.property_type IS NOT NULL
+    #     AND p.property_type <> ''
+    #     AND p.property_type <> 'Warehouse'
+    #     AND p.property_type <> 'Industrial Plant'
+    #     AND p.property_type <> 'Auction Property'
+    #     AND COALESCE(p.exclusion, 0) = 0;
+    #     """
+
+    # elif selectedOption == "Intent to Acquire Existing Industrial Infrastructure":
+    #     # sql_query_for_property_and_employment = f""" SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity FROM tabSurvey No p JOIN tabEmployment City Mapping e ON p.area = e.area JOIN tabArea a on p.area = a.name WHERE (p.zone = '{zone_id}') AND (p.area IN ({area_id_str})) AND p.status != "Sold" AND p.area_acre >0 AND (p.property_type is NOT Null) AND p.property_type != '' AND p.property_type != 'Warehouse' AND (p.property_type = 'Industrial Plant' OR p.property_type = 'Auction Property'); """
+
+    #     if location_type is None:
+    #         sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+    #         p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
+    #         p.distance_from_power_source, p.latitude_longitude, p.property_type,
+    #         p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
+    #         p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved,
+    #         p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport,
+    #         e.area, e.employment_type, e.availability, a.network_connectivity
+    #         FROM `tabSurvey No` p
+    #         JOIN `tabEmployment City Mapping` e
+    #         ON p.area = e.area
+    #         AND COALESCE(e.exclusion, 0) = 0
+    #         JOIN `tabArea` a
+    #         ON p.area = a.name
+    #         AND COALESCE(a.exclusion, 0) = 0
+    #         WHERE p.zone = '{zone_id}'
+    #         AND p.area IN ({area_id_str})
+    #         AND p.status <> 'Sold'
+    #         AND p.area_acre > 0
+    #         AND p.property_type IS NOT NULL
+    #         AND p.property_type <> ''
+    #         AND (p.property_type = 'Industrial Plant'
+    #             OR p.property_type = 'Auction Property')
+    #         AND COALESCE(p.exclusion, 0) = 0;
+    #         """
+
+    #     sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+    #     p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
+    #     p.distance_from_power_source, p.latitude_longitude, p.property_type,
+    #     p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
+    #     p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved,
+    #     p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport,
+    #     e.area, e.employment_type, e.availability, a.network_connectivity
+    #     FROM `tabSurvey No` p
+    #     JOIN `tabEmployment City Mapping` e
+    #     ON p.area = e.area
+    #     AND COALESCE(e.exclusion, 0) = 0
+    #     JOIN `tabArea` a
+    #     ON p.area = a.name
+    #     AND COALESCE(a.exclusion, 0) = 0
+    #     WHERE p.zone = '{zone_id}'
+    #     AND p.area IN ({area_id_str})
+    #     AND p.{location_type} = '{location}'
+    #     AND p.status <> 'Sold'
+    #     AND p.area_acre > 0
+    #     AND p.property_type IS NOT NULL
+    #     AND p.property_type <> ''
+    #     AND (p.property_type = 'Industrial Plant'
+    #         OR p.property_type = 'Auction Property')
+    #     AND COALESCE(p.exclusion, 0) = 0;
+    #     """
+
+    # elif selectedOption == "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure":
+    #     # sql_query_for_property_and_employment = f"""
+    #     #     SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state, p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport, p.distance_from_power_source, p.latitude_longitude, p.property_type, p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole, p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved, p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport, e.area, e.employment_type, e.availability, a.network_connectivity
+    #     #     FROM `tabSurvey No` p
+    #     #     JOIN `tabEmployment City Mapping` e ON p.area = e.area
+    #     #     JOIN `tabArea` a on p.area = a.name
+    #     #     WHERE (p.zone = '{zone_id}') 
+    #     #     AND (p.area IN ({area_id_str}))
+    #     #     AND p.status != "Sold"
+    #     #     AND p.area_acre >0
+    #     #     AND (p.property_type != 'Warehouse');
+    #     #     """
+    #     if location_type is None:
+    #         sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+    #         p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
+    #         p.distance_from_power_source, p.latitude_longitude, p.property_type,
+    #         p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
+    #         p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved,
+    #         p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport,
+    #         e.area, e.employment_type, e.availability, a.network_connectivity
+    #             FROM `tabSurvey No` p
+    #             JOIN `tabEmployment City Mapping` e
+    #             ON p.area = e.area
+    #             AND COALESCE(e.exclusion, 0) = 0
+    #             JOIN `tabArea` a
+    #             ON p.area = a.name
+    #             AND COALESCE(a.exclusion, 0) = 0
+    #             WHERE p.zone = '{zone_id}'
+    #             AND p.area IN ({area_id_str})
+    #             AND p.status <> 'Sold'
+    #             AND p.area_acre > 0
+    #             AND p.property_type <> 'Warehouse'
+    #             AND COALESCE(p.exclusion, 0) = 0;
+    #             """
+
+    #     sql_query_for_property_and_employment = f"""SELECT p.name, p.area_acre, p.area, p.city, p.village, p.taluka, p.district, p.state,
+    #     p.distance_from_nearest_railway_station, p.distance_from_nearest_seaport,
+    #     p.distance_from_power_source, p.latitude_longitude, p.property_type,
+    #     p.business_location_type, p.land_type, p.require_shifting_of_any_electricity_line_or_pole,
+    #     p.vicinity_of, p.tree_cutting_involved, p.road_cutting_involved,
+    #     p.will_your_industry_cross_the_following, p.road_connectivity, p.distance_from_nearest_airport,
+    #     e.area, e.employment_type, e.availability, a.network_connectivity
+    #         FROM `tabSurvey No` p
+    #         JOIN `tabEmployment City Mapping` e
+    #         ON p.area = e.area
+    #         AND COALESCE(e.exclusion, 0) = 0
+    #         JOIN `tabArea` a
+    #         ON p.area = a.name
+    #         AND COALESCE(a.exclusion, 0) = 0
+    #         WHERE p.zone = '{zone_id}'
+    #         AND p.area IN ({area_id_str})
+    #         AND p.{location_type} = '{location}'
+    #         AND p.status <> 'Sold'
+    #         AND p.area_acre > 0
+    #         AND p.property_type <> 'Warehouse'
+    #         AND COALESCE(p.exclusion, 0) = 0;
+    #         """
+    
     frappe.log_error("sql_query_for_property_and_employment",sql_query_for_property_and_employment)
     # Call the function and assign results
     results = fetch_query_results(sql_query_for_property_and_employment)
+    frappe.log_error("results",results)
 
     if results:
+        frappe.log_error("are_there_results",results)
         # Convert the fetched results into a pandas DataFrame
         property_employment_df = pd.DataFrame(results, columns=['property_id', "land_size",'area', 'city', 'village', 'taluka', 'district', 'state', 'distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source', 'latitude_longitude', 'Property Type', "business_location_type", "land_type","pole_shifting", "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following", "road_connectivity", "distance_from_nearest_airport" ,'employment_area_id', 'employmenttype_id', 'availability', 'Network Connectivity'])
+        frappe.log_error("are_there_results_0", f"{property_employment_df}")
+        frappe.log_error("are_there_results_1", f"{property_employment_df.property_id.unique()}")
         return property_employment_df, property_employment_df.property_id.unique()
     else:
         print("No results found in the first query. Executing fallback query...")
-        
+        frappe.log_error("is_it_going",results)
         sql_query_for_connected_property_and_employment = f"""
         SELECT sn.SID, sn.land_size, sn.parea, sn.pcity, sn.pvillage, sn.ptaluka, sn.pdistrict, sn.pstate, sn.rail_dist, sn.sea_dist, sn.power_dist, sn.latlong, sn.business_loc, sn.land, sn.pole_shift, sn.vicinity, sn.tree_cutiing, sn.road_cutting, sn.cross_following, sn.road_connect, sn.area_dist, sn.emp_area, sn.emp_type, sn.emp_avail
         FROM `tabConnected Properties` as ccp
@@ -660,9 +928,9 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
         AND (parea IN ({area_id_str}));
         """
         # 👌👌
-        
+        frappe.log_error("sql_query_for_property_and_employment_0",sql_query_for_connected_property_and_employment)
         fallback_results = fetch_query_results(sql_query_for_connected_property_and_employment)
-        
+        frappe.log_error("fallback_results",fallback_results)
         if fallback_results:
             property_employment_df = pd.DataFrame(fallback_results, columns=['property_id', "land_size",'area', 'city', 'village', 'taluka', 'district', 'state', 'distance_from_nearest_railway_station', 'distance_from_nearest_seaport', 'distance_from_power_source', 'latitude_longitude', 'Property Type', "business_location_type", "land_type","pole_shifting", "vicinity_of", "tree_cutting_involved", "road_cutting_involved", "Cross_the_following", "road_connectivity", "distance_from_nearest_airport" ,'employment_area_id', 'employmenttype_id', 'availability'])
             return property_employment_df, property_employment_df.property_id.unique()
@@ -770,9 +1038,10 @@ WHERE COALESCE(iim.exclusion, 0) = 0
                          # 👌👌
                          
 
-
+    frappe.log_error("sql_query_for_incentive_df",f"{sql_query}")
     # Execute the query using the provided fetch_query_results function
     results = fetch_query_results(sql_query)
+    frappe.log_error("incentive_df_results",f"{results}")
 
     if results:
         property_incentive_mapped_df = pd.DataFrame(results, columns=['incentive_id', "incentive_name", "incentive_type", "incentive_operation_start_date", 'incentive_operation_end_date', 'sub_sector_id', 'area_id', 
@@ -918,7 +1187,7 @@ def calculate_employment_availability_score(df, sub_sector_id):
 
     required_skill_type = {"high_skill": result[0][0], "mod_skill": result[0][1], "low_skill": result[0][2] }
 
-    high_skill = required_skill_type["high_skill"] 
+    high_skill = required_skill_type["high_skill"]  
     mod_skill = required_skill_type["mod_skill"]
     low_skill = required_skill_type["low_skill"]
 

@@ -16,6 +16,8 @@ def analytics_module_call(aiResponse,chatId,validationResult,selectedOption):
         user_intension = check_user_intension(chatId)
         log(chatId,"debug","user_intension",str(user_intension),"Analytics.py",'analytics')
         aiResponse = json.loads(aiResponse)
+        frappe.log_error("aiResponse",f"{aiResponse}")
+
         with open("log2.txt", "a", encoding="utf-8") as file:
             file.write(f"AI RESPONSE FOR TESTING LOG {json.dumps(aiResponse)} USER_INTENSION---->>>> {user_intension} \n")
         log(chatId,"debug","aiResponse",str(aiResponse),"Analytics.py",'analytics')
@@ -33,7 +35,8 @@ def analytics_module_call(aiResponse,chatId,validationResult,selectedOption):
         elif user_intension == "Query to build industry from Scratch":
             if not selectedOption:
                 raise ValueError("selectedOption not found")
-            result =  industry_from_scratch(aiResponse['state'],chatId,selectedOption)
+            # result =  industry_from_scratch(aiResponse['state'],chatId,selectedOption)
+            result =  industry_from_scratch(aiResponse ,chatId,selectedOption)
             response = {
                     **result,
                     "user_intension" : user_intension

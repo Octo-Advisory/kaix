@@ -71,7 +71,6 @@ def updating_database_with_llm_market_trends(update_check, final_results, segmen
         "pan_sub_sector": pan_sub_sector       # int (1) or None
     }
 
-
     # # Step 2: Dynamically build filters list (for GET request)
     # filters_list = []
     # for key, value in field_map.items():

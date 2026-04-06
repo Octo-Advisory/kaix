@@ -107,6 +107,7 @@ const ProgressScreen = () => {
   ...item,
   "User Intention": index === aiResponse.length - 1 ? confirmationMsg ?? item["User Intention"] : item["User Intention"]
 }));
+console.log("Updated AI Response with Confirmation Message:", updatedAiResponse, aiResponse);
 
   const fetchAnalyticsResponse = async () => {
     // await clearProgressAndIntention(sessionId)

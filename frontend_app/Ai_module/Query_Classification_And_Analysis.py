@@ -39,16 +39,23 @@ llm_maverik = ChatGroq(groq_api_key=groq_api_key, model_name="meta-llama/llama-4
 # llm_openai_inf_4 = ChatOpenAI(model="gpt-4", temperature=0.0, api_key=openai_key)
 # llm_openai_inf_3_5 = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0.0, api_key=openai_key)
 
+# RESPONDER_LLM = ChatGroq(
+#     groq_api_key=groq_api_key,
+#     model_name="llama-3.3-70b-versatile",
+#     temperature=0.7,                        # was 0.5 → tighter, still natural
+#     model_kwargs={
+#         "top_p": 0.9,                      # was 0.9 → fewer side-asks
+#     },
+# )
+
 RESPONDER_LLM = ChatGroq(
     groq_api_key=groq_api_key,
-    model_name="llama-3.3-70b-versatile",
+    model_name="openai/gpt-oss-120b",
     temperature=0.7,                        # was 0.5 → tighter, still natural
-    model_kwargs={
-        "top_p": 0.9,                      # was 0.9 → fewer side-asks
-    },
+    # model_kwargs={
+    #     "top_p": 0.9,                      # was 0.9 → fewer side-asks
+    # },
 )
-with open("testlog.txt", "a") as file:
-    file.write(f"\n%%%%%%%% Model: llama-3.3-70b-versatile")
 
 # RESPONDER_LLM = ChatOpenAI(
 #     model="gpt-4o-mini", 
@@ -103,7 +110,7 @@ def refine_query_with_history(
     feasibility_json: dict | None = None,   # NEW (structured_summary object or whole feasibility payload)
     feasibility_mode: bool = False  
 ):
-    """
+    """                      
     Refines user query using chat history with intelligent context handling.
     
     Parameters:
@@ -244,8 +251,7 @@ When a feasibility study is attached, treat it as the **primary grounding source
 
 ### Required Fields Matrix (Ideal Query Shape) — applies in BOTH modes
 (If a required field is missing from the latest user message, fill from **Allowed-History → Feasibility (if on) → Omit**.)
-
-- **Build from Scratch (BFS)** — Must ideally include:
+k- **Build from Scratch (BFS)** — Must ideally include:
   - `product_or_industry` (latest user → allowed history → feasibility.product/sub-sector/main_industry)
   - `capacity` **and** `unit` **and** `time_period`
     - If missing in the user message and not available from allowed history, **parse from** `feasibility_json.final_product_capacity` **when present** (feasibility_mode = "true").
@@ -2421,6 +2427,7 @@ def classify_user_intent(user_query, llm, chat_id):
             'additional_response': str
         }
     """
+
     # Step 1: Main and multilabel classification
     main_intent = classify_query(user_query, llm, chat_id)
     multilabel_result = classify_query_multilabel(user_query, llm, chat_id)
@@ -2504,9 +2511,7 @@ def generate_followup_response(
     chat_history = get_chat(f"chat_{chatId}") or []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
 
-    
-
-    # Step 2: Create prompt
+    # Step 2: Create prompt 
     prompt_template = """
 You are an intelligent assistant that helps determine what kind of follow-up message to show to the user based on their most recent query and the last few messages from their chat history.
 
@@ -2564,7 +2569,7 @@ Return ONLY the appropriate message (based on the 2 cases above). Do NOT include
 def extract_location_from_query(user_input: str, available_areas: List[str], available_cities: List[str], available_states: List[str], llm) -> Dict[str, Dict[str, str]]:
     """
     Extract the location mentioned in the user query and classify it into area, city, or state.
-
+    
     Parameters:
         user_input (str): The user-provided query.
         available_areas (List[str]): List of all available areas.
@@ -2733,7 +2738,6 @@ OUTPUT FORMAT
         match_original = next((choice for choice in choices if choice.lower() == match_lower), "Not Available in List")
 
         return match_original if score >= threshold else "Not Available in List"
-
 
     # Validate using fuzzy matching
     best_city_match = get_best_match(extracted_location, available_cities, threshold=80)
@@ -3628,7 +3632,6 @@ def extract_main_industry_and_product_universal(user_query: str, main_industries
     # Convert the list into a formatted string for the prompt
     main_industries_str = ", ".join([f'"{m}"' for m in main_industries])
 
-    
     # Define the universal prompt
     prompt_template = """
 You are an expert in analyzing industry-related queries and extracting specific details.
@@ -3775,6 +3778,7 @@ def extract_sub_sector_and_product_universal(
         Dict[str, str]: A dictionary containing the extracted Sub-Sector, Original-Inferred Sub-Sector,
                         Forced-Mapping, and Product.
     """    
+
     # Convert the list into a formatted string for the prompt
     sub_sectors_str = ", ".join([f'"{s}"' for s in sub_sectors])
 
@@ -3810,7 +3814,7 @@ Based on the user's query, identify the following details:
     - Then, find the CLOSEST MATCH from the provided list above
     - **STEP-BY-STEP PROCESS:**
         a) Identify what industry segment the query refers to (e.g., "chalk" → "basic chemicals/mineral processing")
-        b) Check if this exactly matches any item in the provided list
+        b) Check if this exactly matches any item in the provided list 
         c) If YES: Use that exact match and set `"Forced-Mapping": "No"`
         d) If NO: Find the closest related option from the provided list and set `"Forced-Mapping": "Yes"`
     
@@ -3855,8 +3859,7 @@ Output Format:
 Query: {user_query}  
 
 Provide only the JSON object in the required format.  
-    """
-
+"""
     # Create the prompt using the provided variables
     prompt = PromptTemplate(
         input_variables=["user_query", "sub_sectors_str", "context"],
@@ -3926,7 +3929,6 @@ def extract_segment_and_product_universal(
         llm: The language model instance to use for processing.
         main_industry (str): Inferred Main-Industry to provide additional context (default: None).
         sub_sector (str): Inferred Sub-Sector to provide additional context (default: None).
-
     Returns:
         Dict[str, Dict[str, str]]: A dictionary containing the extracted and validated Segment, Original-Inferred-Segment, Forced-Mapping, and Product.
     """
@@ -4228,6 +4230,7 @@ def extract_incentive_details_using_ai(description: str, llm=llm_70b_vers_creati
         Dict[str, List[str]]: A dictionary where keys are category names, 
                               and values are lists of relevant points.
     """
+    
     prompt = """
     You are an expert in analyzing government and business incentive descriptions. 
     Your task is to extract structured information from the following incentive description 
@@ -4409,12 +4412,13 @@ def detect_module_switch_intent(
     - This function does not classify the destination module; it only detects if the user
       wants to exit the current modules based on a shift in intent.
     """
+
     Chat_history_normal = "\n".join(chat_history)
 
     # Updated prompt
     prompt_template = """
     You are a smart assistant that helps decide if a user wants to switch away from the current conversation topics (called "modules").
-
+    
     Based on the user's most recent message, the last few exchanges, and the list of current modules, determine whether the user is trying to change the topic to something outside the current active modules.
 
     Only return "True" if it is very likely that the user wants to exit the current module(s) and move to another topic/module.
@@ -4435,7 +4439,6 @@ def detect_module_switch_intent(
     4. If the user’s message is vague, complex, or indirectly worded, do not rely on specific keywords. Instead, analyze the overall meaning of the message to determine whether they are continuing the current topic or shifting to a new one.
     5. If the user's new query discusses a completely different *type of information* about the same project, industry, or location (e.g., land availability after asking about manpower), treat it as a module switch. Shared project or location does NOT mean same intent.
         - For example, a shift from "labor availability" to "land availability" means the user has moved from Employment to Build-from-Scratch — this should be considered a module switch.
-
 
     Additional Understanding Requirement:
     - Do not rely solely on specific keywords like “approvals,” “vendors,” “employment,” “incentives,” or “building industry from scratch.”
