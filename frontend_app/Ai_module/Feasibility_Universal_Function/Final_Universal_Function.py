@@ -129,7 +129,7 @@ embedding_model = HuggingFaceBgeEmbeddings(
         )
 
 warnings.filterwarnings("ignore")
-# config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+# config_file = '/home/mars/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 # config = configparser.ConfigParser()
 # config.read(config_file)
 
@@ -345,13 +345,13 @@ def wrapper_for_frappe_function_for_fetching_fields(doctype_name: str, doc_sessi
             print(doctype_name)
             if value["session_id_required"]:
                 if not doc_session_id:
-                    with open("/home/marsaiae/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                    with open("/home/mars/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
                         file.write(f"\nSTATUS👌:- /n{"Particular session id is required for the respective doctype."}")
                     return "Particular session id is required for the respective helper doctype without which we cannot go ahead."
             
                 # data = frappe_function_for_fetching_fields_from_doctype(doctype = doctype_name, doc_id = doc_session_id)
                 data = fetch_frappe_doc_universal(doctype = doctype_name, identifier = doc_session_id, fields = fields)
-                with open("/home/marsaiae/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                with open("/home/mars/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
                     file.write(f"\nSTATUS👌:- /n{data}") 
                 return data
             
@@ -362,11 +362,11 @@ def wrapper_for_frappe_function_for_fetching_fields(doctype_name: str, doc_sessi
                 print(type(doc_session_id))
                 # data = frappe_function_for_fetching_fields_from_doctype(doctype = doctype_name, doc_id = doc_session_id)
                 data = fetch_frappe_doc_universal(doctype = doctype_name, identifier = doc_session_id, fields = fields)
-                with open("/home/marsaiae/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                with open("/home/mars/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
                     file.write(f"\nSTATUS👌:- /n{data}")
                 return data
 
-    with open("/home/marsaiae/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+    with open("/home/mars/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
         file.write(f"\nSTATUS👌:- /n{"The doctype mentioned does not exist in the Universal dict in which we store the doctypes which requires the usage of vector stores"}")
     return "The doctype mentioned does not exist in the Universal helper doctype dict in which we store the doctypes that acts as a helper to the main doctypes."
 
@@ -636,7 +636,7 @@ def getting_pdf_from_file_url_in_feasibility_session_id(
     # debug=True
     ) 
 
-    with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+    with open("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
         file.write(f"\nSTATUS👌:- /n{file_data}")
     print(file_data)
 
@@ -767,7 +767,7 @@ def checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vecto
 
     frappe.log_error("Check", f"{data}")
 
-    with open("/home/marsaiae/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+    with open("/home/mars/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
         file.write(f"\nSTATUS👌:- /n{data}")
 
     if not isinstance(data, dict):
@@ -1501,13 +1501,13 @@ def ingest_and_persist_with_budget_2(
                 # fields = ["storage_limit","time_period_for_deletion"]
                 data = wrapper_for_frappe_function_for_fetching_fields(doctype_name = configuration_doctype)
 
-                with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                with open("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
                     file.write(f"\nSTATUS👌:- /n{data}")
 
         if not isinstance(data, dict):
             Total_allocated_budget = STORAGE_LIMIT
             # Total_allocated_budget = data["data"]["storage_limit"]
-            with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+            with open("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
                 file.write(f"\nSTATUS👌:- /n{Total_allocated_budget}")
         elif isinstance(data, dict):
             # Total_allocated_budget = STORAGE_LIMIT
@@ -1647,7 +1647,7 @@ def ensure_vector_store(doctype, doc_name, folder_name, vector_id_field, data_so
 
     temporary, progress = checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vector_file(doctype=doctype, doc_name=doc_name, folder_name=folder_name, vector_id_field=vector_id_field, data_source_field=data_source_field)
     # print("TEMPORARY", temporary)
-    with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+    with open("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
         file.write(f"/nSTATUS👌:- /n{progress}")
     # print("PROGRESS", progress)
 
@@ -1779,7 +1779,7 @@ def ensure_vector_and_update_record(doctype, doc_name, vector_id_field, data_sou
             # Print the response (which should include the updated document data)
             # print(json.dumps(updated_response, indent=2))
 
-        with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+        with open("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
             file.write(f"\nSTATUS👌:- /n{mko}")
 
             return mko, True

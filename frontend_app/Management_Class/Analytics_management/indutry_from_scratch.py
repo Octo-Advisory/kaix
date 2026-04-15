@@ -19,9 +19,12 @@ from sklearn.neighbors import BallTree
 import matplotlib.pyplot as plt
 from typing import Optional, List, Dict, Any, Generator
 from frontend_app.Market_Trends.getting_market_trends import retrieving_market_trends
-
+import warnings
 # configs
-config_file = '/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
+warnings.filterwarnings("ignore")
+base_dir = os.path.expanduser("~")
+config_file = os.path.join(base_dir, "frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini")
+# config_file = '/home/marsapplication/frappe-bench/apps/frontend_app/frontend_app/Log_management/mars.ini'
 config = configparser.ConfigParser()
 config.read(config_file)
 
@@ -1609,7 +1612,7 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         frappe.log_error("final_property_ranking_for_decision_000",f"{df_with_property_wise_individual_score["property_id"]}")
         frappe.log_error("final_property_ranking_for_decision_111",f"{df_with_property_wise_individual_score["property_suitability_score"]}")
         frappe.log_error("final_property_ranking_for_decision_222",f"{df_with_property_wise_individual_score["property_suitability_score"].tolist()}")
-        # with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Management_Class/Analytics_management/log2.txt", "w") as file:
+        # with open("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Management_Class/Analytics_management/log2.txt", "w") as file:
         #     file.write("calculate_property_suitability", df_with_property_wise_individual_score)
         df_with_property_wise_individual_score.sort_values(by=["property_suitability_score"], ascending=False)
         frappe.log_error("df_with_property_wise_individual_score",f"{df_with_property_wise_individual_score}")
@@ -1633,7 +1636,7 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
             .drop(columns=["property_id"])
         )
 
-        # with open("/home/marsaiae/frappe-bench/sites/log2.txt", "w") as file:
+        # with open("/home/mars/frappe-bench/sites/log2.txt", "w") as file:
         #     file.write(f"\n DF WITH SCORES AND MARKET TRENDsssssssssssssssssssssssssssssssS {final_property_ranking_for_decision}")
         frappe.log_error("final_property_ranking_for_decision",f"{final_property_ranking_for_decision}")
         final_property_ranking_for_decision = pd.merge(final_property_ranking_for_decision, df_with_property_wise_individual_score[["property_id","property_suitability_score"]], left_on="Property_ID", right_on="property_id", how='left').drop(columns=["property_id"])

@@ -2,7 +2,7 @@ from urllib.parse import quote
 import requests
 
 frappe_api_key = "d3de1e0e4e25846"
-frappe_api_secret = "51fd8e403a19045"
+frappe_api_secret = "c104db9fc3d3cda"
 # ; ritu_local_base_url = http://172.17.242.222
 ritu_local_base_url = "http://172.22.232.42"
 # live_base_url = https://marsaix.marsbazaar.com

@@ -83,7 +83,7 @@ def run_feasibility_analysis(file_path, result_docname, user):
         from frontend_app.Ai_module.Feasibility_study.feasibility_study import query_classification
         result = query_classification(file_path=file_path, feasibility_id=result_docname, vector_id_field="custom_feasibility_vector_file_name", data_source_field="file_path")
 
-        with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_study/testlog.txt", "a") as file:
+        with open("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_study/testlog.txt", "a") as file:
             file.write(f"\nresult:- \n{result}")
 
         # -----------------------------------------
@@ -101,7 +101,7 @@ def run_feasibility_analysis(file_path, result_docname, user):
         if result.get("feasibility_title"):
             doc.feasibility_title = result["feasibility_title"]
 
-        with open("/home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_study/testlog.txt", "a") as file:
+        with open("/home/mars/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_study/testlog.txt", "a") as file:
             file.write(f"\nstatus:- {doc.status}\nresult_data:- {doc.result_data}")
 
         # -----------------------------------------
