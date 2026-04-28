@@ -27,6 +27,8 @@ config.read(config_file)
 groq_api_key = config['Key']['groq_key']
 openai_key = config['Key']['openai_api_key']
 
+
+
 # Initialize LLM    
 llm_70b_vers = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.0)
 llm_70b_vers_creative = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.7)
@@ -251,7 +253,8 @@ When a feasibility study is attached, treat it as the **primary grounding source
 
 ### Required Fields Matrix (Ideal Query Shape) — applies in BOTH modes
 (If a required field is missing from the latest user message, fill from **Allowed-History → Feasibility (if on) → Omit**.)
-k- **Build from Scratch (BFS)** — Must ideally include:
+
+- **Build from Scratch (BFS) / Acquire Facility / Evaluate Both** — Must ideally include:
   - `product_or_industry` (latest user → allowed history → feasibility.product/sub-sector/main_industry)
   - `capacity` **and** `unit` **and** `time_period`
     - If missing in the user message and not available from allowed history, **parse from** `feasibility_json.final_product_capacity` **when present** (feasibility_mode = "true").
@@ -286,6 +289,37 @@ k- **Build from Scratch (BFS)** — Must ideally include:
 - Never draw from **blocked_industries** in this thread.
 
 ## DECISION FRAMEWORK
+
+### Location Scope Preservation (CRUCIAL)
+If the user's latest input contains scope modifiers like "only", "just", "nearby", or "surrounding" (e.g., "Bharuch only", "Bharuch and nearby"), you MUST preserve these exact words in your reformulated query. Do NOT delete them.
+- Example Input: "Bharuch only" -> Output: "Show details for refrigerators in Bharuch only."
+- Example Input: "Surat and nearby" -> Output: "Show details for refrigerators in Surat and nearby."
+
+### Conversational Agreement Resolution (CRUCIAL)
+If the chat history shows the AI recently suggested a specific location (e.g., a state or district) and asked a confirmation question (e.g., "Reply 'yes' to explore this", "Would you like to explore this option?"), and the user's latest message is a conversational agreement (e.g., "yes", "y", "sure", "I want to explore this state", "sounds good", "proceed"):
+- DO NOT output the user's conversational phrase.
+- Rewrite the user's input as the EXACT name of the location they are agreeing to.
+- Example 1: 
+  - AI History: "...we've identified Gujarat as a potential location. Reply 'yes' to explore this."
+  - User Input: "I want to explore this state"
+  - Your Output: "Gujarat"
+- Example 2:
+  - AI History: "...we've identified Gujarat as a potential location. Reply 'yes'"
+  - User Input: "yes"
+  - Your Output: "Gujarat"
+
+### Example & Suggestion Resolution (CRUCIAL)
+If the chat history shows the AI provided an example location (e.g., "give a country (e.g., India)") and the user replies with phrases like "go with the country", "use your suggestion", "the example", or "suggested country":
+- DO NOT just echo the user's vague words.
+- You MUST resolve the reference to the exact location name provided in the AI's example.
+- Example 1: 
+  - AI History: "...provide a country (e.g., India), a state (e.g., Gujarat)..."
+  - User Input: "Go with the country option" or "Go ahead with your suggested country"
+  - Your Output: "India"
+- Example 2:
+  - AI History: "...a state (e.g., Gujarat)..."
+  - User Input: "The suggested state is fine"
+  - Your Output: "Gujarat"
 
 ### Message Type Detection (decide how to refine)
 Classify the latest USER input into exactly one:
@@ -358,7 +392,7 @@ Classify the latest USER input into exactly one:
 - If absent, do not invent.
 
 ### Intent Separation — DO NOT MIX
-Primary intents: **Build from Scratch**, **Vendor Search**, **Incentive Search**, **Approval Search**, **Employee Search**.
+Primary intents: **Build from Scratch**, **Acquire Existing Facility**, **Evaluate Both**, **Vendor Search**, **Incentive Search**, **Approval Search**, **Employee Search**.
 - Keep intent-specific elements isolated across history unless the latest query explicitly mentions multiple intents.
 - Always carry forward **neutral** context (industry, location, metrics) from **allowed** history only.
 
@@ -377,7 +411,9 @@ Primary intents: **Build from Scratch**, **Vendor Search**, **Incentive Search**
 - **Approval Type** (approvals-specific)
 
 ### Canonical Query Templates (for synthesis)
-- **BFS**: “Show details / plan for <product/industry> at <capacity> [in <location>].”
+- **BFS (Build From Scratch / Unspecified)**: “I want to set up / build a new factory for <product/industry> at <capacity> [in <location>].”
+- **ACQUIRE (Existing Facility)**: “I want to buy / acquire an existing facility for <product/industry> at <capacity> [in <location>].”
+- **EVALUATE BOTH (Build or Buy)**: “I want to explore both building and buying options for <product/industry> at <capacity> [in <location>].”
 - **INCENTIVES**: “Show incentives for <industry/product> [in <location>].”
 - **APPROVALS**: “Show approvals required for <industry/product> [in <location>].”
 - **VENDORS**: “Find vendors for <supply or product> [in <location>].”
@@ -387,7 +423,7 @@ Primary intents: **Build from Scratch**, **Vendor Search**, **Incentive Search**
 ## SELF-CHECK — MODULE GATE (must execute silently before final output)
 - Identify the active module intent.
 - Verify the **Required Fields Matrix** is satisfied using **Allowed history → Feasibility (if on) → Omit**:
-  - **BFS**: If `final_product_capacity` exists in feasibility and the user didn’t override capacity with an **allowed** value, ensure the refined query **includes that full string** (value + unit + period). If it’s absent, **STOP**, add it, and re-check.
+  - **BFS/Acquire/Both**: If final_product_capacity exists in feasibility and the user didn’t override capacity with an **allowed** value, ensure the refined query **includes that full string** (value + unit + period). If it’s absent, **STOP**, add it, and re-check.
   - **Incentives/Approvals**: Ensure **both** `industry_or_product` **and** `location` are present (from latest user → allowed history → feasibility). If either is missing after those steps, **omit it** rather than guessing and keep the query otherwise standalone.
   - **Employment**: Ensure `location` is present (latest user → allowed history → feasibility).
   - **Vendors**: Ensure either `product_or_industry` or `raw_material/equipment/service` **and** `location` are present (latest user → allowed history → feasibility).

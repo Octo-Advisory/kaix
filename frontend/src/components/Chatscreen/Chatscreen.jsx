@@ -381,7 +381,7 @@ useEffect(() => {
   };
 
   const handleConfirmation = async (label, response,action) => {
-    console.log('response', response, 'label', label,action, confirmationMessage)
+    // console.log('response', response, 'label', label,action, confirmationMessage)
 
     if (action === "Stay in chat") {
       await handleSendbtn(response);
@@ -660,6 +660,7 @@ useEffect(() => {
       // STEP 2: Get AI response
       const resp = await fetchAIResponse(userMessage, "", currentSession);
       setAiResponses(resp)
+      
       // console.log("ai response", resp)
       const aiMsg = resp.Ai_response === "Not Available in List" ? noResultMsg : resp.Ai_response 
       const aiResponse = aiMsg;

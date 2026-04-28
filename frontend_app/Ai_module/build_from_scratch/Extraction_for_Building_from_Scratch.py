@@ -2203,6 +2203,58 @@ def extract_location_strings(location_info):
 #     ## ----------------- End New define funcation for followup question for location india by Hiren ------------------------ ##
 
 
+def check_property_availability(district_name, state_name):
+    """
+    Fast DB check to see what property types actually exist.
+    STRICTLY maps 'Auction Property' and 'Industrial Plant' to existing facilities.
+    Filters accurately by BOTH District and State.
+    """
+    has_land = False
+    has_facilities = False
+    
+    try:
+        # Native Frappe Database Query
+        filters = {"state": state_name}
+        if district_name:  # Only add district filter if provided
+            filters["district"] = district_name
+
+        records = frappe.get_all(
+            "Survey No",
+            # <-- Added state to the filters dictionary! 
+            # (Assuming your Frappe column is named "state")
+            filters=filters, 
+            fields=["property_type"],
+            limit_page_length=1000
+        )
+        
+        for rec in records:
+            # Converts the Frappe dropdown value to strictly lowercase
+            loc_type = str(rec.get("property_type", "")).strip().lower()
+            
+            # 1. CATCH ALL LAND
+            if "land" in loc_type or "plot" in loc_type or loc_type == "none" or loc_type == "" or loc_type == "null": 
+                has_land = True
+                
+            # 2. STRICT FACILITY MATCH
+            elif "auction property" in loc_type or "industrial plant" in loc_type: 
+                has_facilities = True
+                
+            # Stop early if we found both to save processing time
+            if has_land and has_facilities:
+                break
+        
+        frappe.log_error(
+            "Pre-Check Success", 
+            f"State: {state_name} | District: {district_name}\nLand Available: {has_land}\nFacilities Available: {has_facilities}\nRecords Checked: {len(records)}"
+        )
+            
+    except Exception as e:
+        frappe.log_error("Pre-Check Fatal Crash", f"Error details: {str(e)}")
+        return {"has_land": True, "has_facilities": True} 
+        
+    return {"has_land": has_land, "has_facilities": has_facilities}
+
+
 def gather_industry_details(
     query,
     main_industries,
@@ -2212,7 +2264,16 @@ def gather_industry_details(
     location_df=pd.DataFrame(columns=["Villages", "Areas", "Cities", "Talukas", "Districts", "States", "Countries"])
 ):
     """
-    Gathers industry details from the user query.
+    Gathers industry details from the user query while maintaining a conversation history.
+    
+    Args:
+    - query (str): The latest user query or follow-up response.
+    - main_industries (list): List of valid main industries.
+    - state (dict): Tracks previously provided information.
+
+    Returns:
+    - tuple: A dictionary containing the extracted details and the updated conversation history.
+
  
     CHANGED: Location resolution now handles COUNTRY_LEVEL, STATE_LEVEL,
     and district-level scope (only / nearby) in addition to existing PROCEED flow.
@@ -2510,26 +2571,44 @@ def gather_industry_details(
                             f"{state.get('Capacity Unit')} per {state.get('Time Period')}**"
                             if state.get('Capacity') not in [None, 'None'] else ""
                         )
- 
+
+                        top_state = matched_states[0] if matched_states else "certain key regions"
+
+                        # message = (
+                        #     f"Great! For a **{selected_option}** facility{capacity_text} in **{country_name}**, location is everything.<br/><br/>"
+                        #     # f"While **{country_name}** offers a vast landscape, our data shows that **{top_state}** is currently the premier hub for this industry, offering excellent infrastructure and ecosystem support.<br/><br/>"
+                        #     f"Here are the most promising states we've identified for your project:<br/><br/>"
+                        #     f"{states_list}<br/><br/>"
+                        #     f"Which of these regions catches your eye? Let me know, and we'll narrow down the best specific districts for you."
+                        # )
+
                         message = (
-                            f"Based on your requirement for a **{selected_option}** production unit"
-                            f"{capacity_text}, here are some locations that currently match your needs:<br/><br/>"
+                            f"Now that we’ve identified **{country_name}** as your target country, the next step is to narrow down to the state level.<br/><br/>"
+                            f"Based on the available data, here’s a suitable state to consider for your **{selected_option}** facility{capacity_text}:<br/><br/>"
                             f"{states_list}<br/><br/>"
-                            f"Let me know which of these you would like to explore further, and I will share more details."
-                        )
+                            f"From here, we can go a level deeper and explore specific districts within this region to find the best fit or explore the entire state."
+                        )                       
+ 
+                        # message = (
+                        #     f"Based on your requirement for a **{selected_option}** production unit"
+                        #     f"{capacity_text}, here are some locations that currently match your needs:<br/><br/>"
+                        #     f"{states_list}<br/><br/>"
+                        #     f"Let me know which of these you would like to explore further, and I will share more details."
+                        # )
                         return {
                             "Ai_response": message,
                             "Is_confirmation": False,
                             "state": state,
                             "options": None,
                             "User Intention": user_intention,
-                            "Trigger_Lead_Generation": False
+                            "Trigger_Lead_Generation": False,
+                            "Skip_Polish": True
                         }
  
                     # ═══════════════════════════════════════════════════════════
-                    # ADDED — STATE_LEVEL handling
+                    # STATE_LEVEL handling
                     # User gave "Gujarat" → AI recommends districts → show to user
-                    # Also offer "All Gujarat" option
+                    # Also offer "All Gujarat" option (Yes/No confirmation only)
                     # Risk 3: if no districts in DB → trigger lead generation
                     # ═══════════════════════════════════════════════════════════
                     elif location_resolution_status == "STATE_LEVEL":
@@ -2540,7 +2619,7 @@ def gather_industry_details(
                                 if loc.get("State") not in ["None", "Not Available in List"]:
                                     state_name = loc.get("State")
                                     break
-
+                    
                         query_lower = query.lower().strip()
                         all_state_keywords = [
                             f"all {state_name.lower()}",
@@ -2548,7 +2627,7 @@ def gather_industry_details(
                             f"whole {state_name.lower()}",
                             f"all of {state_name.lower()}",
                         ]
-
+                    
                         selected_option = next(
                             (state.get(key) for key in ['Product', 'Segment', 'Sub-Sector', 'Main-Industry']
                              if state.get(key) not in [None, 'None']),
@@ -2559,11 +2638,18 @@ def gather_industry_details(
                             f"{state.get('Capacity Unit')} per {state.get('Time Period')}**"
                             if state.get('Capacity') not in [None, 'None'] else ""
                         )
-
-                        # ── Case 1 — User explicitly typed "All Gujarat" ──────────────────
-                        if any(kw in query_lower for kw in all_state_keywords):
+                    
+                        # ── Full-state path — user explicitly typed "All Gujarat"
+                        #    OR user typed the same state again after seeing district list ──
+                        is_full_state = (
+                            any(kw in query_lower for kw in all_state_keywords)
+                            or (state.get("District_List_State") == state_name and state.get("State_Shown_Count", 0) > 0)
+                        )
+                    
+                        if is_full_state:
                             state["Location_Scope"] = "full_state"
                             save_state(state, f"QIND_state_{chatId}")
+                    
                             message = (
                                 f"Based on your inputs, we understand that you are planning to set up a "
                                 f"**{selected_option}** production unit{capacity_text}. <br/><br/>"
@@ -2571,10 +2657,12 @@ def gather_industry_details(
                                 f"**{state_name}** state. <br/><br/>"
                                 f"Please confirm if the above understanding is correct."
                             )
+                    
                             options = [
                                 {"label": "Yes, this is correct", "value": user_intention},
                                 {"label": "No, this is not correct", "value": None}
                             ]
+                    
                             return {
                                 "Ai_response": message,
                                 "Is_confirmation": True,
@@ -2582,40 +2670,16 @@ def gather_industry_details(
                                 "state": state,
                                 "options": options,
                                 "User Intention": user_intention,
-                                "Trigger_Lead_Generation": False
+                                "Trigger_Lead_Generation": False,
+                                "Skip_Polish": True
                             }
-
-                        # ── Case 2 — User typed same state again (count logic) ────────────
-                        elif state.get("District_List_State") == state_name and state.get("State_Shown_Count", 0) > 0:
-                            state["Location_Scope"] = "full_state"
-                            save_state(state, f"QIND_state_{chatId}")
-                            message = (
-                                f"Based on your inputs, we understand that you are planning to set up a "
-                                f"**{selected_option}** production unit{capacity_text}. <br/><br/>"
-                                f"We will evaluate all available properties across the entire "
-                                f"**{state_name}** state. <br/><br/>"
-                                f"Please confirm if the above understanding is correct."
-                            )
-                            options = [
-                                {"label": "Yes, this is correct", "value": user_intention},
-                                {"label": "No, this is not correct", "value": None}
-                            ]
-                            return {
-                                "Ai_response": message,
-                                "Is_confirmation": True,
-                                "validated_data": segment_validated_data,
-                                "state": state,
-                                "options": options,
-                                "User Intention": user_intention,
-                                "Trigger_Lead_Generation": False
-                            }
-
-                        # ── Case 3 — First time or different state — show district list ───
+                    
+                        # ── First time or different state — show district list ──
                         else:
                             state["State_Shown_Count"] = 1
                             state["District_List_State"] = state_name
                             save_state(state, f"QIND_state_{chatId}")
-
+                    
                             # Get AI recommended districts
                             matched_districts = get_ai_recommended_districts(
                                 industry=state["Main-Industry"],
@@ -2624,7 +2688,7 @@ def gather_industry_details(
                                 location_df=location_df,
                                 llm=llm
                             )
-
+                    
                             # Risk 3 — no districts available in DB for this state
                             if not matched_districts:
                                 message = (
@@ -2642,18 +2706,19 @@ def gather_industry_details(
                                     "User Intention": user_intention,
                                     "Trigger_Lead_Generation": True
                                 }
-
+                    
                             # Build numbered district list
                             districts_list = "<br/>".join(
                                 [f"{i+1}. {d}" for i, d in enumerate(matched_districts[:5])]
                             )
-
+                    
                             message = (
                                 f"For **{selected_option}** in **{state_name}**, here are the districts where "
                                 f"we currently have relevant options:<br/><br/>"
                                 f"{districts_list}<br/><br/>"
                                 f"Let me know if any of these stand out to you, or if you would prefer to explore options across the entire state."
                             )
+                    
                             return {
                                 "Ai_response": message,
                                 "Is_confirmation": False,
@@ -2662,7 +2727,7 @@ def gather_industry_details(
                                 "User Intention": user_intention,
                                 "Trigger_Lead_Generation": False
                             }
- 
+                    
                     # ═══════════════════════════════════════════════════════════
                     # ADDED — INVALID location handling
                     # ═══════════════════════════════════════════════════════════
@@ -2693,48 +2758,59 @@ def gather_industry_details(
                     #      If neither, asks scope question before confirmation
                     # ═══════════════════════════════════════════════════════════
                     else:
-                        # Get district name for scope question
+                    # Get district name and state name for scope question
                         district_name = "None"
+                        state_name = "None"
+
                         if state.get("Location") and state["Location"] != "None":
                             for loc in state["Location"]:
                                 if loc.get("District") not in ["None", "Not Available in List"]:
                                     district_name = loc.get("District")
-                                    break
+                                if loc.get("State") not in ["None", "Not Available in List"]:
+                                    state_name = loc.get("State")
+                                break
  
                         query_lower = query.lower().strip()
+                        if state.get("Location_Scope") in ["None", None]:
+                            if "nearby" in query_lower or "surrounding" in query_lower or "adjacent" in query_lower:
+                                state["Location_Scope"] = "district_nearby"
+                                save_state(state, f"QIND_state_{chatId}")
+                            elif "only" in query_lower or "just" in query_lower:
+                                state["Location_Scope"] = "district_only"
+                                save_state(state, f"QIND_state_{chatId}")
  
                         # -----------------------------------------------------------
                         # ADDED — Detect "only district" scope from user message
                         # -----------------------------------------------------------
-                        only_keywords = [
-                            f"only {district_name.lower()}",
-                            f"just {district_name.lower()}",
-                            f"{district_name.lower()} only",
-                            "only this district",
-                            "only district",
-                        ]
+                        # only_keywords = [
+                        #     f"only {district_name.lower()}",
+                        #     f"just {district_name.lower()}",
+                        #     f"{district_name.lower()} only",
+                        #     "only this district",
+                        #     "only district",
+                        # ]
  
-                        # -----------------------------------------------------------
-                        # ADDED — Detect "district and nearby" scope from user message
-                        # -----------------------------------------------------------
-                        nearby_keywords = [
-                            f"{district_name.lower()} and nearby",
-                            f"{district_name.lower()} and surrounding",
-                            f"{district_name.lower()} and adjacent",
-                            "and nearby",
-                            "nearby areas",
-                            "nearby districts",
-                            "surrounding districts",
-                            "include nearby",
-                        ]
+                        # # -----------------------------------------------------------
+                        # # ADDED — Detect "district and nearby" scope from user message
+                        # # -----------------------------------------------------------
+                        # nearby_keywords = [
+                        #     f"{district_name.lower()} and nearby",
+                        #     f"{district_name.lower()} and surrounding",
+                        #     f"{district_name.lower()} and adjacent",
+                        #     "and nearby",
+                        #     "nearby areas",
+                        #     "nearby districts",
+                        #     "surrounding districts",
+                        #     "include nearby",
+                        # ]
  
-                        if any(kw in query_lower for kw in only_keywords):
-                            state["Location_Scope"] = "district_only"
-                            save_state(state, f"QIND_state_{chatId}")
+                        # if any(kw in query_lower for kw in only_keywords):
+                        #     state["Location_Scope"] = "district_only"
+                        #     save_state(state, f"QIND_state_{chatId}")
  
-                        elif any(kw in query_lower for kw in nearby_keywords):
-                            state["Location_Scope"] = "district_nearby"
-                            save_state(state, f"QIND_state_{chatId}")
+                        # elif any(kw in query_lower for kw in nearby_keywords):
+                        #     state["Location_Scope"] = "district_nearby"
+                        #     save_state(state, f"QIND_state_{chatId}")
  
                         # -----------------------------------------------------------
                         # ADDED — Scope not yet chosen, ask user
@@ -2764,7 +2840,8 @@ def gather_industry_details(
                                     {"label": f"{district_name} and nearby", "value": f"{district_name} and nearby", "action": "Stay in chat"},
                                     ],
                                 "User Intention": user_intention,
-                                "Trigger_Lead_Generation": False
+                                "Trigger_Lead_Generation": False,
+                                "Skip_Polish": True
                             }
  
                         selected_option = next(
@@ -2783,103 +2860,97 @@ def gather_industry_details(
                             for loc in state["Location"]
                         )
                         has_mapped_districts = bool(mapped_districts_str)
- 
+
                         district_mapping_explanation = (
-                            f"I'd like to highlight one important point about how we evaluate locations. "
-                            f"When a requirement is shared at a very specific level (for example, an area/city/taluka), the number of listed land parcels "
-                            f"can sometimes be limited at that exact micro-boundary. In practice, strong options often exist a short distance away within the "
-                            f"**same district**—sometimes with better highway connectivity, utility access, industrial ecosystem support, or more favorable pricing. <br/><br/>"
-                            f"To ensure we do not miss these high-potential opportunities, we will evaluate land options at the **district level** for the "
-                            f"lower-level locations you mentioned, i.e., across **{mapped_districts_str}**. This provides a broader, more competitive shortlist "
-                            f"while still staying aligned to your intended geography. <br/><br/>"
+                            f"The evaluation is anchored to **{district_name}** district. <br/><br/>"
                         ) if has_mapped_districts else ""
- 
+
                         boundary_expansion_explanation = (
-                            f"In addition, our evaluation will also cover land parcels located **just outside the district boundary** (within a short distance). "
-                            f"This is a practical step we take because some of the most attractive industrial plots sit near district borders—"
-                            f"they may be technically outside the boundary, but can offer materially better logistics access, infrastructure readiness, "
-                            f"availability of utilities, or commercial viability compared to many options strictly inside the district. <br/><br/>"
-                            f"By including these nearby pockets, we increase the likelihood of identifying 'value winners'—options that can outperform "
-                            f"district-only choices while remaining operationally close to your target area. <br/><br/>"
+                            f"To capture more viable parcels, we'll consider options across "
+                            f"**{district_name}** district and nearby areas. This opens up parcels "
+                            f"that may offer better highway connectivity, utility access, proximity "
+                            f"to supporting industries, or competitive pricing — while still staying "
+                            f"within your preferred region. <br/><br/>"
                         ) if has_any_district else ""
 
                         scope = state.get("Location_Scope", "None")
+
                         if scope == "district_only":
-                            scope_line = f"You have selected to evaluate properties **strictly within {district_name} district only**. <br/><br/>"
+                            scope_block = (
+                                f"As per your preference, we'll focus the search **strictly within "
+                                f"{district_name}** district — no parcels outside this boundary "
+                                f"will be considered. <br/><br/>"
+                            )
                         elif scope == "district_nearby":
-                            scope_line = f"You have selected to evaluate properties in **{district_name} district and surrounding nearby districts**. <br/><br/>"
+                            scope_block = (
+                                f"We'll evaluate options across **{district_name}** district and "
+                                f"nearby areas. This opens up parcels that may offer better highway "
+                                f"connectivity, utility access, proximity to supporting industries, "
+                                f"or competitive pricing — while still staying within your preferred "
+                                f"region. <br/><br/>"
+                            )
                         else:
-                            scope_line = ""
+                            scope_block = district_mapping_explanation + boundary_expansion_explanation
                         
-                        district_only_line = f"We will focus our search strictly within **{district_name}** district, as per your preference. <br/><br/>"
- 
                         confirmation_message_class_1 = (
-                            f"Great, here's what we've understood from your inputs. <br/><br/>"
-                            f"You are planning to **build a new industrial unit** for **{selected_option}** production, "
+                            f"Great — here's what we've captured from your inputs. <br/><br/>"
+                            f"You're planning to **set up a new manufacturing unit** for **{selected_option}** production, "
                             f"with a planned capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} per {state.get('Time Period')}**. <br/><br/>"
                             f"Your preferred location is **{available_locations_str}**"
-                            f"{f', however we currently do not have land availability in **{unavailable_locations_str}**, so these will not be part of the evaluation' if unavailable_locations_str else ''}. <br/><br/>"
-                            f"{scope_line}"
-                            f"{district_mapping_explanation}"
-                            f"{district_only_line if scope == 'district_only' else boundary_expansion_explanation}"
+                            f"{f'. However, we currently do not have land availability in **{unavailable_locations_str}**, so these will be excluded from the evaluation' if unavailable_locations_str else ''}. <br/><br/>"
+                            f"{scope_block}"
                             f"Does this reflect what you had in mind? Please confirm so we can get started."
                         )
- 
+                        
                         confirmation_buttons_class_1 = [
                             {"label": "Yes, this is correct", "value": "Intent to Build Industry from Scratch"},
                             {"label": "No, this is not correct", "value": None}
                         ]
- 
+                        
                         confirmation_message_class_2 = (
-                            f"Got it, here's our understanding of your requirement. <br/><br/>"
-                            f"You are looking to **acquire an existing industrial facility** for **{selected_option}** production, "
+                            f"Got it — here's our understanding of your requirement. <br/><br/>"
+                            f"You're looking to **acquire an existing industrial facility** for **{selected_option}** production, "
                             f"with a capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} per {state.get('Time Period')}**. <br/><br/>"
                             f"Your preferred location is **{available_locations_str}**"
-                            f"{f', though we do not currently have matching facilities in **{unavailable_locations_str}**, so these will be excluded' if unavailable_locations_str else ''}. <br/><br/>"
-                            f"{scope_line}"
-                            f"{district_mapping_explanation}"
-                            f"{district_only_line if scope == 'district_only' else boundary_expansion_explanation}"
+                            f"{f'. However, we do not currently have matching facilities in **{unavailable_locations_str}**, so these will be excluded' if unavailable_locations_str else ''}. <br/><br/>"
+                            f"{scope_block}"
                             f"Please confirm if this is correct so we can begin identifying suitable facilities for you."
                         )
- 
+                        
                         confirmation_buttons_class_2 = [
                             {"label": "Yes, this is correct", "value": "Intent to Acquire Existing Industrial Infrastructure"},
                             {"label": "No, this is not correct", "value": None}
                         ]
- 
+                        
                         confirmation_message_class_3 = (
                             f"Here's what we've noted from your inputs. <br/><br/>"
-                            f"You are planning to set up a **{selected_option}** production unit "
+                            f"You're planning to set up a **{selected_option}** production unit "
                             f"with a capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} per {state.get('Time Period')}**. <br/><br/>"
                             f"Your preferred location is **{available_locations_str}**"
-                            f"{f', though we currently do not have listings in **{unavailable_locations_str}**' if unavailable_locations_str else ''}. <br/><br/>"
-                            f"{scope_line}"
-                            f"{district_mapping_explanation}"
-                            f"{district_only_line if scope == 'district_only' else boundary_expansion_explanation}"
+                            f"{f'. However, we currently do not have listings in **{unavailable_locations_str}**' if unavailable_locations_str else ''}. <br/><br/>"
+                            f"{scope_block}"
                             f"Kindly choose one of the following options to move forward."
                         )
- 
+                        
                         confirmation_buttons_class_3 = [
                             {"label": "Explore Land for New Unit", "value": "Intent to Build Industry from Scratch"},
                             {"label": "Explore Existing Facilities", "value": "Intent to Acquire Existing Industrial Infrastructure"},
                             {"label": "View All Setup Options", "value": "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure"},
                             {"label": "Refine Requirements", "value": None}
                         ]
- 
+                        
                         confirmation_message_class_6 = (
-                            f"Excellent, here's our understanding of what you're looking for. <br/><br/>"
+                            f"Excellent — here's our understanding of what you're looking for. <br/><br/>"
                             f"You'd like to **explore both pathways** — "
                             f"**building a new industrial unit** as well as **acquiring an existing facility** — "
                             f"for **{selected_option}** production, "
                             f"with a capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} per {state.get('Time Period')}**. <br/><br/>"
                             f"Your preferred location is **{available_locations_str}**"
-                            f"{f', though we currently do not have suitable options in **{unavailable_locations_str}**, so these will be excluded from the evaluation' if unavailable_locations_str else ''}. <br/><br/>"
-                            f"{scope_line}"
-                            f"{district_mapping_explanation}"
-                            f"{district_only_line if scope == 'district_only' else boundary_expansion_explanation}"
+                            f"{f'. However, we currently do not have suitable options in **{unavailable_locations_str}**, so these will be excluded from the evaluation' if unavailable_locations_str else ''}. <br/><br/>"
+                            f"{scope_block}"
                             f"Does everything look right? Please confirm so we can start identifying the best **land options** and **ready facilities** for your project."
                         )
- 
+                        
                         confirmation_buttons_class_6 = [
                             {"label": "Yes, this is correct", "value": "Intent to Evaluate Both Building from Scratch and Acquiring Existing Infrastructure"},
                             {"label": "No, this is not correct", "value": None}
@@ -2908,19 +2979,55 @@ def gather_industry_details(
                             user_intention,
                             class_confirmation_message_mapping["Intent to Set Up Industry with Unspecified Build or Buy Intent"]
                         )
- 
+
                         confirmation_message_static = confirmation_message_static_dict["Message"]
                         confirmation_message_options = confirmation_message_static_dict["Options"]
+                        is_confirmation_flag = True
+
+                        # -----------------------------------------------------------
+                        # 2. DYNAMIC UI PRE-CHECK (Fixed the IF condition)
+                        # -----------------------------------------------------------
+                        # We check if the options match Class 3, ignoring the messy string!
+                        availability = check_property_availability(
+                            district_name=district_name,
+                            state_name=state_name
+                        )
+
+                        if availability["has_land"] and availability["has_facilities"]:
+                            confirmation_message_static = confirmation_message_class_3
+                            confirmation_message_options = confirmation_buttons_class_3
+                            is_confirmation_flag = True
+
+                        elif availability["has_land"] and not availability["has_facilities"]:
+                            confirmation_message_static = class_confirmation_message_mapping["Intent to Build Industry from Scratch"]["Message"]
+                            confirmation_message_options = class_confirmation_message_mapping["Intent to Build Industry from Scratch"]["Options"]
+                            is_confirmation_flag = True
+
+                        elif not availability["has_land"] and availability["has_facilities"]:
+                            confirmation_message_static = class_confirmation_message_mapping["Intent to Acquire Existing Industrial Infrastructure"]["Message"]
+                            confirmation_message_options = class_confirmation_message_mapping["Intent to Acquire Existing Industrial Infrastructure"]["Options"]
+                            is_confirmation_flag = True
+
+                        else:
+                            confirmation_message_static = (
+                                f"We checked our database, but unfortunately, there are currently no properties "
+                                f"available in **{district_name}**.<br/><br/>"
+                                f"Would you like to explore other districts, or expand your search to the entire state?"
+                            )
+                            confirmation_message_options = None
+                            is_confirmation_flag = False
  
                         return {
                             "Ai_response": confirmation_message_static,
-                            "Is_confirmation": True,
+                            "Is_confirmation": is_confirmation_flag,
                             "validated_data": segment_validated_data,
                             "state": state,
                             "options": confirmation_message_options,
                             "User Intention": user_intention,
-                            "Trigger_Lead_Generation": False
+                            "Trigger_Lead_Generation": False,
+                            "Skip_Polish": True
                         }
+
  
             # Sub-sector not in DB
             elif state['Sub-Sector'] == 'Not Available in List':
