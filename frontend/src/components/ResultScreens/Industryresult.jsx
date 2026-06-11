@@ -25,7 +25,7 @@ function Industryresult({ result }) {
       const response = await fetch(`/api/resource/Survey No?fields=["*"]&filters=[["name","=","${property}"]]&order_by=modified asc`, {
         method: 'GET',
         headers: {
-          'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+          'Authorization': 'token d3de1e0e4e25846:a17a89fc01bd744',
           'Content-Type': 'application/json'
         }
       });

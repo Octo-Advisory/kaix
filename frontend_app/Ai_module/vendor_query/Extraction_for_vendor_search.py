@@ -12,7 +12,8 @@ import spacy
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
 from frontend_app.Management_Class.helpers.utility import update_llm_token
-from frontend_app.Management_Class.Ai_management.AI import *
+# from frontend_app.Management_Class.Ai_management.AI import *
+from frontend_app.Ai_module.parsers import parse_llm_response
 
 warnings.filterwarnings("ignore")
 
@@ -105,12 +106,30 @@ def refine_query_with_history_for_vendor(history, latest_query, llm):
 
     # Extract the reformulated standalone query
     match = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', refined_text, re.IGNORECASE)
-    if match:
-        # Return the captured group that is not None
-        return next(group for group in match.groups() if group)
+    candidate = next((g for g in match.groups() if g), refined_text) if match else refined_text
 
-    # Fallback to the entire response if no match is found
-    return refined_text
+    # P1-5 #2/#3: validate at the boundary; one plain-text corrective retry;
+    # typed RefinedQueryFailure logged on unrecoverable failure.
+    from frontend_app.Ai_module.query_refinement.schemas import RefinedQuery as _RQ, RefinedQueryFailure as _RQF
+    from pydantic import ValidationError as _RQ_VE
+    try:
+        return _RQ(refined_query=candidate).refined_query
+    except _RQ_VE as _first_err:
+        try:
+            _retry_raw = llm.invoke(
+                "Return ONLY a single standalone reformulated query as plain text. "
+                "No JSON, no markdown, no quotes, no headers, no explanations, "
+                "no paragraph breaks — one single line only.\n\n"
+                f"Your previous answer was invalid: {_first_err}\n"
+                f"Previous answer:\n{candidate}\n\nOriginal request:\n{latest_query}"
+            ).content.strip()
+            _m = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', _retry_raw, re.IGNORECASE)
+            _retry_candidate = next((g for g in _m.groups() if g), _retry_raw) if _m else _retry_raw
+            return _RQ(refined_query=_retry_candidate).refined_query
+        except Exception as _retry_err:
+            _f = _RQF(error=str(_retry_err), raw_output=refined_text, refined_query=candidate)
+            frappe.log_error(f"{_f.error} | raw: {_f.raw_output}", "refine_query_with_history parse failure")
+            return candidate
 
 def classify_vendor_query(query: str, llm) -> dict:
     """
@@ -292,14 +311,97 @@ def classify_vendor_query(query: str, llm) -> dict:
     if match:
         classification_number = int(match.group(1))
         classification_category = category_mapping[classification_number]
+        # NEW PYDANTIC LAYER
+        # Wraps the extracted integer in VendorClassification.
+        # The regex above already enforces 1-7, so validation should
+        # never reject in practice. The guard catches any future regex
+        # widening that would silently produce out-of-range values.
+        try:
+            from frontend_app.Ai_module.vendor_query.schemas import (
+                VendorClassification,
+            )
+            from pydantic import ValidationError as _VE
+            try:
+                VendorClassification(classification_number=classification_number)
+            except _VE as _ve:
+                frappe.log_error(
+                    f"VendorClassification rejected {classification_number}: {_ve}",
+                    "classify_vendor_query pydantic"
+                )
+        except Exception as _e:
+            frappe.log_error(str(_e), "classify_vendor_query pydantic")
+
         return {
             "raw_prompt": raw_prompt,
             "classification_number": classification_number,
             "classification_category": classification_category,
         }
     else:
-        raise ValueError(f"Unexpected or invalid response from LLM: {response}")
-
+        # P1-5: regex did not match — the LLM returned junk (a word, prose,
+        # multiple/out-of-range digits, or empty). Instead of raising
+        # ValueError, retry once with a corrective prompt and, if that also
+        # fails, return a typed VendorClassificationFailure envelope so the
+        # caller can degrade gracefully rather than crashing.
+        try:
+            from frontend_app.Ai_module.vendor_query.schemas import (
+                VendorClassification,
+                VendorClassificationFailure,
+            )
+            _retry_prompt = (
+                "Classify the user's vendor-related query into exactly one "
+                "category and return ONLY a JSON object of the form "
+                '{"classification_number": N}, where N is one integer:\n'
+                "1 = vendor search, location only (no industry/supply)\n"
+                "2 = vendor search, industry only (no location)\n"
+                "3 = vendor search, supply only (no location)\n"
+                "4 = vendor search, industry + location\n"
+                "5 = vendor search, supply + location\n"
+                "6 = other intent\n"
+                "7 = negatively intended query\n"
+                "No prose, no words, no extra keys.\n\n"
+                f"Query: {query}"
+            )
+            validated = parse_llm_response(
+                raw=response.content.strip(),
+                model_class=VendorClassification,
+                llm_client=llm,
+                prompt=_retry_prompt,
+            )
+            if isinstance(validated, VendorClassification):
+                classification_number = validated.classification_number
+                return {
+                    "raw_prompt": raw_prompt,
+                    "classification_number": classification_number,
+                    "classification_category": category_mapping[classification_number],
+                }
+            # Retry also failed — normalise to the typed failure envelope.
+            if isinstance(validated, VendorClassificationFailure):
+                failure = validated
+            elif isinstance(validated, dict):
+                failure = VendorClassificationFailure(
+                    error=str(validated.get("error", "unparseable LLM output")),
+                    raw_output=str(validated.get("raw_output", response.content)),
+                )
+            else:
+                failure = VendorClassificationFailure(
+                    error="parse_llm_response returned an unexpected type",
+                    raw_output=str(response.content),
+                )
+            frappe.log_error(
+                f"{failure.error} | raw: {failure.raw_output}",
+                "classify_vendor_query failure",
+            )
+            return failure
+        except Exception as _e:
+            # Never crash the request path: log and degrade to the envelope.
+            frappe.log_error(str(_e), "classify_vendor_query pydantic")
+            from frontend_app.Ai_module.vendor_query.schemas import (
+                VendorClassificationFailure,
+            )
+            return VendorClassificationFailure(
+                error=str(_e),
+                raw_output=str(getattr(response, "content", response)),
+            )
 def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
     """
     Extract the location mentioned in the user query and classify it into Area, City, State, or Country.
@@ -400,22 +502,52 @@ def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
     # Extract the response content
     extracted_data = response.content.strip()
 
-    # Use regex to extract JSON-like structure
-    location_match = re.search(r'"Extracted_Location":\s*"([^"]+)"', extracted_data)
-    classification_match = re.search(r'"Classification":\s*"([^"]+)"', extracted_data)
-    from_india_match = re.search(r'"From_India":\s*"([^"]+)"', extracted_data)
-
-    # Assign extracted values
-    extracted_location = location_match.group(1) if location_match else "None"
-    classification = classification_match.group(1) if classification_match else "Area"  # Default to Area if missing
-    from_india = from_india_match.group(1) if from_india_match else "No"  # Default to "No" if missing
-
-    # Return extracted location, classification, and country check
-    return {
-        "Extracted_Location": extracted_location,
-        "Classification": classification,
-        "From_India": from_india
-    }
+    from frontend_app.Ai_module.vendor_query.schemas import (
+        VendorLocationExtraction,
+        VendorLocationExtractionFailure,
+    )
+    _retry_prompt = (
+        "Extract location info from the user query and return ONLY a "
+        "JSON object with these three string keys: "
+        '{"Extracted_Location": "<location text, or None if none>", '
+        '"Classification": "<one of: Area, City, State, Country, None>", '
+        '"From_India": "<Yes or No>"}. '
+        "No prose, no markdown fences, no extra keys.\n\n"
+        f'User query: "{user_input}"'
+    )
+    _result = parse_llm_response(
+        raw=extracted_data,
+        model_class=VendorLocationExtraction,
+        llm_client=llm,
+        prompt=_retry_prompt,
+    )
+    if isinstance(_result, VendorLocationExtraction):
+        return {
+            "Extracted_Location": _result.Extracted_Location,
+            "Classification": _result.Classification,
+            "From_India": _result.From_India,
+        }
+    # P1-5: parse failed even after one corrective retry. Return the TYPED
+    # envelope — do NOT fall back to the wrong-but-plausible default this
+    # schema exists to eliminate — so callers can distinguish a real
+    # "no location" answer from a parse fail.
+    if isinstance(_result, VendorLocationExtractionFailure):
+        failure = _result
+    elif isinstance(_result, dict):
+        failure = VendorLocationExtractionFailure(
+            error=str(_result.get("error", "unparseable LLM output")),
+            raw_output=str(_result.get("raw_output", extracted_data)),
+        )
+    else:
+        failure = VendorLocationExtractionFailure(
+            error="parse_llm_response returned an unexpected type",
+            raw_output=str(extracted_data),
+        )
+    frappe.log_error(
+        f"{failure.error} | raw: {failure.raw_output}",
+        "extract_location_from_vendor_query failure",
+    )
+    return failure
 
 def get_best_supply_match(extracted_supplies: List[str], available_supplies: List[str], fuzzy_threshold: int = 95, spacy_threshold: float = 0.80) -> List[str]:
     """
@@ -554,6 +686,85 @@ def extract_supplies_from_query(user_input: str, available_supplies: List[str], 
     extracted_supplies = (
         [s.strip() for s in supplies_match.group(1).split(",") if s.strip()] if supplies_match else []
     )
+
+    # NEW PYDANTIC LAYER — SANITY CHECK ONLY
+    # VendorSuppliesExtraction has a mode="before" validator that does
+    # CSV string → clean list[str] coercion. We use it as a sanity check
+    # against the manual CSV split above. If Pydantic produces a
+    # different list, log the divergence but DO NOT override
+    # extracted_supplies — downstream get_best_supply_match() must run
+    # on the original split, and Validated_Supplies in the return dict
+    # must come from that path (not from this layer).
+    try:
+        from frontend_app.Ai_module.vendor_query.schemas import (
+            VendorSuppliesExtraction,
+        )
+        if supplies_match:
+            _csv = supplies_match.group(1)
+            _validated = VendorSuppliesExtraction(Supplies=_csv)
+            _pydantic_supplies = list(_validated.Supplies)
+            if _pydantic_supplies != extracted_supplies:
+                frappe.log_error(
+                    f"Supplies divergence — CSV split: {extracted_supplies}, "
+                    f"Pydantic: {_pydantic_supplies}",
+                    "extract_supplies_from_query pydantic"
+                )
+    except Exception as _e:
+        frappe.log_error(str(_e), "extract_supplies_from_query pydantic")
+    # P1-5: regex found no "Supplies" key at all — the LLM didn't return
+    # the expected shape (omitted key, markdown-fenced, or a nested dict).
+    # This is a genuine parse failure (distinct from a valid empty-supplies
+    # answer). Retry once; on success adopt the recovered supplies, on
+    # unrecoverable failure return the TYPED envelope — do NOT collapse to
+    # the empty-supplies success shape, which is indistinguishable from a
+    # real "no supplies" answer — so callers can tell a parse fail apart.
+    if supplies_match is None:
+        try:
+            from frontend_app.Ai_module.vendor_query.schemas import (
+                VendorSuppliesExtraction,
+                VendorSuppliesExtractionFailure,
+            )
+            _retry_prompt = (
+                'Return ONLY a JSON object of the form '
+                '{"Supplies": "<comma-separated supplies, or empty string>"}. '
+                "No prose, no markdown fences, no nested objects, no extra keys."
+            )
+            _recovered = parse_llm_response(
+                raw=response.content.strip(),
+                model_class=VendorSuppliesExtraction,
+                llm_client=llm,
+                prompt=_retry_prompt,
+            )
+            if isinstance(_recovered, VendorSuppliesExtraction):
+                extracted_supplies = list(_recovered.Supplies)
+            else:
+                if isinstance(_recovered, VendorSuppliesExtractionFailure):
+                    failure = _recovered
+                elif isinstance(_recovered, dict):
+                    failure = VendorSuppliesExtractionFailure(
+                        error=str(_recovered.get("error", "unparseable LLM output")),
+                        raw_output=str(_recovered.get("raw_output", response.content)),
+                    )
+                else:
+                    failure = VendorSuppliesExtractionFailure(
+                        error="parse_llm_response returned an unexpected type",
+                        raw_output=str(response.content),
+                    )
+                frappe.log_error(
+                    f"{failure.error} | raw: {failure.raw_output}",
+                    "extract_supplies_from_query failure",
+                )
+                return failure
+        except Exception as _e:
+            # Never crash the request path: log and degrade to the envelope.
+            frappe.log_error(str(_e), "extract_supplies_from_query pydantic")
+            from frontend_app.Ai_module.vendor_query.schemas import (
+                VendorSuppliesExtractionFailure,
+            )
+            return VendorSuppliesExtractionFailure(
+                error=str(_e),
+                raw_output=str(getattr(response, "content", response)),
+            )
 
     # Return immediately if no supplies were extracted
     if not extracted_supplies:
@@ -1160,6 +1371,27 @@ def handle_vendor_query(
     refined_user_input = user_input
     
     result = classify_vendor_query(refined_user_input, llm)
+    # VendorClassificationFailure envelope instead of raising when the LLM
+    # output cannot be parsed even after one corrective retry.
+    from frontend_app.Ai_module.vendor_query.schemas import (
+        VendorClassificationFailure,
+        VendorLocationExtractionFailure,
+        VendorSuppliesExtractionFailure,
+    )
+    if isinstance(result, VendorClassificationFailure):
+        return {
+            "Ai_response": (
+                "Sorry, I couldn't quite understand your vendor request. "
+                "Could you rephrase it — for example, mention the industry, "
+                "the supplies, and/or the location you need vendors for?"
+            ),
+            "Is_confirmation": None,
+            "State": state,
+            "User Intention": "Other Intent",
+            "options": None,
+            "Trigger_Lead_Generation": False,
+        }
+
     user_intention = result["classification_category"]
     frappe.log_error(f"user _intesnion {user_intention}")
 
@@ -1188,6 +1420,26 @@ def handle_vendor_query(
         
         if user_intention == "Vendor Search for location without industry and supply details":
             extracted_data = extract_location_from_vendor_query(refined_user_input, llm)
+            if isinstance(extracted_data, VendorLocationExtractionFailure):
+                # P1-5: location parse unrecoverable even after one retry.
+                # Do not proceed with the wrong-but-plausible "Area" default —
+                # ask the user to restate the location explicitly.
+                frappe.log_error(
+                    f"{extracted_data.error} | raw: {extracted_data.raw_output}",
+                    "handle_vendor_query location failure",
+                )
+                return {
+                    "Ai_response": (
+                        "Sorry, I couldn't determine the location from your "
+                        "request. Could you restate it — for example the "
+                        "specific area, city, state, or country?"
+                    ),
+                    "Is_confirmation": None,
+                    "State": state,
+                    "User Intention": "Other Intent",
+                    "options": None,
+                    "Trigger_Lead_Generation": False,
+                }
             given_loacation = extracted_data["Extracted_Location"]
             given_location_category = extracted_data["Classification"]
             location_from_india = extracted_data["From_India"]
@@ -1497,6 +1749,27 @@ def handle_vendor_query(
             save_state(state,f"QVND_state_{chatId}")
 
             supply_query_result = extract_supplies_from_query(refined_user_input, available_supplies, llm)
+            if isinstance(supply_query_result, VendorSuppliesExtractionFailure):
+                # P1-5: supplies parse unrecoverable even after one retry.
+                # Do not proceed with empty supplies (indistinguishable from a
+                # real "no supplies" answer) — ask the user to restate them.
+                frappe.log_error(
+                    f"{supply_query_result.error} | raw: {supply_query_result.raw_output}",
+                    "handle_vendor_query supplies failure",
+                )
+                return {
+                    "Ai_response": (
+                        "Sorry, I couldn't determine the supplies or products "
+                        "from your request. Could you restate them — for "
+                        "example the specific materials, parts, or products "
+                        "you need vendors for?"
+                    ),
+                    "Is_confirmation": None,
+                    "State": state,
+                    "User Intention": "Other Intent",
+                    "options": None,
+                    "Trigger_Lead_Generation": False,
+                }
             extracted_supply = supply_query_result["Extracted_Supplies"]
             validated_supply = supply_query_result["Validated_Supplies"]
 
@@ -1620,6 +1893,26 @@ def handle_vendor_query(
             state["Supply_info"]["Supplies"] = []
             save_state(state,f"QVND_state_{chatId}")
             extracted_data = extract_location_from_vendor_query(refined_user_input, llm)
+            if isinstance(extracted_data, VendorLocationExtractionFailure):
+                # P1-5: location parse unrecoverable even after one retry.
+                # Do not proceed with the wrong-but-plausible "Area" default —
+                # ask the user to restate the location explicitly.
+                frappe.log_error(
+                    f"{extracted_data.error} | raw: {extracted_data.raw_output}",
+                    "handle_vendor_query location failure",
+                )
+                return {
+                    "Ai_response": (
+                        "Sorry, I couldn't determine the location from your "
+                        "request. Could you restate it — for example the "
+                        "specific area, city, state, or country?"
+                    ),
+                    "Is_confirmation": None,
+                    "State": state,
+                    "User Intention": "Other Intent",
+                    "options": None,
+                    "Trigger_Lead_Generation": False,
+                }
             given_loacation = extracted_data["Extracted_Location"]
             given_location_category = extracted_data["Classification"]
             location_from_india = extracted_data["From_India"]
@@ -1828,6 +2121,26 @@ def handle_vendor_query(
             }
             save_state(state,f"QVND_state_{chatId}")
             extracted_data = extract_location_from_vendor_query(refined_user_input, llm)
+            if isinstance(extracted_data, VendorLocationExtractionFailure):
+                # P1-5: location parse unrecoverable even after one retry.
+                # Do not proceed with the wrong-but-plausible "Area" default —
+                # ask the user to restate the location explicitly.
+                frappe.log_error(
+                    f"{extracted_data.error} | raw: {extracted_data.raw_output}",
+                    "handle_vendor_query location failure",
+                )
+                return {
+                    "Ai_response": (
+                        "Sorry, I couldn't determine the location from your "
+                        "request. Could you restate it — for example the "
+                        "specific area, city, state, or country?"
+                    ),
+                    "Is_confirmation": None,
+                    "State": state,
+                    "User Intention": "Other Intent",
+                    "options": None,
+                    "Trigger_Lead_Generation": False,
+                }
             given_loacation = extracted_data["Extracted_Location"]
             given_location_category = extracted_data["Classification"]
             location_from_india = extracted_data["From_India"]
@@ -1844,6 +2157,27 @@ def handle_vendor_query(
                 perfect_location_data = False
 
             supply_query_result = extract_supplies_from_query(refined_user_input, available_supplies, llm)
+            if isinstance(supply_query_result, VendorSuppliesExtractionFailure):
+                # P1-5: supplies parse unrecoverable even after one retry.
+                # Do not proceed with empty supplies (indistinguishable from a
+                # real "no supplies" answer) — ask the user to restate them.
+                frappe.log_error(
+                    f"{supply_query_result.error} | raw: {supply_query_result.raw_output}",
+                    "handle_vendor_query supplies failure",
+                )
+                return {
+                    "Ai_response": (
+                        "Sorry, I couldn't determine the supplies or products "
+                        "from your request. Could you restate them — for "
+                        "example the specific materials, parts, or products "
+                        "you need vendors for?"
+                    ),
+                    "Is_confirmation": None,
+                    "State": state,
+                    "User Intention": "Other Intent",
+                    "options": None,
+                    "Trigger_Lead_Generation": False,
+                }
             extracted_supply = supply_query_result["Extracted_Supplies"]
             validated_supply = supply_query_result["Validated_Supplies"]
 

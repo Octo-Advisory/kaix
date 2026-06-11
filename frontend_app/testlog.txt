@@ -1,0 +1,13 @@
+
+ &&&&&&&&&&&&&&&&&&&&&&&& Prompt:
+<frontend_app.tests.integration.test_query_classification._FakeMessage object at 0x7f148affe0c0>
+ &&&&&&&&&&&&&&&&&&&&&&&& Prompt:
+<frontend_app.tests.integration.test_query_classification._FakeMessage object at 0x7f148affe180>
+ &&&&&&&&&&&&&&&&&&&&&&&& Prompt:
+<frontend_app.tests.integration.test_query_classification._FakeMessage object at 0x7f7a94e861e0>
+ &&&&&&&&&&&&&&&&&&&&&&&& Prompt:
+<frontend_app.tests.integration.test_query_classification._FakeMessage object at 0x7f7a94e862a0>
+ &&&&&&&&&&&&&&&&&&&&&&&& Prompt:
+<frontend_app.tests.integration.test_query_classification._FakeMessage object at 0x7f829224e870>
+ &&&&&&&&&&&&&&&&&&&&&&&& Prompt:
+<frontend_app.tests.integration.test_query_classification._FakeMessage object at 0x7f829224e960>

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // const BASE_URL = 'https://marsinfraix.marsbazaar.com';
-const API_TOKEN = 'd3de1e0e4e25846:5045c3c55690e0b';
+const API_TOKEN = 'd3de1e0e4e25846:a17a89fc01bd744';
 
 export const getDataForSingleLayer = async (doctypeName, filters = null) => {
     try {

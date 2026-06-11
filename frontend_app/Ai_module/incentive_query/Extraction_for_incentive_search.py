@@ -7,11 +7,13 @@ from langchain.chains import LLMChain
 from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 from langchain.schema import HumanMessage, AIMessage
 import frappe
+from pydantic import ValidationError as _VE
+from frontend_app.Ai_module.incentive_query.schemas import (IncentiveClassification,IncentiveClassificationFailure,)
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,save_state,get_chat,get_state
 from datetime import datetime
 import json
 from frontend_app.Management_Class.helpers.utility import update_llm_token
-from frontend_app.Management_Class.Ai_management.AI import *
+# from frontend_app.Management_Class.Ai_management.AI import *
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -72,17 +74,43 @@ def refine_query_with_history_for_incentive(history, latest_query, llm):
     refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
     update_llm_token(refined_query)
     refined_text = refined_query.content.strip()
+    # # Extract the reformulated standalone query
+    # match = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', refined_text, re.IGNORECASE)
+    # if match:
+    #     # Return the captured group that is not None
+    #     return next(group for group in match.groups() if group)
     
+    # # Fallback to the entire response if no match is found
+    # return refined_text
+
     # Extract the reformulated standalone query
     match = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', refined_text, re.IGNORECASE)
-    if match:
-        # Return the captured group that is not None
-        return next(group for group in match.groups() if group)
-    
-    # Fallback to the entire response if no match is found
-    return refined_text
+    candidate = next((g for g in match.groups() if g), refined_text) if match else refined_text
 
-def classify_incentive_query(query: str, llm: Any) -> Dict[str, Any]:
+    # P1-5 #2/#3: validate at the boundary; one plain-text corrective retry;
+    # typed RefinedQueryFailure logged on unrecoverable failure.
+    from frontend_app.Ai_module.query_refinement.schemas import RefinedQuery as _RQ, RefinedQueryFailure as _RQF
+    from pydantic import ValidationError as _RQ_VE
+    try:
+        return _RQ(refined_query=candidate).refined_query
+    except _RQ_VE as _first_err:
+        try:
+            _retry_raw = llm.invoke(
+                "Return ONLY a single standalone reformulated query as plain text. "
+                "No JSON, no markdown, no quotes, no headers, no explanations, "
+                "no paragraph breaks — one single line only.\n\n"
+                f"Your previous answer was invalid: {_first_err}\n"
+                f"Previous answer:\n{candidate}\n\nOriginal request:\n{latest_query}"
+            ).content.strip()
+            _m = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', _retry_raw, re.IGNORECASE)
+            _retry_candidate = next((g for g in _m.groups() if g), _retry_raw) if _m else _retry_raw
+            return _RQ(refined_query=_retry_candidate).refined_query
+        except Exception as _retry_err:
+            _f = _RQF(error=str(_retry_err), raw_output=refined_text, refined_query=candidate)
+            frappe.log_error(f"{_f.error} | raw: {_f.raw_output}", "refine_query_with_history parse failure")
+            return candidate
+
+def classify_incentive_query(query: str, llm: Any) -> Union[Dict[str, Any], IncentiveClassificationFailure]:   
     """
     Classifies a user's incentive-related query into one of five predefined categories
     based on content and context.
@@ -208,18 +236,80 @@ Output:
     # Run the chain and capture the response
     response = chain.invoke({"query": query})
 
-    # Use regex to extract a valid classification number
-    match = re.search(r"^\s*([1-5])\s*$", response.content.strip())
-    if match:
-        classification_number = int(match.group(1))
-        classification_category = category_mapping[classification_number]
-        return {
-            "raw_prompt": raw_prompt,
-            "classification_number": classification_number,
-            "classification_category": classification_category,
-        }
-    else:
-        raise ValueError(f"Unexpected or invalid response from LLM: {response}")
+    # # Use regex to extract a valid classification number
+    # match = re.search(r"^\s*([1-5])\s*$", response.content.strip())
+    # if match:
+    #     classification_number = int(match.group(1))
+    #     classification_category = category_mapping[classification_number]
+    #     return {
+    #         "raw_prompt": raw_prompt,
+    #         "classification_number": classification_number,
+    #         "classification_category": classification_category,
+    #     }
+    # else:
+    #     raise ValueError(f"Unexpected or invalid response from LLM: {response}")
+    update_llm_token(response)
+# ------------------------------------------------------------------
+    # P1-5 boundary: regex-extract -> Pydantic-validate -> 1 retry -> envelope
+    # ------------------------------------------------------------------
+    # Bare-integer classifier, so per Ai_module/parsers.py it stays on
+    # re.search rather than the JSON parse_llm_response helper. The
+    # Pydantic model now actually GATES the return value; a parse or
+    # validation miss triggers exactly one corrective retry before
+    # falling back to the typed IncentiveClassificationFailure envelope.
+    def _extract_and_validate(raw_text: str) -> int:
+        """Regex-extract a 1-5 digit and validate it through Pydantic.
+
+        Raises ValueError if no digit is present, ValidationError if the
+        extracted value is out of range. Returns the validated int.
+        """
+        m = re.search(r"^\s*([1-5])\s*$", (raw_text or "").strip())
+        if not m:
+            raise ValueError(
+                f"No 1-5 classification digit in LLM output: {raw_text!r}"
+            )
+        return IncentiveClassification(
+            classification_number=int(m.group(1))
+        ).classification_number
+
+    raw_first = response.content
+    try:
+        classification_number = _extract_and_validate(raw_first)
+    except (ValueError, _VE) as first_error:
+        # Attempt 2 — single corrective retry. The original filled prompt
+        # is included verbatim for task context, plus the raw output and
+        # the exact error so the LLM can self-correct.
+        corrective_prompt = (
+            f"{raw_prompt.replace('{query}', query)}\n\n"
+            "---\n"
+            "Your previous response was not a single digit 1-5.\n\n"
+            f"Previous raw output:\n{raw_first}\n\n"
+            f"Error:\n{first_error}\n\n"
+            "Return ONLY one digit: 1, 2, 3, 4, or 5. No other text."
+        )
+        try:
+            retry_response = llm.invoke(corrective_prompt)
+            update_llm_token(retry_response)
+            classification_number = _extract_and_validate(
+                getattr(retry_response, "content", str(retry_response))
+            )
+        except (ValueError, _VE) as retry_error:
+            frappe.log_error(
+                f"classify_incentive_query unrecoverable: "
+                f"first={first_error!r} retry={retry_error!r}",
+                "classify_incentive_query",
+            )
+            return IncentiveClassificationFailure(
+                error=str(retry_error),
+                raw_output=raw_first,
+            )
+
+    classification_category = category_mapping[classification_number]
+    return {
+        "raw_prompt": raw_prompt,
+        "classification_number": classification_number,
+        "classification_category": classification_category,
+    }
 
 def generate_dynamic_message_for_incentive(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm,chatId) -> str:
     """
@@ -402,17 +492,33 @@ def call_incentive_search(input,chatId, additional_class_response = None):
     chat_history = get_chat(f"chat_{chatId}") or []
     Chat_history_normal = [f"Human: {m.content}" if isinstance(m, HumanMessage) else f"AI: {m.content}" for m in chat_history[-11:]]
     refine_user_input = input
-    
     state = get_state(f"QINC_state_{chatId}") or None
     log_to_file("state1",state)
     if not state:
         state = {'Area':'None','City':'None','State':'None','Product':'None','Main-Industry':'None','Sub-Sector':'None', "KEYWORDS": None, "Only_State_Attempt_Count": 1, "Additional_class_response": None}
         save_state(state,f"QINC_state_{chatId}")
     log_to_file("state2",state)
-    query_intent = classify_incentive_query(refine_user_input,llm=llm_70b_vers)
-    query_intent = query_intent['classification_category']
-    log_to_file("query intent",query_intent)
-
+    classification = classify_incentive_query(refine_user_input, llm=llm_70b_vers)
+    # P1-5: an envelope means classification was unrecoverable even after
+    # one corrective retry. Degrade gracefully (log + return the standard
+    # Other-Intent UX) rather than crashing the request.
+    if isinstance(classification, IncentiveClassificationFailure):
+        log_to_file("classify_incentive_query failure", classification.model_dump())
+        static_follow_up = "Could you provide specific query?"
+        message = generate_dynamic_message_for_incentive(
+            Chat_history_normal, static_follow_up, refine_user_input,
+            llm_70b_vers_creative, chatId
+        )
+        return {
+            "Ai_response": message,
+            "Is_confirmation": None,
+            "State": state,
+            "options": None,
+            "User Intention": "Other Intent",
+            "Trigger_Lead_Generation": False,
+        }
+    query_intent = classification['classification_category']
+    log_to_file("query intent", query_intent)
     if query_intent == "Negatively Intended Query":
         log_to_file("Negatively Intended Query:::::::::::::::::::::::::",":::::::::::::")
         message = respond_to_negative_query(

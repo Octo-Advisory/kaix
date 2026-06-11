@@ -345,13 +345,13 @@ def wrapper_for_frappe_function_for_fetching_fields(doctype_name: str, doc_sessi
             print(doctype_name)
             if value["session_id_required"]:
                 if not doc_session_id:
-                    with open("/home/mars/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                    with open("/home/sanket/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
                         file.write(f"\nSTATUS👌:- /n{"Particular session id is required for the respective doctype."}")
                     return "Particular session id is required for the respective helper doctype without which we cannot go ahead."
             
                 # data = frappe_function_for_fetching_fields_from_doctype(doctype = doctype_name, doc_id = doc_session_id)
                 data = fetch_frappe_doc_universal(doctype = doctype_name, identifier = doc_session_id, fields = fields)
-                with open("/home/mars/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                with open("/home/sanket/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
                     file.write(f"\nSTATUS👌:- /n{data}") 
                 return data
             
@@ -362,11 +362,11 @@ def wrapper_for_frappe_function_for_fetching_fields(doctype_name: str, doc_sessi
                 print(type(doc_session_id))
                 # data = frappe_function_for_fetching_fields_from_doctype(doctype = doctype_name, doc_id = doc_session_id)
                 data = fetch_frappe_doc_universal(doctype = doctype_name, identifier = doc_session_id, fields = fields)
-                with open("/home/mars/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+                with open("/home/sanket/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
                     file.write(f"\nSTATUS👌:- /n{data}")
                 return data
 
-    with open("/home/mars/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+    with open("/home/sanket/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
         file.write(f"\nSTATUS👌:- /n{"The doctype mentioned does not exist in the Universal dict in which we store the doctypes which requires the usage of vector stores"}")
     return "The doctype mentioned does not exist in the Universal helper doctype dict in which we store the doctypes that acts as a helper to the main doctypes."
 
@@ -767,7 +767,7 @@ def checking_whether_vector_file_exists_or_not_and_ifnot_then_creating_new_vecto
 
     frappe.log_error("Check", f"{data}")
 
-    with open("/home/mars/frappe-bench/apps/usaix/usaix/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
+    with open("/home/sanket/frappe-bench/apps/frontend_app/frontend_app/Ai_module/Feasibility_Universal_Function/testlog.txt", "a") as file:
         file.write(f"\nSTATUS👌:- /n{data}")
 
     if not isinstance(data, dict):
@@ -1682,7 +1682,7 @@ def ensure_vector_store(doctype, doc_name, folder_name, vector_id_field, data_so
             "ok": True,
             "collection_name": temporary,
             "persist_root": PERSIST_ROOT,
-            "final_dir": os.path.join(PERSIST_ROOT, LABEL_FEASIBILITY, temporary),
+            "final_dir": os.path.join(PERSIST_ROOT, FEAS_DOCTYPE, temporary),
         }
         return qwerty, "PROCEED"
 

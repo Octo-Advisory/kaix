@@ -2,6 +2,7 @@ import os
 import copy
 import frappe
 import json
+# from langchain.prompts import PromptTemplate
 from langchain.prompts import PromptTemplate
 from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 from frontend_app.Ai_module.employement_query.Extraction_for_employement_search import call_handle_employment_query
@@ -324,9 +325,13 @@ def ai_module_call(input,confirmationMessage,chatId):
                 file.write(f"\nAfter IF Additional response testing {additional_response} for chatId {chatId}")
             try:
                 response = entry_build_from_scratch(input,chatId, additional_class_response=additional_response)
+                # frappe.log_error("in","Hey i am in")
                 response_message = response.get('Ai_response', '')
+                # frappe.log_error("in_1","Hey i am in")
                 response_message += f"<br/><br/>**Note**: {additional_response}" if additional_response else ""
+                # frappe.log_error("in_2","Hey i am in")
                 response["Ai_response"] = response_message
+                # frappe.log_error("in_3","Hey i am in")
                 log(chatId,'debug','response',str(response),'AI.py','ai')
                 # return response
             
@@ -336,11 +341,13 @@ def ai_module_call(input,confirmationMessage,chatId):
                     "Is_confirmation" : None,
                     "Error":e,
                 }
+
                 log(chatId,'error','error',f"{str(response)} error is {str(e)}",'AI.py','ai')
                 return response
             
         elif user_intension == "Query to Get Employee Search":
             try:
+                # frappe.log_error("in_5","Hey i am in")
                 response = call_handle_employment_query(input,chatId, additional_class_response=additional_response)
                 response_message = response.get('Ai_response', '')
                 response_message += f"<br/><br/>**Note**: {additional_response}" if additional_response else ""

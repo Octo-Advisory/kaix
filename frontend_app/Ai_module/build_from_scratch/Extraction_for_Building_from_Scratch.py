@@ -8,7 +8,7 @@ from frontend_app.Ai_module.Query_Classification_And_Analysis import *
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat,save_state,get_state
 from frontend_app.Management_Class.helpers.utility import update_llm_token
-from frontend_app.Management_Class.Ai_management.AI import *
+# from frontend_app.Management_Class.Ai_management.AI import *
 from rapidfuzz import process, fuzz
 import pandas as pd
 
@@ -241,8 +241,27 @@ Output:
 
     match = re.search(r"^\s*([1-6])\s*$", response.content.strip())
 
+    # --- P1-5 PYDANTIC BOUNDARY (bare-int classifier: validated directly,
+    # not via parse_llm_response — see Ai_module/parsers.py:13-15) ---
+    from frontend_app.Ai_module.build_from_scratch.schemas import (
+        BuildSetupClassification,
+        BuildSetupClassificationFailure,
+    )
+    from pydantic import ValidationError as _VE
+    _raw = response.content.strip()
     if match:
-        classification_number = int(match.group(1))
+        try:
+            _validated = BuildSetupClassification(
+                classification_number=int(match.group(1))
+            )
+        except _VE as _ve:
+            _fail = BuildSetupClassificationFailure(error=str(_ve), raw_output=_raw)
+            frappe.log_error(
+                frappe.as_json(_fail.model_dump()),
+                "parse_llm_response failure",
+            )
+            return _fail.model_dump()
+        classification_number = _validated.classification_number
         classification_category = category_mapping[classification_number]
         return {
             "raw_prompt": raw_prompt,
@@ -250,7 +269,15 @@ Output:
             "classification_category": classification_category,
         }
     else:
-        raise ValueError(f"Invalid classification from LLM: {response}")
+        # No 1-6 token: typed envelope instead of an unhandled raise (P1-5).
+        _fail = BuildSetupClassificationFailure(
+            error="LLM did not return an integer 1-6", raw_output=_raw
+        )
+        frappe.log_error(
+            frappe.as_json(_fail.model_dump()),
+            "parse_llm_response failure",
+        )
+        return _fail.model_dump()
 
 
 def extract_locations_from_query_multi(
@@ -445,6 +472,38 @@ USER QUERY
         return {"Locations": []}
 
     parsed = _safe_json_extract(raw_response)
+# --- NEW PYDANTIC LAYER ---
+    try:
+        from frontend_app.Ai_module.build_from_scratch.schemas import (
+            BuildLocationsExtraction,
+            BuildLocationsExtractionFailure,
+        )
+        from frontend_app.Ai_module.parsers import parse_llm_response
+        _retry_prompt = (
+            'Return ONLY a JSON object: '
+            '{"Locations": [{"Location": "city or region name", "Type": "City|State|District|Area|Village"}]} '
+            'OR {"Locations": []} if no locations found. '
+            'No prose, no markdown fences, no extra keys.'
+        )
+        _result = parse_llm_response(
+            raw=raw_response,
+            model_class=BuildLocationsExtraction,
+            llm_client=llm,
+            prompt=_retry_prompt,
+        )
+        if isinstance(_result, BuildLocationsExtraction):
+            parsed = _result.model_dump()
+        else:
+            # P1-5: surface the typed *Failure envelope (no longer silent).
+            # Plan-sanctioned legacy fallback value is retained below.
+            _env = _result.model_dump() if hasattr(_result, "model_dump") else _result
+            frappe.log_error(
+                frappe.as_json({"site": "extract_locations_from_query_multi", "envelope": _env}),
+                "parse_llm_response failure",
+            )
+    except Exception as _e:
+        frappe.log_error(str(_e), "extract_locations_from_query_multi pydantic")
+        # fallback: parsed as returned by _safe_json_extract
     locations_raw = parsed.get("Locations", [])
 
     with open("learnlog.txt", "a") as file:
@@ -762,6 +821,39 @@ Use official state names only (e.g., "Gujarat", "Maharashtra", "Rajasthan").
     except Exception as e:
         frappe.log_error(title="AI State Parse Error", message=str(e))
         ai_states = []
+
+# --- NEW PYDANTIC LAYER ---
+    try:
+        from frontend_app.Ai_module.build_from_scratch.schemas import (
+            AIRecommendedStates,
+            AIRecommendedStatesFailure,
+        )
+        from frontend_app.Ai_module.parsers import parse_llm_response
+        _retry_prompt = (
+            'Return ONLY a JSON object: '
+            '{"states": ["State1", "State2", ...]} '
+            'with a ranked list of Indian state names. '
+            'No prose, no markdown fences, no extra keys.'
+        )
+        _result = parse_llm_response(
+            raw=response.content.strip(),
+            model_class=AIRecommendedStates,
+            llm_client=llm,
+            prompt=_retry_prompt,
+        )
+        if isinstance(_result, AIRecommendedStates):
+            ai_states = _result.states
+        else:
+            # P1-5: surface the typed *Failure envelope (no longer silent).
+            # Plan-sanctioned legacy fallback value is retained below.
+            _env = _result.model_dump() if hasattr(_result, "model_dump") else _result
+            frappe.log_error(
+                frappe.as_json({"site": "get_ai_recommended_states", "envelope": _env}),
+                "parse_llm_response failure",
+            )
+    except Exception as _e:
+        frappe.log_error(str(_e), "get_ai_recommended_states pydantic")
+        # fallback: ai_states unchanged
  
     if not ai_states:
         return []
@@ -859,6 +951,39 @@ Use official district names only.
     except Exception as e:
         frappe.log_error(title="AI District Parse Error", message=str(e))
         ai_districts = []
+
+# --- NEW PYDANTIC LAYER ---
+    try:
+        from frontend_app.Ai_module.build_from_scratch.schemas import (
+            AIRecommendedDistricts,
+            AIRecommendedDistrictsFailure,
+        )
+        from frontend_app.Ai_module.parsers import parse_llm_response
+        _retry_prompt = (
+            'Return ONLY a JSON object: '
+            '{"districts": ["District1", "District2", ...]} '
+            'with a ranked list of district names. '
+            'No prose, no markdown fences, no extra keys.'
+        )
+        _result = parse_llm_response(
+            raw=response.content.strip(),
+            model_class=AIRecommendedDistricts,
+            llm_client=llm,
+            prompt=_retry_prompt,
+        )
+        if isinstance(_result, AIRecommendedDistricts):
+            ai_districts = _result.districts
+        else:
+            # P1-5: surface the typed *Failure envelope (no longer silent).
+            # Plan-sanctioned legacy fallback value is retained below.
+            _env = _result.model_dump() if hasattr(_result, "model_dump") else _result
+            frappe.log_error(
+                frappe.as_json({"site": "get_ai_recommended_districts", "envelope": _env}),
+                "parse_llm_response failure",
+            )
+    except Exception as _e:
+        frappe.log_error(str(_e), "get_ai_recommended_districts pydantic")
+        # fallback: ai_districts unchanged
  
     if not ai_districts:
         return []
@@ -1161,6 +1286,41 @@ Provide only the JSON object in the required format.
     # Extract JSON industry details using the new function
     extracted_details = extract_json_main_industry_details(result_text)
 
+# --- NEW PYDANTIC LAYER ---
+    try:
+        from frontend_app.Ai_module.build_from_scratch.schemas import (
+            MainIndustryExtraction,
+            MainIndustryExtractionFailure,
+        )
+        from frontend_app.Ai_module.parsers import parse_llm_response
+        _retry_prompt = (
+            'Return ONLY a JSON object: '
+            '{"Main-Industry": "...", "Original-Inferred-Main-Industry": "...", '
+            '"Forced-Mapping": "Yes or No", "Product": "..."} '
+            'Use "None" for any field that cannot be determined. '
+            'No prose, no markdown fences, no extra keys.'
+        )
+        _result = parse_llm_response(
+            raw=result_text,
+            model_class=MainIndustryExtraction,
+            llm_client=llm,
+            prompt=_retry_prompt,
+        )
+        if isinstance(_result, MainIndustryExtraction):
+            # model_dump(by_alias=True) restores hyphenated keys ("Main-Industry" etc.)
+            # that downstream validated_data logic and callers depend on
+            extracted_details = _result.model_dump(by_alias=True)
+        else:
+            # P1-5: surface the typed *Failure envelope (no longer silent).
+            # Plan-sanctioned legacy fallback value is retained below.
+            _env = _result.model_dump() if hasattr(_result, "model_dump") else _result
+            frappe.log_error(
+                frappe.as_json({"site": "extract_main_industry_and_product_for_scratch", "envelope": _env}),
+                "parse_llm_response failure",
+            )
+    except Exception as _e:
+        frappe.log_error(str(_e), "extract_main_industry_and_product_for_scratch pydantic")
+        # fallback: extracted_details as returned by the helper
     # Validate against the provided list of Main Industries
     validated_data = copy.deepcopy(extracted_details)
     if extracted_details["Main-Industry"] not in main_industries and extracted_details["Main-Industry"] != "None":
@@ -1443,6 +1603,40 @@ Provide only the JSON object in the required format.
     # Extract JSON response using the new function
     extracted_details = extract_json_sub_sector_product(result.content.strip())
 
+# --- NEW PYDANTIC LAYER ---
+    try:
+        from frontend_app.Ai_module.build_from_scratch.schemas import (
+            SubSectorExtraction,
+            SubSectorExtractionFailure,
+        )
+        from frontend_app.Ai_module.parsers import parse_llm_response
+        _retry_prompt = (
+            'Return ONLY a JSON object: '
+            '{"Sub-Sector": "...", "Original-Inferred-Sub-Sector": "...", '
+            '"Forced-Mapping": "Yes or No", "Product": "..."} '
+            'Use "None" for any field that cannot be determined. '
+            'No prose, no markdown fences, no extra keys.'
+        )
+        _result = parse_llm_response(
+            raw=result.content.strip(),
+            model_class=SubSectorExtraction,
+            llm_client=llm,
+            prompt=_retry_prompt,
+        )
+        if isinstance(_result, SubSectorExtraction):
+            # model_dump(by_alias=True) restores hyphenated keys ("Sub-Sector" etc.)
+            extracted_details = _result.model_dump(by_alias=True)
+        else:
+            # P1-5: surface the typed *Failure envelope (no longer silent).
+            # Plan-sanctioned legacy fallback value is retained below.
+            _env = _result.model_dump() if hasattr(_result, "model_dump") else _result
+            frappe.log_error(
+                frappe.as_json({"site": "extract_sub_sector_and_product_for_scratch", "envelope": _env}),
+                "parse_llm_response failure",
+            )
+    except Exception as _e:
+        frappe.log_error(str(_e), "extract_sub_sector_and_product_for_scratch pydantic")
+        # fallback: extracted_details as returned by the helper
     # Validation: Check if the extracted sub-sector exists in the provided list
     validated_data = copy.deepcopy(extracted_details)
     if extracted_details["Sub-Sector"] not in sub_sectors and extracted_details["Sub-Sector"] != "None":
@@ -1727,6 +1921,40 @@ Provide only the JSON object in the required format.
     result_content = result.content.strip()
     extracted_data = extract_json_segment_and_product(result_content)
 
+# --- NEW PYDANTIC LAYER ---
+    try:
+        from frontend_app.Ai_module.build_from_scratch.schemas import (
+            SegmentExtraction,
+            SegmentExtractionFailure,
+        )
+        from frontend_app.Ai_module.parsers import parse_llm_response
+        _retry_prompt = (
+            'Return ONLY a JSON object: '
+            '{"Segment": "...", "Original-Inferred-Segment": "...", '
+            '"Forced-Mapping": "Yes or No", "Product": "..."} '
+            'Use "None" for any field that cannot be determined. '
+            'No prose, no markdown fences, no extra keys.'
+        )
+        _result = parse_llm_response(
+            raw=result_content,
+            model_class=SegmentExtraction,
+            llm_client=llm,
+            prompt=_retry_prompt,
+        )
+        if isinstance(_result, SegmentExtraction):
+            # model_dump(by_alias=True) restores aliased keys ("Segment" etc.)
+            extracted_data = _result.model_dump(by_alias=True)
+        else:
+            # P1-5: surface the typed *Failure envelope (no longer silent).
+            # Plan-sanctioned legacy fallback value is retained below.
+            _env = _result.model_dump() if hasattr(_result, "model_dump") else _result
+            frappe.log_error(
+                frappe.as_json({"site": "extract_segment_and_product_for_scratch", "envelope": _env}),
+                "parse_llm_response failure",
+            )
+    except Exception as _e:
+        frappe.log_error(str(_e), "extract_segment_and_product_for_scratch pydantic")
+    # fallback: extracted_data as returned by the helper
     # Validate against the provided list of Segments
     validated_data = copy.deepcopy(extracted_data)
     if extracted_data["Segment"] not in segments and extracted_data["Segment"] != "None":
@@ -1938,6 +2166,39 @@ def extract_capacity_details(user_query, llm):
     # Extract JSON capacity details using the new function
     extracted_details = extract_json_capacity_details(result_text)
 
+# --- NEW PYDANTIC LAYER ---
+    try:
+        from frontend_app.Ai_module.build_from_scratch.schemas import (
+            CapacityExtraction,
+            CapacityExtractionFailure,
+        )
+        from frontend_app.Ai_module.parsers import parse_llm_response
+        _retry_prompt = (
+            'Return ONLY a JSON object: '
+            '{"Capacity": <float or "None">, "Capacity Unit": "...", "Time Period": "..."} '
+            'Capacity must be a numeric value or "None". '
+            'No prose, no markdown fences, no extra keys.'
+        )
+        _result = parse_llm_response(
+            raw=result_text,
+            model_class=CapacityExtraction,
+            llm_client=llm,
+            prompt=_retry_prompt,
+        )
+        if isinstance(_result, CapacityExtraction):
+            # model_dump(by_alias=True) restores spaced keys ("Capacity Unit", "Time Period")
+            extracted_details = _result.model_dump(by_alias=True)
+        else:
+            # P1-5: surface the typed *Failure envelope (no longer silent).
+            # Plan-sanctioned legacy fallback value is retained below.
+            _env = _result.model_dump() if hasattr(_result, "model_dump") else _result
+            frappe.log_error(
+                frappe.as_json({"site": "extract_capacity_details", "envelope": _env}),
+                "parse_llm_response failure",
+            )
+    except Exception as _e:
+        frappe.log_error(str(_e), "extract_capacity_details pydantic")
+        # fallback: extracted_details as returned by the helper
     return extracted_details
 
 def generate_ai_message(state, history, missing_fields, attempt_count, llm):
@@ -2313,6 +2574,14 @@ def gather_industry_details(
     refined_query = query
  
     result = classify_industry_setup_query(refined_query, llm)
+    if "error" in result:
+        frappe.log_error(
+            frappe.as_json(result),
+            "classify_industry_setup_query failure",
+        )
+        raise ValueError(
+            f"Industry-setup classification failed: {result.get('error')}"
+        )
     user_intention = result["classification_category"]
  
     with open("testlog.txt", "a") as file:
@@ -3324,6 +3593,39 @@ def time_conversion(user_quantity, user_time_period, db_standard_time_period, pr
     # Extract multiplier using helper function
     multiplier_data = extract_json_time_conversion(response.content.strip())
 
+# --- NEW PYDANTIC LAYER ---
+    try:
+        from frontend_app.Ai_module.build_from_scratch.schemas import (
+            MultiplierResult,
+            MultiplierResultFailure,
+        )
+        from frontend_app.Ai_module.parsers import parse_llm_response
+        _retry_prompt = (
+            'Return ONLY a JSON object: '
+            '{"Multiplier": <numeric conversion factor>} '
+            'Multiplier must be a valid non-zero float. '
+            'No prose, no markdown fences, no extra keys.'
+        )
+        _result = parse_llm_response(
+            raw=response.content.strip(),
+            model_class=MultiplierResult,
+            llm_client=llm,
+            prompt=_retry_prompt,
+        )
+        if isinstance(_result, MultiplierResult):
+            # model_dump(by_alias=True) preserves "Multiplier" key downstream code uses
+            multiplier_data = _result.model_dump(by_alias=True)
+        else:
+            # P1-5: surface the typed *Failure envelope (no longer silent).
+            # Plan-sanctioned legacy fallback value is retained below.
+            _env = _result.model_dump() if hasattr(_result, "model_dump") else _result
+            frappe.log_error(
+                frappe.as_json({"site": "time_conversion", "envelope": _env}),
+                "parse_llm_response failure",
+            )
+    except Exception as _e:
+        frappe.log_error(str(_e), "time_conversion pydantic")
+        # fallback: multiplier_data as returned by the helper
     return {
         "Quantity": user_quantity * multiplier_data["Multiplier"],
         "Time Period": db_standard_time_period
@@ -3410,6 +3712,39 @@ def unit_conversion(user_quantity, user_unit, db_standard_unit, product, llm):
     # Extract JSON response from model output
     multiplier_data = extract_json_unit_conversion(response.content.strip())
 
+# --- NEW PYDANTIC LAYER ---
+    try:
+        from frontend_app.Ai_module.build_from_scratch.schemas import (
+            MultiplierResult,
+            MultiplierResultFailure,
+        )
+        from frontend_app.Ai_module.parsers import parse_llm_response
+        _retry_prompt = (
+            'Return ONLY a JSON object: '
+            '{"Multiplier": <numeric conversion factor>} '
+            'Multiplier must be a valid non-zero float. '
+            'No prose, no markdown fences, no extra keys.'
+        )
+        _result = parse_llm_response(
+            raw=response.content.strip(),
+            model_class=MultiplierResult,
+            llm_client=llm,
+            prompt=_retry_prompt,
+        )
+        if isinstance(_result, MultiplierResult):
+            # model_dump(by_alias=True) preserves "Multiplier" key downstream code uses
+            multiplier_data = _result.model_dump(by_alias=True)
+        else:
+            # P1-5: surface the typed *Failure envelope (no longer silent).
+            # Plan-sanctioned legacy fallback value is retained below.
+            _env = _result.model_dump() if hasattr(_result, "model_dump") else _result
+            frappe.log_error(
+                frappe.as_json({"site": "unit_conversion", "envelope": _env}),
+                "parse_llm_response failure",
+            )
+    except Exception as _e:
+        frappe.log_error(str(_e), "unit_conversion pydantic")
+    # fallback: multiplier_data as returned by the helper
     # Ensure the extracted multiplier is valid
     multiplier = multiplier_data.get("Multiplier", 1)
 
@@ -3635,8 +3970,36 @@ Return ONLY the JSON as specified.
     }))
 
     update_llm_token(response)
-    return extract_json_unit_split(response.content.strip())
- 
+    try:
+        from frontend_app.Ai_module.build_from_scratch.schemas import (
+            UnitTimeSplit,
+            UnitTimeSplitFailure,
+        )
+        from frontend_app.Ai_module.parsers import parse_llm_response
+        _retry_prompt = (
+            'Return ONLY a JSON object: '
+            '{"unit": "the physical unit exactly as written", '
+            '"time_period": "per annum|per day|per hour|per month|per week|per minute|per second|per shift|per batch"} '
+            'No prose, no markdown fences, no extra keys.'
+        )
+        _result = parse_llm_response(
+            raw=response.content.strip(),
+            model_class=UnitTimeSplit,
+            llm_client=llm,
+            prompt=_retry_prompt,
+        )
+        if isinstance(_result, UnitTimeSplit):
+            return _result.model_dump()
+        _env = _result.model_dump() if hasattr(_result, "model_dump") else _result
+        frappe.log_error(
+            frappe.as_json({"site": "split_unit_and_time_period", "envelope": _env}),
+            "parse_llm_response failure",
+        )
+        return _env
+    except Exception as _e:
+        frappe.log_error(str(_e), "split_unit_and_time_period pydantic")
+        return extract_json_unit_split(response.content.strip())
+
 def entry_build_from_scratch(input,chatId, additional_class_response = None):
     final_json = get_json_for_industry()
     main_industry = get_main_industry(final_json)
@@ -3860,6 +4223,21 @@ def do_unit_conversion(state):
 
     db_unit_for_ss = results[0][0]
     standard_unit_time = split_unit_and_time_period(db_unit_for_ss, llm_70b_vers)
+    if not isinstance(standard_unit_time, dict) or "error" in standard_unit_time or not standard_unit_time.get("unit"):        
+        # split_unit_and_time_period now returns a typed UnitTimeSplitFailure
+        # envelope (P1-5) instead of raising. There is NO safe fallback for the
+        # DB-canonical unit/time — degrading here would silently corrupt every
+        # downstream capacity conversion. Fail fast with context, mirroring the
+        # `raise ValueError` for the missing-rule case a few lines above.
+        frappe.log_error(
+            frappe.as_json({"db_unit_for_ss": db_unit_for_ss,
+                            "envelope": standard_unit_time}),
+            "split_unit_and_time_period failure",
+        )
+        raise ValueError(
+            f"Unit/time split failed for {db_unit_for_ss!r}: "
+            f"{standard_unit_time.get('error', 'no unit returned') if isinstance(standard_unit_time, dict) else 'invalid return type'}"
+        )
 
     product_name          = state["Product"]
     user_quantity         = state["Capacity"]
@@ -4042,7 +4420,12 @@ def do_unit_conversion(state):
             else:
                 # Units differ → convert extremity bounds to the SAME standard unit/time
                 try:
-                    ext_parsed      = split_unit_and_time_period(str(ext_unit), llm_70b_vers)
+                    ext_parsed = split_unit_and_time_period(str(ext_unit), llm_70b_vers)
+                    if not isinstance(ext_parsed, dict) or "error" in ext_parsed or not ext_parsed.get("unit"):                        
+                        raise ValueError(
+                            f"Unit/time split failed for {ext_unit!r}: "
+                            f"{ext_parsed.get('error', 'no unit returned') if isinstance(ext_parsed, dict) else 'invalid return type'}"    
+                            )
                     ext_unit_only   = ext_parsed.get("unit")
                     ext_time_period = ext_parsed.get("time_period")
 

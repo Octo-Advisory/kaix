@@ -10,8 +10,7 @@ from langchain.schema import HumanMessage, AIMessage
 import frappe
 from frontend_app.Management_Class.Redis_management.Redis_chat import get_chat,save_chat,get_state,save_state
 from frontend_app.Management_Class.helpers.utility import update_llm_token
-from frontend_app.Management_Class.Ai_management.AI import respond_to_negative_query
-
+from frontend_app.Ai_module.Query_Classification_And_Analysis import respond_to_negative_query
 
 def fetch_query_results(query):
     """
@@ -69,15 +68,41 @@ def refine_query_with_history_for_approval(history, latest_query, llm):
     refined_query = chain.invoke({"history": "\n".join(history), "latest_query": latest_query})
     update_llm_token(refined_query)
     refined_text = refined_query.content.strip()
+
+    # # Extract the reformulated standalone query
+    # match = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', refined_text, re.IGNORECASE)
+    # if match:
+    #     # Return the captured group that is not None
+    #     return next(group for group in match.groups() if group)
     
+    # # Fallback to the entire response if no match is found
+    # return refined_text
     # Extract the reformulated standalone query
     match = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', refined_text, re.IGNORECASE)
-    if match:
-        # Return the captured group that is not None
-        return next(group for group in match.groups() if group)
-    
-    # Fallback to the entire response if no match is found
-    return refined_text
+    candidate = next((g for g in match.groups() if g), refined_text) if match else refined_text
+
+    # P1-5 #2/#3: validate at the boundary; one plain-text corrective retry;
+    # typed RefinedQueryFailure logged on unrecoverable failure.
+    from frontend_app.Ai_module.query_refinement.schemas import RefinedQuery as _RQ, RefinedQueryFailure as _RQF
+    from pydantic import ValidationError as _RQ_VE
+    try:
+        return _RQ(refined_query=candidate).refined_query
+    except _RQ_VE as _first_err:
+        try:
+            _retry_raw = llm.invoke(
+                "Return ONLY a single standalone reformulated query as plain text. "
+                "No JSON, no markdown, no quotes, no headers, no explanations, "
+                "no paragraph breaks — one single line only.\n\n"
+                f"Your previous answer was invalid: {_first_err}\n"
+                f"Previous answer:\n{candidate}\n\nOriginal request:\n{latest_query}"
+            ).content.strip()
+            _m = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', _retry_raw, re.IGNORECASE)
+            _retry_candidate = next((g for g in _m.groups() if g), _retry_raw) if _m else _retry_raw
+            return _RQ(refined_query=_retry_candidate).refined_query
+        except Exception as _retry_err:
+            _f = _RQF(error=str(_retry_err), raw_output=refined_text, refined_query=candidate)
+            frappe.log_error(f"{_f.error} | raw: {_f.raw_output}", "refine_query_with_history parse failure")
+            return candidate
 
 def classify_approval_query(query: str, llm: Any) -> Dict[str, Any]:
     """
@@ -200,13 +225,107 @@ def classify_approval_query(query: str, llm: Any) -> Dict[str, Any]:
     if match:
         classification_number = int(match.group(1))
         classification_category = category_mapping[classification_number]
+    #     return {
+    #         "raw_prompt": raw_prompt,
+    #         "classification_number": classification_number,
+    #         "classification_category": classification_category,
+    #     }
+    # else:
+    #     raise ValueError(f"Unexpected or invalid response from LLM: {response}")
+        # NEW PYDANTIC LAYER — validates the extracted integer against
+        # ApprovalClassification's Literal[1, 2, 3, 4, 5] guard.
+        # The regex above already enforces 1-5, so validation should
+        # never reject in practice. The guard exists so that any future
+        # change to the regex (widening the range) is caught at this
+        # boundary. On any failure we log and fall through — the return
+        # dict below uses the original classification_number which is
+        # still trusted from the regex match.
+        try:
+            from frontend_app.Ai_module.approval_query.schemas import (
+                ApprovalClassification,
+            )
+            from pydantic import ValidationError as _VE
+            try:
+                ApprovalClassification(classification_number=classification_number)
+            except _VE as _ve:
+                frappe.log_error(
+                    f"ApprovalClassification rejected {classification_number}: {_ve}",
+                    "classify_approval_query pydantic"
+                )
+        except Exception as _e:
+            frappe.log_error(str(_e), "classify_approval_query pydantic")
+
         return {
             "raw_prompt": raw_prompt,
             "classification_number": classification_number,
             "classification_category": classification_category,
         }
     else:
-        raise ValueError(f"Unexpected or invalid response from LLM: {response}")
+        # P1-5: regex did not match — the LLM returned junk (a word, prose,
+        # multiple digits, an out-of-range value, or empty). Instead of
+        # raising ValueError, retry once with a corrective prompt and, if
+        # that also fails, return a typed ApprovalClassificationFailure
+        # envelope so the caller can decide (graceful clarification)
+        # rather than crashing.
+        try:
+            from frontend_app.Ai_module.parsers import parse_llm_response
+            from frontend_app.Ai_module.approval_query.schemas import (
+                ApprovalClassification,
+                ApprovalClassificationFailure,
+            )
+            _retry_prompt = (
+                "Classify the user's approval-related query into exactly one "
+                "category and return ONLY a JSON object of the form "
+                '{"classification_number": N}, where N is one integer:\n'
+                "1 = approval search, location only (no industry)\n"
+                "2 = approval search, industry only (no location)\n"
+                "3 = approval search, both industry and location\n"
+                "4 = other intent\n"
+                "5 = negatively intended query\n"
+                "No prose, no words, no extra keys.\n\n"
+                f"Query: {query}"
+            )
+            validated = parse_llm_response(
+                raw=response.content.strip(),
+                model_class=ApprovalClassification,
+                llm_client=llm,
+                prompt=_retry_prompt,
+            )
+            if isinstance(validated, ApprovalClassification):
+                classification_number = validated.classification_number
+                return {
+                    "raw_prompt": raw_prompt,
+                    "classification_number": classification_number,
+                    "classification_category": category_mapping[classification_number],
+                }
+            # Retry also failed — normalise to the typed failure envelope.
+            if isinstance(validated, ApprovalClassificationFailure):
+                failure = validated
+            elif isinstance(validated, dict):
+                failure = ApprovalClassificationFailure(
+                    error=str(validated.get("error", "unparseable LLM output")),
+                    raw_output=str(validated.get("raw_output", response.content)),
+                )
+            else:
+                failure = ApprovalClassificationFailure(
+                    error="parse_llm_response returned an unexpected type",
+                    raw_output=str(response.content),
+                )
+            frappe.log_error(
+                f"{failure.error} | raw: {failure.raw_output}",
+                "classify_approval_query failure",
+            )
+            return failure
+        except Exception as _e:
+            # Never crash the request path: log and degrade to the envelope.
+            frappe.log_error(str(_e), "classify_approval_query pydantic")
+            from frontend_app.Ai_module.approval_query.schemas import (
+                ApprovalClassificationFailure,
+            )
+            return ApprovalClassificationFailure(
+                error=str(_e),
+                raw_output=str(getattr(response, "content", response)),
+            )
 
 def generate_dynamic_message_for_approval(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm) -> str:
     """
@@ -727,6 +846,27 @@ def handle_approval_query(
     
 
     result = classify_approval_query(refined_user_input, llm)
+    # P1-5: classify_approval_query now returns a typed
+    # ApprovalClassificationFailure envelope instead of raising when the
+    # LLM output cannot be parsed even after one corrective retry.
+    # Decision here: surface a graceful clarification instead of crashing.
+    from frontend_app.Ai_module.approval_query.schemas import (
+        ApprovalClassificationFailure,
+    )
+    if isinstance(result, ApprovalClassificationFailure):
+        return {
+            "Ai_response": (
+                "Sorry, I couldn't quite understand your approval request. "
+                "Could you rephrase it — for example, mention the industry "
+                "and/or the location you need approvals for?"
+            ),
+            "Is_confirmation": None,
+            "Extracted Data": extracted_state,
+            "Validation Data": state,
+            "User Intention": "Other Intent",
+            "options": None,
+            "Trigger_Lead_Generation": False,
+        }
     user_intention = result["classification_category"]
 
     if user_intention == "Negatively Intended Query":

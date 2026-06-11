@@ -10,7 +10,7 @@ import './assets/style/propertycreationstyle.css';
 import { useFrappeGetDoc } from "frappe-react-sdk";
 
 const BASE_URL = window.location.origin;
-// const ADMIN_TOKEN = 'd3de1e0e4e25846:51fd8e403a19045';
+// const ADMIN_TOKEN = 'd3de1e0e4e25846:a17a89fc01bd744';
 
 function PropertyCreation() {
   const mapContainerRef = useRef(null);

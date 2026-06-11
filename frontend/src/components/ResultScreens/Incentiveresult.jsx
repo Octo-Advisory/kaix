@@ -589,7 +589,7 @@ useEffect(() => {
   //   const response = await fetch(url, {
   //     method: 'GET',
   //     headers: {
-  //       'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+  //       'Authorization': 'token d3de1e0e4e25846:a17a89fc01bd744',
   //       'Content-Type': 'application/json'
   //     }
   //   });
@@ -610,7 +610,7 @@ useEffect(() => {
   //   const response2 = await fetch(url2, {
   //     method: 'GET',
   //     headers: {
-  //       'Authorization': 'token d3de1e0e4e25846:51fd8e403a19045',
+  //       'Authorization': 'token d3de1e0e4e25846:a17a89fc01bd744',
   //       'Content-Type': 'application/json'
   //     }
   //   });

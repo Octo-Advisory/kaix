@@ -54,7 +54,7 @@ def updating_database_with_llm_market_trends(update_check, final_results, segmen
 
     # check_url = "https://marsinfraix.marsbazaar.com/api/resource/Regulatory insights"
     # headers = {
-    #     "Authorization": "token d3de1e0e4e25846:51fd8e403a19045",
+    #     "Authorization": "token d3de1e0e4e25846:a17a89fc01bd744",
     #     "Content-Type": "application/json",
     #     "Expect": ""  # prevent 417 error
     # }

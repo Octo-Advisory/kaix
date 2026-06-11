@@ -10,8 +10,10 @@ import frappe
 import logging
 from frontend_app.Management_Class.Redis_management.Redis_chat import save_chat,get_chat
 from frontend_app.Management_Class.helpers.utility import update_llm_token
-from frontend_app.Management_Class.Ai_management.AI import respond_to_negative_query
-
+from frontend_app.Ai_module.Query_Classification_And_Analysis import respond_to_negative_query
+from frontend_app.Ai_module.employement_query.schemas import (EmploymentClassification,EmploymentClassificationFailure,EmploymentKeywords,)   
+from frontend_app.Ai_module.parsers import parse_llm_response
+from pydantic import ValidationError as _VE
 logging.basicConfig(
     filename='AIerror.log',  # Log file name
     level=logging.INFO,  # Minimum log level to capture
@@ -73,12 +75,32 @@ def refine_query_with_history_for_employment(history, latest_query, llm):
     
     # Extract the reformulated standalone query
     match = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', refined_text, re.IGNORECASE)
-    if match:
-        # Return the captured group that is not None
-        return next(group for group in match.groups() if group)
-    
-    # Fallback to the entire response if no match is found
-    return refined_text
+    candidate = next((g for g in match.groups() if g), refined_text) if match else refined_text
+
+    # P1-5 #2/#3: validate at the boundary; one plain-text corrective retry;
+    # typed RefinedQueryFailure logged on unrecoverable failure.
+    from frontend_app.Ai_module.query_refinement.schemas import RefinedQuery as _RQ, RefinedQueryFailure as _RQF
+    from pydantic import ValidationError as _RQ_VE
+    try:
+        return _RQ(refined_query=candidate).refined_query
+    except _RQ_VE as _first_err:
+        try:
+            _retry_response = llm.invoke(
+                "Return ONLY a single standalone reformulated query as plain text. "
+                "No JSON, no markdown, no quotes, no headers, no explanations, "
+                "no paragraph breaks — one single line only.\n\n"
+                f"Your previous answer was invalid: {_first_err}\n"
+                f"Previous answer:\n{candidate}\n\nOriginal request:\n{latest_query}"
+            )
+            update_llm_token(_retry_response)
+            _retry_raw =_retry_response.content.strip()
+            _m = re.search(r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', _retry_raw, re.IGNORECASE)
+            _retry_candidate = next((g for g in _m.groups() if g), _retry_raw) if _m else _retry_raw
+            return _RQ(refined_query=_retry_candidate).refined_query
+        except Exception as _retry_err:
+            _f = _RQF(error=str(_retry_err), raw_output=refined_text, refined_query=candidate)
+            frappe.log_error(f"{_f.error} | raw: {_f.raw_output}", "refine_query_with_history parse failure")
+            return candidate
 
 def extract_json_from_llm_response_employment(raw_output: str, json_key: str) -> Dict[str, Union[List[str], None]]:
     """
@@ -241,110 +263,37 @@ def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Un
         "user_query": user_input
     })
 
-    raw_output = response.content.strip()
+    # raw_output = response.content.strip()
 
-    return extract_json_from_llm_response_employment(raw_output, "KEYWORDS")
-
-def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Union[List[str], None]]:
-    """
-    Extracts employment-related keywords from a user query, ensuring they are classified into:
-    - "Skilled"
-    - "Semi-Skilled"
-    - "Unskilled"
-
-    If the query is a general employment search, return `None`. Otherwise, map the keyword
-    to the appropriate skill category.
-
-    Parameters:
-    -----------
-    user_input : str
-        The user-provided query string.
-
-    llm :
-        An instance of a language model (such as from LangChain) capable of processing the prompt.
-
-    Returns:
-    --------
-    Dict[str, Union[List[str], None]]:
-        A dictionary with a single key 'KEYWORDS'.
-    """
-
-    prompt_template_str = """
-    You are an expert in employment search classification.
-
-    Your task:
-
-    1) DETERMINE THE TYPE OF EMPLOYMENT SEARCH:
-    - If the query is for general employment without specifying a job role or skill type, return `null`.
-    - Example (General Employment): "I want employment opportunities in Surat." → null
-    - Example (General Employment): "Looking for jobs in Gujarat." → null
-
-    2) IDENTIFY DIRECT MENTIONS OF SKILL CATEGORIES:
-    - If the query explicitly mentions "Skilled", "Semi-Skilled", or "Unskilled", return these directly.
-    - Example: "I want to hire skilled and unskilled workers." → ["Skilled", "Unskilled"]
-
-    3) CLASSIFY SPECIFIC JOB ROLES OR BROAD TERMS:
-    - If the query mentions a specific job role, classify it into:
-        - Skilled: Requires formal training, technical knowledge, or expertise (e.g., electricians, engineers, mechanics).
-        - Semi-Skilled: Requires experience or on-the-job guidance (e.g., machine operators, crane operators, construction assistants).
-        - Unskilled: Requires minimal training, involves basic physical labor (e.g., loaders, helpers).
-
-    - Extract ONLY the most relevant category based on the job role. Do not include unrelated categories.
-
-    4) HANDLE BROAD TERMS INTELLIGENTLY:
-    - If the user mentions broad or ambiguous terms, classify based on logical context.
-    - "Technical" Terms Handling:
-        - If the context clearly indicates advanced expertise or formal training, classify as "Skilled".
-        - If it refers to operators, assistants, or general on-the-job experience, classify as "Semi-Skilled".
-        - If context is unclear, classify with the most probable category based on the job description.
-        - Do NOT extract multiple categories unless clearly mentioned.
-
-    Examples:
-    - "Looking for technical workers." → ["Semi-Skilled"] (as it's likely general)
-    - "Looking for technical engineers." → ["Skilled"]
-    - "Need technical operators for machines." → ["Semi-Skilled"]
-    - "Hiring experienced technical staff." → ["Skilled"]
-    - "Hiring crane operators for the construction site." → ["Semi-Skilled"]
-    - "Need helpers for packaging work." → ["Unskilled"]
-    - "Looking for electricians and plumbers." → ["Skilled"]
-    - "I need laborers for shifting work." → ["Unskilled"]
-    - "Searching for skilled operators for heavy machinery." → ["Skilled"]
-    - "Looking for workers in Surat." → null
-
-    5) MULTIPLE CLASSIFICATIONS:
-    - If the query mentions multiple job roles, classify each and return them together.
-    - Example: "I need electricians and machine operators." → ["Skilled", "Semi-Skilled"]
-
-    6) FINAL OUTPUT RULES:
-    - Only include the following values in the response: "Skilled", "Semi-Skilled", "Unskilled".
-    - If no valid classification is possible, return `null`.
-
-    Output Format:
-    - The response must be a JSON object in the exact format below.
-    - If no valid keywords are found, return {{ "KEYWORDS": null }} or {{ "KEYWORDS": None }}.
-    - No explanations, no extra text—only the JSON object.
-
-    User Query:
-    {user_query}
-
-    Final Output (JSON only):
-    {{
-        "KEYWORDS": ["word1", "word2"]  # or null if none
-    }}
-    """.strip()
-
-    prompt = PromptTemplate(
-        input_variables=["user_query"],
-        template=prompt_template_str
+    # return extract_json_from_llm_response_employment(raw_output, "KEYWORDS")
+    update_llm_token(response)
+    raw_output = getattr(response, "content", str(response))
+    # P1-5: validate the ACTUAL raw LLM output through EmploymentKeywords.
+    # parse_llm_response does json.loads -> EmploymentKeywords, then exactly
+    # one corrective retry (json_mode) on failure, then an
+    # EmploymentKeywordsFailure envelope. filled_prompt is the same text the
+    # chain rendered above, passed so the corrective retry keeps full task
+    # context. The silent extract_json_from_llm_response_employment regex
+    # fallback is no longer the parse boundary.
+    filled_prompt = prompt.format(user_query=user_input)
+    result = parse_llm_response(
+        raw=raw_output,
+        model_class=EmploymentKeywords,
+        llm_client=llm,
+        prompt=filled_prompt,
     )
-    chain = prompt | llm
-    response = chain.invoke({
-        "user_query": user_input
-    })
-
-    raw_output = response.content.strip()
-
-    return extract_json_from_llm_response_employment(raw_output, "KEYWORDS")
+    if isinstance(result, EmploymentKeywords):
+        # KEYWORDS=None is a valid happy-path value (general query,
+        # no skill filter) — distinct from failure.
+        return {"KEYWORDS": result.KEYWORDS}
+    # Unrecoverable even after one retry. parse_llm_response already
+    # logged the failure; degrade to the no-skill-filter sentinel
+    # rather than silently as the old regex fallback did.
+    frappe.log_error(
+        f"extract_employment_keywords_from_query envelope: {result}",
+        "extract_employment_keywords_from_query",
+    )
+    return {"KEYWORDS": None}
  
 def classify_employment_query(query: str, llm) -> dict:
     """
@@ -490,19 +439,68 @@ def classify_employment_query(query: str, llm) -> dict:
     chain = prompt_template | llm
     # Run the chain and capture the response
     response = chain.invoke({"query": query})
+    update_llm_token(response)
+    # ------------------------------------------------------------------
+    # P1-5 boundary: regex-extract -> Pydantic-validate -> 1 retry -> envelope
+    # ------------------------------------------------------------------
+    # Bare-integer classifier, so per Ai_module/parsers.py it stays on
+    # re.search rather than the JSON parse_llm_response helper. The
+    # Pydantic model now actually GATES the return value; a parse or
+    # validation miss triggers exactly one corrective retry before
+    # falling back to the typed EmploymentClassificationFailure envelope.
+    def _extract_and_validate(raw_text: str) -> int:
+        """Regex-extract a 1-4 digit and validate it through Pydantic.
 
-    # Use regex to extract a valid classification number
-    match = re.search(r"^\s*([1-4])\s*$", response.content.strip())
-    if match:
-        classification_number = int(match.group(1))
-        classification_category = category_mapping[classification_number]
-        return {
-            "raw_prompt": refined_prompt,
-            "classification_number": classification_number,
-            "classification_category": classification_category,
-        }
-    else:
-        raise ValueError(f"Unexpected or invalid response from LLM: {response}")
+        Raises ValueError if no digit is present, ValidationError if the
+        extracted value is out of range. Returns the validated int.
+        """
+        m = re.search(r"^\s*([1-4])\s*$", (raw_text or "").strip())
+        if not m:
+            raise ValueError(
+                f"No 1-4 classification digit in LLM output: {raw_text!r}"
+            )
+        return EmploymentClassification(
+            classification_number=int(m.group(1))
+        ).classification_number
+
+    raw_first = response.content
+    try:
+        classification_number = _extract_and_validate(raw_first)
+    except (ValueError, _VE) as first_error:
+        # Attempt 2 — single corrective retry. The original filled prompt
+        # is included verbatim for task context, plus the raw output and
+        # the exact error so the LLM can self-correct.
+        corrective_prompt = (
+            f"{refined_prompt.replace('{query}', query)}\n\n"
+            "---\n"
+            "Your previous response was not a single digit 1-4.\n\n"
+            f"Previous raw output:\n{raw_first}\n\n"
+            f"Error:\n{first_error}\n\n"
+            "Return ONLY one digit: 1, 2, 3, or 4. No other text."
+        )
+        try:
+            retry_response = llm.invoke(corrective_prompt)
+            update_llm_token(retry_response)
+            classification_number = _extract_and_validate(
+                getattr(retry_response, "content", str(retry_response))
+            )
+        except (ValueError, _VE) as retry_error:
+            frappe.log_error(
+                f"classify_employment_query unrecoverable: "
+                f"first={first_error!r} retry={retry_error!r}",
+                "classify_employment_query",
+            )
+            return EmploymentClassificationFailure(
+                error=str(retry_error),
+                raw_output=raw_first,
+            )
+
+    classification_category = category_mapping[classification_number]
+    return {
+        "raw_prompt": refined_prompt,
+        "classification_number": classification_number,
+        "classification_category": classification_category,
+    }
 
 def generate_dynamic_message(chat_history_for_context: List[dict], static_follow_up: str, user_message: str, llm,chatId) -> str:
     """
@@ -679,13 +677,57 @@ def check_user_intent(response: str, follow_up_question: str, llm,chatId) -> str
     update_llm_token(intent_response)
     intent_text = intent_response.content.strip()
 
+    from frontend_app.Ai_module.employement_query.schemas import (
+        UserIntentClassification as _UIC,
+        UserIntentClassificationFailure as _UICF,
+    )
 
-    # Extract the classified intent using regex
-    intent_match = re.search(r"Classified intent:\s*(Agree|Disagree|Location Specific Query|Other Intent)", intent_text)
-    classified_intent = intent_match.group(1) if intent_match else "Other Intent"
+    def _extract_intent(raw_text: str) -> str:
+        m = re.search(
+            r"Classified intent:\s*(Agree|Disagree|Location Specific Query|Other Intent)",
+            raw_text or "",
+        )
+        if not m:
+            raise ValueError(f"No 'Classified intent:' label in LLM output: {raw_text!r}")
+        return _UIC(classified_intent=m.group(1)).classified_intent
 
-
-    return classified_intent
+    try:
+        return _extract_intent(intent_text)
+    except (ValueError, _VE) as _first_err:
+        filled_prompt = prompt_template.format(
+            response=response, follow_up_question=follow_up_question
+        )
+        corrective_prompt = (
+            f"{filled_prompt}\n\n"
+            "---\n"
+            "Your previous response did not contain a valid 'Classified intent:' line.\n\n"
+            f"Previous raw output:\n{intent_text}\n\n"
+            f"Error:\n{_first_err}\n\n"
+            "Return EXACTLY one line in the format:\n"
+            "Classified intent: <One of 'Agree', 'Disagree', 'Location Specific Query', 'Other Intent'>"
+        )
+        try:
+            retry_response = llm.invoke(corrective_prompt)
+            update_llm_token(retry_response)
+            return _extract_intent(
+                getattr(retry_response, "content", str(retry_response)).strip()
+            )
+        except (ValueError, _VE) as _retry_err:
+            # P1-5: build + log the typed envelope so the failure is
+            # greppable in the Error Log (distinct from legitimate "Other
+            # Intent" classifications). Degrade to the legacy string
+            # sentinel so callers doing `if intent == "Agree":` keep
+            # working — same pattern as extract_employment_keywords_from_query.
+            _f = _UICF(
+                error=str(_retry_err),
+                raw_output=intent_text,
+                classified_intent="Other Intent",
+            )
+            frappe.log_error(
+                f"check_user_intent unrecoverable: first={_first_err!r} retry={_retry_err!r} | envelope={_f.model_dump()}",
+                "check_user_intent",
+            )
+            return "Other Intent"
 
 def handle_employment_query(
     user_input: str,
@@ -716,6 +758,24 @@ def handle_employment_query(
     refined_user_input = user_input
     
     result = classify_employment_query(refined_user_input, llm_70b_vers)
+    # P1-5: an envelope means classification was unrecoverable even after
+    # one corrective retry. Degrade gracefully instead of 500-ing.
+    if isinstance(result, EmploymentClassificationFailure):
+        frappe.log_error(
+            f"classify_employment_query envelope: {result.model_dump()}",
+            "handle_employment_query",
+        )
+        return {
+            "Ai_response": "I couldn't quite interpret that. Could you rephrase your employment-related query?",
+            "Is_confirmation": None,
+            "Extracted Data": None,
+            "Validation Data": None,
+            "User Intention": "Other Intention",
+            "KEYWORDS": None,
+            "options": None,
+            "Trigger_Lead_Generation": False,
+        }
+
     user_intention = result["classification_category"]
     if user_intention == "Negatively Intended Query":
         message = respond_to_negative_query(

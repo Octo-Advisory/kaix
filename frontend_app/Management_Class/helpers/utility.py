@@ -492,13 +492,15 @@ def generate_query_hints(query_list, input_industry_name):
    ---
 
    FINAL OUTPUT FORMAT
-
-   Return only a valid Python list of dictionaries:
-   [
-      {{"query": "<generated_question_1>", "module": "<classified_module>"}},
-      {{"query": "<generated_question_2>", "module": "<classified_module>"}},
-      ...
-   ]
+   Return ONLY a valid JSON object with a single key "hints" whose value is a
+   list of dictionaries. No prose, no markdown fences, no commentary:
+   {{
+      "hints": [
+         {{"query": "<generated_question_1>", "module": "<classified_module>"}},
+         {{"query": "<generated_question_2>", "module": "<classified_module>"}},
+         ...
+      ]
+   }}
    """
 
     formatted_prompt = prompt_template.format(
@@ -506,12 +508,15 @@ def generate_query_hints(query_list, input_industry_name):
                 industry_name = input_industry_name
             )
 
-    # response = llm_70b_vers_creative.invoke(formatted_prompt)
-    # input_text = response.content
-    # results = extract_query_list(input_text) # FINAL OUTPUT TO BE SHOW(will return a list of queries along with their module names)
-    # return results
-
-    response = llm_70b_vers_creative.invoke(formatted_prompt)
+    # P1-5 #1: request Groq structured output (JSON-object mode). Fall back
+    # to a plain invoke if the model/provider rejects response_format.
+    try:
+        response = llm_70b_vers_creative.invoke(
+            formatted_prompt, response_format={"type": "json_object"}
+        )
+    except Exception as _json_mode_e:
+        frappe.log_error(str(_json_mode_e), "generate_query_hints json_object mode")
+        response = llm_70b_vers_creative.invoke(formatted_prompt)
     input_text = response.content
     return input_text
 
@@ -537,25 +542,77 @@ def generate_query_hints(query_list, input_industry_name):
 @frappe.whitelist()
 def extract_query_list(query_list, input_industry_name):
 
-    raw_query_hints = generate_query_hints(query_list = query_list, input_industry_name=input_industry_name)
+    """
+    Generate query hints and validate them through the QueryHintList pydantic
+    boundary (P1-5). Returns list[dict] on success, or a typed
+    QueryHintListFailure envelope on failure — never an ad-hoc error string.
+    """
+    raw_query_hints = generate_query_hints(query_list=query_list, input_industry_name=input_industry_name)
 
-    """
-    Extract the first list of dictionaries (queries + modules) from raw text.
-    """
-    # Match a list of dictionaries like: [ { "query": ..., "module": ... }, {...} ]
+    import json as _json
+    from frontend_app.Ai_module.parsers import parse_llm_response
+    from frontend_app.Ai_module.query_hints.schemas import QueryHintList, QueryHintListFailure
+
+    _retry_prompt = (
+        "Return a JSON object with key 'hints' containing a list of dicts. "
+        "Each dict must have 'query' (string) and 'module' (one of: "
+        "'Build from Scratch', 'Employment', 'Vendor Search', "
+        "'Incentives', 'Approval')."
+    )
+
+    # P1-5 #2/#3: validate the RAW LLM output at the boundary. The prompt now
+    # returns {"hints": [...]} (json_object mode), which maps onto QueryHintList.
+    # parse_llm_response performs the single corrective retry internally.
+    validated = parse_llm_response(
+        raw=raw_query_hints,
+        model_class=QueryHintList,
+        llm_client=llm_70b_vers_creative,
+        prompt=_retry_prompt,
+    )
+    if isinstance(validated, QueryHintList):
+        return validated.model_dump().get("hints", [])
+
+    # Legacy salvage: an older/unsupported model may still emit a bare
+    # [ {...}, ... ] list. Try the original regex + literal_eval, then
+    # re-validate the salvaged data through the same boundary.
     pattern = r"\[\s*\{[\s\S]*?\}\s*\]"
-
+    
     match = re.search(pattern, raw_query_hints, re.DOTALL)
     if match:
         try:
-            return ast.literal_eval(match.group(0))  # safely evaluate list of dicts
+            salvaged = ast.literal_eval(match.group(0))
+            revalidated = parse_llm_response(
+                raw=_json.dumps({"hints": salvaged}),
+                model_class=QueryHintList,
+                llm_client=llm_70b_vers_creative,
+                prompt=_retry_prompt,
+            )
+            if isinstance(revalidated, QueryHintList):
+                return revalidated.model_dump().get("hints", [])
+            validated = revalidated
         except Exception as e:
-            print("⚠️ Error evaluating list:", e)
-            return f"Error evaluating list:, {e}"
-            
-    else:
-        print("❌ No list of queries found in input text.")
-    return "No relevant queries found in the input text"
+            frappe.log_error(str(e), "extract_query_list literal_eval salvage")
+
+    # P1-5: typed failure envelope — never an ad-hoc string.
+    if isinstance(validated, QueryHintListFailure):
+        frappe.log_error(
+            f"{validated.error} | raw: {validated.raw_output}",
+            "extract_query_list query-hint failure",
+        )
+        return validated
+    if isinstance(validated, dict) and "error" in validated:
+        frappe.log_error(
+            f"{validated.get('error')} | raw: {validated.get('raw_output')}",
+            "extract_query_list query-hint failure",
+        )
+        return QueryHintListFailure(
+            error=str(validated.get("error")),
+            raw_output=str(validated.get("raw_output")),
+        )
+    return QueryHintListFailure(
+        error="extract_query_list: unparseable query-hint output",
+        raw_output=str(raw_query_hints),
+    )
 
 nlp = spacy.load("en_core_web_sm")  # run: python -m spacy download en_core_web_sm if not installed
 
@@ -603,13 +660,10 @@ def normalize_queries_with_known_cities(query_list, input_industry_name):
         return final_results
     
     else:
+        # P1-5: extract_query_list returns a typed QueryHintListFailure on
+        # failure (no longer an ad-hoc string). Surface it as-is so callers
+        # can distinguish "parser failed" from real results.
         return extracted_queries
-
-# if isinstance(results, list):
-#     normalized = normalize_queries(results, known_locations)
-#     print(normalized)
-# else:
-#     results
 
 def log_to_file(key,value):
     """

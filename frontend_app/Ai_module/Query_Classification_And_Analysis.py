@@ -3,7 +3,7 @@ import re
 import json 
 from typing import List, Dict, Tuple, Union, Any
 import copy
-import ast
+# import ast
 # from dotenv import load_dotenv
 import spacy
 from langchain.prompts import PromptTemplate
@@ -17,7 +17,9 @@ from frontend_app.Management_Class.Redis_management.Redis_chat import get_chat,s
 import configparser
 import frappe
 import random
-
+from frontend_app.Ai_module.parsers import (parse_llm_response, extract_json_object, safe_parse_output, extract_json_from_llm_response, convert_string_json,)
+from frontend_app.Ai_module.intent_detection.schemas import IntentClassification,IntentClassificationFailure
+from frontend_app.Ai_module.query_refinement.logic import refine_query_with_history
 # from langchain_openai import ChatOpenAI
 
 base_dir = os.path.expanduser("~")
@@ -99,545 +101,8 @@ SUPPLIES_NOT_AVAILABLE_MSG = (
     "Thanks for helping us grow."
 )
 
-
 # Load the SpaCy model for better entity recognition
 nlp = spacy.load("en_core_web_lg")
-
-# Define a function to refine the query using history
-def refine_query_with_history(
-    history, 
-    latest_query, 
-    llm,
-    context_freshness_config=None,
-    feasibility_json: dict | None = None,   # NEW (structured_summary object or whole feasibility payload)
-    feasibility_mode: bool = False  
-):
-    """                      
-    Refines user query using chat history with intelligent context handling.
-    
-    Parameters:
-    -----------
-    history : list
-        List of previous conversation turns (alternating User/AI messages)
-    latest_query : str
-        The user's latest input query
-    llm : LLM instance
-        Language model instance (e.g., ChatOpenAI)
-    context_freshness_config : dict, optional
-        Configuration for context freshness windows. Default values if not provided:
-        {
-            'fresh_turns': 2,      # 0-2 turns ago = FRESH
-            'recent_turns': 4,     # 3-4 turns ago = RECENT
-            'aging_turns': 7,      # 5-7 turns ago = AGING
-            'stale_turns': 8       # 8+ turns ago = STALE
-        }
-    
-    Returns:
-    --------
-    str
-        The refined standalone query
-    
-    Examples:
-    ---------
-    # Use default freshness windows
-    refined = refine_query_with_history(history, query, llm)
-    
-    # Use custom freshness windows (more aggressive context retention)
-    config = {
-        'fresh_turns': 3,
-        'recent_turns': 6,
-        'aging_turns': 10,
-        'stale_turns': 12
-    }
-    refined = refine_query_with_history(history, query, llm, config)
-    
-    # Use custom freshness windows (more conservative context retention)
-    config = {
-        'fresh_turns': 1,
-        'recent_turns': 2,
-        'aging_turns': 4,
-        'stale_turns': 5
-    }
-    refined = refine_query_with_history(history, query, llm, config)
-    """
-    
-    # Set default freshness configuration if not provided
-    if context_freshness_config is None:
-        context_freshness_config = {
-            'fresh_turns': 2,
-            'recent_turns': 4,
-            'aging_turns': 7,
-            'stale_turns': 8
-        }
-    
-    # Extract configuration values
-    fresh_turns = context_freshness_config.get('fresh_turns', 2)
-    recent_turns_lower = fresh_turns+1
-    recent_turns = context_freshness_config.get('recent_turns', 4)
-    aging_turns_lower = recent_turns+1
-    aging_turns = context_freshness_config.get('aging_turns', 7)
-    stale_turns = context_freshness_config.get('stale_turns', 8)
-    
-    # Validate configuration (ensure logical ordering)
-    if not (0 < fresh_turns < recent_turns < aging_turns < stale_turns):
-        raise ValueError(
-            f"Context freshness configuration must follow: "
-            f"0 < fresh_turns < recent_turns < aging_turns < stale_turns. "
-            f"Got: fresh={fresh_turns}, recent={recent_turns}, "
-            f"aging={aging_turns}, stale={stale_turns}"
-        )
-    
-    retriever_prompt_template = """
-You are an intelligent Query Refiner Agent. Your task is to transform the latest user input into a clear, standalone query by intelligently leveraging chat history while preserving the user's exact intent and communication style.
-
-## CORE PHILOSOPHY
-Apply contextual intelligence, not rigid rules. Think like a human conversation partner who remembers what was discussed and understands when context should be carried forward versus when the topic has shifted.
-
-## CONTEXT INTELLIGENCE FRAMEWORK
-
-### Context Classification (Priority System)
-**TIER 1 - ESTABLISHED CONTEXT** (Carry Forward with High Confidence):
-- Information explicitly stated by the user in their own messages
-- Information confirmed or acknowledged by the user (e.g., "Yes, that's correct")
-- Information consistently used across multiple user messages
-- Information the user is clearly building upon (not contradicting)
-
-**TIER 2 - WORKING CONTEXT** (Carry Forward with Moderate Confidence):
-- Information mentioned once by user and is recent (within last 2–3 turns)
-- Implied context from user's questions that's still active
-- Context that hasn't been contradicted but also hasn't been reinforced
-
-**TIER 3 - AI-SUGGESTED CONTEXT** (Carry Forward ONLY if User Explicitly Confirms):
-- Examples, options, or suggestions provided by AI are NON-AUTHORITATIVE.
-- DO NOT carry forward any AI-suggested phrases, options, or branches unless the user explicitly confirms in their latest input (e.g., “I choose land options”, “Show me existing facilities”).
-- Generic acknowledgments like “okay”, “got it”, or silence are NOT confirmation.
-- If the user indicates a mis-tap/undo (e.g., “I mistakenly pressed no”), treat it as NO SELECTION.
-
-**TIER 4 - STALE/CONTRADICTED CONTEXT** (DO NOT Carry Forward):
-- Information explicitly contradicted by user
-- Information from old conversation threads ({stale_turns}+ turns ago) without recent reinforcement
-- Information the user has clearly moved away from
-
-### Context Freshness & Reinforcement
-- **0–{fresh_turns} turns ago**: FRESH — carry forward if relevant.
-- **{recent_turns_lower}–{recent_turns} turns ago**: RECENT — carry forward if still relevant and not contradicted.
-- **{aging_turns_lower}–{aging_turns} turns ago**: AGING — carry forward only if reinforced or consistently used.
-- **{stale_turns}+ turns ago**: STALE — generally do not carry forward unless it is a core established fact.
-
-**Reinforcement Signals**: user repeats/confirms, builds upon, or corrects AI (correction becomes ESTABLISHED).
-**Decay Signals**: different info, explicit contradiction, long silence (3+ turns), or topic shift.
-
-## FEASIBILITY CONTEXT (applies only when feasibility_mode = "true")
-When a feasibility study is attached, treat it as the **primary grounding source for missing facts**. Use it for gap-filling, and **never invent** details.
-
-### Inputs
-- `feasibility_mode`: "true" | "false"
-- `feasibility_json`: structured object that may contain:
-  - `product`, `sub-sector`, `main_industry` (any may be missing)
-  - Optional: `Location`, `final_product_capacity`, `supplies`, `equipments`
-
-### Industry Allow/Block Detection (chat-history governance)
-- From the chat history, infer two sets:
-  - **blocked_industries**: any industry/product for which the AI has **recommended starting a new chat** (redirect/“move to a new chat”) in this thread.  
-    **Important:** once recommended, that industry/product is **blocked for this chat regardless of user response**.
-  - **allowed_industries**: user-established industries/products from recent turns **that are not in blocked_industries**.
-- Never pull context from **blocked_industries** for this thread unless the **latest user message** explicitly and unambiguously selects that industry again **and** states an intent to proceed here despite the prior redirect advice.
-
-### Precedence & Conflict Rules (UPDATED)
-1) **Allowed-History First**: When a needed field is missing/ambiguous in the latest user message, first attempt to fill it using **allowed_industries** and other allowed, user-established context from the recent chat (respect tiers/freshness).  
-2) **Feasibility as Fallback** (only if feasibility_mode = "true"): If still missing, pull the field from `feasibility_json`.  
-3) **Omit if Unknown**: If the field remains unknown after (1) and (2), **omit it** (do not guess).  
-4) **Latest User Overrides**: If the latest user message explicitly contradicts previously established context or feasibility, prefer the **latest user value**.  
-5) **No AI-Option Leakage**: Do not import AI-proposed option labels (e.g., “land / facilities / both”) unless explicitly selected by the user in their latest turn.  
-6) **Main Industry Inference (only if needed)**: If feasibility lacks `main_industry` but has `product` or `sub-sector`, you may infer a main industry **only when reasonably confident**; otherwise leave it unspecified.
-
-### Required Fields Matrix (Ideal Query Shape) — applies in BOTH modes
-(If a required field is missing from the latest user message, fill from **Allowed-History → Feasibility (if on) → Omit**.)
-
-- **Build from Scratch (BFS) / Acquire Facility / Evaluate Both** — Must ideally include:
-  - `product_or_industry` (latest user → allowed history → feasibility.product/sub-sector/main_industry)
-  - `capacity` **and** `unit` **and** `time_period`
-    - If missing in the user message and not available from allowed history, **parse from** `feasibility_json.final_product_capacity` **when present** (feasibility_mode = "true").
-    - Keep exact formatting (e.g., “17,253.3 metric tons per month”).
-  - Optional: `location` (latest user → allowed history → feasibility.Location)
-
-- **Incentives / Approvals** — **Required**:
-  - `industry_or_product` (latest user → allowed history → feasibility)
-  - `location` (latest user → allowed history → feasibility.Location)
-  - Do **not** add capacity unless the latest message includes it for the same intent.
-
-- **Employment** — **Required**:
-  - `location` (latest user → allowed history → feasibility.Location)
-  - Ignore capacity unless provided with employment intent.
-
-- **Vendors** — **Required**:
-  - EITHER (`product_or_industry`) OR (`raw_material/equipment/service`)
-  - AND `location`
-  - For gaps, use allowed history first; else feasibility `supplies`/`equipments` and `Location`.
-  - Do **not** add capacity unless provided with vendor intent.
-
-### Capacity Parsing Guidance (for BFS)
-- If `final_product_capacity` exists (e.g., “17,253.3 metric tons per month”), treat it as:
-  - `capacity_value` = the numeric quantity (preserve commas/decimals),
-  - `capacity_unit` = the unit phrase (e.g., “metric tons”),
-  - `time_period` = the cadence (e.g., “per month”).
-- **Never** convert or re-express units; keep the original string intact in the refined query.
-
-### Feasibility vs History — Final Rule (UPDATED)
-- **Precedence:** Allowed history → Feasibility (if on) → Omit.  
-- Prefer the latest user value when explicit.  
-- Never draw from **blocked_industries** in this thread.
-
-## DECISION FRAMEWORK
-
-### Location Scope Preservation (CRUCIAL)
-If the user's latest input contains scope modifiers like "only", "just", "nearby", or "surrounding" (e.g., "Bharuch only", "Bharuch and nearby"), you MUST preserve these exact words in your reformulated query. Do NOT delete them.
-- Example Input: "Bharuch only" -> Output: "Show details for refrigerators in Bharuch only."
-- Example Input: "Surat and nearby" -> Output: "Show details for refrigerators in Surat and nearby."
-
-### Conversational Agreement Resolution (CRUCIAL)
-If the chat history shows the AI recently suggested a specific location (e.g., a state or district) and asked a confirmation question (e.g., "Reply 'yes' to explore this", "Would you like to explore this option?"), and the user's latest message is a conversational agreement (e.g., "yes", "y", "sure", "I want to explore this state", "sounds good", "proceed"):
-- DO NOT output the user's conversational phrase.
-- Rewrite the user's input as the EXACT name of the location they are agreeing to.
-- Example 1: 
-  - AI History: "...we've identified Gujarat as a potential location. Reply 'yes' to explore this."
-  - User Input: "I want to explore this state"
-  - Your Output: "Gujarat"
-- Example 2:
-  - AI History: "...we've identified Gujarat as a potential location. Reply 'yes'"
-  - User Input: "yes"
-  - Your Output: "Gujarat"
-
-### Example & Suggestion Resolution (CRUCIAL)
-If the chat history shows the AI provided an example location (e.g., "give a country (e.g., India)") and the user replies with phrases like "go with the country", "use your suggestion", "the example", or "suggested country":
-- DO NOT just echo the user's vague words.
-- You MUST resolve the reference to the exact location name provided in the AI's example.
-- Example 1: 
-  - AI History: "...provide a country (e.g., India), a state (e.g., Gujarat)..."
-  - User Input: "Go with the country option" or "Go ahead with your suggested country"
-  - Your Output: "India"
-- Example 2:
-  - AI History: "...a state (e.g., Gujarat)..."
-  - User Input: "The suggested state is fine"
-  - Your Output: "Gujarat"
-
-### Message Type Detection (decide how to refine)
-Classify the latest USER input into exactly one:
-- **ACTIONABLE**: business request (ask/search/show/compare/find/proceed/plan/etc.)
-- **META-CONTROL**: chat control/correction (e.g., “I mistakenly pressed no”, “undo”, “continue”, “refine requirements”)
-- **SMALL-TALK/OTHER**: greetings/thanks/emojis/etc.
-
-**Rules**
-- ACTIONABLE → refine into a clear, standalone actionable query using the Required Fields Matrix and the **Allowed history → Feasibility (if on) → Omit** precedence.
-- META-CONTROL → DO NOT echo meta text. Convert it into a clean actionable query using the last **user-confirmed** context from **allowed history** and feasibility (if available) for missing fields.
-- SMALL-TALK/OTHER:
-  - If it contains a **continuation signal** (“continue”, “go ahead”, “proceed”, “next”, “let’s move on”), treat as META-CONTROL and synthesize an action.
-  - Otherwise, do **not** convert; return the small-talk text itself (normalized).
-
-### Step 1: Analyze Latest User Input
-- Is it a question, statement, or command? (Preserve this structure.)
-- Does it contain all necessary information?
-- Does it contain pronouns/references (it, that, there, them, this)?
-- Does it signal continuation or a topic shift?
-
-### Step 2: Analyze Chat History
-- What context has been established by the **user** (industry, location, metrics, products, services)?
-- How fresh is this context?
-- Reinforced or contradicted?
-- **Is it allowed or blocked?** (Respect the **Industry Allow/Block Detection** rule above.)
-- Continuation or shift?
-
-### Step 3: Context Carry-Forward Decision (per element)
-**CARRY FORWARD IF:** TIER 1, relevant, not contradicted, **and not blocked**, and reasonably fresh/consistent.  
-**OVERRIDE WITH LATEST USER IF:** explicitly different/contradictory.  
-**DO NOT CARRY FORWARD IF:** TIER 3 unconfirmed, TIER 4 stale/contradicted, **blocked**, unrelated, or latest input is already standalone.
-
-### Step 4: Intelligent Synthesis
-- Integrate carried-forward context naturally.
-- Preserve input structure (question stays question; statement stays statement).
-- Output must be standalone.
-- Do not add explanations/justifications (“Based on your previous…” etc.).
-
-## CRITICAL INSTRUCTIONS
-
-### Structure Preservation
-- Preserve question/statement/command for ACTIONABLE inputs.
-- For META-CONTROL, convert to a minimal, clean ACTIONABLE query (do not echo meta text).
-- For SMALL-TALK/OTHER without continuation signals, return the small-talk text verbatim (normalized).
-1) QUESTION → end with “?”
-2) STATEMENT / COMMAND → end with “.” (omit only if the user’s style clearly omits)
-
-### Punctuation Normalization (Apply First)
-- Collapse repeated punctuation: "!!!"→"!", "???"→"?", "..."→"."
-- Collapse repeated commas/semicolons/colons
-- Trim extra whitespace; collapse multiple spaces
-- Do **not** alter punctuation in numbers/units/ranges
-- Respect terminators per structure above
-
-### Mis-tap / Undo Policy
-- If the user says they mis-clicked/pressed wrong/undo: discard implied selections from prior AI turns.
-- Carry forward only explicitly confirmed **neutral** facts (e.g., capacity, industry, location).
-- Do not include AI-proposed options unless newly and explicitly confirmed in the latest message.
-
-### Repair / Undo Resolution Ladder (META-CONTROL)
-1) Use the **last user-stated actionable request**, if any.
-2) Else use **last user-confirmed neutral facts** + feasibility (when available) to form the minimal canonical query for the ongoing intent.
-3) Never include AI-proposed options unless the user confirms them.
-4) Do **not** echo meta phrases like “I mistakenly pressed no”.
-
-### Numerical Values & Units (CRITICAL)
-- **NEVER** modify/convert/expand numbers or units.
-- Keep exact formats (e.g., “15,400,000 kwh per annum” stays as is).
-- If the user provides a metric, retain it exactly.
-- If absent, do not invent.
-
-### Intent Separation — DO NOT MIX
-Primary intents: **Build from Scratch**, **Acquire Existing Facility**, **Evaluate Both**, **Vendor Search**, **Incentive Search**, **Approval Search**, **Employee Search**.
-- Keep intent-specific elements isolated across history unless the latest query explicitly mentions multiple intents.
-- Always carry forward **neutral** context (industry, location, metrics) from **allowed** history only.
-
-### Option Adoption Gate (Block AI-Suggestion Leakage)
-- NEVER include AI-proposed lists/buttons/branches (“land options / existing facilities / both”) unless the user explicitly confirms a choice in their **latest** message.
-- If the user cancels/undoes a prior click, then **no option is selected**.
-- When uncertain, omit all AI-proposed options and return only user-confirmed content.
-
-### Module-Specific Context Elements
-- **Industry/Sector** (neutral; carry across intents; must be **allowed**, not blocked)
-- **Location** (neutral)
-- **Metrics/Specifications** (neutral)
-- **Supply Details** (vendor-specific)
-- **Job/Employment** (employment-specific)
-- **Incentive Type** (incentives-specific)
-- **Approval Type** (approvals-specific)
-
-### Canonical Query Templates (for synthesis)
-- **BFS (Build From Scratch / Unspecified)**: “I want to set up / build a new factory for <product/industry> at <capacity> [in <location>].”
-- **ACQUIRE (Existing Facility)**: “I want to buy / acquire an existing facility for <product/industry> at <capacity> [in <location>].”
-- **EVALUATE BOTH (Build or Buy)**: “I want to explore both building and buying options for <product/industry> at <capacity> [in <location>].”
-- **INCENTIVES**: “Show incentives for <industry/product> [in <location>].”
-- **APPROVALS**: “Show approvals required for <industry/product> [in <location>].”
-- **VENDORS**: “Find vendors for <supply or product> [in <location>].”
-- **EMPLOYMENT**: “Show workforce availability for <role/skill> [in <location>].”
-- Ambiguous but capacity/industry known → prefer BFS template.
-
-## SELF-CHECK — MODULE GATE (must execute silently before final output)
-- Identify the active module intent.
-- Verify the **Required Fields Matrix** is satisfied using **Allowed history → Feasibility (if on) → Omit**:
-  - **BFS/Acquire/Both**: If final_product_capacity exists in feasibility and the user didn’t override capacity with an **allowed** value, ensure the refined query **includes that full string** (value + unit + period). If it’s absent, **STOP**, add it, and re-check.
-  - **Incentives/Approvals**: Ensure **both** `industry_or_product` **and** `location` are present (from latest user → allowed history → feasibility). If either is missing after those steps, **omit it** rather than guessing and keep the query otherwise standalone.
-  - **Employment**: Ensure `location` is present (latest user → allowed history → feasibility).
-  - **Vendors**: Ensure either `product_or_industry` or `raw_material/equipment/service` **and** `location` are present (latest user → allowed history → feasibility).
-- Never include context from **blocked_industries** in this thread.
-- If any required field remains unknown after allowed history + feasibility (if on), **omit it rather than guessing**.
-
-## Micro Examples (Feasibility Mode)
-- User: “Show me the land options.”  | Feasibility: product="Specialty Chemicals", final_product_capacity="17,253.3 metric tons per month", Location="Gujarat"
-  → **Refined**: “Show land options for Specialty Chemicals **at 17,253.3 metric tons per month** in Gujarat.”
-- User: “What incentives are there?”  | Feasibility: product="Solar PV Power Plant", Location="Low-veld"
-  → **Refined**: “Show incentives for Solar PV Power Plant in Low-veld.”
-- User: “Need suppliers near me.”     | Feasibility: supplies=["Solar panels","Invertors"], Location="Low-veld"
-  → **Refined**: “Find vendors for Solar panels in Low-veld.”
-
-## OUTPUT REQUIREMENTS
-1) Output **ONLY** the reformulated standalone query.
-2) No explanations, reasoning, or meta phrases.
-3) Clean, direct reformulation only.
-4) The query must be standalone.
-5) Structure must match the user’s input (question→question, statement→statement).
-6) If latest input is **META-CONTROL**, output a single clean **ACTIONABLE** query (do not echo meta text).
-7) If latest input is **SMALL-TALK/OTHER** (no continuation signal), output the **small-talk text itself** (normalized).
-8) When `feasibility_mode = "true"`, apply the Allowed history → Feasibility (if on) → Omit precedence and pass the SELF-CHECK — MODULE GATE before emitting the final query.
-
-## INPUT
-Feasibility Mode: {feasibility_mode}            # "true" or "false"
-Feasibility JSON: {feasibility_json_str}        # may be empty when mode=false
-Chat History:
-{history}
-
-Latest User Input:
-{latest_query}
-
-Before you output, RE-CHECK: if the refined query contains any phrase that appears only in prior AI messages and is NOT explicitly confirmed in the latest USER input, remove it. If any required field is still unknown after allowed history + feasibility (if on), **omit it** rather than guessing.
-
-Reformulated Standalone Query:
-    """
-   
-    prompt = PromptTemplate(
-        input_variables=["fresh_turns", "recent_turns_lower", "recent_turns", "aging_turns_lower", "aging_turns", "stale_turns", "history", "latest_query"],
-        template=retriever_prompt_template
-    )
-    # print(prompt)
-
-
-    chain = prompt | llm
-    
-    refined_query = chain.invoke({
-        "fresh_turns": fresh_turns, 
-        "recent_turns_lower": recent_turns_lower, 
-        "recent_turns": recent_turns, 
-        "aging_turns_lower": aging_turns_lower, 
-        "aging_turns": aging_turns, 
-        "stale_turns": stale_turns,
-        "history": "\n".join(history), 
-        "latest_query": latest_query,
-        "feasibility_mode": feasibility_mode,
-        "feasibility_json_str": feasibility_json
-    })
-    with open("testlog.txt", "a") as file:
-        file.write(f"\n &&&&&&&&&&&&&&&&&&&&&&&& Prompt:\n{refined_query}")
-    
-    # Uncomment if you have this function
-    # update_llm_token(refined_query)
-    
-    refined_text = refined_query.content.strip()
-    
-    # Extract the reformulated standalone query
-    match = re.search(
-        r'reformulated standalone query:\s*(?:"(.*?)"|\'(.*?)\'|(.*))$', 
-        refined_text, 
-        re.IGNORECASE
-    )
-    
-    if match:
-        # Return the captured group that is not None
-        return next(group for group in match.groups() if group)
-    
-    # Fallback to the entire response if no match is found
-    return refined_text
-
-
-# # Define the function
-# @frappe.whitelist()
-# # Define the function
-# def classify_query(user_query: str) -> str:
-#     """
-#     Classifies a business-related query into one of eight predefined categories based on its intent and context.
-
-#     Parameters:
-#     -----------
-#     user_query : str
-#         A user-submitted query related to industry or business.
-
-#     Returns:
-#     --------
-#     str
-#         A single category name from the following list that best matches the user's query:
-        
-#         - "Query to build industry from Scratch"
-#         - "Query to search Vendors"
-#         - "Query to search Incentives"
-#         - "Query to Get Approvals"
-#         - "Query to Get Employee Search"
-#         - "Negatively Intended Query"
-#         - "Other industry-related queries"
-#         - "Valueless queries"
-
-#     Notes:
-#     ------
-#     - The classification is powered by a language model and follows strict rules for interpreting the query’s intent.
-#     - Only one category is returned per query.
-#     - The function does not provide explanations or return multiple categories.
-#     """
-
-#     prompt_template = """
-#     You are an expert in understanding business-related queries and classifying them into a single most relevant category.
-#     Your task is to strictly assign the query to only one category, even if multiple classes seem applicable.  
-#     Analyze the context carefully and ensure that you return only one category that best fits the query.  
-
-#     Categories & Their Definitions:
-
-#     1. Query to build industry from Scratch:  
-#         - Example: I want to build a 1 TPA Cement Factory.  
-#         - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
-#         - Assign this category if the user's query indicates any intent to establish, set up, construct, initiate, develop, or start a new industry or factory, regardless of the exact words used.  
-#         - The classification must be based on understanding the overall intent and context rather than focusing on specific words like "build" or "establish."  
-#         - Queries about buying property for building an industry may fall under this category only if the intent to use that property for setting up an industry is clearly indicated.  
-#         - Queries about selling property, renting land, or general property transactions that do not involve setting up an industry should not be classified under this category.  
-#         - If the intent to build is unclear, vague, or mixed with other topics, classify it under "Other industry-related queries."
-
-#     2. Query to search Vendors:  
-#         - Example: I am searching for a vendor who supplies pharmaceutical-grade raw chemicals for drug manufacturing.  
-#         - This category is used for queries about finding suppliers, manufacturers, or vendors for raw materials, equipment, or services.
-
-#     3. Query to search Incentives:  
-#         - Example: What benefits are available for setting up a cement manufacturing plant in XYZ area?  
-#         - This category is used for queries asking about government incentives, grants, or subsidies related to setting up or expanding an industry.
-
-#     4. Query to Get Approvals:  
-#         - Example: I want to get approval for my Cement Factory.  
-#         - This category is used for queries about obtaining permits, licenses, or regulatory approvals for a business or industry.
-
-#     5. Query to Get Employee Search:  
-#         - Example: What is the availability of employment in XYZ area for the Pharmaceutical industry?  
-#         - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
-
-#     6. Negatively Intended Query:
-#         - Example: I don't want to search for incentives for the cement industry in Ahmedabad.  
-#         - This category is used for queries where the user clearly expresses that they do not want to proceed with a specific industry-related topic (such as incentives, approvals, vendors, land, or employment).  
-#         - This includes statements where the user rejects, declines, or expresses disinterest, such as "I don't want to...", "No need to...", or "I'm not looking for...".  
-#         - Classify here only if the overall intent is negative toward one or more categories and there is no indication that the user still wants to proceed within the same topic under different parameters (e.g., different city or industry).  
-#         - Do not classify vague queries or neutral statements under this category unless the negative intent is explicit or clearly implied in context.
-
-#     If None of the Above Apply, Use These Two Categories:
-
-#     7. Other industry-related queries:  
-#         - Example: What is the role of AI in manufacturing?  
-#         - This refers to general industry discussions, trends, or innovations that do not fit into the above categories.
-#         - Queries about selling property, renting facilities, or unrelated infrastructure transactions should be classified here.
-
-#     8. Valueless queries:  
-#         - Example: Who is Donald Trump?  
-#         - This refers to queries that are irrelevant to business, industry setup, or supply chains.  
-#         - If the query contains industry-related words but the intent is not meaningful, classify it here.  
-#         - Example: I'm going to buy a new bike, for that which approvals do I need? (Not relevant to industry-building)
-
-#     Strict Classification Rules:
-
-#     1. Return Only One Class:  
-#         - If the query seems to match multiple categories, analyze the overall intent and assign it to the single most appropriate category.  
-
-#     2. Assign "Query to build industry from Scratch" ONLY if Confident:  
-#         - Assign this category only if the query's overall context and intent clearly suggest setting up or establishing an industry, using any terminology (like initiate, develop, set up, start, construct, etc.).  
-#         - Do not classify queries about selling, renting, or unrelated property dealings under this category.  
-#         - Queries that simply mention "property for an industry" but do not clearly indicate an intent to build should be classified under "Other industry-related queries."  
-#         - The classification should be based on a thorough understanding of the full query, not on the presence of single words.
-
-#     3. Do Not Assign "Query to build industry from Scratch" If the Query Contains Only Approvals, Incentives, Vendors, or Employee Searches:  
-#         - If the user is asking about any combination of these categories (Approvals, Incentives, Vendors, or Employee Searches) but does not explicitly or contextually mention setting up a new industry, assign the most relevant category among them.  
-#         - Example: "I need vendors for raw materials and want to know about required approvals and incentives." → Correct classification: Either "Query to search Vendors" or "Query to Get Approvals" based on context.  
-#         - Example: "I want to search vendors, approvals, and also check employment availability in my city." → Correct classification: Choose the most dominant category based on intent.  
-
-#     4. Prioritize Meaningful Context, Not Just Keywords:  
-#         - Do not assign a category just because it contains words like "approval," "vendor," or "incentive."  
-#         - Analyze the full context of the query before assigning a category.  
-
-#     Final Output Instructions:
-#     - Strictly return only the category name from the list above.  
-#     - Do not include multiple categories.  
-#     - Do not provide explanations, justifications, or extra details.  
-
-#     Query:  
-#     {query}
-
-#     Output:  
-#     (Return only one category name from the list)
-#     """
-
-
-#     # Initialize the LLM
-#     # Create the prompt
-#     prompt = PromptTemplate(
-#         input_variables=["query"],
-#         template=prompt_template
-#     )
-
-#     # Create the LLM chain
-#     chain = prompt | llm_70b_vers
-
-#     # Run the query through the chain
-#     category = chain.invoke({"query": user_query})
-
-#     return category.content.strip()
 
 @frappe.whitelist()
 # Define the function
@@ -1414,12 +879,6 @@ Output:
 
     return category.content.strip()
 
-def extract_json_object(text: str) -> str:
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if not match:
-        raise ValueError("No JSON object found in model output")
-    return match.group(0)
-
 def generate_sub_queries(user_query: str, intent_classes: List[str], llm: Any) -> Dict[str, str]:
     """
     Generates one refined sub-query per classified intent from a multi-intent business query.
@@ -1573,65 +1032,6 @@ def decompose_multi_intent_query_into_sub_queries(user_query: str, intent_classe
         "classified_intents": intent_classes,
         "sub_queries": sub_queries
     }
-
-def safe_parse_output(output_str: str) -> list:
-    """
-    Attempt to parse the output string into a valid list of categories.
-    Supports malformed JSON, Python lists, or raw string labels.
-    Returns an empty list if parsing fails.
-    """
-    MAIN_CATEGORIES = {
-        "Query to build industry from Scratch",
-        "Query to search Vendors",
-        "Query to search Incentives",
-        "Query to Get Approvals",
-        "Query to Get Employee Search"
-    }
-
-    FALLBACK_CATEGORIES = {
-        "Negatively Intended Query",
-        "Other industry-related queries",
-        "Valueless queries",
-        "Follow-up Query"
-    }
-    output_str = output_str.strip()
-
-    # Case 1: Try strict JSON
-    try:
-        result = json.loads(output_str)
-        if isinstance(result, list):
-            return result
-        elif isinstance(result, str):
-            # Handle raw string like '"Query to Get Approvals"'
-            return [result.strip('"')]
-    except json.JSONDecodeError:
-        pass
-
-    # Case 2: Try evaluating as a Python literal list
-    try:
-        result = ast.literal_eval(output_str)
-        if isinstance(result, list):
-            return [str(cat) for cat in result]
-    except (ValueError, SyntaxError):
-        pass
-
-    # Case 3: Match bracketed content manually
-    bracket_match = re.search(r"\[.*?\]", output_str)
-    if bracket_match:
-        try:
-            result = ast.literal_eval(bracket_match.group(0))
-            if isinstance(result, list):
-                return [str(cat) for cat in result]
-        except (ValueError, SyntaxError):
-            pass
-
-    # Case 4: If it's a plain string with category name
-    for known_cat in MAIN_CATEGORIES.union(FALLBACK_CATEGORIES):
-        if known_cat in output_str:
-            return [known_cat]
-
-    return []  # Final fallback
-
 
 def classify_query_multilabel(
         user_query: str, 
@@ -1922,13 +1322,15 @@ However, if the query is a continuation (e.g., referencing a shown vendor, appro
 This rule overrides all other instructions.
 
 Examples of Output:
-["Query to search Incentives"]
-["Follow-up Query"]
-["Query to build industry from Scratch", "Query to Get Approvals", "Follow-up Query"]
-["Other industry-related queries"]
-["Negatively Intended Query"]
-["Valueless queries"]
+{{"categories": ["Query to search Incentives"]}}
+{{"categories": ["Follow-up Query"]}}
+{{"categories": ["Query to build industry from Scratch", "Query to Get Approvals", "Follow-up Query"]}}
+{{"categories": ["Other industry-related queries"]}}
+{{"categories": ["Negatively Intended Query"]}}
+{{"categories": ["Valueless queries"]}}
 
+Return ONLY a JSON object of the EXACT shape: {{"categories": [<one or more category strings>]}}
+Do not include prose, markdown fences, or commentary.
 
 Chat History:
 {chat_history_normal}
@@ -1936,7 +1338,7 @@ Chat History:
 Query:
 {query}
 
-Output:
+JSON Output:
         """
 
     else:
@@ -2396,10 +1798,13 @@ This prevents misclassification of passive or vague queries as actual search int
 This rule overrides all other instructions.
 
 Examples of Output:
-["Query to search Vendors"]
-["Query to search Incentives", "Query to Get Approvals"]
-["Negatively Intended Query"]
-["Valueless queries"]
+{{"categories": ["Query to search Vendors"]}}
+{{"categories": ["Query to search Incentives", "Query to Get Approvals"]}}
+{{"categories": ["Negatively Intended Query"]}}
+{{"categories": ["Valueless queries"]}}
+
+Return ONLY a JSON object of the EXACT shape: {{"categories": [<one or more category strings>]}}
+Do not include prose, markdown fences, or commentary.
 
 Chat History:
 {chat_history_normal}
@@ -2407,18 +1812,44 @@ Chat History:
 Query:
 {query}
 
-Output:
+JSON Output:
         """
-       
+
     prompt = PromptTemplate(
         input_variables=["query", "chat_history_normal"],
         template=prompt_template
     )
 
     chain = prompt | llm
-    result = chain.invoke({"query": user_query, "chat_history_normal":Chat_history_normal})
-    print(result.content.strip())
-    parsed_categories = safe_parse_output(result.content.strip())
+    invoke_payload = {"query": user_query, "chat_history_normal": Chat_history_normal}
+    result = chain.invoke(invoke_payload)
+    raw_output = getattr(result, "content", str(result)).strip()
+    print(raw_output)
+
+    # P1-5: validate the raw LLM output through IntentClassification.
+    # parse_llm_response does json.loads -> IntentClassification, then
+    # exactly one corrective retry (json_mode=True) on failure, then an
+    # IntentClassificationFailure envelope. The legacy safe_parse_output
+    # regex/literal_eval ladder is now a fallback only.
+    filled_prompt = prompt.format(**invoke_payload)
+    validated = parse_llm_response(
+        raw=raw_output,
+        model_class=IntentClassification,
+        llm_client=llm,
+        prompt=filled_prompt,
+    )
+    if isinstance(validated, IntentClassification):
+        parsed_categories = list(validated.categories)
+    else:
+        # Failure envelope (IntentClassificationFailure or dict). Already
+        # logged by parse_llm_response. Fall back to the legacy ladder so
+        # the request degrades to "Other industry-related queries" via
+        # the existing downstream branch rather than crashing.
+        frappe.log_error(
+            f"classify_query_multilabel envelope: {validated}",
+            "classify_query_multilabel",
+        )
+        parsed_categories = safe_parse_output(raw_output)
 
     if parsed_categories:
         cleaned_categories = clean_categories(parsed_categories)
@@ -2990,84 +2421,6 @@ field_with_description = {
         "Will your industry cross the following?": "Checks whether the industry site intersects with important geographical or utility structures (Pipeline of Gujarat Gas, Pipeline of Sabarmati Gas, Pipeline of GSPL, Water bodies, Notified rivers/ nalas/ canals/ drains)."
     }
 }
-
-
-def extract_json_from_llm_response(raw_output: str, json_key: str) -> Dict[str, Union[List[str], None]]:
-    """
-    Extracts a JSON object containing the specified key from an LLM response.
-
-    Supports:
-    - Direct JSON responses.
-    - JSON blocks enclosed in triple backticks.
-    - Loosely structured JSON in plain text.
-
-    Handles cases where:
-    - The key's value is explicitly `null` or `None`.
-    - The key contains a list of values.
-    
-    Parameters:
-    -----------
-    raw_output : str
-        The raw text output from the LLM.
-
-    json_key : str
-        The expected key in the JSON response (e.g., "KEYWORDS").
-
-    Returns:
-    --------
-    Dict[str, Union[List[str], None]]:
-        A dictionary with the extracted values, ensuring a structured JSON output.
-    """
-
-    # --- Case 1: Direct JSON Parsing ---
-    try:
-        data_entire = json.loads(raw_output.strip())
-        if isinstance(data_entire, dict) and json_key in data_entire:
-            extracted_value = data_entire.get(json_key, None)
-            return {json_key: extracted_value if isinstance(extracted_value, list) else None}
-    except (json.JSONDecodeError, ValueError, TypeError):
-        pass  # JSON parsing failed
-
-    # --- Case 2: Extract JSON inside triple backticks ---
-    code_blocks = re.findall(r'```(?:[a-zA-Z0-9_-]+)?(.*?)```', raw_output, flags=re.DOTALL)
-    for block in code_blocks:
-        try:
-            block_data = json.loads(block.strip())
-            if isinstance(block_data, dict) and json_key in block_data:
-                extracted_value = block_data.get(json_key, None)
-                return {json_key: extracted_value if isinstance(extracted_value, list) else None}
-        except (json.JSONDecodeError, ValueError, TypeError):
-            pass  # JSON parsing failed
-
-    # --- Case 3: Regex-based Extraction ---
-    
-    #    a) Pattern with curly braces (full JSON structure)
-    pattern_braces = re.compile(r'\{\s*"' + json_key + r'"\s*:\s*(\[[^]]*\]|null|None)\s*\}', flags=re.DOTALL)
-    match_braces = pattern_braces.search(raw_output)
-    if match_braces:
-        keyword_list = match_braces.group(1).strip()
-
-        # If the extracted value is explicitly "null" or "None", return None
-        if keyword_list.lower() in ["null", "none"]:
-            return {json_key: None}
-
-        extracted_values = [kw.strip('" ') for kw in keyword_list.strip("[]").split(',') if kw.strip('" ')]
-        return {json_key: extracted_values if extracted_values else None}
-
-    #    b) Loose JSON structure extraction (if above didn't work)
-    pattern_no_braces = re.compile(r'"' + json_key + r'"\s*:\s*(\[[^]]*\]|null|None)', flags=re.DOTALL)
-    match_no_braces = pattern_no_braces.search(raw_output)
-    if match_no_braces:
-        keyword_list = match_no_braces.group(1).strip()
-
-        if keyword_list.lower() in ["null", "none"]:
-            return {json_key: None}
-
-        extracted_values = [kw.strip('" ') for kw in keyword_list.strip("[]").split(',') if kw.strip('" ')]
-        return {json_key: extracted_values if extracted_values else None}
-
-    # -- If nothing worked, return a default response --
-    return {json_key: None}
 
 def extract_keywords_from_query(
     user_input: str,
@@ -4305,21 +3658,6 @@ def extract_incentive_details_using_ai(description: str, llm=llm_70b_vers_creati
     response = chain.invoke({"description": description})
     update_llm_token(response)
     return response.content.strip()
-
-import ast
-@frappe.whitelist()
-def convert_string_json(input):
-    try:
-        # Try strict JSON parse first
-        return json.loads(input)
-    except json.JSONDecodeError:
-        try:
-            # Fallback: parse Python literal dict
-            parsed = ast.literal_eval(input)
-            # Convert to JSON-compatible dict string and then parse it to validate
-            return json.loads(json.dumps(parsed))
-        except (ValueError, SyntaxError) as e:
-            return {"error": f"Invalid input: {str(e)}"}
 
 def update_user_intension(user_intension,chatId):
     query = "UPDATE `tabSession` SET user_intension = %s WHERE name = %s"
