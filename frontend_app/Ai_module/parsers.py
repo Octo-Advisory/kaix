@@ -185,9 +185,12 @@ def parse_llm_response(
     # same in both cases: ask the LLM to return well-formed JSON again.
     first_error: Exception
     try:
-        parsed = json.loads(raw)
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = json.loads(extract_json_object(raw))
         return model_class(**parsed)
-    except (ValidationError, json.JSONDecodeError) as exc:
+    except (ValidationError, json.JSONDecodeError, ValueError) as exc:
         first_error = exc
 
     # ------------------------------------------------------------------

@@ -23,6 +23,10 @@ PUBLIC_NAMES = [
     "safe_parse_output",
     "extract_json_from_llm_response",
     "convert_string_json",
+# --- newly extracted into intent_detection/logic.py (P2-1a, step intent_detection) ---
+    "update_user_intension",
+    "detect_module_switch_intent",
+    "check_industry_scope_with_feasibility"
 ]
 
 
