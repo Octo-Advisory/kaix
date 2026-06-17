@@ -9,6 +9,7 @@ from frontend_app.Management_Class.helpers.utility import randomSentences
 
 def call_vendor_query(aiResponse,chatId,validationResult):
     try:
+        latitude_longitude = []
         with open("log.txt", "a") as file:
             file.write(f"\nvalidationResult1 {validationResult} for now the latitude and longitude value are set static for any false scenarios (can be changed in vendor_validation.py location_and_supply() and location_and_industry())")
         # Validation Result from validation

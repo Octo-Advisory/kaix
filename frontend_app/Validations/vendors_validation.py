@@ -139,6 +139,8 @@ def vendor_validation(param):
             supplies_with_no_vendors = industry_check.get('supplies_with_no_vendors')
             if pass_to_analytics_industry:
                 location_check =  location_info_check()
+                if not isinstance(location_check, dict):
+                    return {'pass_to_analytics': False, 'log': f'location check failed: {location_check}', 'latitude_longitude': None, 'location_name': None, 'from_gujarat': False}
                 pass_to_analytics_location = location_check.get('pass_to_analytics_module')
                 latitude_longitude = location_check.get('latitude_longitude')
                 from_gujarat = location_check.get('from_gujarat')
@@ -165,6 +167,8 @@ def vendor_validation(param):
             supplies_with_no_vendors = supply_check.get('supplies_with_no_vendors')
             if pass_to_analytics_supply:
                 location_check = location_info_check()
+                if not isinstance(location_check, dict):
+                    return {'pass_to_analytics': False, 'log': f'location check failed: {location_check}', 'latitude_longitude': None, 'location_name': None, 'from_gujarat': False}
                 pass_to_analytics_location = location_check.get('pass_to_analytics_module')
                 latitude_longitude = location_check.get('latitude_longitude')
                 from_gujarat = location_check.get('from_gujarat')
@@ -524,6 +528,14 @@ def vendor_validation(param):
                             location_name = geocode[3]
                             return {"pass_to_analytics_module": True, 'log':f'Didnt found the location in the database.. Got coordinates directly from map function', 'latitude_longitude': lat_long, "location_name":location_name,"from_gujarat": from_gujarat}
                             
+            elif location_category == 'Country':
+                # Country-level query (e.g. "India"): there is no single point to look up
+                # in State/City/Area tables, so use a national centroid and pass through.
+                if from_india == "Yes":
+                    return {'pass_to_analytics_module': True, 'log': 'Country level query - using national centroid coordinates', 'latitude_longitude': '22.3511148,78.6677428', "location_name": location, 'from_gujarat': False}
+                else:
+                    return {'pass_to_analytics_module': False, 'log': 'For now we have no data available for outside India', 'latitude_longitude': None, "location_name": None, 'from_gujarat': False}
+
             else:
                 return 'Invalid Location Category'
 
