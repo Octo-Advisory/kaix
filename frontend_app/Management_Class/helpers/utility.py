@@ -889,41 +889,45 @@ def insert_solution_result():
 
 @frappe.whitelist()
 def excute_Property_Creation(method_name=None,param=None,childBlockId=None):
-    base_dir = os.path.expanduser("~")
-    python_exe = os.path.join(base_dir, "property_seg_env/bin/python")
-    # python_exe = "/home/marsapplication/property_seg_env/bin/python"
-    script_path = os.path.join(base_dir, "frappe-bench/AeroShape/FinalCode.py")
-    # script_path = "/home/marsapplication/frappe-bench/AeroShape/FinalCode.py"
-    # script_path = "/home/marsapplication/frappe-bench/AeroShape/FinalCode.py"
+    # AeroShape/property_seg_env dependency disabled for now (env not available on this machine).
+    return "AeroShape execution disabled"
+    # base_dir = os.path.expanduser("~")
+    # python_exe = os.path.join(base_dir, "property_seg_env/bin/python")
+    # # python_exe = "/home/marsapplication/property_seg_env/bin/python"
+    # script_path = os.path.join(base_dir, "frappe-bench/AeroShape/FinalCode.py")
+    # # script_path = "/home/marsapplication/frappe-bench/AeroShape/FinalCode.py"
+    # # script_path = "/home/marsapplication/frappe-bench/AeroShape/FinalCode.py"
 
-    # Build args safely
-    args = [python_exe, script_path, method_name]
-    if param is not None:
-        args.append(str(param))  # Ensure it's a string
-    if childBlockId is not None:
-        args.append(str(childBlockId))  # Ensure it's a string
-    
-    try:
-        base_dir = os.path.expanduser("~")
-        file_path = os.path.join(base_dir, "frappe-bench/AeroShape")
-        result = subprocess.run(
-            args,
-            check=True,
-            capture_output=True,
-            text=True,
-            cwd=file_path  # set working directory
-        )
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        gc.collect()  # Run garbage collection to free up memory
-        frappe.log_error(e.stderr, "FinalCode Script Error")
-        return f"Error running script: {e.stderr}"
-    
+    # # Build args safely
+    # args = [python_exe, script_path, method_name]
+    # if param is not None:
+    #     args.append(str(param))  # Ensure it's a string
+    # if childBlockId is not None:
+    #     args.append(str(childBlockId))  # Ensure it's a string
+    #
+    # try:
+    #     base_dir = os.path.expanduser("~")
+    #     file_path = os.path.join(base_dir, "frappe-bench/AeroShape")
+    #     result = subprocess.run(
+    #         args,
+    #         check=True,
+    #         capture_output=True,
+    #         text=True,
+    #         cwd=file_path  # set working directory
+    #     )
+    #     return result.stdout
+    # except subprocess.CalledProcessError as e:
+    #     gc.collect()  # Run garbage collection to free up memory
+    #     frappe.log_error(e.stderr, "FinalCode Script Error")
+    #     return f"Error running script: {e.stderr}"
+
 
 @frappe.whitelist()
-def trigger_script(method_name=None,param=None,childBlockId=None):    
-    frappe.enqueue('frontend_app.Management_Class.helpers.utility.excute_Property_Creation', queue='long', job_name="Property Creation Job",method_name=method_name,param=param,childBlockId=childBlockId)    
-    return "excute_Property_Creation executed successfully"
+def trigger_script(method_name=None,param=None,childBlockId=None):
+    # AeroShape/property_seg_env dependency disabled for now (env not available on this machine).
+    return "trigger_script disabled"
+    # frappe.enqueue('frontend_app.Management_Class.helpers.utility.excute_Property_Creation', queue='long', job_name="Property Creation Job",method_name=method_name,param=param,childBlockId=childBlockId)
+    # return "excute_Property_Creation executed successfully"
 
 @frappe.whitelist()
 def UpdatePropertySegStatus(message):

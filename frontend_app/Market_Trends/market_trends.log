@@ -277,3 +277,54 @@
 2026-05-21 12:54:01,398 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
 2026-05-21 13:03:10,191 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
 2026-06-10 10:16:47,550 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 07:48:39,688 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 11:29:20,473 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 11:30:42,426 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 11:34:04,107 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 11:35:18,258 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 12:07:08,709 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 12:08:33,916 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 12:11:55,394 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 06:52:35,116 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 06:55:42,995 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 07:18:00,532 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 07:21:10,074 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:10,650 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:11,203 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:11,747 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:12,281 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:12,490 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:12,877 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:13,160 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:13,598 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:13,942 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:15,601 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:22:20,201 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 07:25:25,846 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 07:43:18,431 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 10:53:37,180 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-16 07:24:25,102 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-16 07:26:41,923 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-16 10:32:53,505 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:54,074 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:54,605 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:55,485 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:55,940 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:56,260 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:56,703 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:57,140 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:57,552 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:57,931 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:59,847 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:11,561 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:12,322 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:13,543 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:14,166 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:14,834 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:15,398 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:15,655 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:18,551 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:19,073 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:26:18,907 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-29 07:22:41,751 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-08-31 10:38:06,836 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
