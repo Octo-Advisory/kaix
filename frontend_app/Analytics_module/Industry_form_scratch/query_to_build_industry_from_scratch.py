@@ -2672,11 +2672,14 @@ def calculate_distance(loc1: str, loc2: str) -> float:
     
     return 6371 * c  # Earth's radius in kilometers
 
+# Temporary fallback for vendors/properties with missing latitude_longitude (state centroid of Gujarat)
+GUJARAT_DEFAULT_LATLONG = "22.2587,71.1924"
+
 def calculate_vendor_property_distances(input_data: dict) -> dict:
     """
     Computes distances between vendors and properties.
     Uses `calculate_distance()` for distance calculation.
-    
+
     Parameters:
     input_data (dict): Dictionary containing "Vendor" and "Property" lists.
 
@@ -2689,18 +2692,18 @@ def calculate_vendor_property_distances(input_data: dict) -> dict:
         vendor_id = vendor["id"]
         vendor_latlong = vendor["latlong"]
 
-        # Skip invalid vendor coordinates
+        # Fall back to Gujarat centroid when vendor coordinates are missing/invalid
         if not is_valid_latlong(vendor_latlong):
-            continue
+            vendor_latlong = GUJARAT_DEFAULT_LATLONG
 
         vendor_distances = {}
         for property in input_data.get("Property", []):
             property_id = property["id"]
             property_latlong = property["latlong"]
 
-            # Skip invalid property coordinates
+            # Fall back to Gujarat centroid when property coordinates are missing/invalid
             if not is_valid_latlong(property_latlong):
-                continue
+                property_latlong = GUJARAT_DEFAULT_LATLONG
 
             # Calculate distance
             distance = calculate_distance(vendor_latlong, property_latlong)
@@ -2712,7 +2715,7 @@ def calculate_vendor_property_distances(input_data: dict) -> dict:
 
     return output
 
-def is_valid_latlong(latlong: str) -> bool:
+def is_valid_latlong(latlong) -> bool:
     """
     Validates whether the given latitude-longitude string is correctly formatted and falls within valid ranges.
 
@@ -2722,18 +2725,20 @@ def is_valid_latlong(latlong: str) -> bool:
     Returns:
         bool: True if the input represents a valid latitude and longitude; False otherwise.
     """
-    
+    if not isinstance(latlong, str) or not latlong.strip():
+        return False
+
     try:
         # Split the input string into lat and lon
         lat, lon = map(float, latlong.split(","))
-        
+
         # Check if lat and lon are within valid ranges
         if -90 <= lat <= 90 and -180 <= lon <= 180:
             return True
         else:
             return False
-    except ValueError:
-        return False  # In case conversion to float fails
+    except (ValueError, AttributeError):
+        return False  # In case conversion to float fails or input isn't splittable
 
 def filter_df_by_keywords(
     extracted_keywords: List[str],
