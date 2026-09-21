@@ -32,7 +32,7 @@ config.read(config_file)
 groq_api_key = config['Key']['groq_key']
 
 # Initialize LLM    
-llm_70b_vers_creative = ChatGroq(groq_api_key=groq_api_key, model_name="llama-3.3-70b-versatile", temperature=0.7)
+llm_70b_vers_creative = ChatGroq(groq_api_key=groq_api_key, model_name="openai/gpt-oss-120b", temperature=0.7)
 llm_4_maverick = ChatGroq(groq_api_key=groq_api_key, model_name="meta-llama/llama-4-maverick-17b-128e-instruct", temperature=0.7) #Added by jenith for Query Hints Ai Responses
 
 @frappe.whitelist(allow_guest=True)

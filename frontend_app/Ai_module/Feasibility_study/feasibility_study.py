@@ -114,7 +114,7 @@ def iter_chroma_docs(vs, where=None, batch_size=1000, hard_cap=None):
 
 class AdvancedRAGSystem:
     # def __init__(self, llm_model: str = "llama3-70b-8192"):
-    def __init__(self, llm_model: str = "llama-3.3-70b-versatile"):
+    def __init__(self, llm_model: str = "openai/gpt-oss-120b"):
     # def __init__(self, llm_model: str = "qwen/qwen3-32b"):
     # def __init__(self, llm_model: str = "meta-llama/llama-4-maverick-17b-128e-instruct"):
         # Initialize core components

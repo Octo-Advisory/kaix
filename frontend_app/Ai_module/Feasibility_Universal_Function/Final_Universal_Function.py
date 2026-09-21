@@ -139,7 +139,7 @@ frappe_api_secret = config['Frappe_api_key_and_secret']['frappe_api_secret']
 ritu_local_base_url = config['Frappe_api_key_and_secret']['ritu_local_base_url']
 live_base_url = config['Frappe_api_key_and_secret']['live_base_url']
 
-llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.5, api_key = api_key)
+llm = ChatGroq(model_name="openai/gpt-oss-120b", temperature=0.5, api_key = api_key)
 
 
 # this code is to check whether the data passes to it is base64 encoded or not.
