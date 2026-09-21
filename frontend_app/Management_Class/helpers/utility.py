@@ -515,7 +515,7 @@ def generate_query_hints(query_list, input_industry_name):
             formatted_prompt, response_format={"type": "json_object"}
         )
     except Exception as _json_mode_e:
-        frappe.log_error(str(_json_mode_e), "generate_query_hints json_object mode")
+        frappe.log_error("generate_query_hints json_object mode", str(_json_mode_e))
         response = llm_70b_vers_creative.invoke(formatted_prompt)
     input_text = response.content
     return input_text
