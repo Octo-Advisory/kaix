@@ -45,7 +45,7 @@ const ForgotPassword = () => {
     }
     setIsLoading(true);
     try {
-      const response = await fetch("/api/method/frontend_app.Management_Class.helpers.otp.forgot_password", {
+      const response = await fetch("/api/method/kaix.Management_Class.helpers.otp.forgot_password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "request_otp", email }),
@@ -72,7 +72,7 @@ const ForgotPassword = () => {
     }
     setIsLoading(true);
     try {
-      const response = await fetch("/api/method/frontend_app.Management_Class.helpers.otp.forgot_password", {
+      const response = await fetch("/api/method/kaix.Management_Class.helpers.otp.forgot_password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "verify_otp", email, otp }),
@@ -98,7 +98,7 @@ const ForgotPassword = () => {
     }
     setIsLoading(true);
     try {
-      const response = await fetch("/api/method/frontend_app.Management_Class.helpers.otp.forgot_password", {
+      const response = await fetch("/api/method/kaix.Management_Class.helpers.otp.forgot_password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reset_password", email, new_password: newPassword }),

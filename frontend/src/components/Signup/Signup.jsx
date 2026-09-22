@@ -116,7 +116,7 @@ const SignUp = () => {
 
      const fetchHints = async (queries,industry) => {
     try {
-      const result = await call.get("frontend_app.Management_Class.helpers.utility.generate_query_hints", {
+      const result = await call.get("kaix.Management_Class.helpers.utility.generate_query_hints", {
         'query_list': [],
         'input_industry_name': industry
       });

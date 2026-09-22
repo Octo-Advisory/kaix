@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='frontend_app',
+    name='kaix',
     version='0.0.1',
     description='Mars 2.0 Frontend App',
     author='Marsbazaar.com',

@@ -113,7 +113,7 @@ console.log("Updated AI Response with Confirmation Message:", updatedAiResponse,
     // await clearProgressAndIntention(sessionId)
     try {
       // console.log("chat id in progress", sessionId); 
-      const result = await call.get("frontend_app.Management_Class.Analytics_management.Analytics.analytics_module_call", { aiResponse: updatedAiResponse, chatId: sessionId, validationResult: validationResult, selectedOption: selectedOption });
+      const result = await call.get("kaix.Management_Class.Analytics_management.Analytics.analytics_module_call", { aiResponse: updatedAiResponse, chatId: sessionId, validationResult: validationResult, selectedOption: selectedOption });
       // console.log("analytics message result", result);
       setresult(result.message)
       dispatch(addAnalyticsResult(result.message))

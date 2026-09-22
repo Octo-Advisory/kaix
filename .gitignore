@@ -5,8 +5,8 @@
 tags
 node_modules
 __pycache__
-frontend_app/Log_management/analytics.txt
-frontend_app/Log_management/ai.txt
-frontend_app/Log_management/mapping.txt
-frontend_app/Log_management/validation.txt
-frontend_app/Log_management/mars.ini
+kaix/Log_management/analytics.txt
+kaix/Log_management/ai.txt
+kaix/Log_management/mapping.txt
+kaix/Log_management/validation.txt
+kaix/Log_management/mars.ini

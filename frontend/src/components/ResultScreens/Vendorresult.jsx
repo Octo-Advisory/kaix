@@ -144,7 +144,7 @@ function Vendorresult({ result, source, rerender }) {
 
   const getData= async(vendor)=>{
     try {
-        const result = await call.get("frontend_app.Management_Class.helpers.utility.get_docs_with_children", {
+        const result = await call.get("kaix.Management_Class.helpers.utility.get_docs_with_children", {
           doctype: 'Vendor',
           names: JSON.stringify([vendor])
         });
@@ -423,7 +423,7 @@ const parseSuppliers = (supplierData) => {
 
 //   try {
 //     // console.log(lastChat, solutions?.[0], 'Method Called')
-//       const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
+//       const result = await call.post("kaix.Management_Class.helpers.utility.insert_solution_result", {
 //       child_row_id: lastChat,
 //       updated_solutions: solutions,
 //       intension: intension
@@ -447,7 +447,7 @@ const parseSuppliers = (supplierData) => {
 
     try {
 
-      const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.convert_json_to_binary", {
+      const convertJson = await call.post("kaix.Management_Class.helpers.utility.convert_json_to_binary", {
         child_row_id: lastChat,
         updated_solutions: solutions,
         intension: intension 

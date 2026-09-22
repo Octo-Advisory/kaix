@@ -53,7 +53,7 @@ function Incentiveresult({ res, source, rerender }) {
 
     try {
 
-      const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.convert_json_to_binary", {
+      const convertJson = await call.post("kaix.Management_Class.helpers.utility.convert_json_to_binary", {
         child_row_id: lastChat,
         updated_solutions: solutions,
         intension: intension

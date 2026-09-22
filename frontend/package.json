@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --base=/assets/frontend_app/frontend/ && yarn copy-html-entry",
+    "build": "vite build --base=/assets/kaix/frontend/ && yarn copy-html-entry",
     "lint": "eslint .",
     "preview": "vite preview",
-    "copy-html-entry": "cp ../frontend_app/public/frontend/index.html ../frontend_app/www/frontend.html"
+    "copy-html-entry": "cp ../kaix/public/frontend/index.html ../kaix/www/frontend.html"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

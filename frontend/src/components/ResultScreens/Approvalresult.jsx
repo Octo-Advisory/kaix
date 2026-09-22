@@ -357,7 +357,7 @@ const handleApprovalSelection = async (approval) => {
 //   if(!lastChat || !solutions) return 
 
 //   try {
-//       const result = await call.post("frontend_app.Management_Class.helpers.utility.insert_solution_result", {
+//       const result = await call.post("kaix.Management_Class.helpers.utility.insert_solution_result", {
 //       child_row_id: lastChat,
 //       updated_solutions: solutions,
 //       intension: intension
@@ -381,7 +381,7 @@ const handleApprovalSelection = async (approval) => {
 
     try {
 
-      const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.convert_json_to_binary", {
+      const convertJson = await call.post("kaix.Management_Class.helpers.utility.convert_json_to_binary", {
         child_row_id: lastChat,
         updated_solutions: solutions,
         intension: intension

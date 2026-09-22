@@ -146,7 +146,7 @@ const FeasibilityStudy = ({ isOpen, onClose,setHasUnseenReport, resultJson}) => 
             // 3. Process file
             setStatus('processing');
             const analysisResult = await call.get(
-                "frontend_app.Management_Class.Ai_management.feasibility.feasibility_method_call",
+                "kaix.Management_Class.Ai_management.feasibility.feasibility_method_call",
                 { file_path: fileUrl }
             );
 

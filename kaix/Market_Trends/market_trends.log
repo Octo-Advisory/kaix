@@ -1,0 +1,338 @@
+2026-04-07 05:02:48,866 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-07 06:48:24,084 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-08 13:58:17,003 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-09 05:19:54,693 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:19:55,273 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:19:55,955 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:19:56,639 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:19:57,017 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:19:57,316 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:19:58,042 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:19:58,282 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:19:58,570 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:19:58,923 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:19:59,439 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:37:46,966 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-09 05:37:59,956 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Texas for 2024-2025
+2026-04-09 05:37:59,958 - INFO - Performing async web search: market trends for Electronic Appliances industry in Texas for 2024-2025
+2026-04-09 05:37:59,958 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Texas for 2024-2025
+2026-04-09 05:37:59,958 - ERROR - Failed to load cache: Expecting value: line 1 column 1 (char 0)
+2026-04-09 05:38:02,302 - INFO - Search successful, retrieved 10 results
+2026-04-09 05:38:02,303 - INFO - Storing search result for query: market trends for Electronic Appliances industry in Texas for 2024-2025, length: 1971 characters
+2026-04-09 05:38:02,303 - ERROR - Failed to load cache: Expecting value: line 1 column 1 (char 0)
+2026-04-09 05:38:02,305 - INFO - Cache saved to /home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/search_cache.json, size: 1 entries
+2026-04-09 05:38:02,305 - INFO - Deciding trend allocation for query
+2026-04-09 05:38:02,663 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:02,672 - INFO - Trend allocation from LLM: {'city': 0, 'state': 0, 'country': 5, 'global': 0}
+2026-04-09 05:38:02,673 - INFO - Trend allocation: {'city': 0, 'state': 0, 'country': 5, 'global': 0}
+2026-04-09 05:38:02,673 - INFO - Detected data scope: India for query: market trends for Electronic Appliances industry in Texas for 2024-2025
+2026-04-09 05:38:02,673 - INFO - Search results excerpt: United States Kitchen Appliance Market Analysis Report ...: Notable growth drivers include smart tec
+2026-04-09 05:38:06,618 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:06,619 - INFO - Trend types: No trends identified
+2026-04-09 05:38:09,705 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:09,706 - INFO - Extracted entities and metrics: Electronic Appliances Market in the United States Ignites 3.8% Growth, USD 99.34 billion, 12.81%, $70 billion, smart home integration, energy-efficient devices, USD 178.03 billion, U.S. Household Appliances Market Driven by Smart Technology Integration, CAGR of 3.8%, housing starts and remodeling uptrend, Omnichannel retail model expansion, advanced connectivity solutions, enhanced safety and compliance, Consumer Electronics Market Outlook Focused on Smart Home Integration, smart home integration, energy-efficient devices, USD 178.03 billion, USD 234.01 billion, AI-powered personalization, digitally led discovery, U.S. Major Appliance Market Share Influenced by Premium Smart-Appliance Adoption, premium smart-appliance adoption, Housing starts and remodeling uptrend, inflation, omnichannel retail model expansion, North America Home Appliances Market Driven by Urbanization and Smart Technology, USD 171.83 billion, smart technology integration, urbanization, smart home integration, energy-efficient devices
+2026-04-09 05:38:09,706 - INFO - Raw LLM output length: 2090 characters
+2026-04-09 05:38:09,810 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Illinois for 2024-2025
+2026-04-09 05:38:09,810 - INFO - Performing async web search: market trends for Electronic Appliances industry in Illinois for 2024-2025
+2026-04-09 05:38:09,810 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Illinois for 2024-2025
+2026-04-09 05:38:09,810 - INFO - Loaded cache, size: 1 entries
+2026-04-09 05:38:10,882 - INFO - Search successful, retrieved 10 results
+2026-04-09 05:38:10,882 - INFO - Storing search result for query: market trends for Electronic Appliances industry in Illinois for 2024-2025, length: 1995 characters
+2026-04-09 05:38:10,882 - INFO - Loaded cache, size: 1 entries
+2026-04-09 05:38:10,883 - INFO - Cache saved to /home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/search_cache.json, size: 2 entries
+2026-04-09 05:38:10,884 - INFO - Deciding trend allocation for query
+2026-04-09 05:38:11,104 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:11,105 - INFO - Trend allocation from LLM: {'city': 0, 'state': 1, 'country': 3, 'global': 1}
+2026-04-09 05:38:11,105 - INFO - Trend allocation: {'city': 0, 'state': 1, 'country': 3, 'global': 1}
+2026-04-09 05:38:11,105 - INFO - Detected data scope: state for query: market trends for Electronic Appliances industry in Illinois for 2024-2025
+2026-04-09 05:38:11,105 - INFO - Search results excerpt: United States Kitchen Appliance Market Analysis Report ...: Notable growth drivers include smart tec
+2026-04-09 05:38:15,100 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:15,100 - INFO - Trend types: No trends identified
+2026-04-09 05:38:18,379 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:18,379 - INFO - Extracted entities and metrics: Growth in Illinois Electronic Appliances Market, Moderate economic growth, Job market recovery, Urbanization, Dual-income family lifestyles, Smart technology integration, U.S. Electronic Appliances Market Expansion, U.S. Major Appliance market, U.S. small kitchen appliances market, 4.3%, Smart home appliances, $62.8 billion, Global Home Appliances Market Growth, global home appliances market, $826.66 billion, $1386.46 billion, 6.68%, Household appliances, Urbanization, Smart Home Adoption Driving Growth, Smart home adoption, United States Smart Kitchen Appliances Market, US$ 17.64 billion, 12.45%, Consumer electronics, 2.81%, Inflation Impact on Electronic Appliances Market, Inflation, U.S. electronic appliances market, omnichannel retail model expansion, smart and connected devices
+2026-04-09 05:38:18,379 - INFO - Raw LLM output length: 2833 characters
+2026-04-09 05:38:18,382 - INFO - Checking cache for query: market trends for Electronic Appliances industry in California for 2024-2025
+2026-04-09 05:38:18,382 - INFO - Performing async web search: market trends for Electronic Appliances industry in California for 2024-2025
+2026-04-09 05:38:18,382 - INFO - Checking cache for query: market trends for Electronic Appliances industry in California for 2024-2025
+2026-04-09 05:38:18,382 - INFO - Loaded cache, size: 2 entries
+2026-04-09 05:38:19,630 - INFO - Search successful, retrieved 10 results
+2026-04-09 05:38:19,630 - INFO - Storing search result for query: market trends for Electronic Appliances industry in California for 2024-2025, length: 1988 characters
+2026-04-09 05:38:19,630 - INFO - Loaded cache, size: 2 entries
+2026-04-09 05:38:19,631 - INFO - Cache saved to /home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/search_cache.json, size: 3 entries
+2026-04-09 05:38:19,631 - INFO - Deciding trend allocation for query
+2026-04-09 05:38:19,960 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:19,961 - INFO - Trend allocation from LLM: {'city': 1, 'state': 1, 'country': 2, 'global': 1}
+2026-04-09 05:38:19,961 - INFO - Trend allocation: {'city': 1, 'state': 1, 'country': 2, 'global': 1}
+2026-04-09 05:38:19,961 - INFO - Detected data scope: city for query: market trends for Electronic Appliances industry in California for 2024-2025
+2026-04-09 05:38:19,961 - INFO - Search results excerpt: US Major Appliance Market Share: Q2 2025 Trends & ...: Track brand and retailer share in the U.S. Ma
+2026-04-09 05:38:23,527 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:23,529 - INFO - Trend types: No trends identified
+2026-04-09 05:38:26,353 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:26,354 - INFO - Extracted entities and metrics: California's Electronic Appliance Market Ignites 20% Growth, California Air Resource Board's, Growing demand, Increased adoption, US Electronic Appliance Industry Pioneers Smart Technology, US Major Appliance Market, Growth in premium smart-appliance adoption, Housing starts and remodeling uptrend, Globally, Electronic Appliance Market Reaches USD 1.1 Trillion, Global AI major appliance market, Global smart home appliances market, Global household appliances market, US Smart Appliance Market Projects USD 71.28 Billion by 2030, Smart appliances market, Smart technology integration, Urbanization and dual-income family lifestyles, North America Consumer Electronics Market Worth USD 245.11 Billion, North America Consumer Electronics Market, Growing demand for consumer electronics, Consumer Electronics and Appliances Market
+2026-04-09 05:38:26,354 - INFO - Raw LLM output length: 1492 characters
+2026-04-09 05:38:26,357 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Nevada for 2024-2025
+2026-04-09 05:38:26,357 - INFO - Performing async web search: market trends for Electronic Appliances industry in Nevada for 2024-2025
+2026-04-09 05:38:26,357 - INFO - Checking cache for query: market trends for Electronic Appliances industry in Nevada for 2024-2025
+2026-04-09 05:38:26,357 - INFO - Loaded cache, size: 3 entries
+2026-04-09 05:38:28,862 - INFO - Search successful, retrieved 10 results
+2026-04-09 05:38:28,862 - INFO - Storing search result for query: market trends for Electronic Appliances industry in Nevada for 2024-2025, length: 1973 characters
+2026-04-09 05:38:28,863 - INFO - Loaded cache, size: 3 entries
+2026-04-09 05:38:28,863 - INFO - Cache saved to /home/marsaiae/frappe-bench/apps/frontend_app/frontend_app/Market_Trends/search_cache.json, size: 4 entries
+2026-04-09 05:38:28,863 - INFO - Deciding trend allocation for query
+2026-04-09 05:38:29,242 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:29,243 - INFO - Trend allocation from LLM: {'city': 0, 'state': 1, 'country': 3, 'global': 1}
+2026-04-09 05:38:29,243 - INFO - Trend allocation: {'city': 0, 'state': 1, 'country': 3, 'global': 1}
+2026-04-09 05:38:29,243 - INFO - Detected data scope: state for query: market trends for Electronic Appliances industry in Nevada for 2024-2025
+2026-04-09 05:38:29,243 - INFO - Search results excerpt: North America Home Appliances Market Size, Share [2026 ...: The North America Home appliances market
+2026-04-09 05:38:32,572 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:32,573 - INFO - Trend types: No trends identified
+2026-04-09 05:38:35,581 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 05:38:35,581 - INFO - Extracted entities and metrics: In Nevada, Electronic Appliances Market Ignites $10 Million Funding, $10,071,131, CDBG, HOME, $2,898,567, $2,856,000, ESG, HOPWA, HTF, $487,812, $539,919, $3,144,833, In the United States, Consumer Electronics and Appliances Pioneer $234 Billion Market, USD 178.03 billion, USD 234.01 billion, 5.4% CAGR, In North America, Home Appliances Market Expands to $180 Billion, USD 171.83 billion, USD 180.48 billion, 3.8% CAGR, Globally, Small Electrical Appliance Market Grows to $347 Billion, USD 157.4B, USD 347B, 9.1% CAGR, Globally, Can Smart Home Appliances Overcome IoT Adoption Challenges?, Significant expansion, Rising adoption of IoT, Investment in IoT infrastructure
+2026-04-09 05:38:35,581 - INFO - Raw LLM output length: 1597 characters
+2026-04-09 09:37:39,392 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 09:37:39,742 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 09:37:40,146 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 09:37:40,656 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 09:37:41,569 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 09:37:41,900 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 09:37:42,193 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 09:37:42,524 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 09:37:42,968 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-09 09:38:55,006 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-09 09:43:05,165 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-09 12:44:45,536 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-10 05:59:24,472 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-10 07:03:21,270 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-10 11:12:36,170 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-10 11:16:14,687 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-10 11:24:47,354 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-14 11:36:26,569 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-14 11:47:17,121 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-14 11:51:47,444 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-14 12:08:58,092 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-15 06:15:13,622 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-15 06:21:44,269 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-15 07:41:09,747 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-15 13:26:56,714 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-16 14:06:09,667 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-16 14:07:00,553 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-16 14:08:50,916 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-16 14:10:57,757 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-16 14:11:01,695 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-16 14:11:01,974 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-16 14:11:02,645 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-16 14:11:03,422 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-16 14:11:04,271 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-16 14:11:04,681 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-16 14:11:05,466 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-16 14:11:05,793 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-16 14:11:06,273 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-16 14:11:08,936 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-16 14:11:09,542 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-17 04:40:02,124 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-17 04:42:51,981 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-17 04:43:51,202 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-17 04:46:13,691 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-17 04:54:10,084 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-24 05:15:21,080 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-24 05:38:42,357 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-24 05:41:04,703 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-24 05:41:04,886 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-24 05:41:05,139 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-24 05:41:05,540 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-24 05:41:05,996 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-24 05:41:06,386 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-24 05:41:07,285 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-24 05:41:07,964 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-24 05:41:08,612 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-24 05:41:08,986 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-24 05:41:12,135 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-04-24 05:51:04,048 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-24 06:48:38,465 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-24 06:50:29,959 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-24 10:11:17,916 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-24 10:19:15,523 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-24 10:24:12,630 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-04-24 10:28:38,026 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-11 11:23:46,613 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-11 11:49:48,415 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-11 11:56:19,038 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-11 11:56:19,246 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-11 11:56:19,572 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-11 11:56:19,874 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-11 11:56:20,230 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-11 11:56:20,549 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-11 11:56:20,917 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-11 11:56:21,191 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-11 11:56:21,638 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-11 11:56:22,199 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-11 11:56:23,984 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-11 11:57:02,254 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-11 12:21:38,473 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-11 12:25:17,994 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-11 12:26:57,081 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-11 12:28:55,845 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-11 12:31:00,525 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-11 12:34:34,565 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-12 04:47:21,387 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:22,169 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:23,003 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:23,440 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:23,843 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:25,121 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:25,552 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:25,929 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:26,314 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:26,738 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:26,954 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:27,353 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:27,678 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:29,502 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:29,832 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 04:47:56,376 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-12 09:08:33,667 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 09:08:33,932 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 09:08:34,319 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 09:08:35,087 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 09:08:35,667 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 09:08:35,980 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 09:08:36,356 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 09:08:36,563 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 09:08:36,898 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 09:08:37,387 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 09:08:39,655 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-12 09:08:52,047 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-13 06:20:38,825 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-13 10:51:02,008 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-13 12:27:45,167 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-13 12:29:40,343 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-13 12:31:05,184 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-13 12:32:26,995 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-13 12:43:50,074 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-14 06:05:49,791 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-15 06:49:11,943 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-15 06:53:19,863 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-15 06:57:42,208 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-18 11:12:13,232 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-18 11:12:13,530 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-18 11:12:13,895 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-18 11:12:14,455 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-18 11:12:14,954 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-18 11:12:15,280 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-18 11:12:15,961 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-18 11:12:16,547 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-18 11:12:21,125 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-18 11:15:24,629 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-19 12:29:42,706 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-19 12:31:02,904 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-19 12:34:01,855 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-19 12:35:44,275 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-19 12:39:26,151 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:39:26,430 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:39:27,109 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:39:27,918 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:39:28,304 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:39:28,572 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:39:29,044 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:39:29,728 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:39:30,223 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:39:30,693 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:39:31,012 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:39:33,506 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:41:30,942 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 12:43:19,935 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-19 18:06:02,882 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:03,702 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:05,210 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:05,593 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:06,325 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:07,098 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:07,458 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:07,736 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:08,095 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:08,384 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:08,855 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:09,307 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:09,589 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:11,295 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:37,484 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-19 18:06:42,918 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-20 04:53:50,070 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:50,895 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:51,712 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:52,158 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:52,833 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:53,928 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:54,552 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:54,977 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:55,447 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:55,866 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:56,215 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:56,733 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:57,032 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:58,570 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-20 04:53:58,909 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-05-21 05:01:57,134 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-21 12:50:02,628 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-21 12:54:01,398 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-05-21 13:03:10,191 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-10 10:16:47,550 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 07:48:39,688 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 11:29:20,473 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 11:30:42,426 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 11:34:04,107 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 11:35:18,258 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 12:07:08,709 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 12:08:33,916 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-11 12:11:55,394 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 06:52:35,116 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 06:55:42,995 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 07:18:00,532 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 07:21:10,074 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:10,650 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:11,203 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:11,747 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:12,281 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:12,490 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:12,877 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:13,160 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:13,598 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:13,942 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:21:15,601 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-15 07:22:20,201 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 07:25:25,846 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 07:43:18,431 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-15 10:53:37,180 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-16 07:24:25,102 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-16 07:26:41,923 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-16 10:32:53,505 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:54,074 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:54,605 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:55,485 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:55,940 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:56,260 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:56,703 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:57,140 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:57,552 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:57,931 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 10:32:59,847 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:11,561 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:12,322 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:13,543 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:14,166 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:14,834 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:15,398 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:15,655 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:18,551 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:25:19,073 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+2026-06-16 11:26:18,907 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-06-29 07:22:41,751 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-08-31 10:38:06,836 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-09-21 10:15:32,672 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-09-21 10:36:29,516 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-09-21 10:41:41,286 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-09-21 10:52:36,502 - INFO - HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 404 Not Found"
+2026-09-21 10:52:43,949 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-09-21 11:04:24,747 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-09-21 11:35:28,939 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5
+2026-09-22 09:36:05,760 - INFO - Load pretrained SentenceTransformer: BAAI/bge-small-en-v1.5

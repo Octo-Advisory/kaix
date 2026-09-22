@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-`frontend_app` is a Frappe v15 app (Python ≥3.10) that powers **Mars 2.0 / MarsAIX** — an AI-driven industrial-setup advisor (land, vendors, workforce, incentives, approvals). It is *not* purely a "frontend" despite the name: the Python side under `frontend_app/` runs all AI/analytics/validation logic; the React SPA under `frontend/` is its UI.
+`kaix` is a Frappe v15 app (Python ≥3.10) that powers **Mars 2.0 / MarsAIX** — an AI-driven industrial-setup advisor (land, vendors, workforce, incentives, approvals). It is *not* purely a "frontend" despite the name: the Python side under `kaix/` runs all AI/analytics/validation logic; the React SPA under `frontend/` is its UI.
 
-The app is expected to live at `~/frappe-bench/apps/frontend_app/`. Several modules build absolute paths via `os.path.expanduser("~") + "/frappe-bench/apps/frontend_app/..."`, so do not move/symlink the tree.
+The app is expected to live at `~/frappe-bench/apps/kaix/`. Several modules build absolute paths via `os.path.expanduser("~") + "/frappe-bench/apps/kaix/..."`, so do not move/symlink the tree.
 
 ## Commands
 
@@ -15,13 +15,13 @@ All commands assume you are already inside an active `frappe-bench` checkout.
 ### Frontend SPA (React + Vite, in `frontend/`)
 - `cd frontend && yarn install` — install (root-level `npm install` runs this via `postinstall`)
 - `yarn dev` — Vite dev server on `:8080`, proxies `/(app|api|assets|files|private)` to the local Frappe webserver (port read from `sites/common_site_config.json`)
-- `yarn build` — builds with `--base=/assets/frontend_app/frontend/`, outputs to `frontend_app/public/frontend/`, then copies `index.html` to `frontend_app/www/frontend.html` (the SPA mount point Frappe serves)
+- `yarn build` — builds with `--base=/assets/kaix/frontend/`, outputs to `kaix/public/frontend/`, then copies `index.html` to `kaix/www/frontend.html` (the SPA mount point Frappe serves)
 - `yarn lint` — ESLint
 - No test runner is configured. Root `package.json`'s `test` script is a stub.
 
 ### Backend / Frappe
 Run from the bench root (`~/frappe-bench`):
-- `bench --site <site> install-app frontend_app` — first install onto a site
+- `bench --site <site> install-app kaix` — first install onto a site
 - `bench --site <site> migrate` — apply DocType / patches changes
 - `bench start` — runs web + workers + redis
 - `bench --site <site> console` — Python REPL with `frappe` bootstrapped, useful for testing whitelisted methods
@@ -59,7 +59,7 @@ There is no Python test suite wired up in `hooks.py` (`before_tests` is commente
 - `vectors/` — persisted vector stores. Note both `Feasibility Report/` (with space) and `Feasibility_Report/` (with underscore) coexist; the underscore variant is the active one written by `ensure_vector_and_update_record`. Don't "clean up" the duplicate without checking call sites.
 
 ### Logging — `Log_management/`
-- Single entry point: `frontend_app.Log_management.createlog.log(chatId, level, key, value, file_name, module)` where `module ∈ {ai, analytics, mapping, validation}`.
+- Single entry point: `kaix.Log_management.createlog.log(chatId, level, key, value, file_name, module)` where `module ∈ {ai, analytics, mapping, validation}`.
 - Behavior is gated by `Log_management/mars.ini` `[Settings]`:
   - `doc_log = yes` → writes a child row into the matching Mars Log child table (auto-creates the parent Mars Log keyed by `chat_id`)
   - `file_log = yes` → appends one JSON line per call to `/mnt/d/mars_logs/<module>.txt` (hardcoded WSL path — the in-tree `Log_management/<module>.txt` files are leftovers, not the live target)
@@ -88,5 +88,5 @@ Defined once in `Ai_module/Query_Classification_And_Analysis.py`, imported by th
 - Long-running work goes through `frappe.enqueue(... queue='long' ...)` (see `trigger_script`). Don't run heavy AI/subprocess calls inline in a request handler.
 - LLM token usage is tracked per-model in the **Mars Config** DocType via `update_llm_token(result, llm=...)` — call this after every `chain.invoke(...)` that returns `usage_metadata`.
 - API-rate-limited integrations should go through `checkApiThreshold(apiName)` which reads/updates **Mars Config / Api Daily Limit / Api Monthly Limit**.
-- Frontend build's base path is hard-coded to `/assets/frontend_app/frontend/`. If you change it, update both `frontend/package.json`'s `build` script and any absolute asset references.
+- Frontend build's base path is hard-coded to `/assets/kaix/frontend/`. If you change it, update both `frontend/package.json`'s `build` script and any absolute asset references.
 - `frontend/src/Redux/Store/Featuresilces/` is misspelled (should be "FeatureSlices") but is referenced by that exact name everywhere — don't rename without sweeping all imports.

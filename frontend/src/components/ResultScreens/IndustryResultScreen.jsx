@@ -219,7 +219,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
 
     try {
 
-      const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.convert_json_to_binary", {
+      const convertJson = await call.post("kaix.Management_Class.helpers.utility.convert_json_to_binary", {
         child_row_id: lastChat,
         updated_solutions: solutions,
         intension: "Query to build industry from Scratch" 
@@ -246,7 +246,7 @@ const IndustryResultScreen = ({ result, source, rerender }) => {
     // Helper to call API for a batch
     const fetchBatch = async (batch) => {
       try {
-        const result = await call.get("frontend_app.Management_Class.helpers.utility.get_docs_with_children", {
+        const result = await call.get("kaix.Management_Class.helpers.utility.get_docs_with_children", {
           doctype: doc,
           names: JSON.stringify(batch)
         });

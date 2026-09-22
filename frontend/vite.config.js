@@ -17,7 +17,7 @@ export default defineConfig({
 		}
 	},
 	build: {
-		outDir: '../frontend_app/public/frontend',
+		outDir: '../kaix/public/frontend',
 		emptyOutDir: true,
 		target: 'es2015',
 	},

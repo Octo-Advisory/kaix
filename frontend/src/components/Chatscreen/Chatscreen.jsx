@@ -272,7 +272,7 @@ useEffect(() => {
   const fetchAIResponse = async (message, confirmationMessage, chatId) => {
     console.log(chatId,'okay')
     try {
-      const result = await call.get("frontend_app.Management_Class.Ai_management.AI.ai_module_call", {
+      const result = await call.get("kaix.Management_Class.Ai_management.AI.ai_module_call", {
         input: message,
         confirmationMessage: confirmationMessage,
         chatId: chatId
@@ -319,7 +319,7 @@ useEffect(() => {
 
   const validationCall = async (aiResponse, user_intension) => {
     try {
-      const result = await call.get("frontend_app.Validations.validate.validation", {
+      const result = await call.get("kaix.Validations.validate.validation", {
         aiResponse: aiResponse,
         user_intension: user_intension
       });
@@ -952,7 +952,7 @@ useEffect(() => {
 
   const fetchHistoryTitle = async (intension) => {
     try {
-      const result = await call.get("frontend_app.Management_Class.helpers.utility.generate_chat_title", {
+      const result = await call.get("kaix.Management_Class.helpers.utility.generate_chat_title", {
         'user_query': intension,
       });
       return result.message;
@@ -965,11 +965,11 @@ useEffect(() => {
 
   const fetchHints = async (queries, industry) => {
     try {
-      const result = await call.get("frontend_app.Management_Class.helpers.utility.normalize_queries_with_known_cities", {
+      const result = await call.get("kaix.Management_Class.helpers.utility.normalize_queries_with_known_cities", {
         'query_list': queries,
         'input_industry_name': industry
       });
-      // const result = await call.get("frontend_app.Management_Class.helpers.utility.generate_query_hints", {
+      // const result = await call.get("kaix.Management_Class.helpers.utility.generate_query_hints", {
       //   'query_list': queries,
       //   'input_industry_name': industry
       // });

@@ -82,7 +82,7 @@ function Renderresult() {
   
     try {
 
-      const convertJson = await call.post("frontend_app.Management_Class.helpers.utility.retrieve_and_decompress", {
+      const convertJson = await call.post("kaix.Management_Class.helpers.utility.retrieve_and_decompress", {
         compressed_data: data,
       },
       {

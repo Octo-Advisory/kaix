@@ -34,7 +34,7 @@ function Empresult({ result, rerender }) {
       // };
   
       const convertJson = await call.post(
-        "frontend_app.Management_Class.helpers.utility.convert_json_to_binary", 
+        "kaix.Management_Class.helpers.utility.convert_json_to_binary", 
         {
           child_row_id: lastChat,
           updated_solutions: restAnalytics,

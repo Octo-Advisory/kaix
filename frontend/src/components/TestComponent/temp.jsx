@@ -59,7 +59,7 @@ function Chatscreen() {
 
   const fetchAIResponse = async (message, confirmationMessage, chatId) => {
     try {
-      const result = await call.get("frontend_app.Management_Class.Ai_management.AI.ai_module_call", {
+      const result = await call.get("kaix.Management_Class.Ai_management.AI.ai_module_call", {
         input: message,
         confirmationMessage: confirmationMessage,
         chatId: chatId
@@ -162,7 +162,7 @@ function Chatscreen() {
 
   const validationCall = async (aiResponse, user_intension) => {
     try {
-      const result = await call.get("frontend_app.Validations.validate.validation", {
+      const result = await call.get("kaix.Validations.validate.validation", {
         aiResponse: aiResponse,
         user_intension: user_intension
       });
