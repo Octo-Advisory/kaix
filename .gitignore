@@ -1009,4 +1009,5 @@ wrapNativeSuper.js
 wrapNativeSuper.js.map
 writeOnlyError.js
 writeOnlyError.js.map
-license
+license* (*)
+* (*).*
