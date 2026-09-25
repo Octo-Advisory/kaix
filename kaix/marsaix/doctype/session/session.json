@@ -1,0 +1,171 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-07-31 13:40:36.949266",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "chat_id",
+  "user",
+  "update_title",
+  "feasibility_id",
+  "section_break_ryqi",
+  "user_intension",
+  "title",
+  "section_break_l0yb",
+  "chat_history",
+  "progress",
+  "chat_json",
+  "state_json",
+  "session_states",
+  "query_hints",
+  "soft_delete"
+ ],
+ "fields": [
+  {
+   "fieldname": "chat_id",
+   "fieldtype": "Data",
+   "label": "Chat Id"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User"
+  },
+  {
+   "default": "0",
+   "fieldname": "update_title",
+   "fieldtype": "Check",
+   "label": "Update Title"
+  },
+  {
+   "fieldname": "feasibility_id",
+   "fieldtype": "Link",
+   "label": "Feasibility Report ID ",
+   "options": "Feasibility Report"
+  },
+  {
+   "fieldname": "section_break_ryqi",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "user_intension",
+   "fieldtype": "Data",
+   "label": "User Intension"
+  },
+  {
+   "default": "New Chat",
+   "fieldname": "title",
+   "fieldtype": "Small Text",
+   "label": "Title"
+  },
+  {
+   "fieldname": "section_break_l0yb",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "chat_history",
+   "fieldtype": "Table",
+   "label": "Chat history",
+   "options": "Chat history"
+  },
+  {
+   "fieldname": "progress",
+   "fieldtype": "Table",
+   "label": "Progress",
+   "options": "Progress"
+  },
+  {
+   "fieldname": "chat_json",
+   "fieldtype": "Long Text",
+   "label": "Chat Json"
+  },
+  {
+   "fieldname": "state_json",
+   "fieldtype": "Long Text",
+   "label": "State Json"
+  },
+  {
+   "fieldname": "session_states",
+   "fieldtype": "Table",
+   "label": "Session States",
+   "options": "Session State"
+  },
+  {
+   "fieldname": "query_hints",
+   "fieldtype": "Small Text",
+   "label": "Query Hints"
+  },
+  {
+   "default": "0",
+   "fieldname": "soft_delete",
+   "fieldtype": "Check",
+   "label": "Soft Delete"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-25 16:03:25.528336",
+ "modified_by": "Administrator",
+ "module": "marsaix",
+ "name": "Session",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Guest",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "AIX User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

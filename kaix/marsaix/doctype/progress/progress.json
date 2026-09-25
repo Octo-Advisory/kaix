@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-07-31 13:08:05.384770",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "process_name",
+  "process_value",
+  "status",
+  "is_completed"
+ ],
+ "fields": [
+  {
+   "fieldname": "process_name",
+   "fieldtype": "Data",
+   "label": "Process Name"
+  },
+  {
+   "fieldname": "process_value",
+   "fieldtype": "Data",
+   "label": "Process Value"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending\nProcessing\nFail\nComplete"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_completed",
+   "fieldtype": "Check",
+   "label": "Is Completed"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-25 16:03:26.564097",
+ "modified_by": "Administrator",
+ "module": "marsaix",
+ "name": "Progress",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

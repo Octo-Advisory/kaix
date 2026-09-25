@@ -1,0 +1,47 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-07-31 17:44:11.186192",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "session",
+  "title"
+ ],
+ "fields": [
+  {
+   "allow_on_submit": 1,
+   "fieldname": "session",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "in_filter": 1,
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Session",
+   "no_copy": 1,
+   "options": "Session"
+  },
+  {
+   "fetch_from": "session.title",
+   "fieldname": "title",
+   "fieldtype": "Small Text",
+   "label": "Title"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-25 16:03:26.209777",
+ "modified_by": "Administrator",
+ "module": "marsaix",
+ "name": "Linked Chats",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
