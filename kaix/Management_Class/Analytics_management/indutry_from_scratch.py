@@ -108,27 +108,27 @@ def fetch_district_polygon(location_query: str) -> dict:
         - Inside check → is this property inside the district?
         - Rsoft / Rhard are measured from this district centroid
 
-    For "Bharuch, Gujarat, India":
-        Returns Bharuch district polygon
-        Centroid ≈ geographic center of Bharuch district
-        Ankleshwar, Vagra, Jambusar → inside_district = True
-        Vadodara, Surat             → inside_district = False
+    For "Bavet, Svay Rieng, Cambodia":
+        Returns Bavet district polygon
+        Centroid ≈ geographic center of Bavet district
+        Neighboring Svay Rieng districts → inside_district = True
+        Kandal, Phnom Penh                → inside_district = False
 
     Query strategy (tries in order, stops at first district-level match):
-        1. "{place} district, {state}, India"   → most explicit
-        2. "{place}, {state}, India"            → standard
-        3. "{place} district, India"            → state-agnostic fallback
-        4. "{place}, India"                     → last resort
+        1. "{place} district, {province}, Cambodia"   → most explicit (only if a province was parsed)
+        2. "{place}, {province}, Cambodia"            → standard (only if a province was parsed)
+        3. "{place} district, Cambodia"                → province-agnostic fallback
+        4. "{place}, Cambodia"                         → last resort
     """
     place = location_query.split(",")[0].strip()
-    state = location_query.split(",")[1].strip() if "," in location_query else "Gujarat"
+    province = location_query.split(",")[1].strip() if "," in location_query else None
 
-    queries = [
-        f"{place} district, {state}, India",
-        f"{place}, {state}, India",
-        f"{place} district, India",
-        f"{place}, India",
-    ]
+    queries = []
+    if province:
+        queries.append(f"{place} district, {province}, Cambodia")
+        queries.append(f"{place}, {province}, Cambodia")
+    queries.append(f"{place} district, Cambodia")
+    queries.append(f"{place}, Cambodia")
 
     print(f"\n  [district polygon] Fetching district polygon for: {location_query}")
 
@@ -221,7 +221,7 @@ def extract_location_robust(data_dict):
                 state_value = location_dict.get('State')
                 
                 if is_meaningful_value(state_value):
-                    return f"{field_value}, {state_value}, India"
+                    return f"{field_value}, {state_value}, Cambodia"
                 else:
                     return str(field_value)
         
@@ -418,13 +418,14 @@ def save_geocode_cache(cache):
 ######################################################################################################
 
 # original option
-def geocode_area(area_name, state="Gujarat", country="India", cache=None):
+def geocode_area(area_name, state=None, country="Cambodia", cache=None):
     if cache is None:
         cache = load_geocode_cache()
-    key = f"{area_name},{state},{country}".lower()
+    key = f"{area_name},{state or ''},{country}".lower()
     if key in cache:
         return cache[key]
-    full = quote(f"{area_name}, {state}, {country}")
+    query_text = f"{area_name}, {state}, {country}" if state else f"{area_name}, {country}"
+    full = quote(query_text)
     url = f"https://nominatim.openstreetmap.org/search?format=json&limit=1&q={full}"
     try:
         r = http_get(url)
@@ -572,7 +573,9 @@ def resolve_coordinates(df, cache):
             except Exception:
                 pass
         if lat is None:
-            q      = f"{row.get('area_name','')}, {row.get('state','Gujarat')}, India"
+            row_state = row.get('state')
+            q = (f"{row.get('area_name','')}, {row_state}, Cambodia"
+                 if row_state else f"{row.get('area_name','')}, Cambodia")
             coords = geocode_place(q, cache)
             if coords:
                 lat, lon = coords[0], coords[1]
@@ -811,21 +814,21 @@ def fetch_property_data(property_ids):
             data     = doc.get("data", {})
             district = data.get("district")
             lat_long = data.get("latitude_longitude")
-            state    = district_to_state.get(district, "Gujarat")
+            state    = district_to_state.get(district)
             rows.append({"Property_ID": prop_id, "district": district,
                          "state": state, "lat_long": lat_long})
             print(f"    district={district}  state={state}  lat_long={lat_long}")
         except Exception as e:
             print(f"    ERROR: {e}")
             rows.append({"Property_ID": prop_id, "district": None,
-                         "state": "Gujarat", "lat_long": None})
+                         "state": None, "lat_long": None})
     print(pd.DataFrame(rows))
     return pd.DataFrame(rows)
 
 def getting_appropriate_state_for_each_property(property_dataframe):
 
     # this functions gets the state for each property of the df(which we are getting as an input) and also latitude, longitude if available.
-    # example:- for 1078--Kalavad-Jamnagar, state is gujarat.
+    # example:- for a property in Bavet, Svay Rieng, the state (province) is Svay Rieng.
 
     all_records_doctype_details = fetch_all_frappe_records(
         doctype="Area",
@@ -970,7 +973,7 @@ def run_location_postprocessor(df_properties, user_location_query, state=None,
                 appropriate_state = state_and_lat_long[property]["state"]
                 if '--' in property:
                     area_name = property.split('--')[1].split('-')[0]
-                res = geocode_area(area_name, state=appropriate_state, country="India", cache=cache)  # adapt state/country if you have better context
+                res = geocode_area(area_name, state=appropriate_state, country="Cambodia", cache=cache)  # adapt state/country if you have better context
                 print("generated_coordinates")
             print(property, res)
             print(type(res))
@@ -1000,7 +1003,7 @@ def run_location_postprocessor(df_properties, user_location_query, state=None,
         city_props = city_feat.get('properties', {}) or {}
         address = city_props.get('address') or {}
         state_name = address.get('state') or state
-        country_name = address.get('country') or "India"
+        country_name = address.get('country') or "Cambodia"
         if state_name:
             state_boundary = fetch_best_boundary(f"{state_name}, {country_name}")
         else:
@@ -1008,7 +1011,7 @@ def run_location_postprocessor(df_properties, user_location_query, state=None,
             state_boundary = fetch_best_boundary(country_name)
     except Exception:
         # fallback safe behavior
-        state_boundary = fetch_best_boundary("India")
+        state_boundary = fetch_best_boundary("Cambodia")
 
     frappe.log_error("state_boundary",f"{state_boundary}")
 
@@ -1134,7 +1137,7 @@ def run_location_postprocessor(df_properties, user_location_query, state=None,
 #     address = city_props.get("address", {}) or {}
 
 #     state_name = address.get("state")
-#     country_name = address.get("country", "India")
+#     country_name = address.get("country", "Cambodia")
 
 #     # Hard boundary = state if available, else country
 #     if state_name:
@@ -1296,7 +1299,7 @@ def run_location_postprocessor(df_properties, user_location_query, state=None,
 # if __name__ == "__main__":
     # small sample like your earlier test
     # sample = pd.DataFrame({
-    #     'property_id': ['2318--Vagra-Bharuch','4640--Ankleshwar-Bharuch','4707--Bharuch-Bharuch','6144--Ankleshwar-Bharuch'],
+    #     'property_id': ['2318--Vagra-Kampong Cham','4640--Bati-Kampong Cham','4707--Kampong Cham-Kampong Cham','6144--Bati-Kampong Cham'],
     #     'property_suitability_score': [2.144654,4.672502,3.292534,4.722931],
     #     # If you have exact coords include them; else the pipeline will geocode using area_name fallback
     #     # 'latitude':[21.8447606,21.6293206,21.7080427,21.6293206],
@@ -1373,7 +1376,7 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         # # elif USER_DESCISION == "YES":
         # elif aiResponse['Is_confirmation'] == False:
         #     frappe.log_error("USER_DESCISION",f"{USER_DESCISION}")
-        #     property_employment_df,property_list = get_property_and_employement(zone_id,area_list,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user,found_property,found_employment,selectedOption = selectedOption, location='Gujarat')
+        #     property_employment_df,property_list = get_property_and_employement(zone_id,area_list,required_LowerMargin_land_for_user,required_UpperMargin_land_for_user,found_property,found_employment,selectedOption = selectedOption, location='Phnom Penh')
         #     # Check if first attempt returned valid data
         #     if property_employment_df is None or (hasattr(property_employment_df, 'empty') and property_employment_df.empty):
         #         frappe.log_error("First attempt returned no data", f"property_employment_df: {property_employment_df}")
@@ -1425,7 +1428,7 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         elif USER_DESCISION == "No, this is not correct" or USER_DESCISION == "Refine Requirements":
             pass
 
-        ### CHECKING WHETHER THE PROPERTY LIST IS EMPTY OR NOT IN ORDER TO SEE THAT WHETHER THE LOCAITON ENTERED BY USER THOUGH AVAILABLE IN DB BUT IF NO PROPERTIES AVAILABLE FOR THAT LOCATION THEN THE FALLBACK SHOULD TRIGGER ie. ALL OVER GUJARAT PROPERTIES WILL BE SHOWN TO USER.
+        ### CHECKING WHETHER THE PROPERTY LIST IS EMPTY OR NOT IN ORDER TO SEE THAT WHETHER THE LOCAITON ENTERED BY USER THOUGH AVAILABLE IN DB BUT IF NO PROPERTIES AVAILABLE FOR THAT LOCATION THEN THE FALLBACK SHOULD TRIGGER ie. ALL OVER CAMBODIA PROPERTIES WILL BE SHOWN TO USER.
         # Check if first attempt returned valid data
         if property_employment_df is None or (hasattr(property_employment_df, 'empty') and property_employment_df.empty):
             frappe.log_error("First attempt returned no data", f"property_employment_df: {property_employment_df}")
@@ -1519,8 +1522,8 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
             # step-3:- filtering the properties recieved from propert_keyword_df json based on the filter-1:- user mentioned location and filter-2:- soft and hard boundary km.
             df = property_df_with_lat_long.copy()
 
-            # location_query_result = extract_location_robust(aiResponse) # example:- "bharuch, gujarat, india" or "Not available in list."
-            location_query_result = extract_location_robust(state_ai_response) # example:- "bharuch, gujarat, india" or "Not available in list."
+            # location_query_result = extract_location_robust(aiResponse) # example:- "bavet, svay rieng, cambodia" or "Not available in list."
+            location_query_result = extract_location_robust(state_ai_response) # example:- "bavet, svay rieng, cambodia" or "Not available in list."
             frappe.log_error("location_query_result",f"{location_query_result}")
 
             district_polygon = fetch_district_polygon(location_query_result) # getting boundary coordinates for the user mentioned location.
@@ -1537,6 +1540,15 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
                 frappe.log_error("lat_long_0",f"{df.to_json()}")
                 lat_long_str = row['lat_long']
                 frappe.log_error("lat_long_1",f"{lat_long_str}")
+
+                if not lat_long_str or ',' not in str(lat_long_str):
+                    frappe.log_error("lat_long_missing", f"No coordinates for property, defaulting to inside district: {row.get('Property_ID')}")
+                    inside_flags.append(True)
+                    border_dists.append(0)
+                    zones.append("Zone1_inside_district")
+                    continue
+
+                
                 lat_str, lon_str = lat_long_str.split(',')
                 latitude = float(lat_str.strip())
                 longitude = float(lon_str.strip())
@@ -1643,7 +1655,10 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         
         df_with_property_wise_emp_score = calculate_employment_availability_score(df_for_property_wise_emp_score,sub_sector)
         df_with_property_wise_emp_score.sort_values(by=["employment_availability_score"], ascending=False)
-        Solution_screen_employment_lookup_df = df_for_property_wise_emp_score[["property_id","Semi-skilled", "Skilled", "Unskilled", "Skill_Type"]]
+        # for _col in ["Semi-Skilled", "Skilled", "Unskilled", "Skill_Type"]:
+        #     if _col not in df_for_property_wise_emp_score.columns:
+        #         df_for_property_wise_emp_score[_col] = 0
+        Solution_screen_employment_lookup_df = df_for_property_wise_emp_score[["property_id","Semi-Skilled", "Skilled", "Unskilled", "Skill_Type"]]
 
 
         final_property_ranking_for_decision = pd.merge(final_property_ranking_for_decision, df_with_property_wise_emp_score[["property_id","employment_availability_score"]], 
@@ -1879,7 +1894,7 @@ def industry_from_scratch(aiResponse,chatId,selectedOption):
         #                 })
         # frappe.log_error("df_formation",f"{df_formation}")
 
-        # location_query_result = extract_location_robust(aiResponse) # example:- "bharuch, gujarat, india" or "Not available in list."
+        # location_query_result = extract_location_robust(aiResponse) # example:- "bavet, svay rieng, cambodia" or "Not available in list."
 
         # if location_query_result == "Not Available in List":
         #     frappe.log_error("Not Available in List",f"{location_query_result}")

@@ -140,9 +140,9 @@ If scale of business is missing:
 
 You must always include all distinct benefit structures mentioned — such as Horizontal and Vertical paths — and compute each as a separate object.
 
-Never hallucinate investment values using arbitrary unit logic like “₹300 per kg” unless that unit-based logic is explicitly present in the scheme.
+Never hallucinate investment values using arbitrary unit logic like “$300 per kg” unless that unit-based logic is explicitly present in the scheme.
 
-Always perform arithmetic in raw form (without commas), and then format the result in Indian comma notation and crore/lakh style.
+Always perform arithmetic in raw form (without commas), and then format the result using standard international comma notation (e.g., $1,000,000).
 
 ---
 
@@ -162,63 +162,59 @@ INSTRUCTIONS:
       - Clearly mark it as an approximation
       - Use realistic and moderate values consistent with the scale of business
       - Mention in the calculation_step: "This is an approximate illustration based on typical investment patterns. Not derived from explicit scheme values."
-      - Never fabricate per-unit logic like ₹/kg, ₹/sq.ft., etc., unless the input explicitly mentions it
+      - Never fabricate per-unit logic like $/kg, $/sq.ft., etc., unless the input explicitly mentions it
 
 3. Estimate investment based on scale of business:
-   - Micro: ≤ ₹1 crore  
-   - Small: ₹1–10 crore  
-   - Medium: ₹10–50 crore  
-   - Large: ₹50–2500 crore  
-   - Mega: ≥ ₹2500 crore and ≥2500 jobs  
-   - Startup: typically < ₹10 crore  
+   - Micro: < $50,000 in assets (typically ≤10 employees)
+   - Small: $50,000–$250,000 in assets (11–50 employees)
+   - Medium: $250,000–$500,000 in assets (51–100 employees)
+   - Large: > $500,000 in assets (>100 employees)
    - If scale is not given, use logical inference from the scheme text
-4. Perform raw arithmetic first, then format numbers using Indian comma style.
+4. Perform raw arithmetic first, then format numbers using standard international comma style.
 5. Never let benefit exceed investment. Net cost must always be greater than zero.
                                                        
 Ensure:
 - Benefit is never more than investment
-- Net cost is always positive (never ₹0)
-- All numbers ≥ ₹1,00,000 are formatted with Indian commas
-- Values in crore/lakh must be rounded to 2 decimal places
+- Net cost is always positive (never $0)
+- All numbers ≥ $100,000 are formatted with standard international commas
+- Values should be rounded to 2 decimal places where applicable
 
 ---
 
-INDIAN NUMBER FORMATTING AND INTERPRETATION RULES
+NUMBER FORMATTING AND INTERPRETATION RULES
 
-All figures ≥ ₹1,00,000 must be formatted using Indian numbering conventions.
+All figures ≥ $100,000 must be formatted using standard international numbering conventions (thousands separators every 3 digits).
 
 Follow these steps:
 
-1. Perform raw arithmetic first — do not use ₹ or commas while calculating.
+1. Perform raw arithmetic first — do not use $ or commas while calculating.
    - Example: 43800000 × 3 = 131400000
 
-2. Format using Indian comma grouping:
-   - ₹1,00,000 = ₹1 lakh
-   - ₹10,00,000 = ₹10 lakh
-   - ₹1,00,00,000 = ₹1 crore
-   - ₹2,50,00,000 = ₹2.5 crore
-   - ₹13,14,00,000 = ₹13.14 crore
+2. Format using standard international comma grouping (groups of 3 digits from the right):
+   - $100,000
+   - $1,000,000
+   - $2,500,000
+   - $13,140,000
 
 3. Count digits from right:
-   - Last 3 digits = first group (e.g., 000 in 1,00,000)
-   - Remaining = grouped by 2s
+   - Group every 3 digits with a comma (e.g., 000 in 100,000; 1,000,000)
 
 4. Interpret properly:
-   - ₹25,00,000 = ₹25 lakh (not ₹2.5 lakh)
-   - ₹2,50,00,000 = ₹2.5 crore (not ₹25 crore)
+   - $2,500,000 means two million five hundred thousand dollars
+   - $25,000,000 means twenty-five million dollars
                                                        
 5. DECIMAL SAFETY RULE:
-   - Always **truncate decimals** before formatting any number using Indian comma rules.
+   - Always **truncate decimals** before formatting any number using standard comma rules.
    - For example, if the value is `3800000.0`, treat it as `3800000`.
-   - Never count decimal digits when inserting commas or interpreting as crore/lakh.
-   - Apply rounding **only for crore/lakh values**, not raw formatted numbers.
+   - Never count decimal digits when inserting commas.
+   - Apply rounding **only for large summarized values (e.g., $ millions)**, not raw formatted numbers.
 
-Round crore/lakh values to 2 decimal places.
+Round large summarized values to 2 decimal places.
 
 Never:
 - Misplace digits or commas
 - Show benefit greater than investment
-- Output net cost as ₹0
+- Output net cost as $0
 
 ---
 
@@ -240,11 +236,11 @@ A JSON object containing the following:
       "benefit_raw": 10000000,
       "net_cost_raw": 30000000,
       "formatted": {{
-        "investment": "₹4,00,00,000",
-        "benefit": "₹1,00,00,000",
-        "net_cost": "₹3,00,00,000"
+        "investment": "$40,000,000",
+        "benefit": "$10,000,000",
+        "net_cost": "$30,000,000"
       }},
-      "calculation_step": "25% of ₹4,00,00,000 = ₹1,00,00,000 (capped at ₹25,00,00,000)"
+      "calculation_step": "25% of $40,000,000 = $10,000,000 (capped at $250,000,000)"
     }},
     {{
       "name": "Vertical Support on Built-up Area",
@@ -257,11 +253,11 @@ A JSON object containing the following:
       "benefit_raw": 3000000,
       "net_cost_raw": 2000000,
       "formatted": {{
-        "investment": "₹50,00,000",
-        "benefit": "₹30,00,000",
-        "net_cost": "₹20,00,000"
+        "investment": "$5,000,000",
+        "benefit": "$3,000,000",
+        "net_cost": "$2,000,000"
       }},
-      "calculation_step": "₹300 × 10,000 sq.ft. = ₹30,00,000"
+      "calculation_step": "$300 × 10,000 sq.ft. = $3,000,000"
     }}
   ]
 }}
@@ -282,7 +278,7 @@ You will receive structured JSON data from a calculation engine along with full 
    - Re-check that the investment used in benefit calculation matches the reported investment value.
    - Do not allow mismatch between assumed investment in the header and actual values used in calculation breakdown.
 2. Check if cap is mentioned for each benefit path. If not, verify using the input text (name, type, description, quantum of assistance). If it is evident from the description or known scheme rules, include it—even if LLM 1 omitted it.
-3. Format all amounts using Indian comma rules and currency notation.
+3. Format all amounts using standard international comma rules and USD currency notation.
 4. Generate a professional financial benefit summary in paragraph form.
 
 ---
@@ -335,56 +331,55 @@ Ensure the final output follows this structure:
 5. Eligibility Criteria
 6. Conclusion
 
-Each financial example must match the structure of investment → benefit → net cost, with clearly formatted figures in Indian style. If the scheme includes multiple benefit components (e.g., horizontal and vertical), summarize each in separate paragraphs.
+Each financial example must match the structure of investment → benefit → net cost, with clearly formatted figures in standard international style. If the scheme includes multiple benefit components (e.g., horizontal and vertical), summarize each in separate paragraphs.
 
-Avoid using any numeric per-unit logic (e.g., ₹300/kg or ₹500/sq.ft.) unless explicitly mentioned in the incentive description. Do not invent unit rates.
+Avoid using any numeric per-unit logic (e.g., $300/kg or $500/sq.ft.) unless explicitly mentioned in the incentive description. Do not invent unit rates.
 
 ---
 
 FORMATTING RULES:
 
 - Do not use markdown, bullet points, emojis, or placeholder text.
-- Format all numbers ≥ ₹1,00,000 using Indian style commas (e.g., ₹2.5 crore, ₹25 lakh).
-- Round large values to 2 decimal places when converting to crore/lakh.
+- Format all numbers ≥ $100,000 using standard international style commas (e.g., $2,500,000, $25,000,000).
+- Round large values to 2 decimal places when summarizing (e.g., $ millions).
 - Avoid repeating raw numbers unless necessary.
 - Do not invent or modify computed figures.
-- Round off crore/lakh values to 2 decimal places
+- Round off large summarized values to 2 decimal places
 - Never explain estimates using artificial unit rates unless provided
 - Ensure net cost is always greater than zero
 - Do not include commentary, self-correction, or phrases like “upon reviewing the calculation...” or “therefore the correct value is...”. All values must be correct in the first instance, with no clarification or explanation needed.
 - If LLM 1 provides approximate examples with disclaimers (e.g., "illustration based on typical investment patterns"), retain them as-is. Do not rephrase or over-justify these in the summary.
 - Never include commentary or self-correction logic such as “this appears to be wrong” or “the correct result should be…”. All outputs must be framed as correct in the first place.
-- Decimal Truncation: Before applying Indian comma formatting, always convert all monetary values to integers. Never format values like 3800000.0 as ₹3,80,00,000. Correct approach is ₹38,00,000.
-- Only apply rounding to crore/lakh values, and **truncate decimals for all values below ₹1 crore**.
+- Decimal Truncation: Before applying comma formatting, always convert all monetary values to integers. Never format values like 3800000.0 as $3,800,00.0. Correct approach is $3,800,000.
+- Only apply rounding to large summarized values, and **truncate decimals for all raw dollar values**.
 - Net cost must be calculated as: net_cost = investment - benefit
-  - Never show net cost as ₹0 unless the benefit fully offsets the total investment (which is rare).
+  - Never show net cost as $0 unless the benefit fully offsets the total investment (which is rare).
   - For interest subsidies or partial grants, ensure the net cost reflects the uncovered portion of investment, not zero.
   - Double-check that investment and benefit amounts are consistent across all calculations.
                                                
 ---
 
-HOW TO FORMAT AND INTERPRET NUMBERS IN INDIAN STYLE
+HOW TO FORMAT AND INTERPRET NUMBERS IN STANDARD INTERNATIONAL STYLE
 
-Ensure every figure ≥ ₹1,00,000 is formatted correctly using Indian commas.
+Ensure every figure ≥ $100,000 is formatted correctly using standard international commas.
 
 Follow these rules:
 
 1. Use comma system:
-   - ₹1,00,000 = ₹1 lakh
-   - ₹10,00,000 = ₹10 lakh
-   - ₹1,00,00,000 = ₹1 crore
-   - ₹2,50,00,000 = ₹2.5 crore
-   - ₹13,14,00,000 = ₹13.14 crore
+   - $100,000
+   - $1,000,000
+   - $2,500,000
+   - $13,140,000
 
 2. Comma logic:
    - Last 3 digits = first group
    - Remaining digits = grouped by 2s
 
 3. Interpret carefully:
-   - ₹25,00,000 means ₹25 lakh, not ₹2.5 lakh
-   - ₹2,50,00,000 means ₹2.5 crore, not ₹25 crore
+   - $2,500,000 means two million five hundred thousand dollars
+   - $25,000,000 means twenty-five million dollars
 
-Round large figures (crores/lakhs) to 2 decimal places and do not misplace commas or misread values.
+Round large figures (millions) to 2 decimal places and do not misplace commas or misread values.
 
 ---
 
@@ -406,25 +401,25 @@ You are a professional financial formatter and math validator.
 Your task is to take the raw incentive summary below and return a polished markdown version with:
 - Proper **headings** using ## and ### where appropriate
 - Proper **bullet points** and **numbered lists** where logical
-- Important **figures** (₹ amounts, percentages, dates) and **key terms** in **bold**
-- Maintain accurate **Indian number system formatting**:
+- Important **figures** ($ amounts, percentages, dates) and **key terms** in **bold**
+- Maintain accurate **standard international number system formatting**:
   - Always truncate decimal parts **before** inserting commas. Never include decimals when formatting.
-  - For example, format `3800000.0` as **₹38,00,000**, not ₹3,80,00,000.
+  - For example, format `3800000.0` as **$3,800,000**, not $3,800,00.0.
 - No emojis
 - No markdown tables
 - No hallucinated changes — always use the content provided
 
-Additionally, you must verify all mathematical operations shown in the content (e.g., "₹300 × 10,000 = ₹3,00,00,000"):
+Additionally, you must verify all mathematical operations shown in the content (e.g., "$300 × 10,000 = $3,000,000"):
 - If the result is wrong, silently correct it and update the value in-place. Do not mention that a correction was made.
-- If the benefit exceeds the investment (e.g., net cost becomes ₹0 or negative), recalculate with a higher realistic investment
+- If the benefit exceeds the investment (e.g., net cost becomes $0 or negative), recalculate with a higher realistic investment
 - If the math seems ambiguous or impossible to verify, do NOT change it — keep the original as-is
 - Net cost must be calculated as: net_cost = investment - benefit
-  - Never show net cost as ₹0 unless the benefit fully offsets the total investment (which is rare).
+  - Never show net cost as $0 unless the benefit fully offsets the total investment (which is rare).
   - For interest subsidies or partial grants, ensure the net cost reflects the uncovered portion of investment, not zero.
   - Double-check that investment and benefit amounts are consistent across all calculations.
 - Do not include any self-correction phrases like “however, this seems wrong” or “the corrected version is…”.
 - The final markdown must appear clean and confident. Only the corrected version should appear — the incorrect version must be removed entirely.
-- Ensure that formatting logic always uses the **integer part** of any number before applying Indian comma formatting. Never apply comma rules to decimal values like `3800000.0` — treat as `3800000`.
+- Ensure that formatting logic always uses the **integer part** of any number before applying comma formatting. Never apply comma rules to decimal values like `3800000.0` — treat as `3800000`.
 
 Input:
 {raw_text}

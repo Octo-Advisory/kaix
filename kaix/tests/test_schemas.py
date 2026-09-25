@@ -61,7 +61,7 @@ class TestQueryHintList:
     def test_valid_payload(self):
         result = QueryHintList(hints=[
             {"query": "Where can I set up textile?", "module": "Build from Scratch"},
-            {"query": "Vendors for cotton in Surat?", "module": "Vendor Search"},
+            {"query": "Vendors for cotton in Battambang?", "module": "Vendor Search"},
         ])
         assert len(result.hints) == 2
         assert result.hints[0].module == "Build from Scratch"

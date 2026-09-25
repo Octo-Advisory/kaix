@@ -11,75 +11,117 @@ import spacy
 from typing import List, Tuple
 
 #####################################################################################################################
-GUJARAT_DISTRICTS = [
-    "Sabarkantha",
-    "Mehsana",
-    "Chhota Udaipur",
-    "Morbi",
-    "Rajkot",
-    "Dadra and Nagar Haveli",
-    "Daman",
-    "Gir Somnath",
-    "Kutch",
-    "Porbandar",
-    "Junagadh",
-    "Amreli",
-    "Bhavnagar",
-    "Jamnagar",
-    "Surendranagar",
-    "Navsari",
-    "Surat",
-    "PanchMahal",
-    "Kheda",
-    "Banaskatha",
-    "Patan",
-    "Dahod",
-    "Gandhinagar",
-    "Valsad",
-    "Ahmedabad",
-    "Vadodara",
-    "Narmada",
-    "Anand",
-    "Bharuch"
+# Cambodia's 25 provinces (khett), including the capital Phnom Penh which is
+# administered at the same level as a province.
+CAMBODIA_PROVINCES = [
+    "Banteay Meanchey",
+    "Battambang",
+    "Kampong Cham",
+    "Kampong Chhnang",
+    "Kampong Speu",
+    "Kampong Thom",
+    "Kampot",
+    "Kandal",
+    "Kep",
+    "Koh Kong",
+    "Kratie",
+    "Mondulkiri",
+    "Oddar Meanchey",
+    "Pailin",
+    "Phnom Penh",
+    "Preah Vihear",
+    "Pursat",
+    "Prey Veng",
+    "Ratanakiri",
+    "Siem Reap",
+    "Preah Sihanouk",
+    "Stung Treng",
+    "Svay Rieng",
+    "Takeo",
+    "Tboung Khmum"
 ]
 
-INDIA_STATES_AND_UTS = [
-    "West Bengal",
-    "Uttarakhand",
-    "Uttar Pradesh",
-    "Tripura",
-    "Telangana",
-    "Tamil Nadu",
-    "Sikkim",
-    "Rajasthan",
-    "Punjab",
-    "Puducherry",
-    "Odisha",
-    "Nagaland",
-    "Mizoram",
-    "Meghalaya",
-    "Manipur",
-    "Maharashtra",
-    "Madhya Pradesh",
-    "Lakshadweep",
-    "Ladakh",
-    "Kerala",
-    "Karnataka",
-    "Jharkhand",
-    "Jammu and Kashmir",
-    "Himachal Pradesh",
-    "Haryana",
-    "Gujarat",
-    "Goa",
-    "Delhi",
-    "Dadra and Nagar Haveli and Daman and Diu",
-    "Chhattisgarh",
-    "Chandigarh",
-    "Bihar",
-    "Assam",
-    "Arunachal Pradesh",
-    "Andhra Pradesh",
-    "Andaman and Nicobar Islands"
+# Second-level administrative units across all 25 provinces: districts (srok),
+# district-level municipalities (krong), and Phnom Penh's sections (khan).
+# Nationwide coverage (not limited to a single home province).
+CAMBODIA_DISTRICTS = [
+    # Banteay Meanchey
+    "Mongkol Borey", "Phnum Srok", "Preah Netr Preah", "Ou Chrov",
+    "Serei Saophoan", "Thma Puok", "Svay Chek", "Malai", "Poipet",
+    # Battambang
+    "Banan", "Thma Koul", "Battambang", "Bavel", "Aek Phnum",
+    "Moung Ruessei", "Rotonak Mondol", "Sangkae", "Samlout", "Sampov Lun",
+    "Phnum Proek", "Kamrieng", "Koas Krala", "Rukh Kiri",
+    # Kampong Cham
+    "Batheay", "Chamkar Leu", "Cheung Prey", "Kampong Cham", "Kampong Siem",
+    "Kang Meas", "Kaoh Soutin", "Prey Chhor", "Srei Santhor", "Stueng Trang",
+    # Kampong Chhnang
+    "Baribour", "Chol Kiri", "Kampong Chhnang", "Kampong Leaeng",
+    "Kampong Tralach", "Rolea B'ier", "Sameakki Mean Chey", "Tuek Phos",
+    # Kampong Speu
+    "Basedth", "Chbar Mon", "Kong Pisei", "Aural", "Phnum Sruoch",
+    "Samraong Tong", "Thpong", "Odongk Maechay", "Samkkei Munichay",
+    # Kampong Thom
+    "Baray", "Kampong Svay", "Stueng Saen", "Prasat Ballangk",
+    "Prasat Sambour", "Sandan", "Santuk", "Stoung", "Taing Kouk",
+    # Kampot
+    "Angkor Chey", "Banteay Meas", "Chhuk", "Chum Kiri", "Dang Tong",
+    "Kampong Trach", "Tuek Chhou", "Kampot", "Bokor",
+    # Kandal
+    "Kandal Stueng", "Kien Svay", "Khsach Kandal", "Kaoh Thum", "Leuk Daek",
+    "Lvea Aem", "Mukh Kampul", "Angk Snuol", "Ponhea Lueu", "S'ang",
+    "Ta Khmau", "Sampeou Poun", "Akreiy Ksatr",
+    # Kep
+    "Damnak Chang'aeur", "Kep",
+    # Koh Kong
+    "Botum Sakor", "Kiri Sakor", "Kaoh Kong", "Khemara Phoumin",
+    "Mondol Seima", "Srae Ambel", "Thma Bang",
+    # Kratie
+    "Chhloung", "Kracheh", "Prek Prasab", "Sambour", "Snuol",
+    "Chetr Borei", "Ou Krieng Saenchey",
+    # Mondulkiri
+    "Kaev Seima", "Kaoh Nheaek", "Ou Reang", "Pech Chreada", "Saen Monourom",
+    # Oddar Meanchey
+    "Anlong Veaeng", "Banteay Ampil", "Chong Kal", "Samraong",
+    "Trapeang Prasat",
+    # Pailin
+    "Pailin", "Sala Krau",
+    # Phnom Penh (sections/khan)
+    "Chamkar Mon", "Doun Penh", "Prampir Meakkakra", "Tuol Kouk", "Dangkao",
+    "Mean Chey", "Russey Keo", "Sen Sok", "Pur SenChey", "Chrouy Changvar",
+    "Praek Pnov", "Chbar Ampov", "Boeng Keng Kang", "Kamboul",
+    # Preah Vihear
+    "Chey Saen", "Chhaeb", "Choam Ksant", "Kuleaen", "Rovieng",
+    "Sangkum Thmei", "Tbaeng Mean Chey", "Preah Vihear",
+    # Pursat
+    "Bakan", "Kandieng", "Krakor", "Phnum Kravanh", "Pursat", "Veal Veaeng",
+    "Ta Lou Senchey",
+    # Prey Veng
+    "Ba Phnum", "Kamchay Mear", "Kampong Trabaek", "Kanhchriech", "Me Sang",
+    "Peam Chor", "Peam Ro", "Pea Reang", "Preah Sdach", "Prey Veng",
+    "Pur Rieng", "Sithor Kandal", "Svay Antor",
+    # Ratanakiri
+    "Andoung Meas", "Ban Lung", "Bar Kaev", "Koun Mom", "Lumphat",
+    "Ou Chum", "Ou Ya Dav", "Ta Veaeng", "Veun Sai",
+    # Siem Reap
+    "Angkor Chum", "Angkor Thum", "Banteay Srei", "Chi Kraeng", "Kralanh",
+    "Puok", "Prasat Bakong", "Siem Reap", "Soutr Nikom", "Srei Snam",
+    "Svay Leu", "Varin", "Run Ta Aek Techo Sen",
+    # Preah Sihanouk
+    "Preah Sihanouk", "Prey Nob", "Stueng Hav", "Kampong Seila",
+    "Kaoh Rung", "Kampong Soam",
+    # Stung Treng
+    "Sesan", "Siem Bouk", "Siem Pang", "Stueng Traeng", "Thala Barivat",
+    "Borei Ou Svay Senchey",
+    # Svay Rieng
+    "Chantrea", "Kampong Rou", "Rumduol", "Romeas Haek", "Svay Chrum",
+    "Svay Rieng", "Svay Teab", "Bavet",
+    # Takeo
+    "Angkor Borei", "Bati", "Borei Cholsar", "Kiri Vong", "Kaoh Andaet",
+    "Prey Kabbas", "Doun Kaev", "Tram Kak", "Treang",
+    # Tboung Khmum
+    "Dambae", "Krouch Chhmar", "Memot", "Ou Reang Ov", "Ponhea Kraek",
+    "Suong", "Tboung Khmum"
 ]
 #####################################################################################################################
 
@@ -596,9 +638,9 @@ def get_property_and_employement(zone_id, area_id_list, required_LowerMargin_lan
     #####################################
     location_type = None
     if location:
-        if location in INDIA_STATES_AND_UTS:
+        if location in CAMBODIA_PROVINCES:
             location_type = "state"
-        elif location in GUJARAT_DISTRICTS:
+        elif location in CAMBODIA_DISTRICTS:
             location_type = "district"
     frappe.log_error("location_type",location_type)
     frappe.log_error("location_for_district",location)
@@ -2672,8 +2714,8 @@ def calculate_distance(loc1: str, loc2: str) -> float:
     
     return 6371 * c  # Earth's radius in kilometers
 
-# Temporary fallback for vendors/properties with missing latitude_longitude (state centroid of Gujarat)
-GUJARAT_DEFAULT_LATLONG = "22.2587,71.1924"
+# Temporary fallback for vendors/properties with missing latitude_longitude (national centroid of Cambodia)
+CAMBODIA_DEFAULT_LATLONG = "12.5657,104.9910"
 
 def calculate_vendor_property_distances(input_data: dict) -> dict:
     """
@@ -2692,18 +2734,18 @@ def calculate_vendor_property_distances(input_data: dict) -> dict:
         vendor_id = vendor["id"]
         vendor_latlong = vendor["latlong"]
 
-        # Fall back to Gujarat centroid when vendor coordinates are missing/invalid
+        # Fall back to Cambodia centroid when vendor coordinates are missing/invalid
         if not is_valid_latlong(vendor_latlong):
-            vendor_latlong = GUJARAT_DEFAULT_LATLONG
+            vendor_latlong = CAMBODIA_DEFAULT_LATLONG
 
         vendor_distances = {}
         for property in input_data.get("Property", []):
             property_id = property["id"]
             property_latlong = property["latlong"]
 
-            # Fall back to Gujarat centroid when property coordinates are missing/invalid
+            # Fall back to Cambodia centroid when property coordinates are missing/invalid
             if not is_valid_latlong(property_latlong):
-                property_latlong = GUJARAT_DEFAULT_LATLONG
+                property_latlong = CAMBODIA_DEFAULT_LATLONG
 
             # Calculate distance
             distance = calculate_distance(vendor_latlong, property_latlong)

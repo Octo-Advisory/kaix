@@ -69,5 +69,5 @@ def fetch_frappe_doc_universal(
 
     return fallback_data
 
-qwerty = fetch_frappe_doc_universal(doctype = "Survey No", identifier='8353--Vadodara-Vadodara')
+qwerty = fetch_frappe_doc_universal(doctype = "Survey No", identifier='8353--Siem Reap-Siem Reap')
 print(qwerty) 

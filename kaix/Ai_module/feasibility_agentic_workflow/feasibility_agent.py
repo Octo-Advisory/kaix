@@ -151,7 +151,7 @@ class FeasibilityAgent:
 # If feasibility_json has “Total Area”: answer directly. Otherwise call retrieve_from_feasibility(refined_input).
 
 # Example 2 (Module search only):
-# User: “Show all incentives available for a cement plant in Vadodara.”
+# User: “Show all incentives available for a cement plant in Siem Reap.”
 # → Call module_search_node(refined_input).
 
 # Example 3 (Both):
@@ -207,38 +207,38 @@ Call `module_search_node(refined_input)` in these cases—even if feasibility_js
 1) **Build-from-Scratch (BFS)** — land / new setup exploration
    - **Intent cues:** land options/availability, buy land/plot, set up/build/start/establish/construct plant/unit/factory/facility, capacity figures (e.g., 1 TPA, 1 MTPA), industrial estate/zone.
    - **Examples:** 
-     - “What are the land options for the chemical industry in Surat?”
-     - “Tell me land availability for agricultural industry in Bharuch.”
-     - “I want to build a 1 MTPA cement plant in Gujarat.”
-     - “Buy land for setting up a pharma unit near Vapi.”
+     - “What are the land options for the chemical industry in Battambang?”
+     - “Tell me land availability for agricultural industry in Kampong Cham.”
+     - “I want to build a 1 MTPA cement plant in Cambodia.”
+     - “Buy land for setting up a pharma unit near Bavet.”
 
 2) **Vendors / Suppliers / Manufacturers**
    - **Intent cues:** show/list/search/find/get vendors/suppliers/manufacturers/producers; product/equipment/service + location.
    - **Examples:**
-     - “Show me vendors for steel rods in Ahmedabad.”
-     - “Search suppliers of plastic granules in Vapi.”
-     - “List manufacturers of glass bottles near Surat.”
+     - “Show me vendors for steel rods in Phnom Penh.”
+     - “Search suppliers of plastic granules in Bavet.”
+     - “List manufacturers of glass bottles near Battambang.”
 
 3) **Incentives / Schemes / Subsidies**
    - **Intent cues:** incentives/benefits/schemes/subsidies/grants/financial assistance; “show/list/search/retrieve/find” + industry/location.
    - **Examples:**
-     - “Give me incentives for specialty chemicals in Gujarat.”
-     - “Search for green-estate incentives for cement in Vadodara.”
+     - “Give me incentives for specialty chemicals in Cambodia.”
+     - “Search for green-estate incentives for cement in Siem Reap.”
      - “List available incentives for a new textile unit in Valsad.”
 
 4) **Approvals / Licenses / Clearances / Permissions**
    - **Intent cues:** approvals/licenses/clearances/permissions required/needed; “show/list/search/find/retrieve” + industry/location/stage.
    - **Examples:**
-     - “What approvals are required to start a dairy in Gujarat?”
+     - “What approvals are required to start a dairy in Cambodia?”
      - “Search approvals for textile manufacturing in Valsad.”
-     - “Get me licenses needed for food processing in Vadodara.”
+     - “Get me licenses needed for food processing in Siem Reap.”
 
 5) **Employment / Labour / Manpower**
    - **Intent cues:** employment/labour/workers/manpower availability/search; “show/list/search/find/get/recruit.”
    - **Examples:**
-     - “What is the availability of skilled workers for textile in Surat?”
-     - “Find manpower for pharma packaging near Bharuch.”
-     - “Search employees for a new plastics unit in Ahmedabad.”
+     - “What is the availability of skilled workers for textile in Battambang?”
+     - “Find manpower for pharma packaging near Kampong Cham.”
+     - “Search employees for a new plastics unit in Phnom Penh.”
 
 **Defaulting rules**
 - If a query **mentions any module cues** above but is short/vague, **treat it as search intent** and call `module_search_node`.
@@ -278,7 +278,7 @@ User: “What is the total land area approved in my setup?”
 If feasibility_json has “Total Area”: answer directly. Otherwise call retrieve_from_feasibility(refined_input).
 
 Example 2 (Module search only):
-User: “Show all incentives available for a cement plant in Vadodara.”
+User: “Show all incentives available for a cement plant in Siem Reap.”
 → Call module_search_node(refined_input).
 
 Example 3 (Both):
@@ -320,14 +320,14 @@ When you decide you have enough context to respond, return a **well-designed Mar
 - For tables, add **one** plain line **below** the table with a compact parenthetical source, e.g.  
   `(Source: FS §§8.1, 8.2)`
 - For single sentences/inline facts, append a compact parenthetical at the end, e.g.  
-  `Total project cost is **₹40 Crore**. (Source: FS §8.2)`
+  `Total project cost is **$40 million**. (Source: FS §8.2)`
 
 **C. Emphasis & typography**
 - Use **bold** for key terms and figures; avoid overusing emojis. If an icon aids scanning, place **one** emoji in the section heading only.
 - Normalize punctuation and dashes (–) and use en-dashes for ranges.
 
 **D. Numbers, units, and currency**
-- Use SI/Indian formatting consistently (e.g., **₹40 Crore**, **17,253.3 MT/month**, **53,997 m²**).
+- Use SI/standard international formatting consistently (e.g., **$40 million**, **17,253.3 MT/month**, **53,997 m²**).
 - Include units on first mention; avoid repeating units in the same row/line unless needed for clarity.
 
 **E. Tone & brevity**
@@ -340,7 +340,7 @@ When you decide you have enough context to respond, return a **well-designed Mar
 
 - Format: a **tiny parenthetical** with minimal words.
   - Abbreviations: `FS` = Feasibility Study, `§`/`§§` = section(s).
-  - Inline fact example: `… **₹40 Crore**. (Source: FS §8.2)`
+  - Inline fact example: `… **$40 million**. (Source: FS §8.2)`
   - Table-wide note (one line under the table): `(Source: FS §§8.1, 8.2)`
   - Bullets example: `- Construction starts after clearances. (Source: FS §8.1)`
 
@@ -375,10 +375,10 @@ When you decide you have enough context to respond, return a **well-designed Mar
 As soon as you are confident the query can be answered (from feasibility_json and/or retrieved snippets, or after `module_search_node` confirms readiness), **produce the final Markdown answer** per the standard above. Do **not** call further tools in that turn.
 
 --- Extra examples (module_search_node behavior) ---
-• User: “Give me the list of incentives for chemical industry in Gujarat.”
+• User: “Give me the list of incentives for chemical industry in Cambodia.”
   → Call `module_search_node` to **confirm or ask** for missing fields (e.g., specific sub-industry, exact location granularity, project stage). Do **not** list incentives yourself. The payload should either confirm readiness for analytics or ask for the minimal missing fields.
 
-• User: “Find vendors for a glass-lined reactor (GLR) 10 KL near Bharuch.”
+• User: “Find vendors for a glass-lined reactor (GLR) 10 KL near Kampong Cham.”
   → `module_search_node` gathers/validates specs (GLR size, quantity, new/used, timeline). It **does not** list vendors; it confirms/requests, or triggers lead-gen if out of scope.
 
 • User: “This request is for a highly novel biotech process (details confidential).”
@@ -537,12 +537,12 @@ Output:
 
             # Default k=5
             docs = retrieve_from_feasibility(
-                "List critical environmental approvals for Specialty Chemicals in Gujarat."
+                "List critical environmental approvals for Specialty Chemicals in Cambodia."
             )
             
             # Explicit higher k for broader context
             docs = retrieve_from_feasibility(
-                "List critical environmental approvals for Specialty Chemicals in Gujarat.",
+                "List critical environmental approvals for Specialty Chemicals in Cambodia.",
                 top_k=10
             )
             """
@@ -606,9 +606,9 @@ Output:
             query : str
                 The **standalone, refined** query string (carry-forward already applied).
                 Examples:
-                - "Show incentives for cement in Vadodara."
+                - "Show incentives for cement in Siem Reap."
                 - "Find vendors for solar panels in Low-veld."
-                - "Show approvals required for food processing in Gujarat."
+                - "Show approvals required for food processing in Cambodia."
 
             Global dependencies (provided by the host app)
             ----------------------------------------------
@@ -649,11 +649,11 @@ Output:
             Example (how the agent should call)
             -----------------------------------
             # Given globals are already set by the runtime:
-            #   USER_INPUT = "Show incentives for cement in Vadodara"
+            #   USER_INPUT = "Show incentives for cement in Siem Reap"
             #   CHAT_ID = "sess_123"
             #   USER_INTENSION = "Query to search Incentives"
 
-            result = module_search_node("Show incentives for cement in Vadodara.")
+            result = module_search_node("Show incentives for cement in Siem Reap.")
             if "module_answer" in result:
                 # pass to responder/composer
                 answer = result["module_answer"]
@@ -991,7 +991,7 @@ def process_agent_result(result):
 # agent = FeasibilityAgent(
 #     persist_dir="store",
 #     collection_name="feasibility_docs",
-#     feasibility_study={"Location": "Gujarat", "final_product_capacity": "17253.3 MT/Month", "product": "Specialty Chemicals"},
+#     feasibility_study={"Location": "Cambodia", "final_product_capacity": "17253.3 MT/Month", "product": "Specialty Chemicals"},
 #     chat_id="xyzabe",
 #     device="cpu",
 # )

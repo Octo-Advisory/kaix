@@ -127,7 +127,7 @@ def test_classify_incentive_query_happy_returns_category(log_error_calls):
     llm = _runnable_llm(["3"])  # 3 = incentive search with industry + location
 
     result = iq.classify_incentive_query(
-        query="textile incentives in Gujarat?",
+        query="textile incentives in Kampong Speu?",
         llm=llm,
     )
 

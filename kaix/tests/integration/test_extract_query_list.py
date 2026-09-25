@@ -36,7 +36,7 @@ def test_extract_query_list_happy_returns_list_of_dicts(
     valid_raw = (
         '{"hints": ['
         '{"query": "Where can I set up textile?", "module": "Build from Scratch"},'
-        '{"query": "Vendors for cotton in Surat?", "module": "Vendor Search"}'
+        '{"query": "Vendors for cotton in Battambang?", "module": "Vendor Search"}'
         ']}'
     )
     # Stub generate_query_hints so no real LLM call is made for the

@@ -925,11 +925,11 @@ function mapApprovalData(ApprovalsObj, nameObj,govtObj,stageObj,timeObj) {
             "non_essential_vendors": nonEssential_supply_all_vendor_lookup_df?.['vendor_id']?.[non_essential_all_index]?.length || 0
           }
 
-          const emp_skill_type = Employment_lookup_df['Skill_Type'][employment_index]
-          const count = Employment_lookup_df[`${emp_skill_type}`][employment_index]
-          const skilled_no = Employment_lookup_df['Skilled'][employment_index] || 0
-          const semiskilled_no = Employment_lookup_df['Semi-skilled'][employment_index] || 0
-          const unskilled_no = Employment_lookup_df['Unskilled'][employment_index] || 0
+          const emp_skill_type = Employment_lookup_df['Skill_Type']?.[employment_index]
+const count = Employment_lookup_df?.[emp_skill_type]?.[employment_index] ?? 0
+const skilled_no = Employment_lookup_df['Skilled']?.[employment_index] || 0
+const semiskilled_no = Employment_lookup_df['Semi-Skilled']?.[employment_index] || 0  // fixed casing
+const unskilled_no = Employment_lookup_df['Unskilled']?.[employment_index] || 0
 
           // let incenetives = incentive_data.map(incentive => {
           //   // let parsedContext = safeJsonParse(incentive.contextual_analysis);

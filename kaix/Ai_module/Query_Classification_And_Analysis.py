@@ -187,8 +187,8 @@ Categories & Their Definitions:
 1. Query to build industry from Scratch:  
     - Examples: 
         - I want to build a 1 TPA Cement Factory. 
-        - What are the land options for the chemical industry in Surat? 
-        - Tell me the land availability for the agricultural industry in Bharuch.
+        - What are the land options for the chemical industry in Battambang? 
+        - Tell me the land availability for the agricultural industry in Kampong Cham.
     - This refers to queries about establishing an industry from the ground up, including land purchase, infrastructure setup, or capacity planning.  
     - Assign this category if the user's query indicates any intent to establish, set up, construct, initiate, develop, or start a new industry or factory, regardless of the exact words used.  
     - The classification must be based on understanding the overall intent and context rather than focusing on specific words like "build" or "establish."  
@@ -203,7 +203,7 @@ Categories & Their Definitions:
 3. Query to search Incentives:  
     - Example: 
         - What benefits are available for setting up a cement manufacturing plant in XYZ area?  
-        - Tell me the government incentives for cement industry in Vadodara,Gujarat
+        - Tell me the government incentives for cement industry in Siem Reap,Cambodia
         - Incentive for Anand Cement
     - This category is used for queries asking about government incentives, grants, or subsidies related to setting up or expanding an industry.
 
@@ -214,11 +214,11 @@ Categories & Their Definitions:
 5. Query to Get Employee Search:  
     - Example: 
         - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
-        - What are the labor options for agricultural industry in Vadodara?
+        - What are the labor options for agricultural industry in Siem Reap?
     - This category is used for queries about recruiting or finding employees for an industry or in a specific location.
 
 6. Negatively Intended Query:
-    - Example: I don't want to search for incentives for the cement industry in Ahmedabad.  
+    - Example: I don't want to search for incentives for the cement industry in Phnom Penh.  
     - This category is used for queries where the user clearly expresses that they do not want to proceed with a specific industry-related topic (such as incentives, approvals, vendors, land, or employment).  
     - This includes statements where the user rejects, declines, or expresses disinterest, such as "I don't want to...", "No need to...", or "I'm not looking for...".  
     - Classify here only if the overall intent is negative toward one or more categories and there is no indication that the user still wants to proceed within the same topic under different parameters (e.g., different city or industry).  
@@ -263,27 +263,27 @@ If None of the Above Apply, Use These Two Categories:
     Follow-up Query Examples by Module:
 
     Build from Scratch:
-        - Earlier: "Show me land options for chemical industry in Dahej"
+        - Earlier: "Show me land options for chemical industry in Kampong Seila"
         - Now: "What is the power connectivity there?"
-        - Now: "Which is the nearest port to the Halol plot you showed?"
+        - Now: "Which is the nearest port to the Chbar Mon plot you showed?"
         - Now: "Tell me the number of vendors who supply clay"
         - Now: "How many approvals are needed in total?"
         - Now: "How many are pre-establishment approvals?"
         → These are follow-ups because Build-from-Scratch results include full property-wise information: land infrastructure, supply chain, employment stats, approvals, and incentives.
 
     Incentives:
-        - Earlier: "What are the incentives for textile units in Bharuch?"
+        - Earlier: "What are the incentives for textile units in Kampong Cham?"
         - Now: "Tell me more about the CGTMSE scheme"
         - Now: "Can I get capital subsidy under this?"
         - Now: "How many incentives are shown in total?"
-        - Now: "What all schemes exist under Gujarat Industrial Policy 2020?"
+        - Now: "What all schemes exist under Cambodia Industrial Policy 2020?"
         - Now: "What is the eligibility for Assistance for Dormitories?"
-        - Now: "What is the incentive period or status for Gujarat Industrial Policy?"
+        - Now: "What is the incentive period or status for Cambodia Industrial Policy?"
         - Now: "What is the procedure to take incentives for toy manufacturing?"
         → These refer to specific incentives from the previous result.
 
     Approvals:
-        - Earlier: "Which approvals are needed in Vadodara for pharma units?"
+        - Earlier: "Which approvals are needed in Siem Reap for pharma units?"
         - Now: "Do I need GPCB clearance too?"
         - Now: "What’s the timeline for Fire Department NOC?"
         - Now: "How many pre-operational approvals were shown?"
@@ -293,7 +293,7 @@ If None of the Above Apply, Use These Two Categories:
         → These are continuations based on previous approval breakdown.
 
     Vendors:
-        - Earlier: "Show vendors of Polypropylene in Dahej"
+        - Earlier: "Show vendors of Polypropylene in Kampong Seila"
         - Now: "Can you show one that is within 50 km?"
         - Now: "Are there more vendors for Styrene?"
         - Now: "How many vendors were shown in total?"
@@ -304,7 +304,7 @@ If None of the Above Apply, Use These Two Categories:
         → These refer back to the vendor list shown earlier.
 
     Employment:
-        - Earlier: "What is the employment availability in Halol?"
+        - Earlier: "What is the employment availability in Chbar Mon?"
         - Now: "How many unskilled workers are there?"
         - Now: "What about skilled labor for textile?"
         → These build upon the employment result shared earlier.
@@ -314,13 +314,13 @@ If None of the Above Apply, Use These Two Categories:
     Do NOT classify a query as Follow-up if it is independently meaningful and can be understood without any prior context.
 
     Important Exception:
-    If the current query uses similar or same keywords (e.g., industry, factor, or module) as a previous query, but introduces a different location, scale, or sub-sector, and the query is independently meaningful on its own (e.g., “incentive for cement in Vadodara” after “incentive for cement in Anand”), then it should be classified as a new search intent, not a Follow-up Query.
+    If the current query uses similar or same keywords (e.g., industry, factor, or module) as a previous query, but introduces a different location, scale, or sub-sector, and the query is independently meaningful on its own (e.g., “incentive for cement in Siem Reap” after “incentive for cement in Anand”), then it should be classified as a new search intent, not a Follow-up Query.
 
     For example:
 
     Earlier: “Incentives for cement in Anand”
 
-    Now: “Incentives for cement in Vadodara”
+    Now: “Incentives for cement in Siem Reap”
     → This is not a Follow-up Query, but a new search, and should be classified as: ["Query to search Incentives"].
 
     This applies across all modules — including vendors, approvals, employment, etc. — whenever the new query introduces a distinct search condition, especially a new location or a redefined scope.
@@ -329,8 +329,8 @@ If None of the Above Apply, Use These Two Categories:
     This holds true even if the industry and location remain the same.
 
     For example:  
-    Earlier: "I want incentives for cement in Bharuch."  
-    Now: "I want approvals for cement in Bharuch."  
+    Earlier: "I want incentives for cement in Kampong Cham."  
+    Now: "I want approvals for cement in Kampong Cham."  
     → This is a new module with full context, so it should be classified as: ["Query to Get Approvals"], not a Follow-up.
 
     If the query introduces a new location or different business condition (e.g., industry type, scale, or region), even if it uses similar keywords as a previous one, treat it as a new main category query, not a Follow-up.
@@ -424,8 +424,8 @@ Categories & Their Definitions:
 
     Examples:  
     - I want to build a 1 TPA Cement Factory.  
-    - What are the land options for the chemical industry in Surat?  
-    - Tell me the land availability for the agricultural industry in Bharuch.  
+    - What are the land options for the chemical industry in Battambang?  
+    - Tell me the land availability for the agricultural industry in Kampong Cham.  
     - I want to buy a 1 TPA cement industry  
     - 1 MTPA Cement Industry  
     - 1 million barrels per month petrochemical industry  
@@ -465,7 +465,7 @@ Categories & Their Definitions:
     - What supplies are needed for cement production?  
     - What is the proportion of raw material to cement production?  
     - Non‑manufacturing property queries:  
-    - I want to rent a shop in Mangal Bazaar, Vadodara.  
+    - I want to rent a shop in Mangal Bazaar, Siem Reap.  
     - Looking for office space for my IT startup.  
     - Want to sell 10 acres of farmland in Nashik.  
     - Need warehouse space for my trading business.  
@@ -481,9 +481,9 @@ Categories & Their Definitions:
 
     Examples:  
     - I am searching for a vendor who supplies pharmaceutical-grade raw chemicals.  
-    - Show me vendors for steel rods in Ahmedabad.  
-    - Search for suppliers of plastic granules in Vapi.  
-    - List manufacturers who produce glass bottles near Surat.  
+    - Show me vendors for steel rods in Phnom Penh.  
+    - Search for suppliers of plastic granules in Bavet.  
+    - List manufacturers who produce glass bottles near Battambang.  
     - Vendors for Anand Cement  
     - Steel supplier who has ISO 9001 certificate  
 
@@ -494,7 +494,7 @@ Categories & Their Definitions:
 
     This includes:  
     - Queries that are short, incomplete, or ambiguous but clearly mention “vendor(s)”, “supplier(s)”, “manufacturer(s)”, or “producer(s)” in relation to an industry, supply/suppies, location, or business type.  
-    - Vague vendor references like “Vendors for cement in Vadodara”, “Vendor Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
+    - Vague vendor references like “Vendors for cement in Siem Reap”, “Vendor Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
 
     Explicit Action‑Oriented Trigger Phrases:  
     If the query contains any of these phrases, it is always “Query to search Vendors”:  
@@ -532,7 +532,7 @@ Categories & Their Definitions:
 
     Examples:  
     - What benefits are available for setting up a cement plant in XYZ area?  
-    - Tell me the government incentives for cement industry in Vadodara, Gujarat  
+    - Tell me the government incentives for cement industry in Siem Reap, Cambodia  
     - Incentive for Anand Cement  
     - Search for green estate incentives for cement industry  
 
@@ -543,7 +543,7 @@ Categories & Their Definitions:
 
     This includes:  
     - Queries that are short, incomplete, or ambiguous but clearly mention “incentive(s)” in relation to an industry, location, or business type.  
-    - Vague incentive references like “Incentive for cement in Vadodara”, “Incentive Anand Cement”, etc. — treat these as search intent unless they are clearly detail-focused (see below).  
+    - Vague incentive references like “Incentive for cement in Siem Reap”, “Incentive Anand Cement”, etc. — treat these as search intent unless they are clearly detail-focused (see below).  
 
     Explicit Action-Oriented Trigger Phrases:  
     If the query contains any of these phrases, it is always “Query to search Incentives”:  
@@ -561,16 +561,16 @@ Categories & Their Definitions:
 
     Exclusion Examples (These go to Other industry-related queries):  
     - General information:  
-    - What assistance is available under Startup Innovation Gujarat-2020?  
+    - What assistance is available under Startup Innovation Cambodia-2020?  
     - What is the eligibility under CGTMSE?  
     - Definitions:  
     - What is CGTMSE?  
     - Program status:  
-    - What is the incentive program period of the Gujarat Industrial Policy?  
+    - What is the incentive program period of the Cambodia Industrial Policy?  
     - Eligibility checks:  
-    - What is the eligibility for Startup Innovation Gujarat-2020?  
+    - What is the eligibility for Startup Innovation Cambodia-2020?  
     - Specific detail request:  
-    - What is the quantum of assistance under Gujarat Industrial Policy?  
+    - What is the quantum of assistance under Cambodia Industrial Policy?  
     - I want to know about the green estate incentive for cement industry (meaning — details about that scheme, not finding other schemes).  
 
     Final Rule:  
@@ -581,9 +581,9 @@ Categories & Their Definitions:
 
     Examples:  
     - I want to get approval for my cement plant.  
-    - What approvals are required to start a dairy in Gujarat?  
+    - What approvals are required to start a dairy in Cambodia?  
     - Search approvals for textile manufacturing in Valsad.  
-    - What licenses do I need for food processing in Vadodara?  
+    - What licenses do I need for food processing in Siem Reap?  
     - Approvals for Anand Cement  
     - Search for tree cutting approvals for cement industry  
 
@@ -594,7 +594,7 @@ Categories & Their Definitions:
 
     This includes:  
     - Queries that are short, incomplete, or ambiguous but clearly mention “approval(s)”, “license(s)”, “clearance(s)”, or “permission(s)” in relation to an industry, location, or business type.  
-    - Vague approval references like “Approval for cement in Vadodara”, “Approval Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
+    - Vague approval references like “Approval for cement in Siem Reap”, “Approval Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
 
     Explicit Action‑Oriented Trigger Phrases:  
     If the query contains any of these phrases, it is always “Query to Get Approvals”:  
@@ -631,10 +631,10 @@ Categories & Their Definitions:
 
     Examples:  
     - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
-    - What are the labor options for agricultural industry in Vadodara?  
+    - What are the labor options for agricultural industry in Siem Reap?  
     - Employment for Anand Cement  
-    - Search for skilled workers for textile industry in Surat  
-    - Labour statistics for cement industry in Gujarat  
+    - Search for skilled workers for textile industry in Battambang  
+    - Labour statistics for cement industry in Cambodia  
 
     Core Definition:  
     Classify here for queries where the user wants to explore, retrieve, or list options for employees, workers, or labour for an industry — whether:  
@@ -643,7 +643,7 @@ Categories & Their Definitions:
 
     This includes:  
     - Queries that are short, incomplete, or ambiguous but clearly mention “employment”, “employees”, “labour”, “workers”, or “manpower” in relation to an industry, location, or business type.  
-    - Vague references like “Employment for cement in Vadodara”, “Labour for Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
+    - Vague references like “Employment for cement in Siem Reap”, “Labour for Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
 
     Explicit Action‑Oriented Trigger Phrases:  
     If the query contains any of these phrases, it is always “Query to Get Employee Search”:  
@@ -682,7 +682,7 @@ Categories & Their Definitions:
     you MUST NOT return "Negatively Intended Query". Only return the categories that reflect the user’s positive interest.  
     This rule takes priority — a single positively intended factor invalidates the negative classification.
 
-    - Example: I don’t want to search incentives for my project in Gujarat.  
+    - Example: I don’t want to search incentives for my project in Cambodia.  
     → Classify as: ["Negatively Intended Query"]
 
     - Example: I want to build industry but I don’t want incentives.  
@@ -716,7 +716,7 @@ If None of the Above Apply, Use These Two Categories:
     - What is the role of AI in manufacturing?  
     - What is the eligibility under CGTMSE?  
     - Looking for office space for my IT startup.  
-    - I want to rent a shop in Mangal Bazaar, Vadodara.
+    - I want to rent a shop in Mangal Bazaar, Siem Reap.
 
     Core Definition:  
     Use this category for industry‑related questions that do not fit into any of the five main categories ("Query to build industry from Scratch", "Query to search Vendors", "Query to search Incentives", "Query to Get Approvals", "Query to Get Employee Search").  
@@ -738,9 +738,9 @@ If None of the Above Apply, Use These Two Categories:
     - What are the best characteristics of land for a cement factory? 
     - How to start a cement factory 
     - Query is non‑manufacturing property related **with business intent**:  
-    - I want to rent a shop in Mangal Bazaar, Vadodara.  
+    - I want to rent a shop in Mangal Bazaar, Siem Reap.  
     - Looking for office space for my IT startup.  
-    - Need café location in Mumbai.  
+    - Need café location in Sihanoukville.  
     - Looking for a place to open a hospital.  
     - Want to buy an existing textile shop.  
     - Unrealistic **business ideas**:  
@@ -757,9 +757,9 @@ If None of the Above Apply, Use These Two Categories:
     **C. Incentives context:**  
     - Incentive definitions / details:  
     - What is CGTMSE?  
-    - What is the eligibility for Startup Innovation Gujarat‑2020?  
-    - What is the incentive program period of the Gujarat Industrial Policy?  
-    - What is the quantum of assistance under Gujarat Industrial Policy?  
+    - What is the eligibility for Startup Innovation Cambodia‑2020?  
+    - What is the incentive program period of the Cambodia Industrial Policy?  
+    - What is the quantum of assistance under Cambodia Industrial Policy?  
 
     **D. Approvals context:**  
     - Approval definitions / process detail:  
@@ -848,7 +848,7 @@ Strict Classification Rules:
 5. Do Not Assign Module Categories for Vague or Ungrounded Queries:
     - If the query mentions a specific vendor, approval, or incentive but does NOT clearly request to search, get, retrieve, or list — classify it under “Other industry-related queries”.
     - This is especially true if the user has not yet seen any results — such queries are not grounded in action, and the system cannot know what they refer to.
-    - Example: “What is the incentive program period of the Gujarat Industrial Policy?” → NOT a search query, hence “Other industry-related queries”
+    - Example: “What is the incentive program period of the Cambodia Industrial Policy?” → NOT a search query, hence “Other industry-related queries”
     - Example: “Where does Maniratna Metal Industries operate?” → NOT a vendor search, hence “Other industry-related queries”
 
 Final Output Instructions:
@@ -913,7 +913,7 @@ STRICT INVARIANTS — NEVER CHANGE THESE:
 4) Named entities & nouns: keep industry/product/company/brand/site names, SKUs, model names, and locations verbatim.
 5) Time references: keep dates, months, quarters, and relative periods (“this year”, “in 2026”) verbatim.
 6) Constraints: keep budget caps, capacity limits, exclusions, and any “without/except” clauses verbatim.
-7) Language & formatting: preserve number/currency formatting (e.g., Indian commas), capitalization within names, and spelling present in the original text.
+7) Language & formatting: preserve number/currency formatting (e.g., standard international commas), capitalization within names, and spelling present in the original text.
 
 ATTRIBUTE SHARING RULE:
 - If the original query clearly applies ONE industry/location/timeframe to multiple intents, replicate those attributes as-is across all relevant sub-queries.
@@ -932,12 +932,12 @@ OUTPUT RULES:
 EXAMPLES (pay close attention to preserving verbs, units, and per-class subjects):
 
 Example A
-User: I want to see incentives for cement in Gujarat and take approvals for chemical in Maharashtra.
+User: I want to see incentives for cement in Cambodia and take approvals for chemical in Preah Sihanouk.
 Classes: ["Query to search Incentives", "Query to Get Approvals"]
 Output:
 {{
-  "Query to search Incentives": "I want to see incentives for a cement factory in Gujarat.",
-  "Query to Get Approvals": "I want to take approvals for a chemical unit in Maharashtra."
+  "Query to search Incentives": "I want to see incentives for a cement factory in Cambodia.",
+  "Query to Get Approvals": "I want to take approvals for a chemical unit in Preah Sihanouk."
 }}
 
 Example B (do NOT coerce “buy” into “build”)
@@ -1131,8 +1131,8 @@ Categories & Their Definitions:
 1. "Query to build industry from Scratch"  
     - Example: 
         - I want to build a 1 TPA Cement Factory. 
-        - What are the land options for the chemical industry in Surat? 
-        - Tell me the land availability for the agricultural industry in Bharuch.  
+        - What are the land options for the chemical industry in Battambang? 
+        - Tell me the land availability for the agricultural industry in Kampong Cham.  
         - I want to buy a 1 mtpa cement industry
     - Used for queries about establishing a new industry or factory from scratch — includes infrastructure, land, setup, and capacity planning.
 
@@ -1144,7 +1144,7 @@ Categories & Their Definitions:
 3. "Query to search Incentives"  
     - Example: 
         - What benefits are available for setting up a cement plant in XYZ area?  
-        - Tell me the government incentives for cement industry in Vadodara,Gujarat
+        - Tell me the government incentives for cement industry in Siem Reap,Cambodia
         - Incentive for Anand Cement
     - For queries asking about government incentives, grants, subsidies, or financial schemes.
 
@@ -1161,7 +1161,7 @@ Categories & Their Definitions:
     you MUST NOT return "Negatively Intended Query". Only return the categories that reflect the user’s positive interest.  
     This rule takes priority — a single positively intended factor invalidates the negative classification.
 
-    - Example: I don’t want to search incentives for my project in Gujarat.  
+    - Example: I don’t want to search incentives for my project in Cambodia.  
     → Classify as: ["Negatively Intended Query"]
 
     - Example: I want to build industry but I don’t want incentives.  
@@ -1226,27 +1226,27 @@ Categories & Their Definitions:
     Follow-up Query Examples by Module:
 
     Build from Scratch:
-        - Earlier: "Show me land options for chemical industry in Dahej"
+        - Earlier: "Show me land options for chemical industry in Kampong Seila"
         - Now: "What is the power connectivity there?"
-        - Now: "Which is the nearest port to the Halol plot you showed?"
+        - Now: "Which is the nearest port to the Chbar Mon plot you showed?"
         - Now: "Tell me the number of vendors who supply clay"
         - Now: "How many approvals are needed in total?"
         - Now: "How many are pre-establishment approvals?"
         → These are follow-ups because Build-from-Scratch results include full property-wise information: land infrastructure, supply chain, employment stats, approvals, and incentives.
 
     Incentives:
-        - Earlier: "What are the incentives for textile units in Bharuch?"
+        - Earlier: "What are the incentives for textile units in Kampong Cham?"
         - Now: "Tell me more about the CGTMSE scheme"
         - Now: "Can I get capital subsidy under this?"
         - Now: "How many incentives are shown in total?"
-        - Now: "What all schemes exist under Gujarat Industrial Policy 2020?"
+        - Now: "What all schemes exist under Cambodia Industrial Policy 2020?"
         - Now: "What is the eligibility for Assistance for Dormitories?"
-        - Now: "What is the incentive period or status for Gujarat Industrial Policy?"
+        - Now: "What is the incentive period or status for Cambodia Industrial Policy?"
         - Now: "What is the procedure to take incentives for toy manufacturing?"
         → These refer to specific incentives from the previous result.
 
     Approvals:
-        - Earlier: "Which approvals are needed in Vadodara for pharma units?"
+        - Earlier: "Which approvals are needed in Siem Reap for pharma units?"
         - Now: "Do I need GPCB clearance too?"
         - Now: "What’s the timeline for Fire Department NOC?"
         - Now: "How many pre-operational approvals were shown?"
@@ -1256,7 +1256,7 @@ Categories & Their Definitions:
         → These are continuations based on previous approval breakdown.
 
     Vendors:
-        - Earlier: "Show vendors of Polypropylene in Dahej"
+        - Earlier: "Show vendors of Polypropylene in Kampong Seila"
         - Now: "Can you show one that is within 50 km?"
         - Now: "Are there more vendors for Styrene?"
         - Now: "How many vendors were shown in total?"
@@ -1267,7 +1267,7 @@ Categories & Their Definitions:
         → These refer back to the vendor list shown earlier.
 
     Employment:
-        - Earlier: "What is the employment availability in Halol?"
+        - Earlier: "What is the employment availability in Chbar Mon?"
         - Now: "How many unskilled workers are there?"
         - Now: "What about skilled labor for textile?"
         → These build upon the employment result shared earlier.
@@ -1277,13 +1277,13 @@ Categories & Their Definitions:
     Do NOT classify a query as Follow-up if it is independently meaningful and can be understood without any prior context.
 
     Important Exception:
-    If the current query uses similar or same keywords (e.g., industry, factor, or module) as a previous query, but introduces a different location, scale, or sub-sector, and the query is independently meaningful on its own (e.g., “incentive for cement in Vadodara” after “incentive for cement in Anand”), then it should be classified as a new search intent, not a Follow-up Query.
+    If the current query uses similar or same keywords (e.g., industry, factor, or module) as a previous query, but introduces a different location, scale, or sub-sector, and the query is independently meaningful on its own (e.g., “incentive for cement in Siem Reap” after “incentive for cement in Anand”), then it should be classified as a new search intent, not a Follow-up Query.
 
     For example:
 
     Earlier: “Incentives for cement in Anand”
 
-    Now: “Incentives for cement in Vadodara”
+    Now: “Incentives for cement in Siem Reap”
     → This is not a Follow-up Query, but a new search, and should be classified as: ["Query to search Incentives"].
 
     This applies across all modules — including vendors, approvals, employment, etc. — whenever the new query introduces a distinct search condition, especially a new location or a redefined scope.
@@ -1365,8 +1365,8 @@ Categories & Their Definitions:
 
     Examples:  
     - I want to build a 1 TPA Cement Factory.  
-    - What are the land options for the chemical industry in Surat?  
-    - Tell me the land availability for the agricultural industry in Bharuch.  
+    - What are the land options for the chemical industry in Battambang?  
+    - Tell me the land availability for the agricultural industry in Kampong Cham.  
     - I want to buy a 1 TPA cement industry  
     - 1 MTPA Cement Industry  
     - 1 million barrels per month petrochemical industry  
@@ -1405,7 +1405,7 @@ Categories & Their Definitions:
     - What supplies are needed for cement production?  
     - What is the proportion of raw material to cement production?  
     - Non‑manufacturing property queries:  
-    - I want to rent a shop in Mangal Bazaar, Vadodara.  
+    - I want to rent a shop in Mangal Bazaar, Siem Reap.  
     - Looking for office space for my IT startup.  
     - Want to sell 10 acres of farmland in Nashik.  
     - Need warehouse space for my trading business.  
@@ -1422,9 +1422,9 @@ Categories & Their Definitions:
 
     Examples:  
     - I am searching for a vendor who supplies pharmaceutical-grade raw chemicals.  
-    - Show me vendors for steel rods in Ahmedabad.  
-    - Search for suppliers of plastic granules in Vapi.  
-    - List manufacturers who produce glass bottles near Surat.  
+    - Show me vendors for steel rods in Phnom Penh.  
+    - Search for suppliers of plastic granules in Bavet.  
+    - List manufacturers who produce glass bottles near Battambang.  
     - Vendors for Anand Cement  
     - Steel supplier who has ISO 9001 certificate  
 
@@ -1435,7 +1435,7 @@ Categories & Their Definitions:
 
     This includes:  
     - Queries that are short, incomplete, or ambiguous but clearly mention “vendor(s)”, “supplier(s)”, “manufacturer(s)”, or “producer(s)” in relation to an industry, supply/suppies, location, or business type.  
-    - Vague vendor references like “Vendors for cement in Vadodara”, “Vendor Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
+    - Vague vendor references like “Vendors for cement in Siem Reap”, “Vendor Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
 
     Explicit Action‑Oriented Trigger Phrases:  
     If the query contains any of these phrases, it is always “Query to search Vendors”:  
@@ -1473,7 +1473,7 @@ Categories & Their Definitions:
 
     Examples:  
     - What benefits are available for setting up a cement plant in XYZ area?  
-    - Tell me the government incentives for cement industry in Vadodara, Gujarat  
+    - Tell me the government incentives for cement industry in Siem Reap, Cambodia  
     - Incentive for Anand Cement  
     - Search for green estate incentives for cement industry  
 
@@ -1484,7 +1484,7 @@ Categories & Their Definitions:
 
     This includes:  
     - Queries that are short, incomplete, or ambiguous but clearly mention “incentive(s)” in relation to an industry, location, or business type.  
-    - Vague incentive references like “Incentive for cement in Vadodara”, “Incentive Anand Cement”, etc. — treat these as search intent unless they are clearly detail-focused (see below).  
+    - Vague incentive references like “Incentive for cement in Siem Reap”, “Incentive Anand Cement”, etc. — treat these as search intent unless they are clearly detail-focused (see below).  
 
     Explicit Action-Oriented Trigger Phrases:  
     If the query contains any of these phrases, it is always “Query to search Incentives”:  
@@ -1502,16 +1502,16 @@ Categories & Their Definitions:
 
     Exclusion Examples (These go to Other industry-related queries):  
     - General information:  
-    - What assistance is available under Startup Innovation Gujarat-2020?  
+    - What assistance is available under Startup Innovation Cambodia-2020?  
     - What is the eligibility under CGTMSE?  
     - Definitions:  
     - What is CGTMSE?  
     - Program status:  
-    - What is the incentive program period of the Gujarat Industrial Policy?  
+    - What is the incentive program period of the Cambodia Industrial Policy?  
     - Eligibility checks:  
-    - What is the eligibility for Startup Innovation Gujarat-2020?  
+    - What is the eligibility for Startup Innovation Cambodia-2020?  
     - Specific detail request:  
-    - What is the quantum of assistance under Gujarat Industrial Policy?  
+    - What is the quantum of assistance under Cambodia Industrial Policy?  
     - I want to know about the green estate incentive for cement industry (meaning — details about that scheme, not finding other schemes).  
 
     Final Rule:  
@@ -1522,9 +1522,9 @@ Categories & Their Definitions:
 
     Examples:  
     - I want to get approval for my cement plant.  
-    - What approvals are required to start a dairy in Gujarat?  
+    - What approvals are required to start a dairy in Cambodia?  
     - Search approvals for textile manufacturing in Valsad.  
-    - What licenses do I need for food processing in Vadodara?  
+    - What licenses do I need for food processing in Siem Reap?  
     - Approvals for Anand Cement  
     - Search for tree cutting approvals for cement industry  
 
@@ -1535,7 +1535,7 @@ Categories & Their Definitions:
 
     This includes:  
     - Queries that are short, incomplete, or ambiguous but clearly mention “approval(s)”, “license(s)”, “clearance(s)”, or “permission(s)” in relation to an industry, location, or business type.  
-    - Vague approval references like “Approval for cement in Vadodara”, “Approval Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
+    - Vague approval references like “Approval for cement in Siem Reap”, “Approval Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
 
     Explicit Action‑Oriented Trigger Phrases:  
     If the query contains any of these phrases, it is always “Query to Get Approvals”:  
@@ -1572,10 +1572,10 @@ Categories & Their Definitions:
 
     Examples:  
     - What is the availability of employment in XYZ area for the Pharmaceutical industry?  
-    - What are the labor options for agricultural industry in Vadodara?  
+    - What are the labor options for agricultural industry in Siem Reap?  
     - Employment for Anand Cement  
-    - Search for skilled workers for textile industry in Surat  
-    - Labour statistics for cement industry in Gujarat  
+    - Search for skilled workers for textile industry in Battambang  
+    - Labour statistics for cement industry in Cambodia  
 
     Core Definition:  
     Classify here for queries where the user wants to explore, retrieve, or list options for employees, workers, or labour for an industry — whether:  
@@ -1584,7 +1584,7 @@ Categories & Their Definitions:
 
     This includes:  
     - Queries that are short, incomplete, or ambiguous but clearly mention “employment”, “employees”, “labour”, “workers”, or “manpower” in relation to an industry, location, or business type.  
-    - Vague references like “Employment for cement in Vadodara”, “Labour for Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
+    - Vague references like “Employment for cement in Siem Reap”, “Labour for Anand Cement”, etc. — treat these as search intent unless they are clearly detail‑focused (see below).  
 
     Explicit Action‑Oriented Trigger Phrases:  
     If the query contains any of these phrases, it is always “Query to Get Employee Search”:  
@@ -1623,7 +1623,7 @@ Categories & Their Definitions:
     you MUST NOT return "Negatively Intended Query". Only return the categories that reflect the user’s positive interest.  
     This rule takes priority — a single positively intended factor invalidates the negative classification.
 
-    - Example: I don’t want to search incentives for my project in Gujarat.  
+    - Example: I don’t want to search incentives for my project in Cambodia.  
     → Classify as: ["Negatively Intended Query"]
 
     - Example: I want to build industry but I don’t want incentives.  
@@ -1655,7 +1655,7 @@ Categories & Their Definitions:
     - What is the role of AI in manufacturing?  
     - What is the eligibility under CGTMSE?  
     - Looking for office space for my IT startup.  
-    - I want to rent a shop in Mangal Bazaar, Vadodara.
+    - I want to rent a shop in Mangal Bazaar, Siem Reap.
 
     Core Definition:  
     Use this category for industry‑related questions that do not fit into any of the five main categories ("Query to build industry from Scratch", "Query to search Vendors", "Query to search Incentives", "Query to Get Approvals", "Query to Get Employee Search").  
@@ -1677,9 +1677,9 @@ Categories & Their Definitions:
     - What are the best characteristics of land for a cement factory? 
     - How to start a cement factory 
     - Query is non‑manufacturing property related **with business intent**:  
-    - I want to rent a shop in Mangal Bazaar, Vadodara.  
+    - I want to rent a shop in Mangal Bazaar, Siem Reap.  
     - Looking for office space for my IT startup.  
-    - Need café location in Mumbai.  
+    - Need café location in Sihanoukville.  
     - Looking for a place to open a hospital.  
     - Want to buy an existing textile shop.  
     - Unrealistic **business ideas**:  
@@ -1696,9 +1696,9 @@ Categories & Their Definitions:
     **C. Incentives context:**  
     - Incentive definitions / details:  
     - What is CGTMSE?  
-    - What is the eligibility for Startup Innovation Gujarat‑2020?  
-    - What is the incentive program period of the Gujarat Industrial Policy?  
-    - What is the quantum of assistance under Gujarat Industrial Policy?  
+    - What is the eligibility for Startup Innovation Cambodia‑2020?  
+    - What is the incentive program period of the Cambodia Industrial Policy?  
+    - What is the quantum of assistance under Cambodia Industrial Policy?  
 
     **D. Approvals context:**  
     - Approval definitions / process detail:  
@@ -2053,31 +2053,31 @@ def extract_location_from_query(user_input: str, available_areas: List[str], ava
     # Define the prompt
     prompt_template = """
 You are an expert location extraction system. 
-Your task is to extract ONE SINGLE, MOST RELEVANT location from the user’s query based on strict hierarchy and literal user intent.
+Your task is to extract ONE SINGLE, MOST RELEVANT location from the user's query based on strict hierarchy and literal user intent.
 
 ------------------------------------------------------
 LOCATION EXTRACTION RULES (STRICT & HIERARCHY-AWARE)
 ------------------------------------------------------
 
 1. Extract ONLY the **lowest-level (most granular)** location mentioned explicitly in the query.
-   - If the query has “City + State”, return only the city.
-   - If the query has “Area + City + State”, return only the area.
-   - If the query has “District + State”, return only the district.
+   - If the query has "City + Province", return only the city.
+   - If the query has "Area + City + Province", return only the area.
+   - If the query has "District + Province", return only the district.
    - Always pick the location **closest to the ground level**, never the larger parent region.
 
    Examples:
-   - “Jhagadia, Gujarat” → “Jhagadia”
-   - “Bhilad, Vapi, Gujarat” → “Bhilad”
-   - “Okhla, Delhi” → “Okhla”
-   - “Panvel, Maharashtra” → “Panvel”
+   - "Bavet, Svay Rieng" → "Bavet"
+   - "Chork, Bavet, Svay Rieng" → "Chork"
+   - "Tuol Kouk, Phnom Penh" → "Tuol Kouk"
+   - "Prey Nob, Preah Sihanouk" → "Prey Nob"
 
 2. Never combine multiple levels.
-   - Do NOT return “Jhagadia, Gujarat”.
-   - Do NOT return “City + State”.
+   - Do NOT return "Bavet, Svay Rieng".
+   - Do NOT return "City + Province".
    - Return only the **single most specific location**.
 
 3. Never infer or hallucinate industrial estates.
-   - Do NOT convert “Jhagadia” → “Jhagadia GIDC” unless the user explicitly writes “GIDC”.
+   - Do NOT convert "Bavet" → "Bavet SEZ" unless the user explicitly writes "SEZ".
    - Do NOT expand locations on your own.
 
 4. Preserve Location Abbreviations ONLY When Explicitly Present.
@@ -2087,52 +2087,38 @@ LOCATION EXTRACTION RULES (STRICT & HIERARCHY-AWARE)
    - Never add an abbreviation that the user did not explicitly mention.
 
    Examples:
-     - “Sanand GIDC” → “Sanand GIDC”
-     - “Dahej SEZ” → “Dahej SEZ”
-     - “Paradeep PCPIR” → “Paradeep PCPIR”
-     - “Aurangabad MIDC” → “Aurangabad MIDC”
-     - “Sri City SEZ” → “Sri City SEZ”
-     - “Oragadam SIPCOT” → “Oragadam SIPCOT”
-     - “Neemrana RIICO” → “Neemrana RIICO”
-     - “Sri City APIIC” → “Sri City APIIC”
-     - “Vikas Nagar DIC” → “Vikas Nagar DIC”
-     - “Hosur SIPCOT” → “Hosur SIPCOT”
-     - “Bengaluru KIADB” → “Bengaluru KIADB”
-     - “Indore MPIDC” → “Indore MPIDC”
-     - “Hyderabad TSIIC” → “Hyderabad TSIIC”
+     - "Phnom Penh SEZ" → "Phnom Penh SEZ"
+     - "Sihanoukville SEZ" → "Sihanoukville SEZ"
+     - "Bavet SEZ" → "Bavet SEZ"
+     - "Poipet SEZ" → "Poipet SEZ"
+     - "Neak Loeung SEZ" → "Neak Loeung SEZ"
+     - "Manhattan SEZ" → "Manhattan SEZ"
+     - "Goldfame Pak Shun SEZ" → "Goldfame Pak Shun SEZ"
 
    Also:
-     - If user writes only “Dahej”, do NOT output “Dahej SEZ”.
-     - If user writes only “Sanand”, do NOT output “Sanand GIDC”.
-     - If user writes only “Paradeep”, do NOT output “Paradeep PCPIR”.
+     - If user writes only "Bavet", do NOT output "Bavet SEZ".
+     - If user writes only "Poipet", do NOT output "Poipet SEZ".
+     - If user writes only "Neak Loeung", do NOT output "Neak Loeung SEZ".
 
    Only preserve abbreviations when explicitly present in the user's query.
 
-5. Correct spelling only when it’s clearly evident.
-   - “Bangluru” → “Bengaluru”
-   - “Vadora” → “Vadodara”
+5. Correct spelling only when it's clearly evident.
+   - "Phnompenh" → "Phnom Penh"
+   - "Siem Riep" → "Siem Reap"
 
 6. Standardise only when the official modern name exists.
-   - “Bombay” → “Mumbai”
-   - “Baroda” → “Vadodara”
-   - “Kashi” → “Varanasi”
-   - “Calcutta” → “Kolkata”
-   - “Bangalore” → “Bengaluru”
-   - “Pondicherry” → “Puducherry”
+   - "Kompong Som" → "Sihanoukville"
+   - "Kompong Cham" → "Kampong Cham"
+   - "Battambong" → "Battambang"
    - Additional examples:
-     - “Madras” → “Chennai” 
-     - “Poona” → “Pune” 
-     - “Trivandrum” → “Thiruvananthapuram” 
-     - “Calicut” → “Kozhikode” 
-     - “Gulbarga” → “Kalaburagi” 
-     - “Belgaum” → “Belagavi” 
-     - “Rajahmundry” → “Rajamahendravaram” 
+     - "Kratie" → "Kratié" 
+     - "Takeo" → "Takéo" 
    - Only apply such standardisation if the user input uses the old name; if the user already uses modern name, leave it as is.
 
-7. If multiple locations appear, extract ONLY the one relevant to the user’s request.
+7. If multiple locations appear, extract ONLY the one relevant to the user's request.
    - Ignore personal or background references.
    - Example:
-     “I live in Surat but I want incentives for Dahej.” → “Dahej”
+     "I live in Battambang but I want incentives for Kampong Seila." → "Kampong Seila"
 
 8. If the query has NO location, return `"None"`.
 
@@ -2264,7 +2250,7 @@ def extract_comparison_locations(user_input: str, available_areas: List[str], av
     - Ignore locations that are mentioned for personal reference or additional context (e.g., "I live in X but want to compare Y and Z" → Extract only Y and Z).
 
     2. Preserve Location Abbreviations:
-    - If a location is followed by an abbreviation (e.g., "SEZ", "PCPIR", "GIDC", "MIDC", etc.), always extract the full location name including the abbreviation.
+    - If a location is followed by an abbreviation (e.g., "SEZ"), always extract the full location name including the abbreviation.
     - Do not remove or separate the abbreviation from the location name under any circumstances.
 
     3. Handle Spelling Errors & Variations:
@@ -2273,20 +2259,20 @@ def extract_comparison_locations(user_input: str, available_areas: List[str], av
     4. Ensure the Official Location Name is Used:
     - If a location has multiple variants, always return the official name of the location instead of alternative or outdated names.
     - Some common examples:
-        - "Bombay" → "Mumbai"
-        - "Baroda" → "Vadodara"
-        - "Kashi" → "Varanasi"
-        - "Calcutta" → "Kolkata"
-        - "Bangalore" → "Bengaluru"
-        - "Pondicherry" → "Puducherry"
+        - "Kompong Som" → "Sihanoukville"
+        - "Kompong Cham" → "Kampong Cham"
+        - "Siem Riep" → "Siem Reap"
+        - "Battambong" → "Battambang"
+        - "Kratie" → "Kratié"
+        - "Takeo" → "Takéo"
     - Ensure all locations are recognized and standardized to their official designation.
 
     5. Only Return Locations if Mentioned:
     - If no locations are found, return `"None"` as the value.
 
-    6. Majority of Locations Will Be from India:
-    - Assume most locations will be from India.
-    - If a location is outside India, still extract and return it.
+    6. Majority of Locations Will Be from Cambodia:
+    - Assume most locations will be from Cambodia.
+    - If a location is outside Cambodia, still extract and return it.
 
     7. No Additional Explanations:
     - The output must only contain the extracted locations.
@@ -2393,11 +2379,11 @@ field_with_description = {
         "List of Certifications": "Certifications held by the vendor that validate compliance with industry standards (e.g., ISO 9001, BIS Certification, GMP Certification, ASME Certification, AS9100 (for aerospace), FDA Approval (US))."
     },
     "Query to search Incentives": {
-        "Incentive Name": "The official title of the financial or non-financial support program available (e.g., Startup India Seed Fund, MSME Credit Guarantee Scheme, Water Infrastructure Development Program, Industrial Water Subsidy Program, Rehabilitation Support Program).",
+        "Incentive Name": "The official title of the financial or non-financial support program available (e.g., Cambodia SME Seed Fund, SME Credit Guarantee Scheme, Water Infrastructure Development Program, Industrial Water Subsidy Program, Rehabilitation Support Program).",
         
         "Incentive Type": "The category of the incentive based on the type of support it provides. This includes financial and non-financial assistance that improves industrial or business growth. Examples include Equity Support, Sustenance Allowance, Tax Exemption, Interest Subsidy, Capital Investment Subsidy, Incentive in Power Tariff and Electricity Duty, Incentive in Water Duty, Subsidies for Water Infrastructure, Assistance in Water Conservation Initiatives, and Rehabilitation Assistance (for disaster recovery, employee support, or facility restoration).",
         
-        "Quantum of Assistance": "The amount or percentage of financial assistance or benefit provided. This may include direct financial grants, subsidies, duty exemptions, or infrastructural support. Example statements include 'Seed support up to Rs. 30 Lakh', 'Capital subsidy of 25% on plant and machinery cost', 'Exemption of electricity duty', 'Subsidy of 15% on water infrastructure development', 'Exemption on water duty for industrial processes', or 'Financial assistance of 10 lakh for rehabilitation of industrial facilities post-natural disaster.'"
+        "Quantum of Assistance": "The amount or percentage of financial assistance or benefit provided. This may include direct financial grants, subsidies, duty exemptions, or infrastructural support. Example statements include 'Seed support up to $30,000', 'Capital subsidy of 25% on plant and machinery cost', 'Exemption of electricity duty', 'Subsidy of 15% on water infrastructure development', 'Exemption on water duty for industrial processes', or 'Financial assistance of $10,000 for rehabilitation of industrial facilities post-natural disaster.'"
     },
     "Query to Get Approvals": {
         "Name of License / Approval": "Clearly specify the exact name of the required license, approval, clearance, or permission for business operations. This includes specific approval types such as 'Environmental Clearance', 'Fire NOC', 'Factory License', or any regulatory certificate required for setting up or operating a business. Do not include generic terms like 'approval' or 'license' without context.",
@@ -2407,7 +2393,7 @@ field_with_description = {
         "Stage": "The specific phase during which the approval is required, like 'Pre-establishment', 'Pre-requisite', or 'Pre-operation'.",
         "Mode of Application": "Specifies whether the approval process is 'Online' or 'Offline'. Extract only these specific terms.",
         "Vicinity Detail": "Details about the proximity to critical or sensitive areas affecting the approval process. This includes terms like 'Forest', 'Archaeological site', or 'Mineral bearing site' relevant to the business operation.",
-        "Cross Following Details": "Indicates whether the business site crosses important utilities such as 'Notified rivers', 'nalas', 'canals', 'drains', or specific pipelines (e.g., 'Gujarat Gas', 'Sabarmati Gas', 'GSPL'). Also includes proximity to 'Water bodies'.",
+        "Cross Following Details": "Indicates whether the business site crosses important utilities such as 'Notified rivers', 'nalas', 'canals', 'drains', or specific pipelines (e.g., 'National Gas Pipeline', 'Regional Gas Pipeline', 'Provincial Gas Line'). Also includes proximity to 'Water bodies'.",
         "Tree Cutting": "Mentions whether tree cutting is required for the business setup or operations. Keywords include 'tree cutting'.",
         "Road Cutting": "Indicates whether road cutting is necessary. Keywords include 'road cutting'.",
         "Require Pole Shifting": "Specifies if shifting of electricity or communication poles is needed. Keywords include 'pole shifting'."
@@ -2416,11 +2402,11 @@ field_with_description = {
         "Property Type": "The type of land based on usage (Non-Agricultural Land, Agricultural Land, Industrial Land, Industrial Park Plot, GIDC Plot, Warehouse, Industrial Plant, Auction Property, Industrial Park).",
         "Business Location Type": "The classification of the business location (GIDC, Non GIDC, DSIRDA, MBSIRDA, GPCP SIRDA).",
         "Land Type": "The specific classification of land (Agricultural Land, Non-Agricultural Land (Rural), Non-Agricultural Land (Urban)).",
-        "Location": "The specific area, city, or state where the property is located (e.g., Gujarat, Surat, Waghodia).",
+        "Location": "The specific area, city, or state where the property is located (e.g., Cambodia, Battambang, Prey Nob).",
         "Vicinity of": "Environmental or geographical features nearby (Forest, Archaeological site, Mineral bearing site).",
         "Tree Cutting Involved": "Indicates whether tree cutting is required for the project (Tree cutting).",
         "Road Cutting Involved": "Specifies if road cutting is required to establish infrastructure (Road Cutting).",
-        "Will your industry cross the following?": "Checks whether the industry site intersects with important geographical or utility structures (Pipeline of Gujarat Gas, Pipeline of Sabarmati Gas, Pipeline of GSPL, Water bodies, Notified rivers/ nalas/ canals/ drains)."
+        "Will your industry cross the following?": "Checks whether the industry site intersects with important geographical or utility structures (Pipeline of National Gas Pipeline, Pipeline of Regional Gas Pipeline, Pipeline of Provincial Gas Line, Water bodies, Notified rivers/ nalas/ canals/ drains)."
     }
 }
 
@@ -2515,7 +2501,7 @@ def extract_keywords_from_query(
         Keywords must be extracted regardless of how the sentence is structured.
         Even if the user uses vague or informal language, focus only on extracting words relevant to the fields.
         Example 1: "plastic factory in Bombay" → ["Bombay"] (Because "plastic" and "factory" are restricted)
-        Example 2: "Wanna build car industry in Vadodara" → ["Vadoadara"] (Because "car" and "industry" are restricted)
+        Example 2: "Wanna build car industry in Siem Reap" → ["Vadoadara"] (Because "car" and "industry" are restricted)
 
         3. Numbers Must Be Extracted If They Are Relevant:
         If a number is part of a certification or standard (like "ISO 9001", "CE 22000"), it must be included as a keyword.
@@ -2575,7 +2561,7 @@ def extract_keywords_from_query(
         Examples: "vendor", "vendors", "supplier", "suppliers"
 
         - Locations: Specific areas, cities, states, or countries.
-        Examples: "Delhi", "Mumbai", "Surat", "Gujarat", "Andhra Pradesh", "USA", "industrial zone"
+        Examples: "Siem Reap", "Sihanoukville", "Battambang", "Cambodia", "Kampong Cham", "USA", "industrial zone"
 
         - Module Names: The following module names and their variations must be excluded from keywords:
         {modules_text}
@@ -2592,9 +2578,9 @@ def extract_keywords_from_query(
         Keywords must be extracted regardless of how the sentence is structured.
         Even if the user uses vague, incomplete, or informal language, focus only on extracting words relevant to the fields.
 
-        Example 1: "I want to find ISO 9000 certified suppliers in Mumbai" → ["ISO", "9000"]
+        Example 1: "I want to find ISO 9000 certified suppliers in Sihanoukville" → ["ISO", "9000"]
         Example 2: "Search for certified equipment providers" → ["certified"]
-        Example 3: "Looking for reliable vendors in Gujarat for machinery" → null (Because "vendors", "Gujarat", and "machinery" are restricted)
+        Example 3: "Looking for reliable vendors in Cambodia for machinery" → null (Because "vendors", "Cambodia", and "machinery" are restricted)
         Example 4: "Find suppliers for high-quality components" → null (Because "suppliers" and "components" are restricted)
         Example 5: "List of companies with ISO certification" → ["ISO", "certification"]
 
@@ -2650,7 +2636,7 @@ def extract_keywords_from_query(
         Examples: "automobile", "chemical", "food processing", "IT sector", "agriculture", "textile industry"
 
         - Locations: Specific areas, cities, states, or countries.
-        Examples: "Delhi", "Mumbai", "Surat", "Gujarat", "Andhra Pradesh", "USA", "industrial zone"
+        Examples: "Siem Reap", "Sihanoukville", "Battambang", "Cambodia", "Kampong Cham", "USA", "industrial zone"
 
         - Module Names: The following module names and their variations must be excluded from keywords:
         {modules_text}
@@ -2742,7 +2728,7 @@ def extract_keywords_from_query(
         Examples: "automobile", "chemical", "food processing", "IT sector", "agriculture", "textile industry"
 
         - Locations: Specific areas, cities, states, or countries.
-        Examples: "Delhi", "Mumbai", "Surat", "Gujarat", "Andhra Pradesh", "USA", "industrial zone"
+        Examples: "Siem Reap", "Sihanoukville", "Battambang", "Cambodia", "Kampong Cham", "USA", "industrial zone"
 
         - Approval-Related Terms: Generic approval-related words that must be excluded.
         Examples: "approval", "approvals", "license", "licenses", "clearance", "permission"
@@ -2762,10 +2748,10 @@ def extract_keywords_from_query(
         Keywords must be extracted regardless of how the sentence is structured.  
         Even if the user uses vague, incomplete, or informal language, focus only on extracting words relevant to the fields.
 
-        Example 1: "Need fire NOC in Gujarat for my factory" → ["fire", "NOC"]  
+        Example 1: "Need fire NOC in Cambodia for my factory" → ["fire", "NOC"]  
         Example 2: "Apply for environmental clearance online" → ["environmental", "online"]  
-        Example 3: "Setup approval for plastic factory in Surat" → null (Because "approval", "plastic", and "Surat" are restricted)  
-        Example 4: "I want to find all the approvals required from the revenue department for cement in Vadodara." → ["revenue", "department"]  
+        Example 3: "Setup approval for plastic factory in Battambang" → null (Because "approval", "plastic", and "Battambang" are restricted)  
+        Example 4: "I want to find all the approvals required from the revenue department for cement in Siem Reap." → ["revenue", "department"]  
         Example 5: "List approvals needed from fire department" → ["fire", "department"]
 
         - Numbers Must Be Extracted If They Are Relevant:
@@ -2821,7 +2807,7 @@ def extract_keywords_from_query(
         Examples: "automobile", "chemical", "food processing", "IT sector", "agriculture", "textile industry"
 
         - Locations: Words that indicate specific areas, cities, states, or countries.
-        Examples: "Delhi", "Mumbai", "Surat", "Gujarat", "Andhra Pradesh", "USA", "industrial zone"
+        Examples: "Siem Reap", "Sihanoukville", "Battambang", "Cambodia", "Kampong Cham", "USA", "industrial zone"
 
         - Common Construction or Setup Terms: Words related to setting up, approvals, incentives, supplies, or vendor processes.
         Examples: "factory", "industry", "building", "setup", "establish", "construct", "infrastructure", 
@@ -2842,8 +2828,8 @@ def extract_keywords_from_query(
         Keywords must be extracted regardless of how the sentence is structured.
         Even if the user uses vague, incomplete, or informal language, focus only on extracting words relevant to the fields.
         Example 1: "I want to find ISO 9000 certified steel suppliers in Bombay" → ["ISO", "9000"]
-        Example 2: "Find subsidies power Gujarat" → ["power"]
-        Example 3: "Wanna build car industry in Vadodara" → null (Because "car", "Vadodara" and "industry" are restricted)
+        Example 2: "Find subsidies power Cambodia" → ["power"]
+        Example 3: "Wanna build car industry in Siem Reap" → null (Because "car", "Siem Reap" and "industry" are restricted)
 
         3. Numbers Must Be Extracted If They Are Relevant:
         If a number is part of a certification or standard (like "ISO 9001", "CE 22000"), it must be included as a keyword.
@@ -3409,7 +3395,7 @@ Logical Matching for Segments:
     - Inferred: "Vendor Sourcing for Construction" → Available: "Building Materials Suppliers" (`Forced-Mapping`: "Yes").
 
 **Examples:**
-- Query: "chalk manufacturing approvals in Mumbai" 
+- Query: "chalk manufacturing approvals in Sihanoukville" 
   - Inferred: "Basic Chemical Manufacturing" 
   - Closest Available: "Industrial Chemicals" (if available in list)
   - Output: `"Segment": "Industrial Chemicals", "Original-Inferred-Segment": "Basic Chemical Manufacturing", "Forced-Mapping": "Yes"`
@@ -3790,7 +3776,7 @@ MODE BEHAVIOR
 
 LANGUAGE GUARDRAILS
 - Avoid: “note”, “please note”, “as an AI”, “based on your query”, “assist you better”.
-- Use Indian number formatting only if INR appears.
+- Use standard international number formatting only if USD appears.
 - Output must be valid Markdown.
 - Avoid robotic pivots like “so you can:”; weave actions naturally into the sentence.
 

@@ -52,7 +52,7 @@ def get_market_trends(query,
         main_industry: Main industry (e.g., chemical)
         sub_sector: Sub-sector (e.g., Petrochemicals)
         segment: Segment (e.g., Polymers)
-        state: State or region (e.g., Kerala)
+        state: State/province or region (e.g., Kampot)
         city: City (e.g., Kochi)
     
     Returns:
@@ -128,7 +128,7 @@ def get_market_trends(query,
                     "city": city
                 }
             ).content
-            logger.info("Using fallback data scope: %s", "state" if state.lower() in output.lower() else "India")
+            logger.info("Using fallback data scope: %s", "state" if state.lower() in output.lower() else "Cambodia")
         else:
             # Decide trend allocation
             trend_allocation = decide_trend_allocation(
@@ -148,7 +148,7 @@ def get_market_trends(query,
             elif trend_allocation["state"] > 0:
                 scope = "state"
             elif trend_allocation["country"] > 0:
-                scope = "India"
+                scope = "Cambodia"
             logger.info("Detected data scope: %s for query: %s", scope, query)
             logger.info("Search results excerpt: %s", search_results[:100].replace("\n", " "))
 
@@ -212,7 +212,7 @@ def get_market_trends(query,
                     "city": city
                 }
             ).content
-            logger.info("Using fallback data scope: %s", "state" if state.lower() in output.lower() else "India")
+            logger.info("Using fallback data scope: %s", "state" if state.lower() in output.lower() else "Cambodia")
         
         logger.info("Raw LLM output length: %d characters", len(output))
         # return output

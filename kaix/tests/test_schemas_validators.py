@@ -150,9 +150,9 @@ class TestAIRecommendedStates:
 
     def test_dedupes_preserving_order(self):
         result = AIRecommendedStates(
-            states=["Maharashtra", "Gujarat", "Maharashtra", "Karnataka"],
+            states=["Preah Sihanouk", "Kampong Speu", "Preah Sihanouk", "Kandal"],
         )
-        assert result.states == ["Maharashtra", "Gujarat", "Karnataka"]
+        assert result.states == ["Preah Sihanouk", "Kampong Speu", "Kandal"]
 
 
 # ===========================================================================

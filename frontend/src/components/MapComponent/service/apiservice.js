@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 // const BASE_URL = 'https://marsinfraix.marsbazaar.com';
-const API_TOKEN = 'd3de1e0e4e25846:a17a89fc01bd744';
+//const { data: adminToken } = useFrappeGetDoc("Mars Configurations", "admin_token")
+  //const ADMIN_TOKEN = adminToken?.admin_token
 
 export const getDataForSingleLayer = async (doctypeName, filters = null) => {
     try {
@@ -10,7 +11,7 @@ export const getDataForSingleLayer = async (doctypeName, filters = null) => {
             url += `&filters=${encodeURIComponent(JSON.stringify(filters))}`;
         }
         const headers = {
-            'Authorization': `token ${API_TOKEN}`,
+            'Authorization': `token d3de1e0e4e25846:8c3b173b4554288`,
             'Content-Type': 'application/json'
         };
         const response = await axios.get(url, { headers });

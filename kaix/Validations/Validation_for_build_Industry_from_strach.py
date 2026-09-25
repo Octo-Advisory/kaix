@@ -485,7 +485,7 @@ def search_industry(INDUSTRY_NAME, SUB_SECTOR, SEGMENT, user_cap):
                         SELECT area
                         FROM `tabEmployment City Mapping`
                         WHERE area IN ({area_id_str})
-                        AND employment_type IN ('Skilled', 'Semi-skilled', 'Unskilled')
+                        AND employment_type IN ('Skilled', 'Semi-Skilled', 'Unskilled')
                         GROUP BY
                             area
                         HAVING

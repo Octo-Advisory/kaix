@@ -852,7 +852,7 @@ def generate_questions(dict_45, llm_model="meta-llama/llama-4-maverick-17b-128e-
 
     llm = ChatGroq(model_name=llm_model, temperature=temperature, api_key=api_key)
 
-    prompt_template = """You are a domain-aware assistant helping users plan and explore key aspects of setting up an industry in India.
+    prompt_template = """You are a domain-aware assistant helping users plan and explore key aspects of setting up an industry in Cambodia.
 
 ---
 
@@ -906,12 +906,12 @@ Each industrial module focuses on specific elements:
 These are examples of how queries should be phrased.  
 **Do not use these values** (industries, locations, terms) in your output. Use them only to match the tone and structure.
 
-• What is the vendor availability for cement industry in Vadodara, Gujarat?  
-• Tell me all the incentives available for pharmaceutical industry in Surat city?  
+• What is the vendor availability for cement industry in Siem Reap, Cambodia?  
+• Tell me all the incentives available for pharmaceutical industry in Battambang city?  
 • What are the employment options around the Anand city?  
 • Locations for LED lighting industry with capacity of 175k units per year?  
-• What are the approvals available for building electrochemical storage unit in Bharuch?  
-• What are the vendor options for textile industry in Vadodara?
+• What are the approvals available for building electrochemical storage unit in Kampong Cham?  
+• What are the vendor options for textile industry in Siem Reap?
 
 ---
 

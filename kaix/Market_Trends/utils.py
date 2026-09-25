@@ -161,20 +161,20 @@ def parse_search_results(search_results: str, city: str, state: str, sub_sector:
     city_synonyms = [
         city.lower(),
         city.lower().replace(" ", ""),
-        "cochi" if city.lower() == "kochi" else "",
-        "bengaluru" if city.lower().strip() == "bangalore" else "",
+        "kompongsom" if city.lower() == "sihanoukville" else "",
+        "battambong" if city.lower().strip() == "battambang" else "",
     ]
     city_synonyms = [s for s in city_synonyms if s]
     state_synonyms = [
         state.lower(),
         state.lower().replace(" ", ""),
         state.lower().replace(" ", "") + "'s",
-        "tamilnadu" if state.lower() == "tamil nadu" else "",
+        "banteaymeanchey" if state.lower() == "banteay meanchey" else "",
     ]
     state_synonyms = [s for s in state_synonyms if s]
     city_pattern = re.compile(rf'({"|".join(city_synonyms)})', re.IGNORECASE)
     state_pattern = re.compile(rf'({"|".join(state_synonyms)})', re.IGNORECASE)
-    india_pattern = re.compile(r'\bIndia\b|Indian|\bian\b', re.IGNORECASE)
+    cambodia_pattern = re.compile(r'\bCambodia\b|Cambodian|\bian\b', re.IGNORECASE)
     sector_terms = [
         sub_sector.lower(),
         segment.lower(),
@@ -204,7 +204,7 @@ def parse_search_results(search_results: str, city: str, state: str, sub_sector:
         elif state_pattern.search(sentence):
             state_points.add(sentence)
         # Country-level
-        elif india_pattern.search(sentence):
+        elif cambodia_pattern.search(sentence):
             country_points.add(sentence)
         # Global (no specific location)
         else:
@@ -215,7 +215,7 @@ def parse_search_results(search_results: str, city: str, state: str, sub_sector:
     counts["country"] = len(country_points)
     counts["global"] = len(global_points)
     
-    # If no explicit location but sector-relevant, count as country (India)
+    # If no explicit location but sector-relevant, count as country (Cambodia)
     if not any([counts["city"], counts["state"], counts["country"]]) and counts["global"] > 0:
         counts["country"] = counts["global"]
         counts["global"] = 0

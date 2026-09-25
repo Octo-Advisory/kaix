@@ -260,11 +260,11 @@ def generate_chat_title(user_query):
     - Context: (implied in topic)
     Title: "Django Database Timeout Troubleshooting"
 
-    User Query: "show me some vendors for pharmaceutical industry in bharuch city of gujarat state"
+    User Query: "show me some vendors for pharmaceutical industry in bavet city of svay rieng province"
     - Primary Topic: Pharmaceutical vendors
     - Key Action: Show/list (implied)
-    - Context: Bharuch city, Gujarat
-    Title: "Pharmaceutical Vendors In Bharuch Gujarat"
+    - Context: Bavet city, Svay Rieng
+    Title: "Pharmaceutical Vendors In Bavet Svay Rieng"
 
     User Query: "i want to build cement industry from scratch,so i want area in which i can build the industry, vendors from which i can procure raw materials for the industry,employment availability in the area of the industry, approval and incentives for the city and area in which industry to be developed"
     - Primary Topic:  Cement industry setup
@@ -272,17 +272,17 @@ def generate_chat_title(user_query):
     - Context: Location selection, vendors, employment, approvals, incentives
     Title: "Cement Industry Setup Guide Location Vendors Approvals"
 
-    User Query: "i want to see the employment availability in anand city of gujarat state"
+    User Query: "i want to see the employment availability in kampong speu city of kampong speu province"
     - Primary Topic: employment availability
     - Key Action: Show/list (implied)
-    - Context: anand city, gujarat state
-    Title: "Employment Availability in Anand Gujarat"
+    - Context: kampong speu city, kampong speu province
+    Title: "Employment Availability in Kampong Speu"
 
-    User Query: "what are the incentives available for the devloping textile industry in anand city of gujarat state and also tell me the approvals needed to set up this industry in the anand city of gujarat state"
+    User Query: "what are the incentives available for the devloping textile industry in kampong speu city of kampong speu province and also tell me the approvals needed to set up this industry in the kampong speu city of kampong speu province"
     - Primary Topic: Textile industry
     - Key Action:  Incentives & approvals
-    - Context: Anand city, Gujarat state
-    Title: "Textile Industry Incentives Approvals Anand Gujarat"
+    - Context: Kampong Speu city, Kampong Speu province
+    Title: "Textile Industry Incentives Approvals Kampong Speu"
 
     WARNING:- The output should be meaningful and relate to the original query. Also do not include anything else in the output apart from the actual output.
 
@@ -327,7 +327,7 @@ def generate_query_hints(query_list, input_industry_name):
    # this function generates queries based on chat_history provided to it and then classifies them in to their repsective module names
 
     prompt_template =  """
-   You are an intelligent assistant that helps users explore and plan key aspects of setting up an industry in India.
+   You are an intelligent assistant that helps users explore and plan key aspects of setting up an industry in Cambodia.
 
    Your task is to:
    1. Generate 6 compact and properly framed follow-up questions based on the user's chat history  
@@ -382,17 +382,17 @@ def generate_query_hints(query_list, input_industry_name):
 
    4. *LOCATION RESTRICTION ENFORCEMENT (MANDATORY):*
       • Only use **those city names explicitly mentioned in the chat history** as valid locations for output queries.
-      • Do **not** introduce new cities, even common ones like Ahmedabad, Surat, Bharuch, Rajkot, etc., unless they appear in the user’s prior queries.
+      • Do **not** introduce new cities, even common ones like Phnom Penh, Battambang, Kampong Cham, Sihanoukville, etc., unless they appear in the user’s prior queries.
       • This applies to both normal generation and fallback.
 
    5. *FALLBACK MODE (STRICT TRIGGER):*
       • If all five sessions are empty, switch to fallback generation using the provided `industry_name`.
       • In fallback mode:
-      – Use realistic city names from Gujarat (Ahmedabad, Surat, Vadodara, Rajkot, Bharuch)
+      – Use realistic city names from Cambodia (Phnom Penh, Battambang, Siem Reap, Sihanoukville, Kampong Cham)
       – Generate 6 queries
       – Each query must include:
          ▸ The fallback `industry_name`
-         ▸ A specific Gujarat city from the list above
+         ▸ A specific Cambodia city from the list above
          ▸ Exactly one supported module
       – Avoid vague phrases like “nearby” or “suitable area”
 
@@ -483,11 +483,11 @@ def generate_query_hints(query_list, input_industry_name):
    • **Approval** – regulatory requirements and permits required for setup  
 
    — GOOD QUERY STRUCTURE EXAMPLES (STRICTLY FOLLOW THIS FORMAT):
-   • What is the vendor availability for cement industry in Vadodara, Gujarat?  
-   • Tell me all the incentives available for pharmaceutical industry in Surat city?  
-   • What are the employment options around the Anand city?  
+   • What is the vendor availability for cement industry in Siem Reap, Cambodia?  
+   • Tell me all the incentives available for pharmaceutical industry in Battambang city?  
+   • What are the employment options around the Kandal city?  
    • I want to build a toy factory with 100000 toys capacity  
-   • What are the approvals required for building electrochemical storage unit in Bharuch?
+   • What are the approvals required for building electrochemical storage unit in Kampong Cham?
 
    ---
 

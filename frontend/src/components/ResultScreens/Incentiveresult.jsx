@@ -42,9 +42,9 @@ function Incentiveresult({ res, source, rerender }) {
   if(!incentivesObj || !typesObj) return []
     return Object.keys(incentivesObj).map(key => ({
         id: incentivesObj[key],
-        name: namesObj[key],
+        name: namesObj?.[key],
         type: typesObj[key],  // Fallback in case type doesn't exist
-        aggregated_score: scoreObj[key]
+        aggregated_score: scoreObj?.[key]
     }));
 }
 
@@ -68,6 +68,7 @@ function Incentiveresult({ res, source, rerender }) {
     
     } catch (err) {
       // console.error("Error Storing Result json:", err);
+
       createDiagnostic("Land & Approvals", `Something went wrong while storing the result json ${JSON.stringify(err)} in Incentive screen`,lastChatId)
       return []; // Return empty for this batch on error
     }
@@ -294,6 +295,8 @@ const handleIncentiveSelection = async (incentiveName) => {
         return;
     }
     let incentiveData = mapIncentivesToTypes(result['Incentive ID'], result['Incentive Type'], result['Incentive Name'],result["aggregated_score"])
+
+    createDiagnostic("Incentive data debug", `Debugger ${JSON.stringify(incentiveData)} in Incentive data`,lastChatId)
     // setLoading(false);
     setIncentivesMap(incentiveData)
     handleIncentiveSelection(incentiveData[0].id)

@@ -197,8 +197,8 @@ def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Un
 
     1) DETERMINE THE TYPE OF EMPLOYMENT SEARCH:
     - If the query is for general employment without specifying a job role or skill type, return `null`.
-    - Example (General Employment): "I want employment opportunities in Surat." → null
-    - Example (General Employment): "Looking for jobs in Gujarat." → null
+    - Example (General Employment): "I want employment opportunities in Battambang." → null
+    - Example (General Employment): "Looking for jobs in Cambodia." → null
 
     2) IDENTIFY DIRECT MENTIONS OF SKILL CATEGORIES:
     - If the query explicitly mentions "Skilled", "Semi-Skilled", or "Unskilled", return these directly.
@@ -230,7 +230,7 @@ def extract_employment_keywords_from_query(user_input: str, llm) -> Dict[str, Un
     - "Looking for electricians and plumbers." → ["Skilled"]
     - "I need laborers for shifting work." → ["Unskilled"]
     - "Searching for skilled operators for heavy machinery." → ["Skilled"]
-    - "Looking for workers in Surat." → null
+    - "Looking for workers in Battambang." → null
 
     5) MULTIPLE CLASSIFICATIONS:
     - If the query mentions multiple job roles, classify each and return them together.
@@ -335,47 +335,47 @@ def classify_employment_query(query: str, llm) -> dict:
 
     1 Individual Employment Status:
     - The query is about employment statistics, job availability, or unemployment rates in a single location.  
-    - Example: "What is the employment status in Ahmedabad?" or "Job statistics for Gujarat."  
+    - Example: "What is the employment status in Phnom Penh?" or "Job statistics for Cambodia."  
     - Even if employment-related words are NOT present, assume it is an employment search if a location is mentioned alone.  
     - If the user mentions multiple locations, but one of them is only for reference (e.g., "I live in X but want to search about Y"), classify under this category.  
     - DO NOT assume a comparison unless employment search is for multiple locations in the query’s main intent.  
 
     2 Comparison Between Locations:
     - The query asks about employment status across multiple locations, either explicitly or implicitly.  
-    - Explicit Comparison: "Compare employment in Ahmedabad vs Baroda."  
-    - Implicit Comparison: "What is the employment situation in Gujarat and Maharashtra?"  
+    - Explicit Comparison: "Compare employment in Phnom Penh vs Baroda."  
+    - Implicit Comparison: "What is the employment situation in Cambodia and Preah Sihanouk?"  
     - Even if "compare" is not explicitly mentioned, classify here if employment search involves multiple locations.  
     - If multiple locations are mentioned AND they are both part of the employment search, classify under this category.  
     - DO NOT require explicit words like "compare"—use contextual understanding.  
 
     3 Other Intentions:
     - Only classify here if the query is entirely unrelated to employment.  
-    - Example: "Best places to live in Ahmedabad." or "How is the weather in Gujarat?"  
+    - Example: "Best places to live in Phnom Penh." or "How is the weather in Cambodia?"  
     - DO NOT classify as Other Intent just because employment is not explicitly mentioned.  
     - If a query has no employment, no approvals, no incentives, and no vendor search, assume it is employment-related and classify under Class 1 or 2.  
 
     4 Negatively Intended Query:
     - Use this if the user's query clearly expresses a desire to avoid or not continue with employment-related searches.  
     - Also use this class if the query rejects other supported industry-related topics such as approvals, incentives, vendors, or land — even if the query comes through the employment module.  
-    - Example: "I don't want to search employment in Gujarat." → Class 4  
+    - Example: "I don't want to search employment in Cambodia." → Class 4  
     - Example: "I don't want to check incentives or approvals or vendors either." → Class 4  
     - This class is for any query that **explicitly refuses to proceed with all supported topics**.
 
     Special Classification Rules:
     1 Implicit Employment Queries:  
     - If a location is mentioned alone, classify as Class 1 or 2 (NOT Class 3).  
-    - Example: "Ahmedabad?" → Class 1.  
-    - Example: "Vadodara vs Surat?" → Class 2.  
+    - Example: "Phnom Penh?" → Class 1.  
+    - Example: "Siem Reap vs Battambang?" → Class 2.  
 
     2 Employment + Other Topics = Still Employment (Class 1 or 2):  
     - If the query includes employment + another topic, keep it in Class 1 or 2.  
-    - Example: "Employment status in Ahmedabad and real estate?" → Class 1.  
-    - Example: "Jobs in Delhi and tourism industry?" → Class 1.  
+    - Example: "Employment status in Phnom Penh and real estate?" → Class 1.  
+    - Example: "Jobs in Siem Reap and tourism industry?" → Class 1.  
 
     3 Only Classify as "Other Intent" (Class 3) if a Completely Different Topic is Asked:  
     - Approvals, incentives, vendor searches, or unrelated topics → Class 3.  
-    - Example: "What incentives are available in Mumbai?" → Class 3.  
-    - Example: "Approvals needed for setting up a factory in Gujarat?" → Class 3.  
+    - Example: "What incentives are available in Sihanoukville?" → Class 3.  
+    - Example: "Approvals needed for setting up a factory in Cambodia?" → Class 3.  
 
     4 Only Classify as "Negatively Intended Query" (Class 4) if User Clearly Rejects Supported Topics:  
     - If the user expresses clear disinterest or refusal to explore employment or any of the supported industry-related topics (approvals, vendors, incentives, land), classify under Class 4.  
@@ -562,13 +562,13 @@ def generate_dynamic_message(chat_history_for_context: List[dict], static_follow
     - If the response is a direct question, do not add unnecessary conjunctions.
 
     Example Correction:
-    - User Query: "I want employment details in Ankleshwar."
-    - Wrong Response: "To find employment in Ankleshwar, employment status details are available for Bharuch, which encompasses the area of Ankleshwar. Would you like to view the information for Bharuch?"
-    - Correct Response: "Employment status details are available for Bharuch, which includes Ankleshwar. Would you like to view the information for Bharuch?"
+    - User Query: "I want employment details in Bati."
+    - Wrong Response: "To find employment in Bati, employment status details are available for Kampong Cham, which encompasses the area of Bati. Would you like to view the information for Kampong Cham?"
+    - Correct Response: "Employment status details are available for Kampong Cham, which includes Bati. Would you like to view the information for Kampong Cham?"
 
-    - User Query: "Where is employment highest in Gujarat?"
-    - Wrong Response: "To provide this information, Gujarat has high employment in Ahmedabad and Surat."
-    - Correct Response: "Ahmedabad and Surat have the highest employment in Gujarat. Are you looking for details on a specific sector?"
+    - User Query: "Where is employment highest in Cambodia?"
+    - Wrong Response: "To provide this information, Cambodia has high employment in Phnom Penh and Battambang."
+    - Correct Response: "Phnom Penh and Battambang have the highest employment in Cambodia. Are you looking for details on a specific sector?"
 
     Natural and Engaging Tone:
     - The response should feel like a smooth continuation of the conversation without sounding mechanical or scripted.

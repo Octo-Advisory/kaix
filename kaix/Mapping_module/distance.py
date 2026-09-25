@@ -319,7 +319,7 @@ def getBBoxData(center_lat, center_lon):
 #                     try:
 #                         actualAddress = copy.deepcopy(address)
 #                         address = str(address).upper()
-#                         updatedAddress = address+",Gujarat"
+#                         updatedAddress = address+",Cambodia"
 #                         #API request
 #                         url = f"https://maps.googleapis.com/maps/api/geocode/json?address={updatedAddress}&key=AIzaSyCgESPN3REByWpiQYiRKGpDWwBZLwQEnVA"
 #                         response = requests.get(url)
@@ -338,14 +338,12 @@ def getBBoxData(center_lat, center_lon):
 #                                     latitude_longitude = f"{location['lat']},{location['lng']}"
 #                                     # location_name = item['address_components'][0]['long_name']
 #                                     isAddressPresent = address in formatted_address
-#                                     from_gujarat = "Gujarat" in formatted_address
-#                                     from_india = "India" in formatted_address
+#                                     from_cambodia = "Cambodia" in formatted_address
 #                                     return {
 #                                         'location_info': {
 #                                             'location_name': actualAddress,
 #                                             'latitude_longitude': latitude_longitude,
-#                                             'from_gujarat': from_gujarat,
-#                                             'from_india': from_india,
+#                                             'from_cambodia': from_cambodia,
 #                                         },
 #                                         'isError': False
 #                                     }
@@ -354,15 +352,13 @@ def getBBoxData(center_lat, center_lon):
 #                             # latitude_longitude = f"{location['lat']},{location['lng']}"
 #                             # location_name = data['results'][0]['address_components'][0]['long_name']
                             
-#                             # from_gujarat = "Gujarat" in formatted_address
-#                             # from_india = "India" in formatted_address
+#                             # from_cambodia = "Cambodia" in formatted_address
                             
 #                             return {
 #                                 'location_info': {
 #                                     'location_name': None,
 #                                     'latitude_longitude': None,
-#                                     'from_gujarat': None,
-#                                     'from_india': None,
+#                                     'from_cambodia': None,
 #                                 },
 #                                 'isError': False
 #                             }
@@ -372,8 +368,7 @@ def getBBoxData(center_lat, center_lon):
 #                                 'location_info': {
 #                                     'location_name': None,
 #                                     'latitude_longitude': None,
-#                                     'from_gujarat': None,
-#                                     'from_india': None,
+#                                     'from_cambodia': None,
 #                                 },
 #                                 'isError': True,
 #                                 'error_message':data['status']
@@ -385,8 +380,7 @@ def getBBoxData(center_lat, center_lon):
 #                             'location_info': {
 #                                 'location_name': None,
 #                                 'latitude_longitude': None,
-#                                 'from_gujarat': None,
-#                                 'from_india': None,
+#                                 'from_cambodia': None,
 #                             },
 #                             'isError': True,
 #                             'error_message': str(e)  
@@ -396,8 +390,7 @@ def getBBoxData(center_lat, center_lon):
 #                     'location_info': {
 #                         'location_name': None,
 #                         'latitude_longitude': None,
-#                         'from_gujarat': None,
-#                         'from_india': None,
+#                         'from_cambodia': None,
 #                     },
 #                     'isError': True,
 #                     'error_message': "Invalid Address" 
@@ -407,8 +400,7 @@ def getBBoxData(center_lat, center_lon):
 #             'location_info': {
 #                 'location_name': None,
 #                 'latitude_longitude': None,
-#                 'from_gujarat': None,
-#                 'from_india': None,
+#                 'from_cambodia': None,
 #             },
 #             'isError': True,
 #             'error_message': "Api Limit Exceed"  
@@ -419,13 +411,12 @@ def get_geocode(address):
         response = requests.get(url)
         data = response.json()  #parse the JSON data
         return data
-    def returnResult(location_name=None,latitude_longitude=None,from_gujarat=None,from_india=None,isError=False,error_message=None):
+    def returnResult(location_name=None,latitude_longitude=None,from_cambodia=None,isError=False,error_message=None):
         return {
             'location_info': {
                 'location_name': location_name,
                 'latitude_longitude': latitude_longitude,
-                'from_gujarat': from_gujarat,
-                'from_india': from_india,
+                'from_cambodia': from_cambodia,
             },
             'isError': isError,
             'error_message':error_message
@@ -445,12 +436,11 @@ def get_geocode(address):
                                 formatted_address = formatted_address.upper()
                                 location = data['results'][0]['geometry']['location']
                                 latitude_longitude = f"{location['lat']},{location['lng']}"
-                                from_gujarat = "GUJARAT" in formatted_address
-                                from_india = "INDIA" in formatted_address
-                                return returnResult(actualAddress,latitude_longitude,from_gujarat,from_india,False,None)
+                                from_cambodia = "CAMBODIA" in formatted_address
+                                return returnResult(actualAddress,latitude_longitude,from_cambodia,False,None)
 
                         elif data['status'] == 'ZERO_RESULTS' or len(data['results']) <= 0:
-                            updatedAddress = address+",Gujarat"
+                            updatedAddress = address+",Cambodia"
                             url = f"https://maps.googleapis.com/maps/api/geocode/json?address={updatedAddress}&key=AIzaSyCgESPN3REByWpiQYiRKGpDWwBZLwQEnVA"
                             data = callApi(url)
                             if data['status'] == 'OK' and len(data['results']) > 0:
@@ -463,21 +453,20 @@ def get_geocode(address):
                                         location = item['geometry']['location']
                                         latitude_longitude = f"{location['lat']},{location['lng']}"                                    
                                         
-                                        from_gujarat = "GUJARAT" in formatted_address
-                                        from_india = "INDIA" in formatted_address
-                                        return returnResult(actualAddress,latitude_longitude,from_gujarat,from_india,False,None)
+                                        from_cambodia = "CAMBODIA" in formatted_address
+                                        return returnResult(actualAddress,latitude_longitude,from_cambodia,False,None)
 
-                                return returnResult(None,None,None,None,False,None)
+                                return returnResult(None,None,None,False,None)
                         else:
                             #no valid result found, return False
-                            return returnResult(None,None,None,None,False,None)
+                            return returnResult(None,None,None,False,None)
 
                     except Exception as e:
                         # If any error occurs,
-                        return returnResult(None,None,None,None,True,str(e))                        
+                        return returnResult(None,None,None,True,str(e))                        
  
         else:
-            return returnResult(None,None,None,None,True, "Invalid Address")
+            return returnResult(None,None,None,True, "Invalid Address")
     else:
-        return returnResult(None,None,None,None,True, "Api Limit Exceed")
+        return returnResult(None,None,None,True, "Api Limit Exceed")
 

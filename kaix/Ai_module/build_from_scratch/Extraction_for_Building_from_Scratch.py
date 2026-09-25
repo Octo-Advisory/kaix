@@ -55,23 +55,23 @@ You are an expert in analyzing user queries related to setting up or acquiring a
         - "I need land to set up a textile factory."
         - "Where can I build a cement plant?"
         - "Looking for a site to construct a 1 MTPA fly ash plant."
-        - "Need help finding land for a dairy industry in Gujarat."
-        - "I’m planning to construct a new food processing unit in Punjab."
+        - "Need help finding land for a dairy industry in Kampong Speu."
+        - "I’m planning to construct a new food processing unit in Kandal."
         - "Where can I find a plot to build an electronics manufacturing plant?"
-        - "Need a site for a new steel factory in Maharashtra."
+        - "Need a site for a new steel factory in Preah Sihanouk."
 
 2. Intent to Acquire Existing Industrial Infrastructure:
     - The user expresses interest in purchasing or acquiring an existing industrial facility, auction property, or pre-built infrastructure to start operations without constructing new facilities.
     - Includes queries about buying factories, plants, or auctioned properties, even if not explicitly phrased as "existing infrastructure."
     - Example queries:
         - "I want to buy a cement factory."
-        - "Any factories for sale in Maharashtra?"
+        - "Any factories for sale in Preah Sihanouk?"
         - "Looking for an auctioned industrial plant."
-        - "Need a steel plant to purchase in Gujarat."
+        - "Need a steel plant to purchase in Kampong Speu."
         - "I’m interested in acquiring an existing textile mill."
         - "Where can I find a chemical plant for sale?"
         - "Looking to buy a pre-built packaging facility."
-        - "Any auction properties for industrial use in Tamil Nadu?"
+        - "Any auction properties for industrial use in Svay Rieng?"
 
 3. Intent to Set Up Industry with Unspecified Build or Buy Intent:
     - The user expresses a desire to set up an industry but does not clearly specify whether they want to build from scratch or acquire existing infrastructure, or they indicate uncertainty about the approach.
@@ -99,10 +99,10 @@ You are an expert in analyzing user queries related to setting up or acquiring a
     - The query is clearly related to something else — such as vendors, approvals, employment, incentives — but NOT about industry setup.
     - The query may also be completely unrelated to industrial context (e.g., tourism, politics, daily news, etc.).
     - Example queries:
-        - "What are the vendor options in Gujarat?"
-        - "Employment statistics for Baroda?"
-        - "Tell me about textile incentives in Maharashtra."
-        - "What is the weather in Delhi?"
+        - "What are the vendor options in Kampong Speu?"
+        - "Employment statistics for Phnom Penh?"
+        - "Tell me about textile incentives in Preah Sihanouk."
+        - "What is the weather in Siem Reap?"
         - "I don’t want to build a factory but need vendors."
         - "Not interested in buying a plant, but what are the job opportunities?"
 
@@ -126,12 +126,12 @@ You are an expert in analyzing user queries related to setting up or acquiring a
         - Queries using **"or"** imply one of the two and reflect uncertainty → classify as Class 3.
         - Queries using **"and"** imply the user intends to pursue or explore **both paths** → classify as Class 6.
     - Example queries:
-        - "Looking for land or existing industrial facility for a textile unit in Gujarat."
+        - "Looking for land or existing industrial facility for a textile unit in Kampong Speu."
         - "Need options to either buy an operational plastic factory or find land to build one."
         - "Searching for auction plants or empty plots to set up an EV battery plant."
-        - "Want to explore both land plots and running food processing units in Madhya Pradesh."
+        - "Want to explore both land plots and running food processing units in Battambang."
         - "I am open to either purchasing a chemical factory or acquiring land for greenfield development."
-        - "Interested in buying a running paper mill or land suitable to set up one in Maharashtra."
+        - "Interested in buying a running paper mill or land suitable to set up one in Preah Sihanouk."
         - "I want to buy and build a plastic industry."
         - "We are planning to buy and build facilities for our textile business."
 
@@ -322,8 +322,8 @@ def extract_locations_from_query_multi(
     # 2 — Prompt for multiple locations
     prompt_template = """
 You are an expert location extraction system.  
-Your job is to extract **ALL distinct geographic locations** mentioned in the user’s query 
-and list them individually. Locations include villages, areas, cities, talukas, districts, and states.
+Your job is to extract **ALL distinct geographic locations** mentioned in the user's query 
+and list them individually. Locations include villages, areas, cities, districts, and provinces.
 
 ------------------------------------------------------
 LOCATION EXTRACTION RULES (STRICT & HIERARCHY-AWARE)
@@ -333,85 +333,71 @@ LOCATION EXTRACTION RULES (STRICT & HIERARCHY-AWARE)
 
 2. For each extracted location, preserve the **exact text** the user wrote.
 
-3. Do NOT combine multiple levels (e.g., "City, State" should produce separate entries, not a combined one).
+3. Do NOT combine multiple levels (e.g., "City, Province" should produce separate entries, not a combined one).
 
 4. Use these **hierarchy rules** to understand location context, but still list all found:
-   - If the query has “Area + City + State”, capture all three individually.
-   - If the query has “City + State”, capture both.
-   - If the query has “District + State”, capture both.
+   - If the query has "Area + City + Province", capture all three individually.
+   - If the query has "City + Province", capture both.
+   - If the query has "District + Province", capture both.
 
-5. DO NOT infer or hallucinate industrial estates or zones (e.g., do NOT add “GIDC”, “SEZ”, etc., unless the user explicitly wrote them).
+5. DO NOT infer or hallucinate industrial estates or zones (e.g., do NOT add "SEZ", etc., unless the user explicitly wrote them).
 
 6. **Preserve abbreviations ONLY when explicitly present.**
    - If the user includes an industrial/zone abbreviation, preserve it exactly as written.
    - Never add, modify, or infer abbreviations not present in the input.
 
    Examples of preserved abbreviations:
-     - “Sanand GIDC” → “Sanand GIDC”
-     - “Dahej SEZ” → “Dahej SEZ”
-     - “Paradeep PCPIR” → “Paradeep PCPIR”
-     - “Aurangabad MIDC” → “Aurangabad MIDC”
-     - “Sri City SEZ” → “Sri City SEZ”
-     - “Oragadam SIPCOT” → “Oragadam SIPCOT”
-     - “Neemrana RIICO” → “Neemrana RIICO”
-     - “Sri City APIIC” → “Sri City APIIC”
-     - “Vikas Nagar DIC” → “Vikas Nagar DIC”
-     - “Hosur SIPCOT” → “Hosur SIPCOT”
-     - “Bengaluru KIADB” → “Bengaluru KIADB”
-     - “Indore MPIDC” → “Indore MPIDC”
-     - “Hyderabad TSIIC” → “Hyderabad TSIIC”
+     - "Phnom Penh SEZ" → "Phnom Penh SEZ"
+     - "Sihanoukville SEZ" → "Sihanoukville SEZ"
+     - "Bavet SEZ" → "Bavet SEZ"
+     - "Poipet SEZ" → "Poipet SEZ"
+     - "Neak Loeung SEZ" → "Neak Loeung SEZ"
+     - "Manhattan SEZ" → "Manhattan SEZ"
+     - "Goldfame Pak Shun SEZ" → "Goldfame Pak Shun SEZ"
 
    Also:
-     - If user writes only “Dahej”, do NOT output “Dahej SEZ”.
-     - If user writes only “Sanand”, do NOT output “Sanand GIDC”.
-     - If user writes only “Paradeep”, do NOT output “Paradeep PCPIR”.
+     - If user writes only "Bavet", do NOT output "Bavet SEZ".
+     - If user writes only "Poipet", do NOT output "Poipet SEZ".
+     - If user writes only "Neak Loeung", do NOT output "Neak Loeung SEZ".
 
 7. **Correct common spelling errors only when clearly evident**:
-   - “Bangluru” → “Bengaluru”
-   - “Vadora” → “Vadodara”
+   - "Phnompenh" → "Phnom Penh"
+   - "Siem Riep" → "Siem Reap"
 
 8. **Standardise old place names only when the official modern name exists**:
-   - “Bombay” → “Mumbai”
-   - “Baroda” → “Vadodara”
-   - “Kashi” → “Varanasi”
-   - “Calcutta” → “Kolkata”
-   - “Bangalore” → “Bengaluru”
-   - “Pondicherry” → “Puducherry”
+   - "Kompong Som" → "Sihanoukville"
+   - "Kompong Cham" → "Kampong Cham"
+   - "Battambong" → "Battambang"
    - Additional:
-     - “Madras” → “Chennai”
-     - “Poona” → “Pune”
-     - “Trivandrum” → “Thiruvananthapuram”
-     - “Calicut” → “Kozhikode”
-     - “Gulbarga” → “Kalaburagi”
-     - “Belgaum” → “Belagavi”
-     - “Rajahmundry” → “Rajamahendravaram”
-   - Only apply such standardisation if the user input uses the old nam
+     - "Kratie" → "Kratié"
+     - "Takeo" → "Takéo"
+   - Only apply such standardisation if the user input uses the old name
 
 ------------------------------------------------------
 EXAMPLES (VALID OUTPUTS)
 ------------------------------------------------------
 
-Input: “I want incentives for Dahej and Panvel, Maharashtra”
+Input: "I want incentives for Kampong Seila and Bavet, Preah Sihanouk"
 Output:
 {{
     "Locations": [
-        {{ "Location": "Dahej" }},
-        {{ "Location": "Panvel" }},
-        {{ "Location": "Maharashtra" }}
+        {{ "Location": "Kampong Seila" }},
+        {{ "Location": "Bavet" }},
+        {{ "Location": "Preah Sihanouk" }}
     ]
 }}
 
-Input: “Check in Sanand GIDC, Pune, Maharashtra”
+Input: "Check in Bavet SEZ, Kandal, Preah Sihanouk"
 Output:
 {{
     "Locations": [
-        {{ "Location": "Sanand GIDC" }},
-        {{ "Location": "Pune" }},
-        {{ "Location": "Maharashtra" }}
+        {{ "Location": "Bavet SEZ" }},
+        {{ "Location": "Kandal" }},
+        {{ "Location": "Preah Sihanouk" }}
     ]
 }}
 
-Input: “Nothing relevant here”
+Input: "Nothing relevant here"
 Output:
 {{
     "Locations": []
@@ -756,33 +742,33 @@ def get_ai_recommended_states(
     llm
 ) -> List[str]:
     """
-    Ask AI to recommend best Indian states for a given industry.
-    Cross-check with DB and return only states that exist in our database.
+    Ask AI to recommend best Cambodian provinces for a given industry.
+    Cross-check with DB and return only provinces that exist in our database.
  
     Returns:
-        List[str]: DB-validated states in AI recommended order.
-                   Empty list if no states found in DB.
+        List[str]: DB-validated provinces in AI recommended order.
+                   Empty list if no provinces found in DB.
     """
  
     prompt_template = """
-You are an expert in Indian industrial geography.
+You are an expert in Cambodian industrial geography.
  
-Recommend the best Indian states for setting up a {industry} industry{product_context}.
+Recommend the best Cambodian provinces for setting up a {industry} industry{product_context}.
  
 Consider:
 - Raw material availability
-- Industrial infrastructure and clusters
+- Industrial infrastructure and clusters (including Special Economic Zones)
 - Connectivity and logistics
 - Government policies and incentives
 - Power and water availability
  
-Return a ranked list of top 25 most suitable Indian states.
+Return a ranked list of top 25 most suitable Cambodian provinces.
 Return ONLY this JSON format, nothing else:
 {{
-    "states": ["State1", "State2", "State3", ...]
+    "states": ["Province1", "Province2", "Province3", ...]
 }}
  
-Use official state names only (e.g., "Gujarat", "Maharashtra", "Rajasthan").
+Use official province names only (e.g., "Kandal", "Svay Rieng", "Preah Sihanouk").
     """
  
     product_context = f" (product: {product})" if product and product != "None" else ""
@@ -832,7 +818,7 @@ Use official state names only (e.g., "Gujarat", "Maharashtra", "Rajasthan").
         _retry_prompt = (
             'Return ONLY a JSON object: '
             '{"states": ["State1", "State2", ...]} '
-            'with a ranked list of Indian state names. '
+            'with a ranked list of Cambodian province names. '
             'No prose, no markdown fences, no extra keys.'
         )
         _result = parse_llm_response(
@@ -894,7 +880,7 @@ def get_ai_recommended_districts(
     """
  
     prompt_template = """
-You are an expert in Indian industrial geography.
+You are an expert in Cambodian industrial geography.
  
 Recommend the best districts in {state_name} for setting up a {industry} industry{product_context}.
  
@@ -1026,9 +1012,9 @@ def cross_check_locations_with_db(
     Preserves the ranking order from AI list.
  
     Example:
-        AI list: ["Gujarat", "Rajasthan", "Telangana", "Kerala"]
-        DB list: ["Gujarat", "Maharashtra", "Rajasthan", "Andhra Pradesh"]
-        Result:  ["Gujarat", "Rajasthan"]  ← only matched, in AI order
+        AI list: ["Kampong Speu", "Rajasthan", "Telangana", "Kerala"]
+        DB list: ["Kampong Speu", "Preah Sihanouk", "Rajasthan", "Andhra Pradesh"]
+        Result:  ["Kampong Speu", "Rajasthan"]  ← only matched, in AI order
  
     Returns:
         List[str]: DB-correct location names in AI ranking order.
@@ -1850,7 +1836,7 @@ Logical Matching for Segments:
     - Inferred: "Metal Gear Production" → Available: "Metalworking Machinery" (`Forced-Mapping`: "Yes").
 
 **Examples:**
-- Query: "chalk manufacturing setup in Delhi" 
+- Query: "chalk manufacturing setup in Siem Reap" 
   - Inferred: "Basic Chemical Manufacturing" 
   - Closest Available: "Chemical Products" (if available in list)
   - Output: `"Segment": "Chemical Products", "Original-Inferred-Segment": "Basic Chemical Manufacturing", "Forced-Mapping": "Yes"`
@@ -2401,7 +2387,7 @@ def extract_location_strings(location_info):
     return available_locations_str, unavailable_locations_str, mapped_districts_str
 
 
-## ----------------- Start New define funcation for followup question for location india by Hiren ------------------------ ##
+## ----------------- Start New define funcation for followup question for location cambodia by Hiren ------------------------ ##
 
 # def determine_location_specificity(location_data):
 #     """
@@ -2420,13 +2406,13 @@ def extract_location_strings(location_info):
 #             - "No_Location": No location provided at all
     
 #     Examples:
-#         Input: [{"Country": "India", "State": "None", "District": "None"}]
+#         Input: [{"Country": "Cambodia", "State": "None", "District": "None"}]
 #         Output: "Country_Only"
         
-#         Input: [{"Country": "India", "State": "Gujarat", "District": "None"}]
+#         Input: [{"Country": "Cambodia", "State": "Kampong Speu", "District": "None"}]
 #         Output: "State_Only"
         
-#         Input: [{"Country": "India", "State": "Gujarat", "District": "Ahmedabad"}]
+#         Input: [{"Country": "Cambodia", "State": "Kampong Speu", "District": "Phnom Penh"}]
 #         Output: "District_Or_More"
 #     """
     
@@ -2461,7 +2447,7 @@ def extract_location_strings(location_info):
 #     # If nothing found, return No_Location
 #     return "No_Location"
 
-#     ## ----------------- End New define funcation for followup question for location india by Hiren ------------------------ ##
+#     ## ----------------- End New define funcation for followup question for location cambodia by Hiren ------------------------ ##
 
 
 def check_property_availability(district_name, state_name):
@@ -2770,7 +2756,7 @@ def gather_industry_details(
                         f"with a planned capacity of **{state.get('Capacity')} {state.get('Capacity Unit')} "
                         f"per {state.get('Time Period')}**. <br/><br/>"
                         f"To move ahead, please share your **preferred location**. "
-                        f"You can provide a country (e.g. India), a state (e.g. Gujarat), "
+                        f"You can provide a country (e.g. Cambodia), a state (e.g. Kampong Speu), "
                         f"or a specific district — we will guide you from there."
                     )
                     chat_history.append(AIMessage(content=message))
@@ -2794,7 +2780,7 @@ def gather_industry_details(
  
                     # ═══════════════════════════════════════════════════════════
                     # ADDED — COUNTRY_LEVEL handling
-                    # User gave "India" → AI recommends states → show to user
+                    # User gave "Cambodia" → AI recommends states → show to user
                     # Risk 3: if no states in DB → trigger lead generation
                     # ═══════════════════════════════════════════════════════════
                     if location_resolution_status == "COUNTRY_LEVEL":
@@ -2876,8 +2862,8 @@ def gather_industry_details(
  
                     # ═══════════════════════════════════════════════════════════
                     # STATE_LEVEL handling
-                    # User gave "Gujarat" → AI recommends districts → show to user
-                    # Also offer "All Gujarat" option (Yes/No confirmation only)
+                    # User gave "Kampong Speu" → AI recommends districts → show to user
+                    # Also offer "All Kampong Speu" option (Yes/No confirmation only)
                     # Risk 3: if no districts in DB → trigger lead generation
                     # ═══════════════════════════════════════════════════════════
                     elif location_resolution_status == "STATE_LEVEL":
@@ -2908,7 +2894,7 @@ def gather_industry_details(
                             if state.get('Capacity') not in [None, 'None'] else ""
                         )
                     
-                        # ── Full-state path — user explicitly typed "All Gujarat"
+                        # ── Full-state path — user explicitly typed "All Kampong Speu"
                         #    OR user typed the same state again after seeing district list ──
                         is_full_state = (
                             any(kw in query_lower for kw in all_state_keywords)
@@ -3823,7 +3809,7 @@ You are an expert at parsing capacity strings into:
 
 ### Non-negotiable rules
 1) **Preserve the unit EXACTLY as written** in the input (keep words, casing, spaces, hyphens, parentheses, and qualifiers like "Million", "Metric", etc.). 
-   - Never drop magnitude words (e.g., Million, Thousand, Lakh, Crore).
+   - Never drop magnitude words (e.g., Million, Thousand, Billion).
    - Never normalize/singularize or translate (e.g., do NOT change “Tonne” to “Ton” or “m3” to “m³”).
    - Keep hyphens and bracketed text (e.g., “Tonne-Force(Metric)”) inside the unit.
 

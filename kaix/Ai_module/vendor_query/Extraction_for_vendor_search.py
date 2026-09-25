@@ -175,7 +175,7 @@ def classify_vendor_query(query: str, llm) -> dict:
 
     1. Vendor Search for a Location without Industry or Supply Details  
         - The user only mentions a location but does not specify any industry or supply details.  
-        - Example: "I need vendor details in Gujarat."  
+        - Example: "I need vendor details in Battambang."  
 
     2. Vendor Search for an Industry without a Location  
         - The user mentions an industry, sector, or product but does not specify a location or specific supply details.  
@@ -187,11 +187,11 @@ def classify_vendor_query(query: str, llm) -> dict:
 
     4. Vendor Search for an Industry with a Location  
         - The user mentions both an industry and a location, but does not mention a specific supply.  
-        - Example: "Looking for vendors in the textile industry in Surat."  
+        - Example: "Looking for vendors in the textile industry in Battambang."  
 
     5. Vendor Search for a Specific Supply with a Location  
         - The user mentions both a supply and a location.  
-        - Example: "Need API suppliers in Gujarat."  
+        - Example: "Need API suppliers in Battambang."  
 
     6. Other Intent  
         - The query is unrelated to vendor search and shows intent toward other topics such as employment, approvals, incentives, or setting up an industry.  
@@ -405,7 +405,7 @@ def classify_vendor_query(query: str, llm) -> dict:
 def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
     """
     Extract the location mentioned in the user query and classify it into Area, City, State, or Country.
-    Additionally, determine if the extracted location is within India.
+    Additionally, determine if the extracted location is within Cambodia.
 
     Parameters:
         user_input (str): The user-provided query.
@@ -437,35 +437,35 @@ def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
     - Only apply spelling corrections if the misspelling is obvious and widely known.
 
     3. Preserve Abbreviations & Contextual Terms:
-    - If a location includes an abbreviation (e.g., "SEZ", "GIDC", "MIDC"), always retain it in the extracted name.
+    - If a location includes an abbreviation (e.g., "SEZ"), always retain it in the extracted name.
     - Examples:
-        - "Dahej SEZ" → Extract as "Dahej SEZ" (not just "Dahej").
-        - "Sanand GIDC" → Extract as "Sanand GIDC" (not just "Sanand").
+        - "Bavet SEZ" → Extract as "Bavet SEZ" (not just "Bavet").
+        - "Sihanoukville SEZ" → Extract as "Sihanoukville SEZ" (not just "Sihanoukville").
     - Do not remove or alter these abbreviations.
 
     4. Classify the Location Correctly (Default to Area if Unclear):
     - Based on sentence structure and logical context, determine if the extracted location is an Area, City, State, or Country.
     - Example Classifications:
-        - "Looking for vendors in Andheri" → Area: Andheri
-        - "Need approvals in Ahmedabad" → City: Ahmedabad
-        - "What are the rules for businesses in Maharashtra?" → State: Maharashtra
-        - "What are the import duties in Germany?" → Country: Germany
+        - "Looking for vendors in Tuol Kouk" → Area: Tuol Kouk
+        - "Need approvals in Siem Reap" → City: Siem Reap
+        - "What are the rules for businesses in Svay Rieng?" → State: Svay Rieng
+        - "What are the import duties in Vietnam?" → Country: Vietnam
     - If the classification is unclear, default to `"Area"` instead of making incorrect assumptions.
 
-    5. Check if the Location is from India:
-    - If the extracted location belongs to India, set `"From_India": "Yes"`.
-    - If the location is outside India, set `"From_India": "No"`.
-    - Assume that most locations mentioned will be from India.
+    5. Check if the Location is from Cambodia:
+    - If the extracted location belongs to Cambodia, set `"From_Cambodia": "Yes"`.
+    - If the location is outside Cambodia, set `"From_Cambodia": "No"`.
+    - Assume that most locations mentioned will be from Cambodia.
 
     6. Ensure the Official Location Name is Used:
     - If the location has multiple variants, always return the official name of the location instead of alternative or outdated names.
     - Some common examples:
-        - "Bombay" → "Mumbai"
-        - "Baroda" → "Vadodara"
-        - "Kashi" → "Varanasi"
-        - "Calcutta" → "Kolkata"
-        - "Bangalore" → "Bengaluru"
-        - "Pondicherry" → "Puducherry"
+        - "Kompong Som" → "Sihanoukville" (Preah Sihanouk)
+        - "Kratie" → "Kratié"
+        - "Siem Riep" → "Siem Reap"
+        - "Kompong Cham" → "Kampong Cham"
+        - "Battambong" → "Battambang"
+        - "Takeo" → "Takéo"
     - Ensure all locations are recognized and standardized to their official designation.
     - Do NOT change names that are already valid and contextually correct.
 
@@ -480,11 +480,11 @@ def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
     {query}
 
     Output Format:
-    Provide the extracted location, classification, and India check in the following JSON format:
+    Provide the extracted location, classification, and Cambodia check in the following JSON format:
     {{
         "Extracted_Location": "<Location or 'None'>",
         "Classification": "<Area | City | State | Country | None>",
-        "From_India": "<Yes | No>"
+        "From_Cambodia": "<Yes | No>"
     }}
     """
 
@@ -511,7 +511,7 @@ def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
         "JSON object with these three string keys: "
         '{"Extracted_Location": "<location text, or None if none>", '
         '"Classification": "<one of: Area, City, State, Country, None>", '
-        '"From_India": "<Yes or No>"}. '
+        '"From_Cambodia": "<Yes or No>"}. '
         "No prose, no markdown fences, no extra keys.\n\n"
         f'User query: "{user_input}"'
     )
@@ -525,7 +525,7 @@ def extract_location_from_vendor_query(user_input: str, llm) -> Dict[str, str]:
         return {
             "Extracted_Location": _result.Extracted_Location,
             "Classification": _result.Classification,
-            "From_India": _result.From_India,
+            "From_Cambodia": _result.From_Cambodia,
         }
     # P1-5: parse failed even after one corrective retry. Return the TYPED
     # envelope — do NOT fall back to the wrong-but-plausible default this
@@ -1442,11 +1442,11 @@ def handle_vendor_query(
                 }
             given_loacation = extracted_data["Extracted_Location"]
             given_location_category = extracted_data["Classification"]
-            location_from_india = extracted_data["From_India"]
+            location_from_cambodia = extracted_data["From_Cambodia"]
 
             extracted_state["Location_info"]["Location"] = given_loacation if given_loacation != "None" else None
             extracted_state["Location_info"]["Location Category"] = given_location_category if given_location_category != "None" else None
-            extracted_state["Location_info"]["From_India"] = location_from_india if (given_loacation != "None" and given_location_category != "None") else None
+            extracted_state["Location_info"]["From_Cambodia"] = location_from_cambodia if (given_loacation != "None" and given_location_category != "None") else None
             state["Location_info"] = copy.deepcopy(extracted_state["Location_info"])
             save_state(state,f"QVND_state_{chatId}")
 
@@ -1915,10 +1915,10 @@ def handle_vendor_query(
                 }
             given_loacation = extracted_data["Extracted_Location"]
             given_location_category = extracted_data["Classification"]
-            location_from_india = extracted_data["From_India"]
+            location_from_cambodia = extracted_data["From_Cambodia"]
             extracted_state["Location_info"]["Location"] = given_loacation if given_loacation != "None" else None
             extracted_state["Location_info"]["Location Category"] = given_location_category if given_location_category != "None" else None
-            extracted_state["Location_info"]["From_India"] = location_from_india if (given_loacation != "None" and given_location_category != "None") else None
+            extracted_state["Location_info"]["From_Cambodia"] = location_from_cambodia if (given_loacation != "None" and given_location_category != "None") else None
             state["Location_info"] = copy.deepcopy(extracted_state["Location_info"])
             save_state(state,f"QVND_state_{chatId}")
 
@@ -2143,11 +2143,11 @@ def handle_vendor_query(
                 }
             given_loacation = extracted_data["Extracted_Location"]
             given_location_category = extracted_data["Classification"]
-            location_from_india = extracted_data["From_India"]
+            location_from_cambodia = extracted_data["From_Cambodia"]
 
             extracted_state["Location_info"]["Location"] = given_loacation if given_loacation != "None" else None
             extracted_state["Location_info"]["Location Category"] = given_location_category if given_location_category != "None" else None
-            extracted_state["Location_info"]["From_India"] = location_from_india if (given_loacation != "None" and given_location_category != "None") else None
+            extracted_state["Location_info"]["From_Cambodia"] = location_from_cambodia if (given_loacation != "None" and given_location_category != "None") else None
             state["Location_info"] = copy.deepcopy(extracted_state["Location_info"])
             save_state(state,f"QVND_state_{chatId}")
 
@@ -2371,7 +2371,7 @@ def call_handle_vendor_query(input,chatId, additional_class_response = None):
             "Location_info":{
                 "Location":None,
                 "Location Category": None,
-                "From_India": None
+                "From_Cambodia": None
             },
             "Industry_info":{
                 "Main-Industry": None,

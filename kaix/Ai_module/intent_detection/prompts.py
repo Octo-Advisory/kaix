@@ -131,7 +131,7 @@ Return exactly this JSON object with primitive fields only:
 
 ### Example D: Vendors/Raw material plausibly related or uncertain
 - Feasibility: product="Solar PV Power Plant"
-- Latest: "Find vendors for high-capacity transformers near Vadodara."
+- Latest: "Find vendors for high-capacity transformers near Siem Reap."
 → {"redirect": false, "reason": "vendors_cross_industry_ok", "confidence": 0.75}
 
 ### Example E: Vendors for an obviously unrelated item
@@ -145,6 +145,6 @@ Return exactly this JSON object with primitive fields only:
 
 ### Example G: Feasibility missing main_industry; infer from product
 - Feasibility: main_industry=null, product="H2SO4"
-- Latest: "Show approvals for specialty chemicals in Dahej."
+- Latest: "Show approvals for specialty chemicals in Kampong Seila."
 → {"redirect": false, "reason": "within_industry", "confidence": 0.80}
     """

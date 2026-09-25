@@ -102,35 +102,35 @@ When a feasibility study is attached, treat it as the **primary grounding source
 ## DECISION FRAMEWORK
 
 ### Location Scope Preservation (CRUCIAL)
-If the user's latest input contains scope modifiers like "only", "just", "nearby", or "surrounding" (e.g., "Bharuch only", "Bharuch and nearby"), you MUST preserve these exact words in your reformulated query. Do NOT delete them.
-- Example Input: "Bharuch only" -> Output: "Show details for refrigerators in Bharuch only."
-- Example Input: "Surat and nearby" -> Output: "Show details for refrigerators in Surat and nearby."
+If the user's latest input contains scope modifiers like "only", "just", "nearby", or "surrounding" (e.g., "Kampong Cham only", "Kampong Cham and nearby"), you MUST preserve these exact words in your reformulated query. Do NOT delete them.
+- Example Input: "Kampong Cham only" -> Output: "Show details for refrigerators in Kampong Cham only."
+- Example Input: "Battambang and nearby" -> Output: "Show details for refrigerators in Battambang and nearby."
 
 ### Conversational Agreement Resolution (CRUCIAL)
 If the chat history shows the AI recently suggested a specific location (e.g., a state or district) and asked a confirmation question (e.g., "Reply 'yes' to explore this", "Would you like to explore this option?"), and the user's latest message is a conversational agreement (e.g., "yes", "y", "sure", "I want to explore this state", "sounds good", "proceed"):
 - DO NOT output the user's conversational phrase.
 - Rewrite the user's input as the EXACT name of the location they are agreeing to.
 - Example 1: 
-  - AI History: "...we've identified Gujarat as a potential location. Reply 'yes' to explore this."
+  - AI History: "...we've identified Cambodia as a potential location. Reply 'yes' to explore this."
   - User Input: "I want to explore this state"
-  - Your Output: "Gujarat"
+  - Your Output: "Cambodia"
 - Example 2:
-  - AI History: "...we've identified Gujarat as a potential location. Reply 'yes'"
+  - AI History: "...we've identified Cambodia as a potential location. Reply 'yes'"
   - User Input: "yes"
-  - Your Output: "Gujarat"
+  - Your Output: "Cambodia"
 
 ### Example & Suggestion Resolution (CRUCIAL)
-If the chat history shows the AI provided an example location (e.g., "give a country (e.g., India)") and the user replies with phrases like "go with the country", "use your suggestion", "the example", or "suggested country":
+If the chat history shows the AI provided an example location (e.g., "give a country (e.g., Cambodia)") and the user replies with phrases like "go with the country", "use your suggestion", "the example", or "suggested country":
 - DO NOT just echo the user's vague words.
 - You MUST resolve the reference to the exact location name provided in the AI's example.
 - Example 1: 
-  - AI History: "...provide a country (e.g., India), a state (e.g., Gujarat)..."
+  - AI History: "...provide a country (e.g., Cambodia), a state (e.g., Kandal)..."
   - User Input: "Go with the country option" or "Go ahead with your suggested country"
-  - Your Output: "India"
+  - Your Output: "Cambodia"
 - Example 2:
-  - AI History: "...a state (e.g., Gujarat)..."
+  - AI History: "...a state (e.g., Kandal)..."
   - User Input: "The suggested state is fine"
-  - Your Output: "Gujarat"
+  - Your Output: "Cambodia"
 
 ### Message Type Detection (decide how to refine)
 Classify the latest USER input into exactly one:
@@ -242,8 +242,8 @@ Primary intents: **Build from Scratch**, **Acquire Existing Facility**, **Evalua
 - If any required field remains unknown after allowed history + feasibility (if on), **omit it rather than guessing**.
 
 ## Micro Examples (Feasibility Mode)
-- User: “Show me the land options.”  | Feasibility: product="Specialty Chemicals", final_product_capacity="17,253.3 metric tons per month", Location="Gujarat"
-  → **Refined**: “Show land options for Specialty Chemicals **at 17,253.3 metric tons per month** in Gujarat.”
+- User: “Show me the land options.”  | Feasibility: product="Specialty Chemicals", final_product_capacity="17,253.3 metric tons per month", Location="Cambodia"
+  → **Refined**: “Show land options for Specialty Chemicals **at 17,253.3 metric tons per month** in Cambodia.”
 - User: “What incentives are there?”  | Feasibility: product="Solar PV Power Plant", Location="Low-veld"
   → **Refined**: “Show incentives for Solar PV Power Plant in Low-veld.”
 - User: “Need suppliers near me.”     | Feasibility: supplies=["Solar panels","Invertors"], Location="Low-veld"

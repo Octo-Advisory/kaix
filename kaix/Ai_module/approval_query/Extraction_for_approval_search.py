@@ -151,11 +151,11 @@ def classify_approval_query(query: str, llm: Any) -> Dict[str, Any]:
     Rule 1: Positive Approval Queries (Class 1, 2, or 3)
     - If approvals are mentioned positively, classify based on location and industry details:
     - Class 1: Only location is mentioned with a positive intent to know about approvals.
-        Example: "What approvals do I need in Ahmedabad?"
+        Example: "What approvals do I need in Phnom Penh?"
     - Class 2: Only industry is mentioned with a positive intent to know about approvals.
         Example: "Approvals required for food processing?"
     - Class 3: Both location and industry are mentioned.
-        Example: "Approvals for textile factory in Gujarat."
+        Example: "Approvals for textile factory in Cambodia."
     - If approvals are mentioned positively, classify into Class 1/2/3 regardless of any other factor being present (whether positive or negative).
 
     Rule 2: Pure Negative Intent (Class 5)

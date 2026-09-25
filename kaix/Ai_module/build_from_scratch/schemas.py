@@ -145,7 +145,7 @@ class BuildLocationsExtractionFailure(BaseModel):
 
 class AIRecommendedStates(BaseModel):
     """Happy path output of get_ai_recommended_states.
-    Returns 0..25 official Indian state names in AI ranking order.
+    Returns 0..25 official Cambodian province names (khett) in AI ranking order.
     Open list — no literal restriction (prompt does not enumerate).
     """
     model_config = ConfigDict(extra="ignore")

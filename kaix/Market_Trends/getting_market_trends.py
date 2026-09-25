@@ -555,13 +555,13 @@ def retrieving_market_trends(
 # market_trends, params_dict = retrieving_market_trends(main_industry="Agricultural",
 #                                          sub_sector="Agricultural Trade and Marketing-Agricultural",
 #                                          segment="Agri-Exports-Agricultural Trade and Marketing-Agricultural",
-#                                          state="Gujarat",
+#                                          state="Cambodia",
 #                                          city="Shehera-Shehera-PanchMahal",
 #                                          deepdown_industry_info="segment",
 #                                          deepdown_location_info="city")
 
 # market_trends, params_dict = retrieving_market_trends(main_industry="Foods and Beverages",
-#                                         state="Gujarat",
+#                                         state="Cambodia",
 #                                         sub_sector="Paint, Coatings & Inks-Chemical",
 #                                         segment=None,
 #                                         city=None,
@@ -569,7 +569,7 @@ def retrieving_market_trends(
 #                                         deepdown_location_info="pan_state")
 
 # market_trends, params_dict = retrieving_market_trends(main_industry="Mining",
-#                                         state="Gujarat",
+#                                         state="Cambodia",
 #                                         sub_sector="Paint, Coatings & Inks-Chemical",
 #                                         segment=None,
 #                                         city=None,

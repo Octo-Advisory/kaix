@@ -210,12 +210,12 @@ OUTPUT INSTRUCTIONS
 EXAMPLES (for calibration; do NOT echo in output):
 - “I want incentives.” → 2
 - “Tell me about subsidies.” → 2
-- “What incentives are available in Ahmedabad?” → 1
+- “What incentives are available in Phnom Penh?” → 1
 - “Are there benefits for setting up a dairy factory?” → 2
-- “Incentives for the textile industry in Gujarat” → 3
+- “Incentives for the textile industry in Cambodia” → 3
 - “I don’t want incentives.” → 5
 - “I don’t want incentives, but I need suppliers for PET resin.” → 4
-- “Any tax breaks in Surat?” → 1
+- “Any tax breaks in Battambang?” → 1
 - “Jobs for my planned pharma unit” → 4
 
 Query:

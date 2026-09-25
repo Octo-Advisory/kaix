@@ -5,8 +5,8 @@ Source LLM calls: Ai_module/vendor_query/Extraction_for_vendor_search.py
      Output: integer 1-7 (regex r"^\s*([1-7])\s*$").
   2) extract_location_from_vendor_query() lines 303-418
      Output: JSON-ish blob parsed by 3 separate regexes (lines 404-406):
-       {"Extracted_Location": "...", "Classification": "...", "From_India": "..."}
-     Silently defaults Classification to "Area" and From_India to "No" on miss.
+       {"Extracted_Location": "...", "Classification": "...", "From_Cambodia": "..."}
+     Silently defaults Classification to "Area" and From_Cambodia to "No" on miss.
   3) extract_supplies_from_query()       lines 467-570
      Output: {"Supplies": "comma,separated,string"} parsed by one regex
      (line 551) — empty string is silently treated as "no supplies".
@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 VendorCategoryNumber = Literal[1, 2, 3, 4, 5, 6, 7]
 LocationClass = Literal["Area", "City", "State", "Country", "None"]
-FromIndiaFlag = Literal["Yes", "No"]
+FromCambodiaFlag = Literal["Yes", "No"]
 
 
 class VendorClassification(BaseModel):
@@ -48,7 +48,7 @@ class VendorLocationExtraction(BaseModel):
 
     Catches the silent-defaults bug at lines 410-411:
       - "Classification" missing → currently defaults to 'Area' silently
-      - "From_India" missing     → currently defaults to 'No' silently
+      - "From_Cambodia" missing     → currently defaults to 'No' silently
     Schema makes both required so a missing field becomes a failure envelope
     instead of a wrong-but-plausible answer.
     """
@@ -56,7 +56,7 @@ class VendorLocationExtraction(BaseModel):
 
     Extracted_Location: str = Field(..., min_length=1)
     Classification: LocationClass
-    From_India: FromIndiaFlag
+    From_Cambodia: FromCambodiaFlag
 
     @field_validator("Extracted_Location")
     @classmethod
@@ -71,7 +71,7 @@ class VendorLocationExtractionFailure(BaseModel):
       - LLM returned 'None' for location but a real Classification (inconsistency)
       - LLM returned unknown Classification value (e.g. 'Region', 'District')
       - JSON wrapped in markdown fences
-      - LLM omitted From_India entirely (current code silently -> 'No')
+      - LLM omitted From_Cambodia entirely (current code silently -> 'No')
     """
     model_config = ConfigDict(extra="ignore")
 
@@ -79,7 +79,7 @@ class VendorLocationExtractionFailure(BaseModel):
     raw_output: str
     Extracted_Location: Optional[str] = None
     Classification: Optional[str] = None
-    From_India: Optional[str] = None
+    From_Cambodia: Optional[str] = None
 
 
 class VendorSuppliesExtraction(BaseModel):
