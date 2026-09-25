@@ -1,9 +1,0 @@
- 
-  /* .bg-gradient {
-    background-color: #0093E9;
-    background-image: linear-gradient(160deg, #0093E9 0%, #58b9ae 100%);
-  } */
-.bg-gradient {
-    height: 100vh; /* Ensures the background covers 100% height */
-    overflow: hidden; /* Prevent scrolling */
-  }
